@@ -35,12 +35,22 @@ test("image and video products use the same 3D flip interaction", async ({ page 
   await page.getByRole("button", { name: /开始点餐/ }).click();
   for (const name of ["黑椒牛柳", "火炙三文鱼寿司"]) {
     await page.locator(".dish-card", { hasText: name }).click();
-    await page.getByRole("button", { name: "翻转查看食材" }).click();
+    await page.locator(".detail-front").click();
     await expect(page.locator(".detail-flip-inner")).toHaveClass(/flipped/);
     await expect(page.getByRole("region", { name: "菜品详细信息" })).toBeVisible();
     await page.getByRole("button", { name: "返回正面" }).click();
     await page.getByRole("button", { name: "关闭详情" }).click();
   }
+});
+
+test("language switcher changes home and menu copy", async ({ page }) => {
+  await expect(page.getByRole("button", { name: /开始点餐/ })).toBeVisible();
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.getByRole("button", { name: "Bestellen" })).toBeVisible();
+  await page.getByRole("button", { name: "Bestellen" }).click();
+  await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.locator(".dish-card", { hasText: "Black Pepper Beef Fillet" })).toBeVisible();
 });
 
 test("dish opens with shared-element detail, adds to cart, and submits an order", async ({ page }) => {

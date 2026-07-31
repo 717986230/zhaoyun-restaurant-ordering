@@ -3,6 +3,8 @@ import { formatEuro, summarizeCart } from "@zhaoyun/domain";
 import type { Order, Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
+import { productName, t } from "../../app/i18n";
+import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 export function CartScreen({ state, dispatch, products }: { state: CustomerState; dispatch: CustomerDispatch; products: Product[] }) {
   const [note, setNote] = useState("");
@@ -24,7 +26,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
       table: "08",
       status: "pending-sync",
       note,
-      items: entries.map(({ product, quantity }) => ({ productId: product.id, quantity, name: product.names.zh })),
+        items: entries.map(({ product, quantity }) => ({ productId: product.id, quantity, name: productName(product, state.language) })),
       totalCents: summary.totalCents,
       createdAt: new Date().toISOString()
     };
@@ -53,13 +55,13 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
   }
 
   return <section id="cart" className="screen panel active">
-    <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>购物车</h2><small>WARENKORB</small></div></header>
+    <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>{t(state.language, "cart")}</h2><small>WARENKORB</small></div><LanguageSwitcher language={state.language} dispatch={dispatch} /></header>
     <div id="cartContent" className="content">{entries.length ? <>
-      {entries.map(({ product, quantity }) => <div className="row" key={product.id}><div><h3>{product.names.zh}</h3><small>{product.names.de} × {quantity}</small></div><strong>{formatEuro(product.priceCents * quantity)}</strong></div>)}
-      <label className="note-label">订单备注<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：少盐、不要香菜" /></label>
-      <div className="total"><span>合计 · GESAMT</span><b>{formatEuro(summary.totalCents)}</b></div>
-      <button id="submitOrder" className="primary" disabled={submitting} onClick={submitOrder}>{submitting ? "正在提交" : "确认下单"}</button>
-      <button id="clearCart" className="secondary" onClick={() => dispatch({ type: "clear-cart" })}>清空购物车</button>
-    </> : <div className="empty">购物车还是空的<button className="secondary" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>返回菜单</button></div>}</div>
+      {entries.map(({ product, quantity }) => <div className="row" key={product.id}><div><h3>{productName(product, state.language)}</h3><small>{product.names.de} × {quantity}</small></div><strong>{formatEuro(product.priceCents * quantity)}</strong></div>)}
+      <label className="note-label">{t(state.language, "note")}<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder={state.language === "zh" ? "例如：少盐、不要香菜" : state.language === "de" ? "z. B. wenig Salz" : "e.g. less salt"} /></label>
+      <div className="total"><span>{t(state.language, "total")}</span><b>{formatEuro(summary.totalCents)}</b></div>
+      <button id="submitOrder" className="primary" disabled={submitting} onClick={submitOrder}>{submitting ? "…" : t(state.language, "submit")}</button>
+      <button id="clearCart" className="secondary" onClick={() => dispatch({ type: "clear-cart" })}>{state.language === "zh" ? "清空购物车" : state.language === "de" ? "Warenkorb leeren" : "Clear cart"}</button>
+    </> : <div className="empty">{t(state.language, "emptyCart")}<button className="secondary" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>{t(state.language, "backMenu")}</button></div>}</div>
   </section>;
 }

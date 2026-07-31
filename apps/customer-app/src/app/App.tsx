@@ -11,17 +11,19 @@ import { OrdersScreen } from "../features/orders/OrdersScreen";
 import { ServiceScreen } from "../features/service/ServiceScreen";
 import { StaffScreen } from "../features/staff/StaffScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
+import { t } from "./i18n";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
-function HomeScreen({ onAdminTap, dispatch }: { onAdminTap: () => Promise<void>; dispatch: ReturnType<typeof useCustomerState>["dispatch"] }) {
+function HomeScreen({ onAdminTap, dispatch, language }: { onAdminTap: () => Promise<void>; dispatch: ReturnType<typeof useCustomerState>["dispatch"]; language: "zh" | "de" | "en" }) {
   return <section id="home" className="screen home active">
-    <button className="brand brand-button" onClick={() => void onAdminTap()}><small>ZHAO YUN RESTAURANT</small><h1>赵云</h1><p>Tisch 08 · 08号桌</p></button>
+    <button className="brand brand-button" onClick={() => void onAdminTap()}><small>ZHAO YUN RESTAURANT</small><h1>赵云</h1><p>{t(language, "table")} 08 · 08</p></button>
     <div className="home-actions">
-      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "menu" })}><span>01</span><b>开始点餐</b><small>SPEISEKARTE</small></button>
-      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "orders" })}><span>02</span><b>订单状态</b><small>MEINE BESTELLUNG</small></button>
-      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "service" })}><span>03</span><b>呼叫服务员</b><small>SERVICE RUFEN</small></button>
-      <button className="home-btn staff-link" onClick={() => dispatch({ type: "navigate", screen: "staff" })}><span>04</span><b>员工看板</b><small>MITARBEITER</small></button>
+      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "menu" })}><span>01</span><b>{t(language, "start")}</b><small>SPEISEKARTE</small></button>
+      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "orders" })}><span>02</span><b>{t(language, "orders")}</b><small>MEINE BESTELLUNG</small></button>
+      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "service" })}><span>03</span><b>{t(language, "service")}</b><small>SERVICE RUFEN</small></button>
+      <button className="home-btn staff-link" onClick={() => dispatch({ type: "navigate", screen: "staff" })}><span>04</span><b>{t(language, "staff")}</b><small>MITARBEITER</small></button>
     </div>
-    <div className="langs"><button onClick={() => dispatch({ type: "language", language: "zh" })}>中文</button><button onClick={() => dispatch({ type: "language", language: "de" })}>Deutsch</button><button onClick={() => dispatch({ type: "language", language: "en" })}>English</button></div>
+    <LanguageSwitcher language={language} dispatch={dispatch} />
   </section>;
 }
 
@@ -41,10 +43,10 @@ export function App() {
 
   return <>
     <main className="app-shell">
-      {state.screen === "home" && <HomeScreen onAdminTap={handleAdminTap} dispatch={dispatch} />}
+      {state.screen === "home" && <HomeScreen onAdminTap={handleAdminTap} dispatch={dispatch} language={state.language} />}
       {state.screen === "menu" && <CatalogScreen state={state} dispatch={dispatch} products={products} />}
       {state.screen === "cart" && <CartScreen state={state} dispatch={dispatch} products={products} />}
-      {state.screen === "orders" && <OrdersScreen orders={state.orders} products={products} dispatch={dispatch} />}
+      {state.screen === "orders" && <OrdersScreen orders={state.orders} products={products} dispatch={dispatch} language={state.language} />}
       {state.screen === "service" && <ServiceScreen state={state} dispatch={dispatch} />}
       {state.screen === "staff" && <StaffScreen state={state} products={products} dispatch={dispatch} />}
     </main>
