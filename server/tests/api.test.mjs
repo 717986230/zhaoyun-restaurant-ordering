@@ -118,3 +118,25 @@ test("catalog, orders, service requests and print routing work together", async 
   assert.equal(completeOrder.json().order.status, "ready");
 });
 
+test("admin authentication rate-limits repeated invalid tokens", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-auth-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await app.inject({ method: "GET", url: "/api/admin/products", headers: { "x-admin-token": "wrong-token" } });
+    assert.equal(response.statusCode, 401);
+  }
+  const blocked = await app.inject({ method: "GET", url: "/api/admin/products", headers: { "x-admin-token": "wrong-token" } });
+  assert.equal(blocked.statusCode, 429);
+  assert.equal(blocked.json().retryAfter > 0, true);
+  assert.equal(blocked.headers["retry-after"] > 0, true);
+});

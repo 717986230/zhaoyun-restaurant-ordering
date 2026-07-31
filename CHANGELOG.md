@@ -15,6 +15,7 @@
 - 首页、菜单、购物车、订单页可切换语言，当前语言持久化。
 - 新增语言切换和卡片直接翻转的 Playwright 响应式测试。
 - 新增根目录 README，明确启动、测试、交互和已知边界。
+- 管理 API 增加常量时间 token 比较、错误尝试限流和 `Retry-After` 响应；Android 管理 PIN 增加失败锁定。
 
 ### Verification
 

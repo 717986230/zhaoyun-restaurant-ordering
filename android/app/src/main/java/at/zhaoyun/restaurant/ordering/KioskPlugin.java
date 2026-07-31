@@ -34,12 +34,19 @@ public class KioskPlugin extends Plugin {
 
     @PluginMethod
     public void unlock(PluginCall call) {
+        long retryAfter = KioskStore.retryAfterMs(getContext());
+        if (retryAfter > 0) {
+            call.reject("Too many incorrect PIN attempts. Try again in " + Math.max(1, (retryAfter + 999) / 1000) + " seconds");
+            return;
+        }
         String pin = call.getString("pin", "");
         if (!KioskStore.matches(getContext(), pin)) {
+            KioskStore.recordFailure(getContext());
             call.reject("Incorrect PIN");
             return;
         }
 
+        KioskStore.clearFailures(getContext());
         getActivity().runOnUiThread(() -> activity().unlockKioskMode());
         call.resolve();
     }

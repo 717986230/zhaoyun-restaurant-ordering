@@ -1,6 +1,6 @@
 import { createWriteStream, existsSync } from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 
 const MEDIA_TYPES = new Map([
@@ -11,16 +11,42 @@ const MEDIA_TYPES = new Map([
   ["video/webm", { type: "video", extension: ".webm" }]
 ]);
 
+const AUTH_WINDOW_MS = 5 * 60 * 1000;
+const AUTH_MAX_FAILURES = 5;
+
+function tokenMatches(provided, expected) {
+  const providedBytes = Buffer.from(typeof provided === "string" ? provided : "", "utf8");
+  const expectedBytes = Buffer.from(expected, "utf8");
+  const candidate = providedBytes.length === expectedBytes.length ? providedBytes : Buffer.alloc(expectedBytes.length);
+  return providedBytes.length === expectedBytes.length && timingSafeEqual(candidate, expectedBytes);
+}
+
 function errorReply(reply, error, statusCode = 400) {
   return reply.code(statusCode).send({ error: error.message || "Request failed" });
 }
 
 export function registerRoutes(app, { database, realtime, config }) {
+  const authFailures = new Map();
+
   function requireAdmin(request, reply, done) {
-    if (request.headers["x-admin-token"] !== config.adminToken) {
+    const now = Date.now();
+    const key = request.ip || "unknown";
+    const current = authFailures.get(key);
+    if (current && current.resetAt <= now) authFailures.delete(key);
+    const active = authFailures.get(key);
+    if (active && active.failures >= AUTH_MAX_FAILURES) {
+      const retryAfter = Math.max(1, Math.ceil((active.resetAt - now) / 1000));
+      reply.header("retry-after", retryAfter);
+      reply.code(429).send({ error: "Too many authentication attempts", retryAfter });
+      return;
+    }
+    if (!tokenMatches(request.headers["x-admin-token"], config.adminToken)) {
+      const failures = (active?.failures ?? 0) + 1;
+      authFailures.set(key, { failures, resetAt: now + AUTH_WINDOW_MS });
       reply.code(401).send({ error: "Admin authentication required" });
       return;
     }
+    authFailures.delete(key);
     done();
   }
 
