@@ -1,6 +1,15 @@
 # 测试报告
 
-日期：2026-07-30
+日期：2026-08-01
+
+## v0.3 架构迁移验证
+
+- 顾客端入口已从原生 JavaScript 迁移到 React + TypeScript。
+- 管理台入口已从原生 JavaScript 迁移到 React + TypeScript。
+- npm workspaces、TypeScript strict 和 Project References：通过。
+- `domain`、`contracts`、`api-client`、`native-bridge` 包构建：通过。
+- Vite 顾客端与管理台多页生产构建：通过。
+- `npm audit --omit=dev`：0 个生产依赖漏洞。
 
 ## 浏览器功能与响应式测试
 
@@ -13,14 +22,25 @@ Playwright 覆盖：
 
 每种视口验证：
 
-- 点击菜品后打开共享元素详情，背景列表弱化
+- 点击菜品后打开详情，背景列表弱化
+- 图片与视频商品使用同一个 3D 翻转状态和动画容器
 - 详情显示食材、过敏原、价格和数量
 - 加入购物车、提交订单、查看状态
 - 服务呼叫、员工处理请求
 - 员工推进订单状态
 - 顶栏和购物车操作保持可见
 
-最终结果：16/16 通过。
+管理台同时验证商品目录、打印机模块、连接设置和响应式控件可用性。
+
+最终结果：28/28 通过。
+
+## TypeScript 领域单元测试
+
+- 订单状态只能按允许方向推进
+- 同步失败订单不能被员工直接推进
+- 购物车金额始终使用整数分计算
+
+最终结果：2/2 通过。
 
 ## 后端集成测试
 
@@ -51,17 +71,17 @@ Node 测试覆盖：
 
 ## Android 构建与设备验证
 
-- Vite 多页生产构建：通过
+- React + TypeScript Vite 多页生产构建：通过
 - Capacitor Android 同步：通过
 - 原生 Kiosk 与 Printer 插件 Java 编译：通过
-- Gradle `assembleDebug`：通过
+- Gradle `assembleDebug`：通过，v0.3 APK SHA-256：`2d59e199a4f440eafeb3b9bfefb13a3aa5d8f8fa3cabb7fa268d8e4c05c33445`
 - Android 15 ARM64 平板模拟器安装：ADB 返回 `Success`
 - 2560×1600 平板启动与首页渲染：通过
 - 平板菜单渲染：通过
 - 应用进程和前台 Activity：通过
 - WebView/AndroidRuntime 致命错误日志：未发现
 
-Playwright 已验证共享元素详情交互；模拟器进入屏幕固定后，ADB 注入点击会受系统固定提示和任务栈影响，因此打印机周围设备搜索与实体打印页不能用无硬件模拟器完成。
+Playwright 已验证详情与 3D 翻转交互；模拟器进入屏幕固定后，ADB 注入点击会受系统固定提示和任务栈影响，因此打印机周围设备搜索与实体打印页不能用无硬件模拟器完成。
 
 ## 打印机验证边界
 
@@ -88,4 +108,3 @@ Playwright 已验证共享元素详情交互；模拟器进入屏幕固定后，
 ## iOS
 
 未安装完整 Xcode。本次未生成 iOS 工程，也未生成或声称生成 IPA。
-

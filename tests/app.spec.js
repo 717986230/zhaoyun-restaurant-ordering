@@ -1,9 +1,46 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  const products = [
+    {
+      id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
+      names: { zh: "黑椒牛柳", de: "Rinderfilet mit schwarzem Pfeffer", en: "Black Pepper Beef Fillet" },
+      description: "Zartes Rinderfilet mit schwarzem Pfeffer.", price: 34.5,
+      allergens: ["F", "O"], details: { time: "35 min", people: "2 Personen", level: "Mittel", ingredients: "Rinderfilet, Pfeffer" },
+      appearance: { art: "linear-gradient(135deg,#7e1e18,#190f0e 76%)", pattern: "ring" }, media: []
+    },
+    {
+      id: "video-1", sku: "SUSHI-01", kind: "sushi", category: "SUSHI",
+      names: { zh: "火炙三文鱼寿司", de: "Flambierter Lachs", en: "Torched Salmon Sushi" },
+      description: "Flambierter Lachs.", price: 12.8,
+      allergens: ["D"], details: { time: "10 min", people: "1 Person", level: "Mild", ingredients: "Lachs, Reis" },
+      appearance: { art: "#37231d", pattern: "lines" }, media: [{ type: "video", url: "/media/demo.mp4" }]
+    }
+  ];
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products }) }));
+  await page.route("**/api/orders", async (route) => {
+    const command = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
+      id: "order-1", clientRequestId: command.clientRequestId, no: "260801-001", table: command.table,
+      status: "new", note: command.note, total: 34.5, items: command.items, createdAt: new Date().toISOString()
+    } }) });
+  });
+  await page.route("**/api/service-requests", (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ request: { id: "service-1" } }) }));
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+});
+
+test("image and video products use the same 3D flip interaction", async ({ page }) => {
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  for (const name of ["黑椒牛柳", "火炙三文鱼寿司"]) {
+    await page.locator(".dish-card", { hasText: name }).click();
+    await page.getByRole("button", { name: "翻转查看食材" }).click();
+    await expect(page.locator(".detail-flip-inner")).toHaveClass(/flipped/);
+    await expect(page.getByRole("region", { name: "菜品详细信息" })).toBeVisible();
+    await page.getByRole("button", { name: "返回正面" }).click();
+    await page.getByRole("button", { name: "关闭详情" }).click();
+  }
 });
 
 test("dish opens with shared-element detail, adds to cart, and submits an order", async ({ page }) => {
@@ -17,7 +54,7 @@ test("dish opens with shared-element detail, adds to cart, and submits an order"
   await page.locator(".dish-detail-card .add").click();
   await expect(page.locator("#cartCount")).toHaveText("1");
   await page.getByRole("button", { name: "关闭详情" }).click();
-  await expect(page.locator(".dish-overlay")).not.toHaveClass(/open/);
+  await expect(page.locator(".dish-overlay")).not.toBeAttached();
   await page.locator(".cartbar").click();
   await page.getByRole("button", { name: /确认下单/ }).click();
   await page.locator(".screen.active .back").click();

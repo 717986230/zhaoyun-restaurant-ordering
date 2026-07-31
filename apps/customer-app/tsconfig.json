@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    "declaration": true,
+    "declarationMap": true,
+    "composite": true,
+    "emitDeclarationOnly": true
+  },
+  "references": [
+    { "path": "../../packages/domain/tsconfig.json" },
+    { "path": "../../packages/contracts/tsconfig.json" },
+    { "path": "../../packages/api-client/tsconfig.json" },
+    { "path": "../../packages/native-bridge/tsconfig.json" }
+  ],
+  "include": ["src"]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@zhaoyun/customer-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@tanstack/react-query": "^5.83.0",
+    "@zhaoyun/api-client": "*",
+    "@zhaoyun/contracts": "*",
+    "@zhaoyun/domain": "*",
+    "@zhaoyun/native-bridge": "*",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
+}

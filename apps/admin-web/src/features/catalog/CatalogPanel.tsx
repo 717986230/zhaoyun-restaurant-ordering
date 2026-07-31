@@ -1,0 +1,72 @@
+import type { FormEvent } from "react";
+import { formatEuro } from "@zhaoyun/domain";
+import type { Product } from "@zhaoyun/domain";
+import type { AdminProductInput } from "@zhaoyun/api-client";
+import type { ProductFilter } from "../../app/types";
+
+interface Props {
+  products: Product[];
+  editing: Product | null;
+  filter: ProductFilter;
+  mediaUrl: (path: string) => string;
+  onFilter: (filter: ProductFilter) => void;
+  onEdit: (product: Product | null) => void;
+  onSave: (input: AdminProductInput, id: string | null, media: File | null) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onRefresh: () => Promise<void>;
+}
+
+function readText(form: FormData, name: string): string { return String(form.get(name) || "").trim(); }
+
+export function CatalogPanel(props: Props) {
+  const rows = props.products.filter((product) => props.filter === "all" || product.kind === props.filter);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const data = new FormData(formElement);
+    const input: AdminProductInput = {
+      sku: readText(data, "sku"),
+      kind: readText(data, "kind") as AdminProductInput["kind"],
+      category: readText(data, "category"),
+      names: { zh: readText(data, "nameZh"), de: readText(data, "nameDe"), en: readText(data, "nameEn") },
+      description: readText(data, "description"),
+      price: Number(data.get("price")),
+      details: { ingredients: readText(data, "ingredients"), time: readText(data, "time"), people: readText(data, "people"), level: readText(data, "level") },
+      allergens: readText(data, "allergens").split(",").map((item) => item.trim()).filter(Boolean),
+      printStation: readText(data, "printStation") as AdminProductInput["printStation"],
+      available: data.get("available") === "on",
+      published: data.get("published") === "on"
+    };
+    const mediaInput = formElement.elements.namedItem("media") as HTMLInputElement;
+    await props.onSave(input, props.editing?.id ?? null, mediaInput.files?.[0] ?? null);
+  }
+
+  const product = props.editing;
+  return <section id="catalogPanel" className="admin-panel active"><div className="catalog-layout">
+    <aside className="editor-pane"><form key={product?.id ?? "new"} id="productForm" className="editor-form" onSubmit={(event) => void submit(event)}>
+      <div className="form-title"><div><h2>{product ? "编辑商品" : "新增商品"}</h2><p>菜品、酒水与寿司共用统一商品模型</p></div>{product && <button type="button" className="icon-action" onClick={() => props.onEdit(null)} title="新建商品">＋</button>}</div>
+      <div className="segmented">{[["food", "菜品"], ["drink", "酒水"], ["sushi", "寿司"]].map(([value, label]) => <label key={value}><input type="radio" name="kind" value={value} defaultChecked={(product?.kind ?? "food") === value} /><span>{label}</span></label>)}</div>
+      <div className="field-grid"><label><span>SKU</span><input name="sku" defaultValue={product?.sku ?? ""} placeholder="自动生成" /></label><label><span>分类</span><input name="category" required defaultValue={product?.category ?? ""} placeholder="MAIN / WINE / NIGIRI" /></label></div>
+      <label><span>中文名称</span><input name="nameZh" defaultValue={product?.names.zh ?? ""} /></label>
+      <label><span>德文名称</span><input name="nameDe" defaultValue={product?.names.de ?? ""} /></label>
+      <label><span>英文名称</span><input name="nameEn" defaultValue={product?.names.en ?? ""} /></label>
+      <label><span>简介</span><textarea name="description" rows={3} defaultValue={product?.description ?? ""} /></label>
+      <div className="field-grid"><label><span>价格 EUR</span><input name="price" required type="number" min="0" step="0.01" defaultValue={product ? product.priceCents / 100 : ""} /></label><label><span>出单档口</span><select name="printStation" defaultValue={product?.printStation ?? "kitchen"}>{[["kitchen", "厨房"], ["bar", "吧台"], ["sushi", "寿司台"], ["front", "前台"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
+      <label><span>主要食材</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
+      <div className="field-grid three"><label><span>制作时间</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>份量</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>口味/难度</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
+      <label><span>过敏原（逗号分隔）</span><input name="allergens" defaultValue={product?.allergens.join(", ") ?? ""} /></label>
+      <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>选择图片或视频</b><small>JPEG、PNG、WebP、MP4、WebM，最大 50 MB</small></label>
+      <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>可售</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>前台显示</span></label></div>
+      <button className="primary-action" type="submit">{product ? "保存修改" : "创建商品"}</button>
+    </form></aside>
+    <section className="list-pane"><header className="list-head"><div><h1>商品目录</h1><p>{props.products.length} 个商品</p></div><button className="icon-action" onClick={() => void props.onRefresh()} title="刷新">↻</button></header>
+      <div className="filter-tabs">{[["all", "全部"], ["food", "菜品"], ["drink", "酒水"], ["sushi", "寿司"]].map(([value, label]) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{label}</button>)}</div>
+      <div className="product-list">{rows.length ? rows.map((row) => {
+        const media = row.media[0];
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => props.onEdit(row)}><span className="product-thumb">{media?.type === "image" ? <img src={props.mediaUrl(media.url)} alt="" /> : <span className="media-mark">{media?.type === "video" ? "▶" : row.kind === "drink" ? "杯" : row.kind === "sushi" ? "鮨" : "菜"}</span>}</span><span className="product-copy"><b>{row.names.zh || row.names.de || row.names.en}</b><small>{row.sku} · {row.category}</small></span><span className="product-kind">{{ food: "菜品", drink: "酒水", sushi: "寿司" }[row.kind]}</span><strong>{formatEuro(row.priceCents)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+      }) : <div className="admin-empty">当前分类暂无商品</div>}</div>
+      {product && <button className="danger-action" onClick={() => { if (window.confirm("确定删除这个商品及其媒体吗？")) void props.onDelete(product.id); }}>删除当前商品</button>}
+    </section>
+  </div></section>;
+}

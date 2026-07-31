@@ -2,9 +2,11 @@
 
 ## 交付内容
 
-- Android 测试 APK：`dist/zhaoyun-ordering-android-test.apk`
-- 完整源码包：`dist/austria-restaurant-ordering-app-source.zip`
+- Android v0.3 测试 APK：`dist/zhaoyun-ordering-v0.3.0-debug.apk`
+- 完整源码包：`dist/zhaoyun-ordering-v0.3.0-source.zip`
 - 顾客端、管理台、Fastify/SQLite 后端和 Android 原生工程
+- React + TypeScript workspace：`apps/customer-app`、`apps/admin-web`
+- 共享包：`packages/domain`、`contracts`、`api-client`、`native-bridge`
 - 架构说明：`ARCHITECTURE.md`
 - 测试报告：`TEST_REPORT.md`
 
@@ -83,7 +85,7 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 设备直接安装：
 
-1. 将 `dist/zhaoyun-ordering-android-test.apk` 传到手机或平板。
+1. 将 `dist/zhaoyun-ordering-v0.3.0-debug.apk` 传到手机或平板。
 2. 允许文件管理器“安装未知应用”。
 3. 安装并打开。
 4. 首次启动设置 6-12 位管理员数字 PIN。
@@ -93,7 +95,7 @@ ADB 安装：
 
 ```bash
 /Users/xinglong/Library/Android/sdk/platform-tools/adb install -r \
-  dist/zhaoyun-ordering-android-test.apk
+  dist/zhaoyun-ordering-v0.3.0-debug.apk
 ```
 
 ## 不可退出终端模式
@@ -111,10 +113,11 @@ adb shell dpm set-device-owner \
 
 ```bash
 npm test
+npm run typecheck
+npm run unit
 npm run server:test
 ```
 
 ## iOS
 
 本机没有完整 Xcode，本次未生成 iOS 工程、IPA 或签名构建。安装完整 Xcode 后才能添加 Capacitor iOS 工程并进行签名测试。
-
