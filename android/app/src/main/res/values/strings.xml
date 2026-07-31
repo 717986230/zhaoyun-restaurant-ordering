@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Zhao Yun Ordering</string>
+    <string name="title_activity_main">Zhao Yun Ordering</string>
+    <string name="package_name">at.zhaoyun.restaurant.ordering</string>
+    <string name="custom_url_scheme">at.zhaoyun.restaurant.ordering</string>
+</resources>

@@ -1,0 +1,16 @@
+{
+  "appId": "at.zhaoyun.restaurant.ordering",
+  "appName": "Zhao Yun Ordering",
+  "webDir": "dist/web",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#090807"
+    }
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}
