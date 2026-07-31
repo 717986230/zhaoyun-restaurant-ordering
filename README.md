@@ -13,6 +13,7 @@
 - 食材、过敏原、规格、价格、购物车、下单和订单状态
 - 服务呼叫、员工看板、管理端媒体上传和打印机发现
 - Capacitor Android 测试构建与 kiosk 模式
+- 后端请求 schema 校验、订单状态机、认证限流和生产启动校验
 
 ## 快速开始
 
@@ -28,6 +29,8 @@ ADMIN_TOKEN='replace-with-a-long-random-token' npm run server
 - 管理台：`http://127.0.0.1:8787/admin.html`
 
 完整 Android SDK、APK 安装、局域网部署和打印机说明见 [INSTALL.md](INSTALL.md)。
+
+部署前请先阅读 [INSTALL.md](INSTALL.md) 的生产环境要求；当前版本适合单机/单进程餐厅部署，多实例前需要将认证限流迁移到共享存储。
 
 ## 开发命令
 

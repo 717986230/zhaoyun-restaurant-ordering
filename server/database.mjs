@@ -8,6 +8,20 @@ const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cance
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
+const SCHEMA_VERSION = 1;
+const ORDER_TRANSITIONS = new Map([
+  ["new", new Set(["preparing", "cancelled"])],
+  ["preparing", new Set(["ready", "cancelled"])],
+  ["ready", new Set(["completed", "cancelled"])],
+  ["completed", new Set()],
+  ["cancelled", new Set()]
+]);
+const REQUEST_TRANSITIONS = new Map([
+  ["open", new Set(["acknowledged", "completed", "cancelled"])],
+  ["acknowledged", new Set(["completed", "cancelled"])],
+  ["completed", new Set()],
+  ["cancelled", new Set()]
+]);
 
 function now() {
   return new Date().toISOString();
@@ -87,7 +101,7 @@ function normalizeProduct(input, current = {}) {
     nameEn: String(names.en ?? input.nameEn ?? current.name_en ?? "").trim(),
     description: String(input.description ?? current.description ?? "").trim(),
     priceCents: input.price === undefined ? current.price_cents ?? 0 : priceToCents(input.price),
-    allergensJson: JSON.stringify(input.allergens ?? parseJson(current.allergens_json, [])),
+    allergensJson: JSON.stringify(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, [])),
     prepTime: String(details.time ?? current.prep_time ?? "").trim(),
     portion: String(details.people ?? current.portion ?? "").trim(),
     level: String(details.level ?? current.level ?? "").trim(),
@@ -203,6 +217,9 @@ export function createDatabase(databasePath) {
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
   `);
+  const currentSchemaVersion = Number(db.prepare("PRAGMA user_version").get().user_version || 0);
+  if (currentSchemaVersion > SCHEMA_VERSION) throw new Error(`Unsupported database schema version: ${currentSchemaVersion}`);
+  if (currentSchemaVersion < SCHEMA_VERSION) db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 
   const statements = {
     productCount: db.prepare("SELECT COUNT(*) AS count FROM products"),
@@ -362,7 +379,11 @@ export function createDatabase(databasePath) {
 
   function updateOrder(id, status) {
     if (!ORDER_STATUSES.has(status)) throw new Error("Unsupported order status");
-    if (!statements.orderById.get(String(id))) return null;
+    const current = statements.orderById.get(String(id));
+    if (!current) return null;
+    if (current.status !== status && !ORDER_TRANSITIONS.get(current.status)?.has(status)) {
+      throw new Error(`Invalid order transition: ${current.status} -> ${status}`);
+    }
     statements.updateOrderStatus.run(status, now(), String(id));
     return orderView(statements.orderById.get(String(id)));
   }
@@ -376,7 +397,11 @@ export function createDatabase(databasePath) {
 
   function updateServiceRequest(id, status) {
     if (!REQUEST_STATUSES.has(status)) throw new Error("Unsupported service request status");
-    if (!statements.requestById.get(String(id))) return null;
+    const current = statements.requestById.get(String(id));
+    if (!current) return null;
+    if (current.status !== status && !REQUEST_TRANSITIONS.get(current.status)?.has(status)) {
+      throw new Error(`Invalid service request transition: ${current.status} -> ${status}`);
+    }
     statements.updateRequest.run(status, now(), String(id));
     return statements.requestById.get(String(id));
   }
@@ -397,6 +422,7 @@ export function createDatabase(databasePath) {
     if (!printer.name || !printer.address) throw new Error("Printer name and address are required");
     if (!["lan", "bluetooth", "usb"].includes(printer.transport)) throw new Error("Unsupported printer transport");
     if (!PRINT_STATIONS.has(printer.role)) throw new Error("Unsupported printer role");
+    if (printer.port !== null && (!Number.isInteger(printer.port) || printer.port < 1 || printer.port > 65535)) throw new Error("Printer port must be between 1 and 65535");
     const timestamp = now();
     if (current) {
       statements.updatePrinter.run(printer.name, printer.transport, printer.address, printer.port, printer.role, printer.enabled, printer.capabilities, timestamp, printer.id);
@@ -453,4 +479,3 @@ export function createDatabase(databasePath) {
     listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) }))
   };
 }
-

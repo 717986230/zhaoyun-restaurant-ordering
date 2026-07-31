@@ -1,7 +1,12 @@
 import { createWriteStream, existsSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
+import {
+  CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
+  ProductBody, ServiceRequestBody, ServiceStatusBody
+} from "./schemas.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
@@ -59,12 +64,12 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/ws", { websocket: true }, (socket) => realtime.connect(socket));
 
   app.get("/api/catalog", async () => ({ products: database.listProducts(true) }));
-  app.get("/api/admin/products", { preHandler: requireAdmin }, async () => ({ products: database.listProducts(false) }));
-  app.get("/api/admin/products/:id", { preHandler: requireAdmin }, async (request, reply) => {
+  app.get("/api/admin/products", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async () => ({ products: database.listProducts(false) }));
+  app.get("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const product = database.getProduct(request.params.id);
     return product || errorReply(reply, new Error("Product not found"), 404);
   });
-  app.post("/api/admin/products", { preHandler: requireAdmin }, async (request, reply) => {
+  app.post("/api/admin/products", { preHandler: requireAdmin, schema: { body: ProductBody } }, async (request, reply) => {
     try {
       const product = database.saveProduct(request.body || {});
       realtime.broadcast("catalog.changed", { productId: product.id });
@@ -73,7 +78,7 @@ export function registerRoutes(app, { database, realtime, config }) {
       return errorReply(reply, error);
     }
   });
-  app.put("/api/admin/products/:id", { preHandler: requireAdmin }, async (request, reply) => {
+  app.put("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams, body: ProductBody } }, async (request, reply) => {
     try {
       const product = database.saveProduct(request.body || {}, request.params.id);
       if (!product) return errorReply(reply, new Error("Product not found"), 404);
@@ -83,13 +88,13 @@ export function registerRoutes(app, { database, realtime, config }) {
       return errorReply(reply, error);
     }
   });
-  app.delete("/api/admin/products/:id", { preHandler: requireAdmin }, async (request, reply) => {
+  app.delete("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     if (!database.deleteProduct(request.params.id)) return errorReply(reply, new Error("Product not found"), 404);
     realtime.broadcast("catalog.changed", { productId: request.params.id });
     return reply.code(204).send();
   });
 
-  app.post("/api/admin/products/:id/media", { preHandler: requireAdmin }, async (request, reply) => {
+  app.post("/api/admin/products/:id/media", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const part = await request.file({ limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
     if (!part) return errorReply(reply, new Error("Media file is required"));
     const accepted = MEDIA_TYPES.get(part.mimetype);
@@ -101,23 +106,30 @@ export function registerRoutes(app, { database, realtime, config }) {
     const target = path.join(config.uploadDir, filename);
     try {
       await pipeline(part.file, createWriteStream(target, { flags: "wx" }));
-      if (part.file.truncated) return errorReply(reply, new Error("Media file exceeds 50 MB"), 413);
+      if (part.file.truncated) {
+        await unlink(target).catch(() => undefined);
+        return errorReply(reply, new Error("Media file exceeds 50 MB"), 413);
+      }
       const product = database.addMedia(request.params.id, {
         type: accepted.type,
         url: `/media/${filename}`
       });
-      if (!product) return errorReply(reply, new Error("Product not found"), 404);
+      if (!product) {
+        await unlink(target).catch(() => undefined);
+        return errorReply(reply, new Error("Product not found"), 404);
+      }
       realtime.broadcast("catalog.changed", { productId: product.id });
       return reply.code(201).send({ product });
     } catch (error) {
+      await unlink(target).catch(() => undefined);
       return errorReply(reply, error);
     }
   });
 
-  app.get("/api/orders", { preHandler: requireAdmin }, async (request) => ({
+  app.get("/api/orders", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     orders: database.listOrders(request.query.limit)
   }));
-  app.post("/api/orders", async (request, reply) => {
+  app.post("/api/orders", { schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body || {});
       realtime.broadcast("order.changed", order);
@@ -127,7 +139,7 @@ export function registerRoutes(app, { database, realtime, config }) {
       return errorReply(reply, error);
     }
   });
-  app.patch("/api/orders/:id/status", { preHandler: requireAdmin }, async (request, reply) => {
+  app.patch("/api/orders/:id/status", { preHandler: requireAdmin, schema: { params: IdParams, body: OrderStatusBody } }, async (request, reply) => {
     try {
       const order = database.updateOrder(request.params.id, request.body?.status);
       if (!order) return errorReply(reply, new Error("Order not found"), 404);
@@ -138,10 +150,10 @@ export function registerRoutes(app, { database, realtime, config }) {
     }
   });
 
-  app.get("/api/service-requests", { preHandler: requireAdmin }, async (request) => ({
+  app.get("/api/service-requests", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     requests: database.listServiceRequests(request.query.limit)
   }));
-  app.post("/api/service-requests", async (request, reply) => {
+  app.post("/api/service-requests", { schema: { body: ServiceRequestBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.createServiceRequest(request.body || {});
       realtime.broadcast("service.changed", serviceRequest);
@@ -150,7 +162,7 @@ export function registerRoutes(app, { database, realtime, config }) {
       return errorReply(reply, error);
     }
   });
-  app.patch("/api/service-requests/:id/status", { preHandler: requireAdmin }, async (request, reply) => {
+  app.patch("/api/service-requests/:id/status", { preHandler: requireAdmin, schema: { params: IdParams, body: ServiceStatusBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.updateServiceRequest(request.params.id, request.body?.status);
       if (!serviceRequest) return errorReply(reply, new Error("Service request not found"), 404);
@@ -162,14 +174,14 @@ export function registerRoutes(app, { database, realtime, config }) {
   });
 
   app.get("/api/admin/printers", { preHandler: requireAdmin }, async () => ({ printers: database.listPrinters() }));
-  app.post("/api/admin/printers", { preHandler: requireAdmin }, async (request, reply) => {
+  app.post("/api/admin/printers", { preHandler: requireAdmin, schema: { body: PrinterBody } }, async (request, reply) => {
     try {
       return reply.code(201).send({ printer: database.savePrinter(request.body || {}) });
     } catch (error) {
       return errorReply(reply, error);
     }
   });
-  app.put("/api/admin/printers/:id", { preHandler: requireAdmin }, async (request, reply) => {
+  app.put("/api/admin/printers/:id", { preHandler: requireAdmin, schema: { params: IdParams, body: PrinterBody } }, async (request, reply) => {
     try {
       const printer = database.savePrinter(request.body || {}, request.params.id);
       return printer ? { printer } : errorReply(reply, new Error("Printer not found"), 404);
@@ -177,11 +189,11 @@ export function registerRoutes(app, { database, realtime, config }) {
       return errorReply(reply, error);
     }
   });
-  app.delete("/api/admin/printers/:id", { preHandler: requireAdmin }, async (request, reply) => {
+  app.delete("/api/admin/printers/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     if (!database.deletePrinter(request.params.id)) return errorReply(reply, new Error("Printer not found"), 404);
     return reply.code(204).send();
   });
-  app.get("/api/admin/print-jobs", { preHandler: requireAdmin }, async (request) => ({
+  app.get("/api/admin/print-jobs", { preHandler: requireAdmin, schema: { querystring: PrintJobsQuery } }, async (request) => ({
     jobs: database.listPrintJobs(request.query.status, request.query.limit)
   }));
 

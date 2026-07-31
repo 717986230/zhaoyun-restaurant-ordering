@@ -109,6 +109,13 @@ test("catalog, orders, service requests and print routing work together", async 
   });
   assert.equal(completeService.json().request.status, "completed");
 
+  const preparingOrder = await app.inject({
+    method: "PATCH",
+    url: `/api/orders/${firstOrder.json().order.id}/status`,
+    headers: adminHeaders,
+    payload: { status: "preparing" }
+  });
+  assert.equal(preparingOrder.json().order.status, "preparing");
   const completeOrder = await app.inject({
     method: "PATCH",
     url: `/api/orders/${firstOrder.json().order.id}/status`,
@@ -139,4 +146,42 @@ test("admin authentication rate-limits repeated invalid tokens", async (context)
   assert.equal(blocked.statusCode, 429);
   assert.equal(blocked.json().retryAfter > 0, true);
   assert.equal(blocked.headers["retry-after"] > 0, true);
+});
+
+test("API rejects malformed commands before reaching the database", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-schema-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const invalidOrder = await app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "short", table: "08", note: "", items: [] }
+  });
+  assert.equal(invalidOrder.statusCode, 400);
+  assert.match(invalidOrder.json().error, /Invalid request/);
+  assert.ok(invalidOrder.json().requestId);
+
+  const invalidProduct = await app.inject({
+    method: "POST",
+    url: "/api/admin/products",
+    headers: { "x-admin-token": "test-admin-token" },
+    payload: {
+      sku: "INVALID",
+      kind: "food",
+      category: "not valid",
+      names: { zh: "测试", de: "Test", en: "Test" },
+      price: -1,
+      printStation: "kitchen"
+    }
+  });
+  assert.equal(invalidProduct.statusCode, 400);
 });

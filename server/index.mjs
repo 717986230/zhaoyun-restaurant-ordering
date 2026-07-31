@@ -16,12 +16,12 @@ export async function buildServer(overrides = {}) {
   }
 
   mkdirSync(settings.uploadDir, { recursive: true });
-  const app = Fastify({ logger: overrides.logger ?? true, bodyLimit: 2 * 1024 * 1024 });
+  const app = Fastify({ logger: overrides.logger ?? true, bodyLimit: 2 * 1024 * 1024, requestIdHeader: "x-request-id" });
   const database = createDatabase(settings.databasePath);
   const realtime = createRealtimeHub();
 
   await app.register(cors, {
-    origin: settings.isProduction ? false : true,
+    origin: settings.isProduction ? settings.corsOrigin : true,
     allowedHeaders: ["content-type", "x-admin-token"]
   });
   await app.register(websocket);
@@ -40,6 +40,15 @@ export async function buildServer(overrides = {}) {
     });
   }
 
+  app.setErrorHandler((error, request, reply) => {
+    const statusCode = error.validation ? 400 : (error.statusCode && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500);
+    request.log.error({ err: error, requestId: request.id }, "request failed");
+    return reply.code(statusCode).send({
+      error: statusCode === 500 ? "Internal server error" : (error.validation ? "Invalid request" : error.message),
+      requestId: request.id
+    });
+  });
+
   registerRoutes(app, { database, realtime, config: settings });
   app.addHook("onClose", async () => database.close());
   return app;
@@ -52,9 +61,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (!config.isProduction && config.adminToken === "local-dev-admin") {
       app.log.warn("Development admin token: local-dev-admin");
     }
+    const shutdown = async (signal) => {
+      app.log.info({ signal }, "shutting down");
+      await app.close();
+      process.exit(0);
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
   } catch (error) {
     app.log.error(error);
     process.exit(1);
   }
 }
-

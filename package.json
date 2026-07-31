@@ -8,6 +8,9 @@
     "packages/*"
   ],
   "description": "Capacitor Android app for an offline restaurant ordering table system.",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "start": "vite --host 127.0.0.1",
     "server": "node server/index.mjs",

@@ -197,6 +197,14 @@ public class PrinterPlugin extends Plugin {
             call.reject("Printer address is required");
             return;
         }
+        if (port < 1 || port > 65535) {
+            call.reject("Printer port must be between 1 and 65535");
+            return;
+        }
+        if (!"lan".equals(transport) && !"bluetooth".equals(transport)) {
+            call.reject("Unsupported printer transport");
+            return;
+        }
         io.execute(() -> {
             try {
                 byte[] payload = testPage();
@@ -265,4 +273,3 @@ public class PrinterPlugin extends Plugin {
         return value == null || value.trim().isEmpty() ? fallback : value;
     }
 }
-

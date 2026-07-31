@@ -20,6 +20,8 @@
 
 ## 启动后端与管理台
 
+后端使用 Node `>=22.5.0` 的 `node:sqlite`。生产环境必须通过反向代理提供 HTTPS/WSS，SQLite 数据目录和媒体目录必须使用持久化磁盘，不能把开发服务器直接暴露到公网。
+
 首次运行：
 
 ```bash
@@ -39,7 +41,7 @@ ADMIN_TOKEN='请替换成长随机令牌' npm run server
 http://192.168.1.9:8787
 ```
 
-生产部署必须设置 `ADMIN_TOKEN`。`local-dev-admin` 只用于未设置环境变量的开发模式。
+生产部署必须设置至少 32 个字符的随机 `ADMIN_TOKEN`，不能使用 `local-dev-admin`。管理员错误 token 会按来源限流；单进程限流适合单机部署，多实例部署前需要把限流状态迁移到 Redis。跨域管理台只有在明确设置 `CORS_ORIGIN` 时才开放。
 
 ## 管理菜品、酒水和寿司
 
@@ -116,6 +118,7 @@ npm test
 npm run typecheck
 npm run unit
 npm run server:test
+npm audit --omit=dev
 ```
 
 ## iOS
