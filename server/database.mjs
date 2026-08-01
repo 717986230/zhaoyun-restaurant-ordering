@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { dishes } from "../src/data.js";
+import { photoMenuDishes } from "./photo-menu.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
@@ -433,22 +434,26 @@ export function createDatabase(databasePath) {
   }
 
   function seed() {
+    const existing = statements.allProducts.all();
+    const isLegacyDemoCatalog = existing.length > 0 && existing.length <= 15 && existing.every((row) => row.sku.startsWith("FOOD-"));
+    if (isLegacyDemoCatalog) db.exec("DELETE FROM products");
     if (statements.productCount.get().count) return;
+    const catalog = photoMenuDishes.length ? photoMenuDishes : dishes;
     db.exec("BEGIN");
     try {
-      dishes.forEach((dish, index) => saveProduct({
+      catalog.forEach((dish, index) => saveProduct({
         id: String(dish.id),
-        sku: `FOOD-${dish.id}`,
-        kind: "food",
+        sku: dish.sku || `FOOD-${dish.id}`,
+        kind: dish.kind || "food",
         category: dish.cat,
         names: { zh: dish.zh, de: dish.de, en: dish.en },
         description: dish.intro,
         price: dish.price,
-        allergens: dish.allergens.split(",").map((item) => item.trim()).filter(Boolean),
+        allergens: Array.isArray(dish.allergens) ? dish.allergens : dish.allergens.split(",").map((item) => item.trim()).filter(Boolean),
         details: { time: dish.time, people: dish.people, level: dish.level, ingredients: dish.ingredients },
         appearance: { art: dish.art, pattern: dish.pattern },
         sortOrder: index,
-        printStation: "kitchen"
+        printStation: dish.station || (dish.kind === "drink" ? "bar" : dish.kind === "sushi" ? "sushi" : "kitchen")
       }));
       db.exec("COMMIT");
     } catch (error) {
