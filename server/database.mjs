@@ -9,7 +9,7 @@ const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cance
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const ORDER_TRANSITIONS = new Map([
   ["new", new Set(["preparing", "cancelled"])],
   ["preparing", new Set(["ready", "cancelled"])],
@@ -67,6 +67,7 @@ function mapProduct(row, media = []) {
       art: row.art,
       pattern: row.pattern
     },
+    modifiers: parseJson(row.modifiers_json, []),
     available: Boolean(row.available),
     published: Boolean(row.published),
     sortOrder: row.sort_order,
@@ -109,6 +110,7 @@ function normalizeProduct(input, current = {}) {
     ingredients: String(details.ingredients ?? current.ingredients ?? "").trim(),
     art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#384c3f,#151817 75%)"),
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
+    modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
     sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
@@ -144,6 +146,7 @@ export function createDatabase(databasePath) {
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
+      modifiers_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -177,7 +180,8 @@ export function createDatabase(databasePath) {
       product_name TEXT NOT NULL,
       quantity INTEGER NOT NULL CHECK (quantity > 0),
       unit_price_cents INTEGER NOT NULL,
-      print_station TEXT NOT NULL
+      print_station TEXT NOT NULL,
+      modifiers_json TEXT NOT NULL DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS service_requests (
@@ -218,6 +222,12 @@ export function createDatabase(databasePath) {
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
   `);
+  for (const statement of [
+    "ALTER TABLE products ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE order_items ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'"
+  ]) {
+    try { db.exec(statement); } catch (error) { if (!String(error.message).includes("duplicate column name")) throw error; }
+  }
   const currentSchemaVersion = Number(db.prepare("PRAGMA user_version").get().user_version || 0);
   if (currentSchemaVersion > SCHEMA_VERSION) throw new Error(`Unsupported database schema version: ${currentSchemaVersion}`);
   if (currentSchemaVersion < SCHEMA_VERSION) db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -233,14 +243,14 @@ export function createDatabase(databasePath) {
       INSERT INTO products (
         id, sku, kind, category, name_zh, name_de, name_en, description, price_cents,
         allergens_json, prep_time, portion, level, ingredients, art, pattern, available,
-        published, sort_order, print_station, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        published, sort_order, print_station, modifiers_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     updateProduct: db.prepare(`
       UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
         name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
         portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
-        published = ?, sort_order = ?, print_station = ?, updated_at = ? WHERE id = ?
+        published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, updated_at = ? WHERE id = ?
     `),
     deleteProduct: db.prepare("DELETE FROM products WHERE id = ?"),
     insertMedia: db.prepare("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"),
@@ -250,7 +260,7 @@ export function createDatabase(databasePath) {
     orderItems: db.prepare("SELECT * FROM order_items WHERE order_id = ?"),
     listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?"),
     insertOrder: db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)"),
-    insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station) VALUES (?, ?, ?, ?, ?, ?, ?)"),
+    insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
     updateOrderStatus: db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"),
     insertPrintJob: db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)"),
     listPrintJobs: db.prepare("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?"),
@@ -289,7 +299,7 @@ export function createDatabase(databasePath) {
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
         product.pattern, product.available, product.published, product.sortOrder,
-        product.printStation, timestamp, product.id
+        product.printStation, product.modifiersJson, timestamp, product.id
       );
     } else {
       statements.insertProduct.run(
@@ -297,7 +307,7 @@ export function createDatabase(databasePath) {
         product.nameDe, product.nameEn, product.description, product.priceCents,
         product.allergensJson, product.prepTime, product.portion, product.level,
         product.ingredients, product.art, product.pattern, product.available,
-        product.published, product.sortOrder, product.printStation, timestamp, timestamp
+        product.published, product.sortOrder, product.printStation, product.modifiersJson, timestamp, timestamp
       );
     }
     return getProduct(product.id);
@@ -331,11 +341,29 @@ export function createDatabase(databasePath) {
         name: item.product_name,
         qty: item.quantity,
         unitPrice: item.unit_price_cents / 100,
-        printStation: item.print_station
+        printStation: item.print_station,
+        modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
       })),
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
+  }
+
+  function resolveModifiers(product, requested = []) {
+    const groups = parseJson(product.modifiers_json, []);
+    const options = new Map(groups.flatMap((group) => group.options.map((option) => [option.id, { ...option, groupId: group.id, selection: group.selection }] )));
+    const selected = [];
+    const selectedGroups = new Map();
+    for (const request of Array.isArray(requested) ? requested : []) {
+      const option = options.get(String(request.id));
+      if (!option) throw new Error(`Modifier ${request.id} is not available for ${product.sku}`);
+      const count = (selectedGroups.get(option.groupId) || 0) + 1;
+      if (option.selection === "single" && count > 1) throw new Error(`Only one modifier is allowed for ${option.groupId}`);
+      if (selected.some((item) => item.id === option.id)) throw new Error(`Duplicate modifier ${option.id}`);
+      selectedGroups.set(option.groupId, count);
+      selected.push({ id: option.id, name: option.names.zh, names: option.names, priceCents: Number(option.priceCents) || 0 });
+    }
+    return selected;
   }
 
   function createOrder(input) {
@@ -349,9 +377,11 @@ export function createDatabase(databasePath) {
       const quantity = Number(item.qty);
       if (!product || !product.published || !product.available) throw new Error(`Product ${item.id} is unavailable`);
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error("Invalid item quantity");
-      return { product, quantity };
+      const modifiers = resolveModifiers(product, item.modifiers);
+      const modifierTotalCents = modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);
+      return { product, quantity, modifiers, unitPriceCents: product.price_cents + modifierTotalCents };
     });
-    const totalCents = resolvedItems.reduce((sum, item) => sum + item.product.price_cents * item.quantity, 0);
+    const totalCents = resolvedItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
     const id = randomUUID();
     const timestamp = now();
     const orderNo = `${timestamp.slice(2, 10).replaceAll("-", "")}-${id.slice(0, 5).toUpperCase()}`;
@@ -360,11 +390,11 @@ export function createDatabase(databasePath) {
     try {
       statements.insertOrder.run(id, orderNo, requestId, String(input.table || "08"), String(input.note || "").trim(), totalCents, timestamp, timestamp);
       const jobs = new Map();
-      for (const { product, quantity } of resolvedItems) {
+      for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {
         const productName = product.name_zh || product.name_de || product.name_en;
-        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, product.price_cents, product.print_station);
+        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers));
         const stationItems = jobs.get(product.print_station) || [];
-        stationItems.push({ sku: product.sku, name: productName, quantity });
+        stationItems.push({ sku: product.sku, name: productName, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, price: modifier.priceCents / 100 })) });
         jobs.set(product.print_station, stationItems);
       }
       for (const [station, items] of jobs) {
@@ -437,7 +467,16 @@ export function createDatabase(databasePath) {
     const existing = statements.allProducts.all();
     const isLegacyDemoCatalog = existing.length > 0 && existing.length <= 15 && existing.every((row) => row.sku.startsWith("FOOD-"));
     if (isLegacyDemoCatalog) db.exec("DELETE FROM products");
-    if (statements.productCount.get().count) return;
+    if (statements.productCount.get().count) {
+      const ramen = statements.productBySku.get("R1");
+      if (ramen && !parseJson(ramen.modifiers_json, []).length) {
+        for (const dish of photoMenuDishes) {
+          const current = statements.productBySku.get(dish.sku);
+          if (current) saveProduct({ modifiers: dish.modifiers || [] }, current.id);
+        }
+      }
+      return;
+    }
     const catalog = photoMenuDishes.length ? photoMenuDishes : dishes;
     db.exec("BEGIN");
     try {
@@ -452,6 +491,7 @@ export function createDatabase(databasePath) {
         allergens: Array.isArray(dish.allergens) ? dish.allergens : dish.allergens.split(",").map((item) => item.trim()).filter(Boolean),
         details: { time: dish.time, people: dish.people, level: dish.level, ingredients: dish.ingredients },
         appearance: { art: dish.art, pattern: dish.pattern },
+        modifiers: dish.modifiers || [],
         sortOrder: index,
         printStation: dish.station || (dish.kind === "drink" ? "bar" : dish.kind === "sushi" ? "sushi" : "kitchen")
       }));

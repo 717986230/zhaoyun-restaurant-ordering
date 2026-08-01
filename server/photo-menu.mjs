@@ -4,6 +4,49 @@ const art = {
   drink: "linear-gradient(135deg,#8b622f,#171210 75%)"
 };
 
+const labels = {
+  zh: { extraNoodles: "加面", noScallion: "不要葱", noCilantro: "不要香菜", noChili: "不要辣椒", extraChili: "加辣椒", spice: "辣度" },
+  de: { extraNoodles: "Extra Nudeln", noScallion: "Ohne Zwiebel", noCilantro: "Ohne Koriander", noChili: "Ohne Chili", extraChili: "Extra Chili", spice: "Scharf" },
+  en: { extraNoodles: "Extra noodles", noScallion: "No scallion", noCilantro: "No cilantro", noChili: "No chili", extraChili: "Extra chili", spice: "Spice" }
+};
+
+function modifier(id, names, priceCents = 0) {
+  return { id, names, priceCents };
+}
+
+function modifiersFor(kind, category) {
+  if (kind !== "food") return [];
+  const groups = [{
+    id: "exclusions",
+    names: { zh: "去除配料", de: "Zutaten entfernen", en: "Remove ingredients" },
+    selection: "multi",
+    options: [
+      modifier("no-scallion", { zh: labels.zh.noScallion, de: labels.de.noScallion, en: labels.en.noScallion }),
+      modifier("no-cilantro", { zh: labels.zh.noCilantro, de: labels.de.noCilantro, en: labels.en.noCilantro }),
+      modifier("no-chili", { zh: labels.zh.noChili, de: labels.de.noChili, en: labels.en.noChili })
+    ]
+  }];
+  if (["RAMEN", "HOT POT", "FRIED UDON"].includes(category)) {
+    groups.unshift({
+      id: "extras",
+      names: { zh: "加料", de: "Extras", en: "Add-ons" },
+      selection: "multi",
+      options: [modifier("extra-noodles", { zh: labels.zh.extraNoodles, de: labels.de.extraNoodles, en: labels.en.extraNoodles }, 250)]
+    });
+    groups.push({
+      id: "spice",
+      names: { zh: labels.zh.spice, de: labels.de.spice, en: labels.en.spice },
+      selection: "single",
+      options: [
+        modifier("no-spicy", { zh: "不辣", de: "Nicht scharf", en: "Not spicy" }),
+        modifier("normal-spicy", { zh: "正常辣", de: "Normal scharf", en: "Regular spice" }),
+        modifier("extra-chili", { zh: labels.zh.extraChili, de: labels.de.extraChili, en: labels.en.extraChili }, 50)
+      ]
+    });
+  }
+  return groups;
+}
+
 function item(sku, kind, category, de, en, zh, price, allergens, ingredients, station = kind === "drink" ? "bar" : kind === "sushi" ? "sushi" : "kitchen", options = {}) {
   return {
     id: `photo-${sku.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
@@ -22,7 +65,8 @@ function item(sku, kind, category, de, en, zh, price, allergens, ingredients, st
     level: options.level || "Mild",
     art: art[kind],
     pattern: options.pattern || "lines",
-    station
+    station,
+    modifiers: modifiersFor(kind, category)
   };
 }
 

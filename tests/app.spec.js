@@ -7,7 +7,12 @@ test.beforeEach(async ({ page }) => {
       names: { zh: "黑椒牛柳", de: "Rinderfilet mit schwarzem Pfeffer", en: "Black Pepper Beef Fillet" },
       description: "Zartes Rinderfilet mit schwarzem Pfeffer.", price: 34.5,
       allergens: ["F", "O"], details: { time: "35 min", people: "2 Personen", level: "Mittel", ingredients: "Rinderfilet, Pfeffer" },
-      appearance: { art: "linear-gradient(135deg,#7e1e18,#190f0e 76%)", pattern: "ring" }, media: []
+      appearance: { art: "linear-gradient(135deg,#7e1e18,#190f0e 76%)", pattern: "ring" }, media: [],
+      modifiers: [{ id: "custom", names: { zh: "口味要求", de: "Sonderwünsche", en: "Preferences" }, selection: "multi", options: [
+        { id: "extra-noodles", names: { zh: "加面", de: "Extra Nudeln", en: "Extra noodles" }, priceCents: 250 },
+        { id: "no-cilantro", names: { zh: "不要香菜", de: "Ohne Koriander", en: "No cilantro" }, priceCents: 0 },
+        { id: "extra-chili", names: { zh: "加辣椒", de: "Extra Chili", en: "Extra chili" }, priceCents: 50 }
+      ] }]
     },
     {
       id: "video-1", sku: "SUSHI-01", kind: "sushi", category: "SUSHI",
@@ -35,9 +40,15 @@ test("image and video products use the same 3D flip interaction", async ({ page 
   await page.getByRole("button", { name: /开始点餐/ }).click();
   for (const name of ["黑椒牛柳", "火炙三文鱼寿司"]) {
     await page.locator(".dish-card", { hasText: name }).click();
-    await page.locator(".detail-front").click();
+    await expect(page.locator(".detail-front")).toBeVisible();
+    await page.locator(".detail-heading").click({ delay: 50 });
     await expect(page.locator(".detail-flip-inner")).toHaveClass(/flipped/);
     await expect(page.getByRole("region", { name: "菜品详细信息" })).toBeVisible();
+    if (name === "黑椒牛柳") {
+      await expect(page.getByText("加面")).toBeVisible();
+      await expect(page.getByText("不要香菜")).toBeVisible();
+      await expect(page.getByText("加辣椒")).toBeVisible();
+    }
     await page.getByRole("button", { name: "返回正面" }).click();
     await page.getByRole("button", { name: "关闭详情" }).click();
   }

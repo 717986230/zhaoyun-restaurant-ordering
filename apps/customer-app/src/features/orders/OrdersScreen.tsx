@@ -19,7 +19,7 @@ export function OrderCard({ order, products, language = "zh" }: { order: Order; 
   return <article className="order">
     <div className="order-head"><h3>{t(language, "order")} {order.no}</h3><span>{labels[order.status]}</span></div>
     <small>{new Date(order.createdAt).toLocaleString("de-AT")} · {t(language, "table")} {order.table}</small>
-    <p>{order.items.map((item) => { const product = products.find((candidate) => candidate.id === item.productId); return <span key={`${item.productId}-${item.quantity}`}>{item.quantity}x {product ? productName(product, language) : item.name || "Dish"}<br /></span>; })}</p>
+    <p>{order.items.map((item) => { const product = products.find((candidate) => candidate.id === item.productId); return <span key={`${item.productId}-${item.quantity}-${(item.modifiers || []).map((modifier) => modifier.id).join(",")}`}>{item.quantity}x {product ? productName(product, language) : item.name || "Dish"}{item.modifiers?.length ? ` (${item.modifiers.map((modifier) => modifier.name).join(" · ")})` : ""}<br /></span>; })}</p>
     {order.note && <p className="note">{t(language, "note")}: {order.note}</p>}
     {(order.status === "pending-sync" || order.status === "sync-failed") && <p className="offline-note">订单尚未被餐厅服务器确认</p>}
     <div className="total"><span>合计</span><b>{formatEuro(order.totalCents)}</b></div>

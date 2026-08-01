@@ -1,11 +1,22 @@
 import { motion } from "motion/react";
 import { formatEuro, summarizeCart } from "@zhaoyun/domain";
-import type { Product } from "@zhaoyun/domain";
+import type { ModifierGroup, ModifierOption, Product, SelectedModifier } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { productName, t } from "../../app/i18n";
 
 interface Props { state: CustomerState; dispatch: CustomerDispatch; products: Product[] }
+
+function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
+  return names[language] || names.de || names.en;
+}
+
+function toggleModifier(group: ModifierGroup, option: ModifierOption, selected: SelectedModifier[], language: CustomerState["language"]): SelectedModifier[] {
+  const current = selected.filter((item) => group.options.some((candidate) => candidate.id === item.id));
+  const exists = current.some((item) => item.id === option.id);
+  const next = group.selection === "single" ? (exists ? [] : [{ id: option.id, name: localized(option.names, language), priceCents: option.priceCents }]) : exists ? current.filter((item) => item.id !== option.id) : [...current, { id: option.id, name: localized(option.names, language), priceCents: option.priceCents }];
+  return [...selected.filter((item) => !group.options.some((candidate) => candidate.id === item.id)), ...next];
+}
 
 function ProductMedia({ product }: { product: Product }) {
   const media = product.media[0];
@@ -33,6 +44,16 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
               <ProductMedia product={product} />
               <div><h4>{product.names.en}</h4><p>{product.description}</p></div>
             </div>
+            {product.modifiers?.map((group) => <fieldset className="modifier-group" key={group.id} onClick={(event) => event.stopPropagation()}>
+              <legend>{localized(group.names, state.language)}</legend>
+              <div className="modifier-options">{group.options.map((option) => {
+                const checked = state.detailModifiers.some((modifier) => modifier.id === option.id);
+                return <label className={`modifier-option ${checked ? "selected" : ""}`} key={option.id}>
+                  <input type={group.selection === "single" ? "radio" : "checkbox"} name={`modifier-${product.id}-${group.id}`} checked={checked} onChange={() => dispatch({ type: "detail-modifiers", modifiers: toggleModifier(group, option, state.detailModifiers, state.language) })} />
+                  <span>{localized(option.names, state.language)}</span>{option.priceCents > 0 && <b>+{formatEuro(option.priceCents)}</b>}
+                </label>;
+              })}</div>
+            </fieldset>)}
             <div className="meta"><span>{product.details.time}</span><span>{product.details.people}</span><span>{product.details.level}</span></div>
           </div>
           <div className="detail-buy">
@@ -43,7 +64,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
             </div></div>
             <button className="primary add" onClick={(event) => {
               event.stopPropagation();
-              dispatch({ type: "add-to-cart", productId: product.id, quantity: state.detailQuantity });
+              dispatch({ type: "add-to-cart", productId: product.id, quantity: state.detailQuantity, modifiers: state.detailModifiers });
               dispatch({ type: "toast", message: t(state.language, "add") });
             }}>{t(state.language, "add")}</button>
           </div>
@@ -71,7 +92,7 @@ export function CatalogScreen({ state, dispatch, products }: Props) {
     return categoryMatch && (!query || text.includes(query));
   });
   const categories = ["ALLE", ...new Set(products.map((product) => product.category))];
-  const lines = Object.entries(state.cart).map(([productId, quantity]) => ({ productId, quantity }));
+  const lines = Object.values(state.cart);
   const summary = summarizeCart(lines, products);
   const activeProduct = products.find((product) => product.id === state.activeProductId);
 
@@ -86,7 +107,7 @@ export function CatalogScreen({ state, dispatch, products }: Props) {
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
     <nav id="chips" className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} onClick={() => dispatch({ type: "category", category })}>{category}</button>)}</nav>
-    <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id, quantity: state.cart[product.id] ?? 1 })}>
+    <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id, quantity: Object.values(state.cart).find((line) => line.productId === product.id)?.quantity ?? 1 })}>
       <div className="summary"><span className="number">{product.sku}</span><div><h3>{productName(product, state.language)}</h3><p>{product.names.de}</p></div><span className="cat">{product.category}</span></div>
     </article>) : <div className="empty">{t(state.language, "empty")}</div>}</div>
     {activeProduct && <ProductDetail product={activeProduct} state={state} dispatch={dispatch} />}

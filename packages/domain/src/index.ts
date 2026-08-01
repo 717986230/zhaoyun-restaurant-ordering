@@ -10,6 +10,25 @@ export interface ProductMedia {
   sortOrder?: number;
 }
 
+export interface ModifierOption {
+  id: string;
+  names: { zh: string; de: string; en: string };
+  priceCents: number;
+}
+
+export interface ModifierGroup {
+  id: string;
+  names: { zh: string; de: string; en: string };
+  selection: "single" | "multi";
+  options: ModifierOption[];
+}
+
+export interface SelectedModifier {
+  id: string;
+  name: string;
+  priceCents: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -22,6 +41,7 @@ export interface Product {
   details: { time: string; people: string; level: string; ingredients: string };
   appearance: { art: string; pattern: string };
   media: ProductMedia[];
+  modifiers?: ModifierGroup[];
   available: boolean;
   published: boolean;
   printStation: PrintStation;
@@ -30,6 +50,7 @@ export interface Product {
 export interface CartLine {
   productId: string;
   quantity: number;
+  modifiers?: SelectedModifier[];
 }
 
 export interface OrderLine extends CartLine {
@@ -108,7 +129,7 @@ export function summarizeCart(lines: readonly CartLine[], products: readonly Pro
     if (!product) return summary;
     return {
       count: summary.count + line.quantity,
-      totalCents: summary.totalCents + product.priceCents * line.quantity
+      totalCents: summary.totalCents + (product.priceCents + (line.modifiers || []).reduce((sum, modifier) => sum + modifier.priceCents, 0)) * line.quantity
     };
   }, { count: 0, totalCents: 0 });
 }

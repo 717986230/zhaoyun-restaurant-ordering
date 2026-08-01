@@ -21,6 +21,7 @@ export function mapApiProduct(product: ApiCatalogProduct): Product {
     allergens: product.allergens,
     details: product.details,
     appearance: product.appearance,
+    modifiers: product.modifiers ?? [],
     media: (product.media ?? []).map((media) => ({ ...media })),
     available: product.available ?? true,
     published: product.published ?? true,

@@ -13,6 +13,17 @@ const Details = Type.Object({
   people: Type.String({ maxLength: 64 }),
   level: Type.String({ maxLength: 64 })
 });
+const ModifierOption = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 64 }),
+  names: Names,
+  priceCents: Type.Integer({ minimum: 0, maximum: 100000 })
+});
+const ModifierGroup = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 64 }),
+  names: Names,
+  selection: Type.Union([Type.Literal("single"), Type.Literal("multi")]),
+  options: Type.Array(ModifierOption, { maxItems: 32 })
+});
 
 export const ProductBody = Type.Object({
   sku: Type.String({ maxLength: 64 }),
@@ -30,7 +41,8 @@ export const ProductBody = Type.Object({
   appearance: Type.Optional(Type.Object({
     art: Type.String({ maxLength: 400 }),
     pattern: Type.String({ maxLength: 32 })
-  }))
+  })),
+  modifiers: Type.Optional(Type.Array(ModifierGroup, { maxItems: 16 }))
 });
 
 export const PrinterBody = Type.Object({
@@ -49,7 +61,8 @@ export const CreateOrderBody = Type.Object({
   note: Type.String({ maxLength: 500 }),
   items: Type.Array(Type.Object({
     id: Type.String({ minLength: 1, maxLength: 128 }),
-    qty: Type.Integer({ minimum: 1, maximum: 99 })
+    qty: Type.Integer({ minimum: 1, maximum: 99 }),
+    modifiers: Type.Optional(Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }) }), { maxItems: 32 }))
   }), { minItems: 1, maxItems: 100 })
 });
 

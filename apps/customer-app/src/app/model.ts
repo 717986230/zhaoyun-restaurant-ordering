@@ -1,5 +1,5 @@
 import { useEffect, useReducer } from "react";
-import type { Order, OrderStatus, ServiceRequest } from "@zhaoyun/domain";
+import type { CartLine, Order, OrderStatus, SelectedModifier, ServiceRequest } from "@zhaoyun/domain";
 
 export type Screen = "home" | "menu" | "cart" | "orders" | "service" | "staff";
 
@@ -11,7 +11,8 @@ export interface CustomerState {
   activeProductId: string | null;
   productFlipped: boolean;
   detailQuantity: number;
-  cart: Record<string, number>;
+  detailModifiers: SelectedModifier[];
+  cart: Record<string, CartLine>;
   orders: Order[];
   requests: ServiceRequest[];
   language: "zh" | "de" | "en";
@@ -28,7 +29,8 @@ type Action =
   | { type: "close-product" }
   | { type: "toggle-product-flip" }
   | { type: "detail-quantity"; quantity: number }
-  | { type: "add-to-cart"; productId: string; quantity: number }
+  | { type: "detail-modifiers"; modifiers: SelectedModifier[] }
+  | { type: "add-to-cart"; productId: string; quantity: number; modifiers: SelectedModifier[] }
   | { type: "clear-cart" }
   | { type: "order-created"; order: Order }
   | { type: "order-status"; orderId: string; clientRequestId?: string; status: OrderStatus; totalCents?: number }
@@ -47,6 +49,7 @@ const initialState: CustomerState = {
   activeProductId: null,
   productFlipped: false,
   detailQuantity: 1,
+  detailModifiers: [],
   cart: {},
   orders: [],
   requests: [],
@@ -58,7 +61,9 @@ const initialState: CustomerState = {
 function hydrate(): CustomerState {
   try {
     const stored = JSON.parse(localStorage.getItem(storageKey) || "null") as Partial<CustomerState> | null;
-    return stored ? { ...initialState, ...stored, screen: "home", activeProductId: null, productFlipped: false, toast: "" } : initialState;
+    if (!stored) return initialState;
+    const cart = Object.fromEntries(Object.entries(stored.cart || {}).map(([key, value]) => [key, typeof value === "number" ? { productId: key, quantity: value, modifiers: [] } : value]));
+    return { ...initialState, ...stored, cart, screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: "" };
   } catch {
     return initialState;
   }
@@ -66,15 +71,20 @@ function hydrate(): CustomerState {
 
 function reducer(state: CustomerState, action: Action): CustomerState {
   switch (action.type) {
-    case "navigate": return { ...state, screen: action.screen, activeProductId: null, productFlipped: false };
+    case "navigate": return { ...state, screen: action.screen, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "category": return { ...state, category: action.category };
     case "query": return { ...state, query: action.query };
     case "toggle-search": return { ...state, searchOpen: !state.searchOpen };
-    case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: action.quantity };
-    case "close-product": return { ...state, activeProductId: null, productFlipped: false };
+    case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: action.quantity, detailModifiers: [] };
+    case "close-product": return { ...state, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "toggle-product-flip": return { ...state, productFlipped: !state.productFlipped };
     case "detail-quantity": return { ...state, detailQuantity: Math.max(1, Math.min(99, action.quantity)) };
-    case "add-to-cart": return { ...state, cart: { ...state.cart, [action.productId]: action.quantity } };
+    case "detail-modifiers": return { ...state, detailModifiers: action.modifiers };
+    case "add-to-cart": {
+      const modifierKey = action.modifiers.map((modifier) => modifier.id).sort().join(",");
+      const key = `${action.productId}::${modifierKey}`;
+      return { ...state, cart: { ...state.cart, [key]: { productId: action.productId, quantity: action.quantity, modifiers: action.modifiers } } };
+    }
     case "clear-cart": return { ...state, cart: {} };
     case "order-created": return { ...state, cart: {}, orders: [action.order, ...state.orders] };
     case "order-status": return {

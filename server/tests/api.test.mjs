@@ -29,6 +29,15 @@ test("catalog, orders, service requests and print routing work together", async 
   assert.ok(catalogProducts.some((product) => product.sku === "R1" && product.category === "RAMEN"));
   assert.ok(catalogProducts.some((product) => product.sku === "N1-6" && product.kind === "sushi" && product.printStation === "sushi"));
   assert.ok(catalogProducts.some((product) => product.sku === "BEER-WIESEL-FASS" && product.kind === "drink" && product.printStation === "bar"));
+  const ramen = catalogProducts.find((product) => product.sku === "R1");
+  const modifierOrder = await app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "modifier-order-0001", table: "08", note: "", items: [{ id: ramen.id, qty: 1, modifiers: [{ id: "extra-noodles" }, { id: "no-cilantro" }, { id: "extra-chili" }] }] }
+  });
+  assert.equal(modifierOrder.statusCode, 201);
+  assert.equal(modifierOrder.json().order.total, 15.5);
+  assert.deepEqual(modifierOrder.json().order.items[0].modifiers.map((modifier) => modifier.name), ["加面", "不要香菜", "加辣椒"]);
 
   const drinkResponse = await app.inject({
     method: "POST",
@@ -95,7 +104,7 @@ test("catalog, orders, service requests and print routing work together", async 
   });
   assert.deepEqual(
     jobs.json().jobs.map((job) => job.printer_role).sort(),
-    ["bar", "sushi"]
+    ["bar", "kitchen", "sushi"]
   );
 
   const service = await app.inject({

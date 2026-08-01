@@ -56,6 +56,7 @@ Node 测试覆盖：
 - 111 条照片菜单 seed 商品初始化，覆盖 Ramen、Specials、Bao、Hot Pot、寿司、主菜、前菜、乌冬、配菜、甜品、酒水和咖啡茶
 - 新增酒水和寿司
 - 服务器按数据库价格计价
+- 加面、不要香菜、加辣椒选项由后端校验、计价并写入打印任务
 - `client_request_id` 幂等下单
 - 酒水路由到吧台、寿司路由到寿司台
 - 按档口生成独立打印任务
@@ -82,7 +83,7 @@ Node 测试覆盖：
 - React + TypeScript Vite 多页生产构建：通过
 - Capacitor Android 同步：通过
 - 原生 Kiosk 与 Printer 插件 Java 编译：通过
-- Gradle `assembleDebug`：通过，UI polish APK SHA-256：`be6bfbb6afd9447d2d0792f15cd3c3583f50db69de5e3f969acfb587e68c3ca3`
+- Gradle `assembleDebug`：通过，modifier APK SHA-256：`adeaf325f9b386f3b882ca94ffcdd6fe20bcd29d6998c1fc77120378de18e9fd`
 - Android 15 ARM64 平板模拟器安装：ADB 返回 `Success`
 - 2560×1600 平板启动与首页渲染：通过
 - 平板菜单渲染：通过

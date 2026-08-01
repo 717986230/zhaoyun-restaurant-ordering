@@ -9,11 +9,11 @@ import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 export function CartScreen({ state, dispatch, products }: { state: CustomerState; dispatch: CustomerDispatch; products: Product[] }) {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const entries = Object.entries(state.cart).flatMap(([productId, quantity]) => {
-    const product = products.find((candidate) => candidate.id === productId);
-    return product ? [{ product, quantity }] : [];
+  const entries = Object.values(state.cart).flatMap((line) => {
+    const product = products.find((candidate) => candidate.id === line.productId);
+    return product ? [{ product, quantity: line.quantity, modifiers: line.modifiers || [] }] : [];
   });
-  const summary = summarizeCart(entries.map(({ product, quantity }) => ({ productId: product.id, quantity })), products);
+  const summary = summarizeCart(entries.map(({ product, quantity, modifiers }) => ({ productId: product.id, quantity, modifiers })), products);
 
   async function submitOrder() {
     if (!entries.length || submitting) return;
@@ -26,7 +26,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
       table: "08",
       status: "pending-sync",
       note,
-        items: entries.map(({ product, quantity }) => ({ productId: product.id, quantity, name: productName(product, state.language) })),
+        items: entries.map(({ product, quantity, modifiers }) => ({ productId: product.id, quantity, name: productName(product, state.language), modifiers })),
       totalCents: summary.totalCents,
       createdAt: new Date().toISOString()
     };
@@ -35,7 +35,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
         clientRequestId,
         table: "08",
         note,
-        items: entries.map(({ product, quantity }) => ({ id: product.id, qty: quantity }))
+        items: entries.map(({ product, quantity, modifiers }) => ({ id: product.id, qty: quantity, modifiers: modifiers.map((modifier) => ({ id: modifier.id })) }))
       });
       dispatch({ type: "order-created", order: {
         ...baseOrder,
@@ -57,7 +57,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
   return <section id="cart" className="screen panel active">
     <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>{t(state.language, "cart")}</h2><small>WARENKORB</small></div><LanguageSwitcher language={state.language} dispatch={dispatch} /></header>
     <div id="cartContent" className="content">{entries.length ? <>
-      {entries.map(({ product, quantity }) => <div className="row" key={product.id}><div><h3>{productName(product, state.language)}</h3><small>{product.names.de} × {quantity}</small></div><strong>{formatEuro(product.priceCents * quantity)}</strong></div>)}
+      {entries.map(({ product, quantity, modifiers }) => <div className="row" key={`${product.id}-${modifiers.map((modifier) => modifier.id).join(",")}`}><div><h3>{productName(product, state.language)}</h3><small>{product.names.de} × {quantity}</small>{modifiers.length > 0 && <small className="modifier-summary">{modifiers.map((modifier) => modifier.name).join(" · ")}</small>}</div><strong>{formatEuro((product.priceCents + modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0)) * quantity)}</strong></div>)}
       <label className="note-label">{t(state.language, "note")}<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder={state.language === "zh" ? "例如：少盐、不要香菜" : state.language === "de" ? "z. B. wenig Salz" : "e.g. less salt"} /></label>
       <div className="total"><span>{t(state.language, "total")}</span><b>{formatEuro(summary.totalCents)}</b></div>
       <button id="submitOrder" className="primary" disabled={submitting} onClick={submitOrder}>{submitting ? "…" : t(state.language, "submit")}</button>

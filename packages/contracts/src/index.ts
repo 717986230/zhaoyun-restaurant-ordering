@@ -11,7 +11,10 @@ export const CreateOrderSchema = Type.Object({
   note: Type.String({ maxLength: 500 }),
   items: Type.Array(Type.Object({
     id: Type.String({ minLength: 1 }),
-    qty: Type.Integer({ minimum: 1, maximum: 99 })
+    qty: Type.Integer({ minimum: 1, maximum: 99 }),
+    modifiers: Type.Optional(Type.Array(Type.Object({
+      id: Type.String({ minLength: 1, maxLength: 64 })
+    }), { maxItems: 32 }))
   }), { minItems: 1, maxItems: 100 })
 });
 
@@ -34,6 +37,12 @@ export interface ApiCatalogProduct {
   allergens: string[];
   details: { time: string; people: string; level: string; ingredients: string };
   appearance: { art: string; pattern: string };
+  modifiers?: Array<{
+    id: string;
+    names: { zh: string; de: string; en: string };
+    selection: "single" | "multi";
+    options: Array<{ id: string; names: { zh: string; de: string; en: string }; priceCents: number }>;
+  }>;
   media?: Array<{ id?: string; type: "image" | "video"; url: string; posterUrl?: string | null; sortOrder?: number }>;
   available?: boolean;
   published?: boolean;
@@ -48,7 +57,7 @@ export interface ApiOrder {
   status: Static<typeof OrderStatusSchema>;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number }>;
+  items: Array<{ id: string; name?: string; qty: number; modifiers?: Array<{ id: string; name: string; price: number }> }>;
   createdAt: string;
 }
 
