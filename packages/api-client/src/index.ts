@@ -1,5 +1,5 @@
 import type { ApiCatalogProduct, ApiOrder, CreateOrderCommand, CreateServiceRequestCommand, RealtimeEnvelope } from "@zhaoyun/contracts";
-import type { PrinterProfile } from "@zhaoyun/domain";
+import type { ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
 
 export interface RestaurantApiOptions {
   baseUrl: () => string;
@@ -18,6 +18,7 @@ export interface AdminProductInput {
   printStation: "kitchen" | "bar" | "sushi" | "front";
   available: boolean;
   published: boolean;
+  modifiers?: ModifierGroup[];
 }
 
 export interface AdminStorage {

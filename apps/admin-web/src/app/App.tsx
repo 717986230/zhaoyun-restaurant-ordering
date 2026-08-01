@@ -15,7 +15,7 @@ function mapProduct(product: ApiCatalogProduct): Product {
   return {
     id: String(product.id), sku: product.sku, kind: product.kind, category: product.category,
     names: product.names, description: product.description, priceCents: Math.round(product.price * 100),
-    allergens: product.allergens, details: product.details, appearance: product.appearance,
+    allergens: product.allergens, details: product.details, appearance: product.appearance, modifiers: product.modifiers ?? [],
     media: (product.media ?? []).map((media) => ({
       ...(media.id ? { id: media.id } : {}), type: media.type, url: media.url,
       ...(media.posterUrl !== undefined ? { posterUrl: media.posterUrl } : {}),

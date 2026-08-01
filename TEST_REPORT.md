@@ -1,6 +1,6 @@
 # 测试报告
 
-日期：2026-08-01
+日期：2026-08-02
 
 ## v0.3 架构迁移验证
 
@@ -36,7 +36,7 @@ Playwright 覆盖：
 - 员工推进订单状态
 - 顶栏和购物车操作保持可见
 
-管理台同时验证商品目录、打印机模块、连接设置和响应式控件可用性。
+管理台同时验证商品目录、打印机模块、连接设置和响应式控件可用性；商品编辑器额外验证结构化选项 JSON 会加载到表单。
 
 最终结果：32/32 通过（包含本次 UI 修复后的回归）。
 
@@ -83,7 +83,7 @@ Node 测试覆盖：
 - React + TypeScript Vite 多页生产构建：通过
 - Capacitor Android 同步：通过
 - 原生 Kiosk 与 Printer 插件 Java 编译：通过
-- Gradle `assembleDebug`：通过，modifier APK SHA-256：`adeaf325f9b386f3b882ca94ffcdd6fe20bcd29d6998c1fc77120378de18e9fd`
+- Gradle `assembleDebug`：通过，admin optimization APK SHA-256：`d97132f258e436800d8c01a7474e300f9ac02eb5b62227d7209a60d6f96279e7`
 - Android 15 ARM64 平板模拟器安装：ADB 返回 `Success`
 - 2560×1600 平板启动与首页渲染：通过
 - 平板菜单渲染：通过

@@ -18,6 +18,18 @@ interface Props {
 
 function readText(form: FormData, name: string): string { return String(form.get(name) || "").trim(); }
 
+function readModifiers(form: FormData) {
+  const raw = readText(form, "modifiers");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("必须是数组");
+    return parsed;
+  } catch {
+    throw new Error("选项配置 JSON 格式不正确");
+  }
+}
+
 export function CatalogPanel(props: Props) {
   const rows = props.products.filter((product) => props.filter === "all" || product.kind === props.filter);
 
@@ -34,6 +46,7 @@ export function CatalogPanel(props: Props) {
       price: Number(data.get("price")),
       details: { ingredients: readText(data, "ingredients"), time: readText(data, "time"), people: readText(data, "people"), level: readText(data, "level") },
       allergens: readText(data, "allergens").split(",").map((item) => item.trim()).filter(Boolean),
+      modifiers: readModifiers(data),
       printStation: readText(data, "printStation") as AdminProductInput["printStation"],
       available: data.get("available") === "on",
       published: data.get("published") === "on"
@@ -56,6 +69,7 @@ export function CatalogPanel(props: Props) {
       <label><span>主要食材</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
       <div className="field-grid three"><label><span>制作时间</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>份量</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>口味/难度</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
       <label><span>过敏原（逗号分隔）</span><input name="allergens" defaultValue={product?.allergens.join(", ") ?? ""} /></label>
+      <label><span>点餐选项（JSON）</span><textarea name="modifiers" rows={8} spellCheck={false} defaultValue={JSON.stringify(product?.modifiers ?? [], null, 2)} placeholder={'[{"id":"spice","names":{"zh":"辣度","de":"Scharf","en":"Spice"},"selection":"single","options":[]}]'} /><small>选项会进入订单和打印单；价格使用 priceCents（分）。</small></label>
       <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>选择图片或视频</b><small>JPEG、PNG、WebP、MP4、WebM，最大 50 MB</small></label>
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>可售</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>前台显示</span></label></div>
       <button className="primary-action" type="submit">{product ? "保存修改" : "创建商品"}</button>
@@ -64,7 +78,7 @@ export function CatalogPanel(props: Props) {
       <div className="filter-tabs">{[["all", "全部"], ["food", "菜品"], ["drink", "酒水"], ["sushi", "寿司"]].map(([value, label]) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{label}</button>)}</div>
       <div className="product-list">{rows.length ? rows.map((row) => {
         const media = row.media[0];
-        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => props.onEdit(row)}><span className="product-thumb">{media?.type === "image" ? <img src={props.mediaUrl(media.url)} alt="" /> : <span className="media-mark">{media?.type === "video" ? "▶" : row.kind === "drink" ? "杯" : row.kind === "sushi" ? "鮨" : "菜"}</span>}</span><span className="product-copy"><b>{row.names.zh || row.names.de || row.names.en}</b><small>{row.sku} · {row.category}</small></span><span className="product-kind">{{ food: "菜品", drink: "酒水", sushi: "寿司" }[row.kind]}</span><strong>{formatEuro(row.priceCents)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => props.onEdit(row)}><span className="product-thumb">{media?.type === "image" ? <img src={props.mediaUrl(media.url)} alt="" /> : <span className="media-mark">{media?.type === "video" ? "▶" : row.kind === "drink" ? "杯" : row.kind === "sushi" ? "鮨" : "菜"}</span>}</span><span className="product-copy"><b>{row.names.zh || row.names.de || row.names.en}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${row.modifiers.length} 组选项` : ""}</small></span><span className="product-kind">{{ food: "菜品", drink: "酒水", sushi: "寿司" }[row.kind]}</span><strong>{formatEuro(row.priceCents)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">当前分类暂无商品</div>}</div>
       {product && <button className="danger-action" onClick={() => { if (window.confirm("确定删除这个商品及其媒体吗？")) void props.onDelete(product.id); }}>删除当前商品</button>}
     </section>
