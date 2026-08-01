@@ -28,6 +28,9 @@ Playwright 覆盖：
 - 打开详情后点击卡片正面直接翻转，点击背面返回；加购控件不误触翻转
 - 中文、德文、英文切换后首页、菜单、商品名称和购物车/订单文字更新
 - 详情显示食材、过敏原、价格和数量
+- 菜单页不显示语言切换按钮；首页切换语言后进入菜单仍保持对应语言
+- 菜单顶部和详情顶部不重复计算安全区留空
+- 固定时长 3D 翻转、视频 metadata 预加载和减少动画模式
 - 加入购物车、提交订单、查看状态
 - 服务呼叫、员工处理请求
 - 员工推进订单状态
@@ -35,7 +38,7 @@ Playwright 覆盖：
 
 管理台同时验证商品目录、打印机模块、连接设置和响应式控件可用性。
 
-最终结果：32/32 通过。
+最终结果：32/32 通过（包含本次 UI 修复后的回归）。
 
 ## TypeScript 领域单元测试
 
@@ -79,7 +82,7 @@ Node 测试覆盖：
 - React + TypeScript Vite 多页生产构建：通过
 - Capacitor Android 同步：通过
 - 原生 Kiosk 与 Printer 插件 Java 编译：通过
-- Gradle `assembleDebug`：通过，v0.3 APK SHA-256：`2d59e199a4f440eafeb3b9bfefb13a3aa5d8f8fa3cabb7fa268d8e4c05c33445`
+- Gradle `assembleDebug`：通过，UI polish APK SHA-256：`be6bfbb6afd9447d2d0792f15cd3c3583f50db69de5e3f969acfb587e68c3ca3`
 - Android 15 ARM64 平板模拟器安装：ADB 返回 `Success`
 - 2560×1600 平板启动与首页渲染：通过
 - 平板菜单渲染：通过
