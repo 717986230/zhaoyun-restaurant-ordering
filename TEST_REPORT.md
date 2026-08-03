@@ -77,13 +77,14 @@ Node 测试覆盖：
 - 上传 PNG 并显示缩略图：通过
 - 删除测试商品：通过
 - 管理表单 `name="id"` 遮蔽 `form.id` 问题已修复
+- 商品选项配置保存、服务端校验和数据库回读：通过
 
 ## Android 构建与设备验证
 
 - React + TypeScript Vite 多页生产构建：通过
 - Capacitor Android 同步：通过
 - 原生 Kiosk 与 Printer 插件 Java 编译：通过
-- Gradle `assembleDebug`：通过，admin optimization APK SHA-256：`d97132f258e436800d8c01a7474e300f9ac02eb5b62227d7209a60d6f96279e7`
+- Gradle `assembleDebug`：通过，validation APK SHA-256：`56bad7653f0ec79f6a7ea4ccc5f063424be4ecfbb051be581b4d13086f1cc08c`
 - Android 15 ARM64 平板模拟器安装：ADB 返回 `Success`
 - 2560×1600 平板启动与首页渲染：通过
 - 平板菜单渲染：通过

@@ -59,6 +59,26 @@ test("catalog, orders, service requests and print routing work together", async 
   assert.equal(drink.kind, "drink");
   assert.equal(drink.printStation, "bar");
 
+  const modifierConfig = {
+    id: "sweetness",
+    names: { zh: "甜度", de: "Süße", en: "Sweetness" },
+    selection: "single",
+    options: [
+      { id: "less-sugar", names: { zh: "少糖", de: "Weniger Zucker", en: "Less sugar" }, priceCents: 0 },
+      { id: "no-sugar", names: { zh: "无糖", de: "Ohne Zucker", en: "No sugar" }, priceCents: 0 }
+    ]
+  };
+  const updatedDrink = await app.inject({
+    method: "PUT",
+    url: `/api/admin/products/${drink.id}`,
+    headers: adminHeaders,
+    payload: { ...drinkResponse.json().product, price: 6.9, modifiers: [modifierConfig] }
+  });
+  assert.equal(updatedDrink.statusCode, 200);
+  assert.deepEqual(updatedDrink.json().product.modifiers, [modifierConfig]);
+  const reloadedDrink = await app.inject({ method: "GET", url: `/api/admin/products/${drink.id}`, headers: adminHeaders });
+  assert.deepEqual(reloadedDrink.json().modifiers, [modifierConfig]);
+
   const sushiResponse = await app.inject({
     method: "POST",
     url: "/api/admin/products",

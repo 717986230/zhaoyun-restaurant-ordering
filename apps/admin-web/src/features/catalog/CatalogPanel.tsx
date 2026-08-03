@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { formatEuro } from "@zhaoyun/domain";
-import type { Product } from "@zhaoyun/domain";
+import type { ModifierGroup, Product } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
 
@@ -18,15 +18,32 @@ interface Props {
 
 function readText(form: FormData, name: string): string { return String(form.get(name) || "").trim(); }
 
-function readModifiers(form: FormData) {
+function isModifierGroup(value: unknown): value is ModifierGroup {
+  if (!value || typeof value !== "object") return false;
+  const group = value as Partial<ModifierGroup>;
+  const names = group.names;
+  return typeof group.id === "string" && Boolean(group.id.trim()) &&
+    (group.selection === "single" || group.selection === "multi") &&
+    Boolean(names) && typeof names === "object" &&
+    ["zh", "de", "en"].every((language) => typeof names[language as keyof typeof names] === "string") &&
+    Array.isArray(group.options) && group.options.every((option) => {
+      if (!option || typeof option !== "object") return false;
+      const item = option as ModifierGroup["options"][number];
+      return typeof item.id === "string" && Boolean(item.id.trim()) &&
+        item.names && ["zh", "de", "en"].every((language) => typeof item.names[language as keyof typeof item.names] === "string") &&
+        Number.isInteger(item.priceCents) && item.priceCents >= 0;
+    });
+}
+
+function readModifiers(form: FormData): ModifierGroup[] {
   const raw = readText(form, "modifiers");
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error("必须是数组");
+    if (!Array.isArray(parsed) || !parsed.every(isModifierGroup)) throw new Error("结构不完整");
     return parsed;
   } catch {
-    throw new Error("选项配置 JSON 格式不正确");
+    throw new Error("选项配置必须包含 id、三语名称、选择方式、选项和 priceCents");
   }
 }
 
