@@ -11,8 +11,8 @@ import { registerRoutes } from "./routes.mjs";
 
 export async function buildServer(overrides = {}) {
   const settings = { ...config, ...overrides };
-  if (settings.isProduction && settings.adminToken === "local-dev-admin") {
-    throw new Error("ADMIN_TOKEN must be set in production");
+  if (settings.isProduction && (settings.adminToken === "local-dev-admin" || typeof settings.adminToken !== "string" || settings.adminToken.length < 32)) {
+    throw new Error("Production ADMIN_TOKEN must be at least 32 characters and must not use the development token");
   }
 
   mkdirSync(settings.uploadDir, { recursive: true });

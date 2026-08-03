@@ -388,6 +388,11 @@ export function createDatabase(databasePath) {
 
     db.exec("BEGIN IMMEDIATE");
     try {
+      const committed = statements.orderByClientId.get(requestId);
+      if (committed) {
+        db.exec("COMMIT");
+        return orderView(committed);
+      }
       statements.insertOrder.run(id, orderNo, requestId, String(input.table || "08"), String(input.note || "").trim(), totalCents, timestamp, timestamp);
       const jobs = new Map();
       for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {

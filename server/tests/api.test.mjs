@@ -38,6 +38,15 @@ test("catalog, orders, service requests and print routing work together", async 
   assert.equal(modifierOrder.statusCode, 201);
   assert.equal(modifierOrder.json().order.total, 15.5);
   assert.deepEqual(modifierOrder.json().order.items[0].modifiers.map((modifier) => modifier.name), ["加面", "不要香菜", "加辣椒"]);
+  const concurrentPayload = {
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "concurrent-order-0001", table: "08", note: "", items: [{ id: ramen.id, qty: 1 }] }
+  };
+  const [concurrentA, concurrentB] = await Promise.all([app.inject(concurrentPayload), app.inject(concurrentPayload)]);
+  assert.equal(concurrentA.statusCode, 201);
+  assert.equal(concurrentB.statusCode, 201);
+  assert.equal(concurrentA.json().order.id, concurrentB.json().order.id);
 
   const drinkResponse = await app.inject({
     method: "POST",
@@ -124,7 +133,7 @@ test("catalog, orders, service requests and print routing work together", async 
   });
   assert.deepEqual(
     jobs.json().jobs.map((job) => job.printer_role).sort(),
-    ["bar", "kitchen", "sushi"]
+    ["bar", "kitchen", "kitchen", "sushi"]
   );
 
   const service = await app.inject({
@@ -217,4 +226,11 @@ test("API rejects malformed commands before reaching the database", async (conte
     }
   });
   assert.equal(invalidProduct.statusCode, 400);
+});
+
+test("production bootstrap rejects short admin tokens even when overridden programmatically", async () => {
+  await assert.rejects(
+    () => buildServer({ isProduction: true, adminToken: "short-token", logger: false }),
+    /Production ADMIN_TOKEN must be at least 32 characters/
+  );
 });
