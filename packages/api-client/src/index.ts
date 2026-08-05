@@ -26,6 +26,16 @@ export interface AdminStorage {
   token: string;
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export class AdminApi {
   get storage(): AdminStorage {
     const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : location.origin;
@@ -49,6 +59,7 @@ export class AdminApi {
   printers(): Promise<{ printers: PrinterProfile[] }> { return this.#request("/api/admin/printers"); }
   createPrinter(profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request("/api/admin/printers", { method: "POST", body: JSON.stringify(profile) }); }
   updatePrinter(id: string, profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(profile) }); }
+  retryPrintJob(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }
 
   async uploadMedia(id: string, file: File): Promise<{ product: ApiCatalogProduct }> {
     const form = new FormData();
@@ -63,7 +74,7 @@ export class AdminApi {
     const response = await fetch(`${this.storage.baseUrl}${path}`, { ...options, headers });
     if (response.status === 204) return undefined as T;
     const payload = await response.json().catch(() => ({})) as { error?: string };
-    if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+    if (!response.ok) throw new ApiError(payload.error || `Request failed (${response.status})`, response.status);
     return payload as T;
   }
 }
@@ -121,7 +132,7 @@ export class RestaurantApi {
     if (options.body) headers.set("content-type", "application/json");
     const response = await this.#fetch(`${this.#baseUrl()}${path}`, { ...options, headers });
     const payload = await response.json().catch(() => ({})) as { error?: string };
-    if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+    if (!response.ok) throw new ApiError(payload.error || `Request failed (${response.status})`, response.status);
     return payload as T;
   }
 }

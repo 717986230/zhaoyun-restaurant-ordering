@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-05
+
+### Production Candidate Hardening
+
+- 离线订单命令持久化到本机，联网后自动退避重试；4xx 业务拒绝不会无限重试。
+- 新增 LAN ESC/POS 打印代理，支持任务租约、防重复处理、失败退避和人工重试接口。
+- SQLite 使用 `VACUUM INTO` 生成一致性备份并执行 `integrity_check`。
+- Android Release 构建必须显式提供签名密钥环境变量，避免误发布 Debug/未签名包。
+
 ## 2026-08-02
 
 ### Admin Catalog Optimization

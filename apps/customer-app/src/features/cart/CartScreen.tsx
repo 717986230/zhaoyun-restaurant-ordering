@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { CreateOrderCommand } from "@zhaoyun/contracts";
+import { ApiError } from "@zhaoyun/api-client";
 import { formatEuro, summarizeCart } from "@zhaoyun/domain";
 import type { Order, Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
@@ -30,13 +32,14 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
       totalCents: summary.totalCents,
       createdAt: new Date().toISOString()
     };
-    try {
-      const { order } = await restaurantApi.createOrder({
+    const command: CreateOrderCommand = {
         clientRequestId,
         table: "08",
         note,
         items: entries.map(({ product, quantity, modifiers }) => ({ id: product.id, qty: quantity, modifiers: modifiers.map((modifier) => ({ id: modifier.id })) }))
-      });
+    };
+    try {
+      const { order } = await restaurantApi.createOrder(command);
       dispatch({ type: "order-created", order: {
         ...baseOrder,
         id: order.id,
@@ -46,9 +49,15 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
         createdAt: order.createdAt
       } });
       dispatch({ type: "toast", message: "订单已提交" });
-    } catch {
-      dispatch({ type: "order-created", order: { ...baseOrder, status: "sync-failed" } });
-      dispatch({ type: "toast", message: "服务器离线，订单等待重新同步" });
+    } catch (error) {
+      const retryable = !(error instanceof ApiError) || error.status >= 500;
+      if (retryable) {
+        dispatch({ type: "order-queued", order: { ...baseOrder, status: "sync-failed" }, command });
+        dispatch({ type: "toast", message: "服务器离线，订单已保存并等待自动重试" });
+      } else {
+        dispatch({ type: "order-created", order: { ...baseOrder, status: "sync-failed" } });
+        dispatch({ type: "toast", message: "订单未被接受，请检查菜品或购物车" });
+      }
     } finally {
       setSubmitting(false);
     }

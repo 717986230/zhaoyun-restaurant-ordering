@@ -1,6 +1,6 @@
 # 目标系统架构
 
-状态：v0.3 已完成顾客端、管理台、领域契约和平台适配层迁移；当前服务端仍是带模块化边界的 ESM JavaScript，完整 API TypeScript 迁移与打印代理待后续阶段
+状态：v0.4 生产候选收口中；顾客端、管理台、领域契约、离线订单重试、SQLite 备份和 LAN 打印代理已实现。服务端仍是带模块化边界的 ESM JavaScript，完整 API TypeScript 迁移、实体打印机和 Device Owner 验证仍需单独完成。
 更新：2026-08-01
 
 ## 1. 架构结论
@@ -9,7 +9,7 @@
 
 - 顾客 App：React + TypeScript + Vite + Capacitor。
 - 管理台：React + TypeScript + Vite，独立入口和权限边界。
-- 服务端：Fastify + TypeScript，以业务模块注册为 Fastify plugins。
+- 服务端：Fastify + ESM JavaScript，使用 TypeBox schema、模块化路由、SQLite 事务和集成测试；TypeScript API 迁移仍是后续工程，不把文档愿景当成已完成事实。
 - API 契约：TypeBox/JSON Schema 作为单一事实来源，由服务端验证并被客户端共享。
 - 服务端状态：TanStack Query 管理请求、缓存、失效和重连。
 - 本地交互状态：React reducer/context；只有真正跨页面且长期存在的 UI 状态才进入小型 store。
@@ -25,7 +25,7 @@
 2. **跨边界只传契约 DTO，不共享数据库行或组件状态。**
 3. **服务端是订单、价格、库存状态和打印任务的最终事实来源。**
 4. **离线命令必须显示为“待同步”，服务端确认后才能显示“已下单”。**
-5. **打印是可重试、有回执的后台任务，不是页面中的一次副作用。**
+5. **打印是可重试、有租约的后台任务，不是页面中的一次副作用。**
 6. **模块化单体优先；只有出现独立扩缩容或故障隔离证据时才拆服务。**
 7. **逐步迁移，每个阶段均可构建、测试和发布。**
 

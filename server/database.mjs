@@ -9,7 +9,7 @@ const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cance
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const ORDER_TRANSITIONS = new Map([
   ["new", new Set(["preparing", "cancelled"])],
   ["preparing", new Set(["ready", "cancelled"])],
@@ -214,6 +214,9 @@ export function createDatabase(databasePath) {
       status TEXT NOT NULL DEFAULT 'queued',
       attempts INTEGER NOT NULL DEFAULT 0,
       error TEXT,
+      claimed_by TEXT,
+      lease_until TEXT,
+      next_attempt_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -224,7 +227,10 @@ export function createDatabase(databasePath) {
   `);
   for (const statement of [
     "ALTER TABLE products ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
-    "ALTER TABLE order_items ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'"
+    "ALTER TABLE order_items ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE print_jobs ADD COLUMN claimed_by TEXT",
+    "ALTER TABLE print_jobs ADD COLUMN lease_until TEXT",
+    "ALTER TABLE print_jobs ADD COLUMN next_attempt_at TEXT"
   ]) {
     try { db.exec(statement); } catch (error) { if (!String(error.message).includes("duplicate column name")) throw error; }
   }
@@ -264,6 +270,12 @@ export function createDatabase(databasePath) {
     updateOrderStatus: db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"),
     insertPrintJob: db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)"),
     listPrintJobs: db.prepare("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?"),
+    claimablePrintJob: db.prepare("SELECT * FROM print_jobs WHERE printer_role = ? AND ((status = 'queued') OR (status = 'retry-wait' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)) OR (status = 'claimed' AND lease_until <= ?)) ORDER BY created_at LIMIT 1"),
+    claimPrintJob: db.prepare("UPDATE print_jobs SET status = 'claimed', claimed_by = ?, lease_until = ?, updated_at = ? WHERE id = ? AND (status = 'queued' OR status = 'retry-wait' OR (status = 'claimed' AND lease_until <= ?))"),
+    completePrintJob: db.prepare("UPDATE print_jobs SET status = 'printed', claimed_by = NULL, lease_until = NULL, next_attempt_at = NULL, error = NULL, updated_at = ? WHERE id = ? AND status = 'claimed' AND claimed_by = ?"),
+    printJobById: db.prepare("SELECT * FROM print_jobs WHERE id = ?"),
+    failPrintJob: db.prepare("UPDATE print_jobs SET status = ?, attempts = attempts + 1, error = ?, claimed_by = NULL, lease_until = NULL, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = 'claimed' AND claimed_by = ?"),
+    retryPrintJob: db.prepare("UPDATE print_jobs SET status = 'queued', attempts = 0, error = NULL, claimed_by = NULL, lease_until = NULL, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = 'failed'"),
     listRequests: db.prepare("SELECT * FROM service_requests ORDER BY created_at DESC LIMIT ?"),
     requestById: db.prepare("SELECT * FROM service_requests WHERE id = ?"),
     insertRequest: db.prepare("INSERT INTO service_requests (id, table_no, type, status, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?)"),
@@ -526,6 +538,35 @@ export function createDatabase(databasePath) {
     listPrinters: () => statements.listPrinters.all().map((row) => ({ ...row, enabled: Boolean(row.enabled), capabilities: parseJson(row.capabilities_json, {}) })),
     savePrinter,
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
-    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) }))
+    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) })),
+    claimPrintJob: (role, workerId, leaseMs = 30_000) => {
+      const timestamp = now();
+      const leaseUntil = new Date(Date.now() + leaseMs).toISOString();
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const job = statements.claimablePrintJob.get(String(role), timestamp, timestamp);
+        if (!job) { db.exec("COMMIT"); return null; }
+        const changed = statements.claimPrintJob.run(String(workerId), leaseUntil, timestamp, job.id, timestamp).changes;
+        db.exec("COMMIT");
+        return changed ? { ...job, status: "claimed", claimed_by: String(workerId), lease_until: leaseUntil, payload: parseJson(job.payload_json, {}) } : null;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+    completePrintJob: (id, workerId) => statements.completePrintJob.run(now(), String(id), String(workerId)).changes > 0,
+    failPrintJob: (id, workerId, error, maxAttempts = 5) => {
+      const current = statements.printJobById.get(String(id));
+      if (!current || current.claimed_by !== String(workerId)) return false;
+      const attempts = Number(current.attempts || 0) + 1;
+      const status = attempts >= maxAttempts ? "failed" : "retry-wait";
+      const nextAttemptAt = status === "failed" ? null : new Date(Date.now() + Math.min(300_000, 2_000 * 2 ** Math.min(attempts, 7))).toISOString();
+      return statements.failPrintJob.run(status, String(error).slice(0, 1000), nextAttemptAt, now(), String(id), String(workerId)).changes > 0;
+    },
+    retryPrintJob: (id) => statements.retryPrintJob.run(now(), String(id)).changes > 0,
+    printerForRole: (role) => {
+      const row = statements.listPrinters.all().find((printer) => printer.role === String(role) && printer.enabled);
+      return row ? { ...row, enabled: Boolean(row.enabled), capabilities: parseJson(row.capabilities_json, {}) } : null;
+    }
   };
 }

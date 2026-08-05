@@ -88,6 +88,34 @@ test("dish opens with shared-element detail, adds to cart, and submits an order"
   await expect(page.locator("#ordersContent")).toContainText("新订单");
 });
 
+test("offline order is persisted and automatically retried", async ({ page }) => {
+  await page.unroute("**/api/orders");
+  let attempts = 0;
+  await page.route("**/api/orders", async (route) => {
+    attempts += 1;
+    if (attempts < 2) {
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "offline" }) });
+      return;
+    }
+    const command = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
+      id: "retried-order", clientRequestId: command.clientRequestId, no: "260805-001", table: command.table,
+      status: "new", note: command.note, total: 34.5, items: command.items, createdAt: new Date().toISOString()
+    } }) });
+  });
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
+  await page.locator(".dish-detail-card .add").click();
+  await page.getByRole("button", { name: "关闭详情" }).click();
+  await page.locator(".cartbar").click();
+  await page.getByRole("button", { name: /确认下单/ }).click();
+  await expect.poll(() => attempts).toBeGreaterThanOrEqual(2);
+  await page.locator(".screen.active .back").click();
+  await page.locator(".screen.active .back").click();
+  await page.getByRole("button", { name: /订单状态/ }).click();
+  await expect(page.locator("#ordersContent")).toContainText("新订单");
+});
+
 test("service request appears in staff board and can be completed", async ({ page }) => {
   await page.getByRole("button", { name: /呼叫服务员/ }).click();
   await page.getByRole("button", { name: /加水/ }).click();

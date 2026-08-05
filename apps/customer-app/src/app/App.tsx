@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ApiOrder, RealtimeEnvelope } from "@zhaoyun/contracts";
 import type { OrderStatus } from "@zhaoyun/domain";
+import { ApiError } from "@zhaoyun/api-client";
 import { restaurantApi } from "./api";
 import { useCatalog } from "./useCatalog";
 import { useCustomerState } from "./model";
@@ -32,6 +33,33 @@ export function App() {
   const { data: products } = useCatalog();
   const queryClient = useQueryClient();
   const handleAdminTap = useKiosk();
+  const syncingOrders = useRef(new Set<string>());
+
+  useEffect(() => {
+    let stopped = false;
+    const syncPendingOrders = async () => {
+      if (!navigator.onLine || stopped) return;
+      const now = Date.now();
+      for (const pending of Object.values(state.pendingOrders)) {
+        if (pending.nextAttemptAt > now || syncingOrders.current.has(pending.command.clientRequestId)) continue;
+        syncingOrders.current.add(pending.command.clientRequestId);
+        try {
+          const { order } = await restaurantApi.createOrder(pending.command);
+          dispatch({ type: "order-status", orderId: order.id, clientRequestId: order.clientRequestId, status: order.status as OrderStatus, totalCents: Math.round(order.total * 100) });
+          dispatch({ type: "order-synced", clientRequestId: pending.command.clientRequestId });
+        } catch (error) {
+          if (error instanceof ApiError && error.status >= 400 && error.status < 500) dispatch({ type: "order-synced", clientRequestId: pending.command.clientRequestId });
+          else dispatch({ type: "order-retry-scheduled", clientRequestId: pending.command.clientRequestId });
+        } finally {
+          syncingOrders.current.delete(pending.command.clientRequestId);
+        }
+      }
+    };
+    void syncPendingOrders();
+    const timer = window.setInterval(() => void syncPendingOrders(), 5_000);
+    window.addEventListener("online", syncPendingOrders);
+    return () => { stopped = true; window.clearInterval(timer); window.removeEventListener("online", syncPendingOrders); };
+  }, [dispatch, state.pendingOrders]);
 
   useEffect(() => restaurantApi.connect((message: RealtimeEnvelope) => {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });

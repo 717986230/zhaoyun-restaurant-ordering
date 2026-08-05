@@ -1,8 +1,8 @@
 # 测试报告
 
-日期：2026-08-02
+日期：2026-08-05
 
-## v0.3 架构迁移验证
+## v0.4 生产候选验证
 
 - 顾客端入口已从原生 JavaScript 迁移到 React + TypeScript。
 - 管理台入口已从原生 JavaScript 迁移到 React + TypeScript。
@@ -65,7 +65,14 @@ Node 测试覆盖：
 - 请求 schema 拒绝非法订单/商品 payload
 - 后台错误 token 第 6 次尝试触发 429 限流
 
-最终结果：3 个后端集成场景通过。
+额外覆盖：
+
+- 离线订单命令持久化后自动重试：Playwright 通过
+- 打印任务认领租约、成功完成、防重复处理：Node 集成测试通过
+- 打印失败进入 `retry-wait` 并保留错误：Node 集成测试通过
+- SQLite `VACUUM INTO` 备份和 `integrity_check`：临时数据库演练通过
+
+最终结果：6 个后端/打印集成场景通过。
 
 ## 管理台实测
 
@@ -86,8 +93,10 @@ Node 测试覆盖：
 - React + TypeScript Vite 多页生产构建：通过
 - Capacitor Android 同步：通过
 - 原生 Kiosk 与 Printer 插件 Java 编译：通过
-- Gradle `assembleDebug`：通过，validation APK SHA-256：`56bad7653f0ec79f6a7ea4ccc5f063424be4ecfbb051be581b4d13086f1cc08c`
+- Gradle `assembleDebug`：通过，production-candidate debug APK SHA-256：`bf3339fd9bdbca012da41923b64b9127eeecc42b4b9cb1d06c130a96627b96fc`
+- Gradle `assembleRelease`：无签名环境变量时按预期拒绝构建；未声称已生成生产签名 APK
 - Android 15 ARM64 平板模拟器安装：ADB 返回 `Success`
+- Debug 构建继续通过；Release 构建已加入签名密钥环境变量门禁，未使用未知签名密钥生成生产包
 - 2560×1600 平板启动与首页渲染：通过
 - 平板菜单渲染：通过
 - 应用进程和前台 Activity：通过

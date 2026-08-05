@@ -16,9 +16,30 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    def releaseKeystore = System.getenv('ANDROID_RELEASE_KEYSTORE')
+    def releaseStorePassword = System.getenv('ANDROID_RELEASE_STORE_PASSWORD')
+    def releaseKeyAlias = System.getenv('ANDROID_RELEASE_KEY_ALIAS')
+    def releaseKeyPassword = System.getenv('ANDROID_RELEASE_KEY_PASSWORD')
+    def releaseRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+    if (releaseRequested && (!releaseKeystore || !releaseStorePassword || !releaseKeyAlias || !releaseKeyPassword)) {
+        throw new GradleException('Release build requires ANDROID_RELEASE_KEYSTORE, ANDROID_RELEASE_STORE_PASSWORD, ANDROID_RELEASE_KEY_ALIAS and ANDROID_RELEASE_KEY_PASSWORD')
+    }
+    if (releaseRequested) signingConfigs {
+        release {
+            storeFile file(releaseKeystore)
+            storePassword releaseStorePassword
+            keyAlias releaseKeyAlias
+            keyPassword releaseKeyPassword
+        }
+    }
     buildTypes {
         release {
-            minifyEnabled false
+            if (releaseRequested) {
+                signingConfig signingConfigs.release
+                minifyEnabled true
+            } else {
+                minifyEnabled false
+            }
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

@@ -1,4 +1,5 @@
 import { useEffect, useReducer } from "react";
+import type { CreateOrderCommand } from "@zhaoyun/contracts";
 import type { CartLine, Order, OrderStatus, SelectedModifier, ServiceRequest } from "@zhaoyun/domain";
 
 export type Screen = "home" | "menu" | "cart" | "orders" | "service" | "staff";
@@ -14,6 +15,7 @@ export interface CustomerState {
   detailModifiers: SelectedModifier[];
   cart: Record<string, CartLine>;
   orders: Order[];
+  pendingOrders: Record<string, { command: CreateOrderCommand; attempts: number; nextAttemptAt: number }>;
   requests: ServiceRequest[];
   language: "zh" | "de" | "en";
   serviceMessage: string;
@@ -33,6 +35,9 @@ type Action =
   | { type: "add-to-cart"; productId: string; quantity: number; modifiers: SelectedModifier[] }
   | { type: "clear-cart" }
   | { type: "order-created"; order: Order }
+  | { type: "order-queued"; order: Order; command: CreateOrderCommand }
+  | { type: "order-synced"; clientRequestId: string }
+  | { type: "order-retry-scheduled"; clientRequestId: string }
   | { type: "order-status"; orderId: string; clientRequestId?: string; status: OrderStatus; totalCents?: number }
   | { type: "advance-order"; orderId: string; status: OrderStatus }
   | { type: "service-created"; request: ServiceRequest; message: string }
@@ -52,6 +57,7 @@ const initialState: CustomerState = {
   detailModifiers: [],
   cart: {},
   orders: [],
+  pendingOrders: {},
   requests: [],
   language: "zh",
   serviceMessage: "请选择需要的服务",
@@ -63,7 +69,7 @@ function hydrate(): CustomerState {
     const stored = JSON.parse(localStorage.getItem(storageKey) || "null") as Partial<CustomerState> | null;
     if (!stored) return initialState;
     const cart = Object.fromEntries(Object.entries(stored.cart || {}).map(([key, value]) => [key, typeof value === "number" ? { productId: key, quantity: value, modifiers: [] } : value]));
-    return { ...initialState, ...stored, cart, screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: "" };
+    return { ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {}, screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: "" };
   } catch {
     return initialState;
   }
@@ -87,6 +93,23 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     }
     case "clear-cart": return { ...state, cart: {} };
     case "order-created": return { ...state, cart: {}, orders: [action.order, ...state.orders] };
+    case "order-queued": return {
+      ...state,
+      cart: {},
+      orders: [action.order, ...state.orders],
+      pendingOrders: { ...state.pendingOrders, [action.command.clientRequestId]: { command: action.command, attempts: 0, nextAttemptAt: 0 } }
+    };
+    case "order-synced": {
+      const pendingOrders = { ...state.pendingOrders };
+      delete pendingOrders[action.clientRequestId];
+      return { ...state, pendingOrders };
+    }
+    case "order-retry-scheduled": {
+      const pending = state.pendingOrders[action.clientRequestId];
+      if (!pending) return state;
+      const attempts = pending.attempts + 1;
+      return { ...state, pendingOrders: { ...state.pendingOrders, [action.clientRequestId]: { ...pending, attempts, nextAttemptAt: Date.now() + Math.min(60_000, 2_000 * 2 ** Math.min(attempts, 5)) } } };
+    }
     case "order-status": return {
       ...state,
       orders: state.orders.map((order) => order.id === action.orderId || (action.clientRequestId && order.clientRequestId === action.clientRequestId)

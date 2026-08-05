@@ -196,6 +196,10 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/admin/print-jobs", { preHandler: requireAdmin, schema: { querystring: PrintJobsQuery } }, async (request) => ({
     jobs: database.listPrintJobs(request.query.status, request.query.limit)
   }));
+  app.post("/api/admin/print-jobs/:id/retry", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
+    if (!database.retryPrintJob(request.params.id)) return errorReply(reply, new Error("Only failed print jobs can be retried"), 409);
+    return { ok: true, id: request.params.id };
+  });
 
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) return reply.code(404).send({ error: "API route not found" });

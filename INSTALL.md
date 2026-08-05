@@ -2,8 +2,8 @@
 
 ## 交付内容
 
-- Android v0.3 测试 APK：`dist/zhaoyun-ordering-v0.3.0-debug.apk`
-- 完整源码包：`dist/zhaoyun-ordering-v0.3.0-source.zip`
+- Android v0.4 production-candidate Debug APK：`dist/zhaoyun-ordering-v0.4.0-production-candidate-debug.apk`
+- 完整源码包：`dist/zhaoyun-ordering-v0.4.0-source.zip`
 - 顾客端、管理台、Fastify/SQLite 后端和 Android 原生工程
 - React + TypeScript workspace：`apps/customer-app`、`apps/admin-web`
 - 共享包：`packages/domain`、`contracts`、`api-client`、`native-bridge`
@@ -29,6 +29,17 @@ npm install
 npm run build
 ADMIN_TOKEN='请替换成长随机令牌' npm run server
 ```
+
+生产备份：
+
+```bash
+DATABASE_PATH=/var/lib/zhaoyun/restaurant.sqlite \
+UPLOAD_DIR=/var/lib/zhaoyun/uploads \
+BACKUP_DIR=/var/backups/zhaoyun \
+npm run backup
+```
+
+备份命令使用 SQLite `VACUUM INTO` 生成一致性快照，并执行 `PRAGMA integrity_check`；备份目录应放在独立磁盘或远程备份系统中，并定期做恢复演练。
 
 同一电脑打开：
 
@@ -65,6 +76,17 @@ Android App 内进入管理台：在首页顶部“赵云”区域 4 秒内连�
 
 局域网热敏打印机通常使用 IP 和 9100 端口。USB 目前完成设备发现与选择，实际打印需要针对具体型号补充驱动。
 
+服务端 LAN 打印代理按档口单独启动：
+
+```bash
+DATABASE_PATH=/var/lib/zhaoyun/restaurant.sqlite \
+PRINTER_ROLE=kitchen \
+PRINT_AGENT_ID=kitchen-01 \
+npm run print-agent
+```
+
+每个档口运行一个代理。代理会认领任务、持有租约、失败退避重试，超过 5 次后标记 `failed`；修复打印机后可通过管理 API 的 `/api/admin/print-jobs/:id/retry` 手动重试。
+
 ## Android 构建
 
 ```bash
@@ -77,6 +99,18 @@ ANDROID_SDK_ROOT=/Users/xinglong/Library/Android/sdk \
 ./gradlew assembleDebug
 ```
 
+Release 构建必须使用餐厅自己保管的签名密钥，密钥不能提交到 Git：
+
+```bash
+ANDROID_RELEASE_KEYSTORE=/secure/zhaoyun-upload.jks \
+ANDROID_RELEASE_STORE_PASSWORD='...' \
+ANDROID_RELEASE_KEY_ALIAS='zhaoyun' \
+ANDROID_RELEASE_KEY_PASSWORD='...' \
+npm run android:release
+```
+
+未提供上述变量时，Release 构建会主动失败，避免误把未签名或错误签名包当成生产包。
+
 构建输出：
 
 ```text
@@ -87,7 +121,7 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 设备直接安装：
 
-1. 将 `dist/zhaoyun-ordering-v0.3.0-debug.apk` 传到手机或平板。
+1. 将 `dist/zhaoyun-ordering-v0.4.0-production-candidate-debug.apk` 传到手机或平板。
 2. 允许文件管理器“安装未知应用”。
 3. 安装并打开。
 4. 首次启动设置 6-12 位管理员数字 PIN。
@@ -97,7 +131,7 @@ ADB 安装：
 
 ```bash
 /Users/xinglong/Library/Android/sdk/platform-tools/adb install -r \
-  dist/zhaoyun-ordering-v0.3.0-debug.apk
+  dist/zhaoyun-ordering-v0.4.0-production-candidate-debug.apk
 ```
 
 ## 不可退出终端模式

@@ -14,6 +14,8 @@
 - 服务呼叫、员工看板、管理端媒体上传和打印机发现
 - Capacitor Android 测试构建与 kiosk 模式
 - 后端请求 schema 校验、订单状态机、认证限流和生产启动校验
+- 离线订单持久化重试、幂等下单和 LAN ESC/POS 打印代理
+- SQLite 一致性备份、integrity_check 和失败打印任务人工重试接口
 
 ## 快速开始
 
@@ -40,8 +42,11 @@ npm run unit          # 领域单元测试
 npm run server:test   # Fastify/SQLite 集成测试
 npm test              # Playwright 手机/平板响应式测试
 npm run build         # Web 生产构建
+npm run backup        # 生成并校验 SQLite/媒体备份
+npm run print-agent   # 按 PRINTER_ROLE 启动 LAN 打印任务代理
 npm run cap:sync      # 同步 Capacitor Android 工程
 npm run android:debug # 构建 debug APK
+npm run android:release # 使用环境变量签名构建 Release APK
 ```
 
 ## 交互约定
@@ -58,4 +63,4 @@ npm run android:debug # 构建 debug APK
 
 ## 已知边界
 
-真实打印纸张输出仍需连接具体型号的实体打印机验证；USB 打印需要型号驱动。iOS 工程、签名 IPA 和生产级 Device Owner 配置未在本仓库中声称已完成。
+LAN 打印代理已完成任务租约、失败重试和人工重试接口，但真实打印纸张输出仍需连接具体型号的实体打印机验证；USB/Bluetooth 后端代理需要对应驱动或 Android 端执行。iOS 工程、签名 IPA 和生产级 Device Owner 配置未在本仓库中声称已完成。
