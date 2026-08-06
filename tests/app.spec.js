@@ -60,6 +60,7 @@ test("language switcher changes home and menu copy", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Bestellen" })).toBeVisible();
   await page.getByRole("button", { name: "Bestellen" }).click();
   await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
+  await expect(page.locator(".menu .langs")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "English" })).toHaveCount(0);
   await page.getByRole("button", { name: "返回" }).click();
   await page.getByRole("button", { name: "English" }).click();
