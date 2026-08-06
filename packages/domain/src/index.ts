@@ -80,6 +80,8 @@ export interface ServiceRequest {
 }
 
 export type PrinterTransport = "lan" | "bluetooth" | "usb";
+export type PrinterLanguage = "zh" | "de" | "en";
+export type PrinterEncoding = "utf8" | "gb18030" | "shift_jis" | "cp437";
 
 export interface PrinterProfile {
   id: string;
@@ -89,7 +91,7 @@ export interface PrinterProfile {
   port: number | null;
   role: PrintStation;
   enabled: boolean;
-  capabilities?: Record<string, unknown>;
+  capabilities?: Record<string, unknown> & { printLanguage?: PrinterLanguage; encoding?: PrinterEncoding };
 }
 
 export interface DiscoveredPrinter {

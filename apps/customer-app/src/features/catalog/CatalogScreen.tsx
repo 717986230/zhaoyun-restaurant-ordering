@@ -44,6 +44,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
               <ProductMedia product={product} />
               <div><h4>{product.names.en}</h4><p>{product.description}</p></div>
             </div>
+            {product.modifiers?.length ? <p className="modifier-heading">{t(state.language, "customize")}</p> : null}
             {product.modifiers?.map((group) => <fieldset className="modifier-group" key={group.id} onClick={(event) => event.stopPropagation()}>
               <legend>{localized(group.names, state.language)}</legend>
               <div className="modifier-options">{group.options.map((option) => {

@@ -411,7 +411,7 @@ export function createDatabase(databasePath) {
         const productName = product.name_zh || product.name_de || product.name_en;
         statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers));
         const stationItems = jobs.get(product.print_station) || [];
-        stationItems.push({ sku: product.sku, name: productName, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, price: modifier.priceCents / 100 })) });
+        stationItems.push({ sku: product.sku, name: productName, names: { zh: product.name_zh, de: product.name_de, en: product.name_en }, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names, price: modifier.priceCents / 100 })) });
         jobs.set(product.print_station, stationItems);
       }
       for (const [station, items] of jobs) {

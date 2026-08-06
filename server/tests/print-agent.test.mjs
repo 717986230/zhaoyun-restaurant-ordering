@@ -10,7 +10,7 @@ function setup() {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-print-agent-"));
   const database = createDatabase(path.join(directory, "restaurant.sqlite"));
   const product = database.listProducts(true).find((item) => item.sku === "R1");
-  database.savePrinter({ name: "Kitchen", transport: "lan", address: "127.0.0.1", port: 9100, role: "kitchen", enabled: true });
+  database.savePrinter({ name: "Kitchen", transport: "lan", address: "127.0.0.1", port: 9100, role: "kitchen", enabled: true, capabilities: { printLanguage: "en", encoding: "utf8" } });
   database.createOrder({ clientRequestId: `print-agent-${Date.now()}`, table: "08", note: "", items: [{ id: product.id, qty: 1 }] });
   return { database, directory };
 }
@@ -46,4 +46,17 @@ test("print agent records a failed job for retry", async () => {
     database.close();
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("receipt selects the configured printer language and encoding", () => {
+  const payload = {
+    orderNo: "A",
+    table: "08",
+    items: [{ quantity: 1, name: "默认名称", names: { zh: "加面", de: "Extra Nudeln", en: "Extra noodles" }, modifiers: [] }]
+  };
+  const german = renderReceipt(payload, { capabilities: { printLanguage: "de", encoding: "utf8" } });
+  assert.ok(german.includes(Buffer.from("Extra Nudeln", "utf8")));
+  assert.equal(german.includes(Buffer.from("加面", "utf8")), false);
+  const chinese = renderReceipt(payload, { capabilities: { printLanguage: "zh", encoding: "gb18030" } });
+  assert.ok(chinese.includes(Buffer.from([0xBC, 0xD3, 0xC3, 0xE6])));
 });

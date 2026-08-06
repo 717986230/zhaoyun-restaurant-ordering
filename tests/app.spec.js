@@ -89,6 +89,32 @@ test("dish opens with shared-element detail, adds to cart, and submits an order"
   await expect(page.locator("#ordersContent")).toContainText("新订单");
 });
 
+test("dish options are selected before adding and remain attached to cart order", async ({ page }) => {
+  let submitted;
+  await page.unroute("**/api/orders");
+  await page.route("**/api/orders", async (route) => {
+    submitted = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
+      id: "customized-order", clientRequestId: submitted.clientRequestId, no: "260806-001", table: submitted.table,
+      status: "new", note: submitted.note, total: 37.5, items: [], createdAt: new Date().toISOString()
+    } }) });
+  });
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
+  await expect(page.getByText("加入购物车前选择口味与加料")).toBeVisible();
+  await page.getByText("加面", { exact: true }).click();
+  await page.getByText("不要香菜", { exact: true }).click();
+  await page.getByText("加辣椒", { exact: true }).click();
+  await page.locator(".dish-detail-card .add").click();
+  await page.getByRole("button", { name: "关闭详情" }).click();
+  await page.locator(".cartbar").click();
+  await expect(page.locator(".modifier-summary")).toContainText("加面");
+  await expect(page.locator(".modifier-summary")).toContainText("不要香菜");
+  await expect(page.locator(".modifier-summary")).toContainText("加辣椒");
+  await page.getByRole("button", { name: /确认下单/ }).click();
+  await expect.poll(() => submitted?.items?.[0]?.modifiers?.map((modifier) => modifier.id)).toEqual(["extra-noodles", "no-cilantro", "extra-chili"]);
+});
+
 test("offline order is persisted and automatically retried", async ({ page }) => {
   await page.unroute("**/api/orders");
   let attempts = 0;

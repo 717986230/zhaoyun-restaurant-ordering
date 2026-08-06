@@ -1,5 +1,6 @@
 import { createDatabase } from "./database.mjs";
 import { config } from "./config.mjs";
+import iconv from "iconv-lite";
 
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -8,21 +9,31 @@ function line(value = "") {
   return `${String(value).replace(/[\u0000-\u001f]/g, "")}\n`;
 }
 
-export function renderReceipt(payload) {
+const labels = {
+  zh: { title: "赵云餐厅", order: "订单", table: "桌号", note: "备注" },
+  de: { title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz" },
+  en: { title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note" }
+};
+
+export function renderReceipt(payload, printer = {}) {
+  const capabilities = printer.capabilities || {};
+  const language = ["zh", "de", "en"].includes(capabilities.printLanguage) ? capabilities.printLanguage : "zh";
+  const encoding = ["utf8", "gb18030", "shift_jis", "cp437"].includes(capabilities.encoding) ? capabilities.encoding : "utf8";
+  const copy = labels[language];
   const lines = [
-    "ZHAO YUN RESTAURANT",
-    `Order ${payload.orderNo || ""}  Table ${payload.table || ""}`,
+    copy.title,
+    `${copy.order} ${payload.orderNo || ""}  ${copy.table} ${payload.table || ""}`,
     "--------------------------------"
   ];
   for (const item of payload.items || []) {
-    lines.push(`${item.quantity} x ${item.name || item.sku || "Item"}`);
-    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.name}${modifier.price ? ` (+${Number(modifier.price).toFixed(2)})` : ""}`);
+    lines.push(`${item.quantity} x ${item.names?.[language] || item.name || item.sku || "Item"}`);
+    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}${modifier.price ? ` (+${Number(modifier.price).toFixed(2)})` : ""}`);
   }
-  if (payload.note) lines.push(`Note: ${payload.note}`);
+  if (payload.note) lines.push(`${copy.note}: ${payload.note}`);
   lines.push("--------------------------------", "\n");
   return Buffer.concat([
     Buffer.from([ESC, 0x40]),
-    Buffer.from(lines.map(line).join(""), "utf8"),
+    iconv.encode(lines.map(line).join(""), encoding),
     Buffer.from([GS, 0x56, 0x00])
   ]);
 }
@@ -53,7 +64,7 @@ export async function processPrintJob({ database, role, workerId, transport = cr
   const job = database.claimPrintJob(role, workerId, leaseMs);
   if (!job) return { processed: false, reason: "No queued job" };
   try {
-    await transport.send(printer, renderReceipt(job.payload));
+    await transport.send(printer, renderReceipt(job.payload, printer));
     database.completePrintJob(job.id, workerId);
     return { processed: true, status: "printed", jobId: job.id };
   } catch (error) {
