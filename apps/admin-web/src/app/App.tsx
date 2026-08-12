@@ -16,6 +16,7 @@ function mapProduct(product: ApiCatalogProduct): Product {
   return {
     id: String(product.id), sku: product.sku, kind: product.kind, category: product.category,
     names: product.names, description: product.description, priceCents: Math.round(product.price * 100),
+    vatPercent: product.vatPercent ?? (product.kind === "drink" ? 20 : 10),
     allergens: product.allergens, details: product.details, appearance: product.appearance, modifiers: product.modifiers ?? [],
     media: (product.media ?? []).map((media) => ({
       ...(media.id ? { id: media.id } : {}), type: media.type, url: media.url,
@@ -29,7 +30,7 @@ function mapProduct(product: ApiCatalogProduct): Product {
 
 const initialState: AdminState = {
   tab: "catalog", connected: false, connectionText: "未连接", products: [], printers: [],
-  orders: [], requests: [], failedJobs: [], boardBusy: false,
+  orders: [], requests: [], failedJobs: [], bill: null, tables: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", toast: null
 };
 
@@ -67,6 +68,21 @@ export function App() {
 
   useEffect(() => { void connect(); }, [connect]);
 
+  const loadTables = useCallback(async () => {
+    if (!adminApi.storage.token) return;
+    try {
+      const { tables } = await adminApi.tables();
+      setState((current) => ({ ...current, tables }));
+    } catch {
+      /* The connection form stays usable while the server is unreachable. */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (state.tab !== "system") return;
+    void loadTables();
+  }, [state.tab, loadTables]);
+
   useEffect(() => {
     if (state.tab !== "board") return undefined;
     void loadBoard();
@@ -82,6 +98,27 @@ export function App() {
       notify(message);
     } catch (error) {
       notify(error instanceof Error ? error.message : "操作失败", "error");
+    } finally {
+      setState((current) => ({ ...current, boardBusy: false }));
+    }
+  }
+
+  async function openBill(table: string) {
+    try {
+      const { bill } = await adminApi.bill(table);
+      setState((current) => ({ ...current, bill }));
+    } catch (error) { notify(error instanceof Error ? error.message : "账单加载失败", "error"); }
+  }
+
+  async function settleBill(table: string) {
+    setState((current) => ({ ...current, boardBusy: true }));
+    try {
+      const { bill } = await adminApi.settleBill(table);
+      setState((current) => ({ ...current, bill: null }));
+      await loadBoard(true);
+      notify(`桌 ${table} 已结账 EUR ${bill.total.toFixed(2)}，账单已送前台打印`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "结账失败", "error");
     } finally {
       setState((current) => ({ ...current, boardBusy: false }));
     }
@@ -129,7 +166,24 @@ export function App() {
   async function saveConnection(nextStorage: AdminStorage) {
     adminApi.configure(nextStorage);
     await connect();
+    await loadTables();
     notify("连接设置已保存");
+  }
+
+  async function saveTable(input: { table: string; label?: string; rotateToken?: boolean }) {
+    try {
+      await adminApi.saveTable(input);
+      await loadTables();
+      notify(input.rotateToken ? "桌台令牌已更换，请重新分发入口链接" : "桌台已登记");
+    } catch (error) { notify(error instanceof Error ? error.message : "桌台保存失败", "error"); }
+  }
+
+  async function deleteTable(table: string) {
+    try {
+      await adminApi.deleteTable(table);
+      await loadTables();
+      notify("桌台已删除");
+    } catch (error) { notify(error instanceof Error ? error.message : "删除失败", "error"); }
   }
 
   async function returnToApp() {
@@ -153,9 +207,13 @@ export function App() {
         onOrderStatus={(id: string, status: ApiOrder["status"]) => runBoardAction(() => adminApi.updateOrderStatus(id, status), "订单状态已更新")}
         onRequestStatus={(id: string, status: ApiServiceRequest["status"]) => runBoardAction(() => adminApi.updateServiceRequestStatus(id, status), "服务呼叫已处理")}
         onRetryJob={(id: string) => runBoardAction(() => adminApi.retryPrintJob(id), "打印任务已重新排队")}
+        bill={state.bill}
+        onOpenBill={openBill}
+        onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
+        onSettleBill={settleBill}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
-      {state.tab === "system" && <SettingsPanel storage={storage} onSave={saveConnection} />}
+      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} />}
     </main>
   </div><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;
 }

@@ -14,6 +14,7 @@ function seedCatalog(): Product[] {
     names: { zh: dish.zh, de: dish.de, en: dish.en },
     description: dish.intro,
     priceCents: Math.round(dish.price * 100),
+    vatPercent: 10,
     allergens: dish.allergens.split(",").map((value) => value.trim()).filter(Boolean),
     details: { time: dish.time, people: dish.people, level: dish.level, ingredients: dish.ingredients },
     appearance: { art: dish.art, pattern: dish.pattern },

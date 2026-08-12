@@ -34,6 +34,7 @@ export interface ApiCatalogProduct {
   names: { zh: string; de: string; en: string };
   description: string;
   price: number;
+  vatPercent?: VatPercent;
   allergens: string[];
   details: { time: string; people: string; level: string; ingredients: string };
   appearance: { art: string; pattern: string };
@@ -57,12 +58,38 @@ export interface ApiOrder {
   status: Static<typeof OrderStatusSchema>;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number; unitPrice?: number; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
+  items: Array<{ id: string; name?: string; qty: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
   createdAt: string;
   updatedAt?: string;
+  billedAt?: string | null;
 }
 
 export type PrintStationName = "kitchen" | "bar" | "sushi" | "front";
+
+/** Austrian gastronomy rates; menu prices are gross. */
+export type VatPercent = 10 | 13 | 20;
+
+export interface ApiBill {
+  table: string;
+  orderNos: string[];
+  orderIds: string[];
+  items: Array<{
+    orderNo: string;
+    name: string;
+    names?: { zh: string; de: string; en: string };
+    qty: number;
+    unitPrice: number;
+    lineTotal: number;
+    vatPercent: VatPercent;
+    modifiers?: Array<{ name: string }>;
+  }>;
+  vatBreakdown: Array<{ percent: VatPercent; gross: number; net: number; vat: number }>;
+  total: number;
+  issuedAt: string;
+  /** Always false: the fiscal receipt still has to come from the register. */
+  fiscalReceipt: false;
+  printJobId?: string;
+}
 
 export interface ApiServiceRequest {
   id: string;
@@ -94,7 +121,7 @@ export interface ApiPrintJob {
 }
 
 export interface RealtimeEnvelope<T = unknown> {
-  type: "connected" | "catalog.changed" | "order.changed" | "service.changed" | "print.queued";
+  type: "connected" | "catalog.changed" | "order.changed" | "service.changed" | "print.queued" | "bill.settled";
   payload?: T;
   at: string;
 }

@@ -1,4 +1,4 @@
-import type { ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
+import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
 
 const orderStatusLabels: Record<ApiOrder["status"], string> = {
   new: "新订单",
@@ -38,16 +38,21 @@ interface Props {
   orders: ApiOrder[];
   requests: ApiServiceRequest[];
   failedJobs: ApiPrintJob[];
+  bill: ApiBill | null;
   busy: boolean;
   onRefresh: () => Promise<void>;
   onOrderStatus: (id: string, status: ApiOrder["status"]) => Promise<void>;
   onRequestStatus: (id: string, status: ApiServiceRequest["status"]) => Promise<void>;
   onRetryJob: (id: string) => Promise<void>;
+  onOpenBill: (table: string) => Promise<void>;
+  onCloseBill: () => void;
+  onSettleBill: (table: string) => Promise<void>;
 }
 
 export function BoardPanel(props: Props) {
   const openOrders = props.orders.filter((order) => order.status !== "completed" && order.status !== "cancelled");
   const openRequests = props.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled");
+  const openTables = [...new Set(props.orders.filter((order) => !order.billedAt && order.status !== "cancelled").map((order) => order.table))];
 
   return <section id="boardPanel" className="admin-panel active">
     <div className="list-head"><div><h1>订单看板</h1><p>全店实时订单、服务呼叫和失败打印任务，每 5 秒自动刷新</p></div><button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>刷新</button></div>
@@ -59,7 +64,7 @@ export function BoardPanel(props: Props) {
           const next = nextOrderStatus[order.status];
           return <article className="board-card" key={order.id}>
             <div className="board-card-head"><b>桌 {order.table}</b><span className={`status ${order.status}`}>{orderStatusLabels[order.status]}</span></div>
-            <small>{order.no} · {time(order.createdAt)} · EUR {order.total.toFixed(2)}</small>
+            <small>{order.no} · {time(order.createdAt)} · EUR {order.total.toFixed(2)}{order.billedAt ? " · 已结账" : ""}</small>
             <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>{item.qty} × {item.name || item.id}{item.modifiers?.length ? <em> （{item.modifiers.map((modifier) => modifier.name).join(" · ")}）</em> : null}</li>)}</ul>
             {order.note && <p className="board-note">备注：{order.note}</p>}
             <div className="board-actions">
@@ -71,6 +76,19 @@ export function BoardPanel(props: Props) {
       </section>
 
       <section className="board-column">
+        <h2>结账 <em>{openTables.length}</em></h2>
+        <div className="board-list">{openTables.length ? <div className="table-chips">{openTables.map((table) => <button key={table} className="ghost-action" disabled={props.busy} onClick={() => void props.onOpenBill(table)}>桌 {table}</button>)}</div> : <div className="admin-empty">没有待结账的桌</div>}</div>
+        {props.bill && <div className="bill-sheet" role="dialog" aria-label="账单">
+          <div className="board-card-head"><b>桌 {props.bill.table} 账单</b><button className="ghost-action" onClick={props.onCloseBill}>关闭</button></div>
+          {props.bill.items.length ? <>
+            <ul className="bill-items">{props.bill.items.map((item, index) => <li key={`${item.orderNo}-${index}`}><span>{item.qty} × {item.name}</span><span>{item.lineTotal.toFixed(2)} · {item.vatPercent}%</span></li>)}</ul>
+            <div className="bill-total"><span>合计</span><b>EUR {props.bill.total.toFixed(2)}</b></div>
+            <table className="bill-vat"><thead><tr><th>税率</th><th>净额</th><th>税额</th><th>含税</th></tr></thead><tbody>{props.bill.vatBreakdown.map((group) => <tr key={group.percent}><td>{group.percent}%</td><td>{group.net.toFixed(2)}</td><td>{group.vat.toFixed(2)}</td><td>{group.gross.toFixed(2)}</td></tr>)}</tbody></table>
+            <p className="bill-disclaimer">内部账单，不是税务收据；正式收据仍需由收银系统开具。</p>
+            <button className="primary-action" disabled={props.busy} onClick={() => void props.onSettleBill(props.bill!.table)}>打印账单并结账</button>
+          </> : <div className="admin-empty">这桌没有待结账的订单</div>}
+        </div>}
+
         <h2>服务呼叫 <em>{openRequests.length}</em></h2>
         <div className="board-list">{openRequests.length ? openRequests.map((request) => <article className="board-card compact" key={request.id}>
           <div className="board-card-head"><b>桌 {request.table}</b><span className={`status ${request.status}`}>{serviceLabels[request.type] || request.type}</span></div>

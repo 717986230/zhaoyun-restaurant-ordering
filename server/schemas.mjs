@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
+import { ALLERGEN_CODES } from "../src/allergens.js";
 
 const IdParams = Type.Object({ id: Type.String({ minLength: 1, maxLength: 128 }) });
+const TableParams = Type.Object({ table: Type.String({ minLength: 1, maxLength: 32 }) });
 const LimitQuery = Type.Object({ limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })) });
 const Names = Type.Object({
   zh: Type.String({ maxLength: 160 }),
@@ -33,7 +35,8 @@ export const ProductBody = Type.Object({
   description: Type.Optional(Type.String({ maxLength: 2000 })),
   price: Type.Number({ minimum: 0, maximum: 100000 }),
   details: Type.Optional(Details),
-  allergens: Type.Optional(Type.Array(Type.String({ maxLength: 8 }), { maxItems: 32 })),
+  allergens: Type.Optional(Type.Array(Type.Union(ALLERGEN_CODES.map((code) => Type.Literal(code))), { maxItems: ALLERGEN_CODES.length })),
+  vatPercent: Type.Optional(Type.Union([Type.Literal(10), Type.Literal(13), Type.Literal(20)])),
   printStation: Type.Union([Type.Literal("kitchen"), Type.Literal("bar"), Type.Literal("sushi"), Type.Literal("front")]),
   available: Type.Optional(Type.Boolean()),
   published: Type.Optional(Type.Boolean()),
@@ -66,6 +69,13 @@ export const CreateOrderBody = Type.Object({
   }), { minItems: 1, maxItems: 100 })
 });
 
+export const TableBody = Type.Object({
+  table: Type.String({ minLength: 1, maxLength: 8 }),
+  label: Type.Optional(Type.String({ maxLength: 64 })),
+  enabled: Type.Optional(Type.Boolean()),
+  rotateToken: Type.Optional(Type.Boolean())
+});
+
 export const ServiceRequestBody = Type.Object({
   table: Type.String({ minLength: 1, maxLength: 32 }),
   type: Type.String({ minLength: 1, maxLength: 64 })
@@ -84,4 +94,4 @@ export const PrintJobsQuery = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 }))
 });
 
-export { IdParams, LimitQuery };
+export { IdParams, LimitQuery, TableParams };

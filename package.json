@@ -1,6 +1,6 @@
 {
   "name": "austria-restaurant-ordering-app",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -27,7 +27,7 @@
     "cap:sync": "cap sync android",
     "android:debug": "cd android && ./gradlew assembleDebug",
     "android:release": "cd android && ./gradlew assembleRelease",
-    "package:source": "zip -FS -r dist/zhaoyun-ordering-v0.5.0-source.zip . -x 'node_modules/*' '.npm-cache/*' 'android/.gradle/*' 'android/app/build/*' 'android/capacitor-cordova-android-plugins/build/*' 'android/local.properties' 'server/data/*' 'server/uploads/*' 'dist/*' 'apps/*/dist/*' 'packages/*/dist/*' 'apps/*/tsconfig.tsbuildinfo' 'packages/*/tsconfig.tsbuildinfo' 'test-results/*' 'playwright-report/*' 'sources/*' 'AGENTS.md' '.git/*' '.DS_Store'"
+    "package:source": "zip -FS -r dist/zhaoyun-ordering-v0.6.0-source.zip . -x 'node_modules/*' '.npm-cache/*' 'android/.gradle/*' 'android/app/build/*' 'android/capacitor-cordova-android-plugins/build/*' 'android/local.properties' 'server/data/*' 'server/uploads/*' 'dist/*' 'apps/*/dist/*' 'packages/*/dist/*' 'apps/*/tsconfig.tsbuildinfo' 'packages/*/tsconfig.tsbuildinfo' 'test-results/*' 'playwright-report/*' 'sources/*' 'AGENTS.md' '.git/*' '.DS_Store'"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",

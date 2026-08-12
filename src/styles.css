@@ -154,6 +154,22 @@ html.plt-android .screen.active {
   border-color: rgba(122, 150, 126, 0.72);
 }
 
+.allergen-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.allergen {
+  border: 1px solid rgba(185, 154, 112, 0.42);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 .staff-scope {
   margin: 0 0 14px;
   padding: 10px 12px;

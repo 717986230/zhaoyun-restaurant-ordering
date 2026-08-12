@@ -27,7 +27,7 @@ function HomeScreen({ onAdminTap, dispatch, language }: { onAdminTap: () => Prom
       window.alert(t(language, "tableInvalid"));
       return;
     }
-    setTable({ tableNo: saved, configured: true });
+    setTable((current) => ({ ...current, tableNo: saved, configured: true }));
   }
 
   return <section id="home" className="screen home active">

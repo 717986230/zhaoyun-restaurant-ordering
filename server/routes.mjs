@@ -5,7 +5,7 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
   CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody
+  ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody, TableParams
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 
@@ -37,6 +37,34 @@ export function registerRoutes(app, { database, realtime, config }) {
   const serviceLimiter = createRateLimiter({ windowMs: config.publicRateLimitWindowMs, max: config.serviceRateLimitMax });
   const guardOrders = rateLimitGuard(orderLimiter, "Too many orders from this device");
   const guardServiceRequests = rateLimitGuard(serviceLimiter, "Too many service requests from this device");
+
+  /**
+   * Guest devices declare their own table. Once tables are registered the server
+   * only accepts a known table plus its token; an empty registry stays open so a
+   * fresh install works before any table has been set up.
+   */
+  function requireTable(request, reply, done) {
+    const table = String(request.body?.table ?? "").trim().toUpperCase();
+    if (!table) {
+      reply.code(400).send({ error: "Table is required" });
+      return;
+    }
+    request.body.table = table;
+    if (!database.hasTables()) {
+      done();
+      return;
+    }
+    const registered = database.getTable(table);
+    if (!registered || !registered.enabled) {
+      reply.code(403).send({ error: "Unknown table" });
+      return;
+    }
+    if (!tokenMatches(request.headers["x-table-token"], registered.token)) {
+      reply.code(403).send({ error: "Table token is invalid" });
+      return;
+    }
+    done();
+  }
 
   function requireAdmin(request, reply, done) {
     const now = Date.now();
@@ -134,7 +162,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/orders", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     orders: database.listOrders(request.query.limit)
   }));
-  app.post("/api/orders", { preHandler: guardOrders, schema: { body: CreateOrderBody } }, async (request, reply) => {
+  app.post("/api/orders", { preHandler: [guardOrders, requireTable], schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body || {});
       realtime.broadcast("order.changed", order);
@@ -158,7 +186,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/service-requests", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     requests: database.listServiceRequests(request.query.limit)
   }));
-  app.post("/api/service-requests", { preHandler: guardServiceRequests, schema: { body: ServiceRequestBody } }, async (request, reply) => {
+  app.post("/api/service-requests", { preHandler: [guardServiceRequests, requireTable], schema: { body: ServiceRequestBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.createServiceRequest(request.body || {});
       realtime.broadcast("service.changed", serviceRequest);
@@ -176,6 +204,29 @@ export function registerRoutes(app, { database, realtime, config }) {
     } catch (error) {
       return errorReply(reply, error);
     }
+  });
+
+  app.get("/api/admin/tables", { preHandler: requireAdmin }, async () => ({ tables: database.listTables() }));
+  app.post("/api/admin/tables", { preHandler: requireAdmin, schema: { body: TableBody } }, async (request, reply) => {
+    try {
+      return reply.code(201).send({ table: database.saveTable(request.body || {}) });
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+  app.delete("/api/admin/tables/:table", { preHandler: requireAdmin, schema: { params: TableParams } }, async (request, reply) => {
+    if (!database.deleteTable(request.params.table)) return errorReply(reply, new Error("Table not found"), 404);
+    return reply.code(204).send();
+  });
+  app.get("/api/admin/tables/:table/bill", { preHandler: requireAdmin, schema: { params: TableParams } }, async (request) => ({
+    bill: database.billForTable(request.params.table)
+  }));
+  app.post("/api/admin/tables/:table/bill/settle", { preHandler: requireAdmin, schema: { params: TableParams } }, async (request, reply) => {
+    const bill = database.settleTableBill(request.params.table);
+    if (!bill) return errorReply(reply, new Error("Table has no open orders to settle"), 409);
+    realtime.broadcast("bill.settled", { table: bill.table, total: bill.total });
+    realtime.broadcast("print.queued", { jobId: bill.printJobId });
+    return { bill };
   });
 
   app.get("/api/admin/printers", { preHandler: requireAdmin }, async () => ({ printers: database.listPrinters() }));

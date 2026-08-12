@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { buildServer } from "../index.mjs";
+import { renderReceipt } from "../print-agent.mjs";
 
 test("catalog, orders, service requests and print routing work together", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-api-"));
@@ -319,4 +320,171 @@ test("responses carry hardening headers", async (context) => {
   assert.equal(response.headers["x-content-type-options"], "nosniff");
   assert.equal(response.headers["referrer-policy"], "no-referrer");
   assert.equal(response.headers["x-frame-options"], "SAMEORIGIN");
+});
+
+test("table bill splits VAT by rate and prints once", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-bill-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const catalog = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products;
+  const food = catalog.find((product) => product.sku === "R1");
+  const drink = catalog.find((product) => product.kind === "drink");
+  assert.equal(food.vatPercent, 10);
+  assert.equal(drink.vatPercent, 20);
+
+  await app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "bill-order-0001", table: "07", note: "", items: [{ id: food.id, qty: 2 }, { id: drink.id, qty: 1 }] }
+  });
+
+  const preview = (await app.inject({ method: "GET", url: "/api/admin/tables/07/bill", headers: adminHeaders })).json().bill;
+  const grossFood = food.price * 2;
+  const expectedTotal = Number((grossFood + drink.price).toFixed(2));
+  assert.equal(preview.total, expectedTotal);
+  assert.equal(preview.fiscalReceipt, false);
+  assert.deepEqual(preview.vatBreakdown.map((group) => group.percent), [10, 20]);
+  const reduced = preview.vatBreakdown.find((group) => group.percent === 10);
+  assert.equal(reduced.gross, grossFood);
+  assert.equal(Number((reduced.net + reduced.vat).toFixed(2)), grossFood);
+  assert.equal(reduced.net, Math.round((grossFood * 100) / 1.1) / 100);
+
+  const settled = (await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/settle", headers: adminHeaders })).json().bill;
+  assert.equal(settled.total, expectedTotal);
+  assert.ok(settled.printJobId);
+
+  const jobs = (await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: adminHeaders })).json().jobs;
+  const billJob = jobs.find((job) => job.payload.kind === "bill");
+  assert.equal(billJob.printerRole, "front");
+  assert.equal(billJob.payload.table, "07");
+
+  const emptied = await app.inject({ method: "GET", url: "/api/admin/tables/07/bill", headers: adminHeaders });
+  assert.deepEqual(emptied.json().bill.items, []);
+  const again = await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/settle", headers: adminHeaders });
+  assert.equal(again.statusCode, 409);
+
+  const orders = (await app.inject({ method: "GET", url: "/api/orders", headers: adminHeaders })).json().orders;
+  assert.ok(orders[0].billedAt);
+});
+
+test("allergen codes are validated and normalized", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-allergens-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const base = {
+    sku: "TEST-ALLERGEN-01",
+    kind: "food",
+    category: "MAIN",
+    names: { zh: "测试", de: "Test", en: "Test" },
+    price: 9.9,
+    printStation: "kitchen",
+    published: true,
+    available: true
+  };
+
+  const rejected = await app.inject({ method: "POST", url: "/api/admin/products", headers: adminHeaders, payload: { ...base, allergens: ["Gluten"] } });
+  assert.equal(rejected.statusCode, 400);
+
+  const created = await app.inject({ method: "POST", url: "/api/admin/products", headers: adminHeaders, payload: { ...base, allergens: ["G", "A", "A"] } });
+  assert.equal(created.statusCode, 201);
+  assert.deepEqual(created.json().product.allergens, ["A", "G"]);
+  assert.equal(created.json().product.vatPercent, 10);
+});
+
+test("registered tables require their own token", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-tables-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products[0];
+  const order = (id, table, headers = {}) => app.inject({
+    method: "POST",
+    url: "/api/orders",
+    headers,
+    payload: { clientRequestId: id, table, note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+
+  // An empty registry keeps a fresh install usable.
+  assert.equal((await order("open-mode-0001", "09")).statusCode, 201);
+
+  const registered = (await app.inject({ method: "POST", url: "/api/admin/tables", headers: adminHeaders, payload: { table: "t-9", label: "Terrasse" } })).json().table;
+  assert.equal(registered.table, "T-9");
+  assert.ok(registered.token.length >= 12);
+
+  assert.equal((await order("guarded-0001", "T-9")).statusCode, 403);
+  assert.equal((await order("guarded-0002", "T-9", { "x-table-token": "wrong" })).statusCode, 403);
+  assert.equal((await order("guarded-0003", "99", { "x-table-token": registered.token })).statusCode, 403);
+
+  const accepted = await order("guarded-0004", "t-9", { "x-table-token": registered.token });
+  assert.equal(accepted.statusCode, 201);
+  assert.equal(accepted.json().order.table, "T-9");
+
+  const service = await app.inject({ method: "POST", url: "/api/service-requests", headers: { "x-table-token": registered.token }, payload: { table: "T-9", type: "water" } });
+  assert.equal(service.statusCode, 201);
+  const deniedService = await app.inject({ method: "POST", url: "/api/service-requests", payload: { table: "T-9", type: "water" } });
+  assert.equal(deniedService.statusCode, 403);
+
+  const listed = (await app.inject({ method: "GET", url: "/api/admin/tables", headers: adminHeaders })).json().tables;
+  assert.deepEqual(listed.map((row) => row.table), ["T-9"]);
+  const rotated = (await app.inject({ method: "POST", url: "/api/admin/tables", headers: adminHeaders, payload: { table: "T-9", rotateToken: true } })).json().table;
+  assert.notEqual(rotated.token, registered.token);
+  assert.equal((await order("guarded-0005", "T-9", { "x-table-token": registered.token })).statusCode, 403);
+});
+
+test("bill tickets carry localized names", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-bill-i18n-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products.find((product) => product.sku === "R1");
+  await app.inject({ method: "POST", url: "/api/orders", payload: { clientRequestId: "bill-i18n-0001", table: "04", note: "", items: [{ id: dish.id, qty: 1 }] } });
+  const bill = (await app.inject({ method: "GET", url: "/api/admin/tables/04/bill", headers: adminHeaders })).json().bill;
+  assert.equal(bill.items[0].names.de, dish.names.de);
+
+  const settled = await app.inject({ method: "POST", url: "/api/admin/tables/04/bill/settle", headers: adminHeaders });
+  assert.equal(settled.statusCode, 200);
+  const jobs = (await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: adminHeaders })).json().jobs;
+  const billJob = jobs.find((job) => job.payload.kind === "bill");
+  const ticket = renderReceipt(billJob.payload, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(ticket, /Rechnung/);
+  assert.match(ticket, new RegExp(dish.names.de));
+  assert.match(ticket, /kein Kassenbeleg/);
 });

@@ -22,7 +22,7 @@ export async function buildServer(overrides = {}) {
 
   await app.register(cors, {
     origin: settings.isProduction ? settings.corsOrigin : true,
-    allowedHeaders: ["content-type", "x-admin-token"]
+    allowedHeaders: ["content-type", "x-admin-token", "x-table-token"]
   });
   await app.register(websocket);
   await app.register(multipart);

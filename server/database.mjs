@@ -1,16 +1,21 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { dishes } from "../src/data.js";
+import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
+const VAT_PERCENTS = new Set([10, 13, 20]);
+// Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
+// The operator can override per product; confirm the rates with a tax advisor.
+const DEFAULT_VAT_PERCENT = { food: 10, sushi: 10, drink: 20 };
 const ORDER_TRANSITIONS = new Map([
   ["new", new Set(["preparing", "cancelled"])],
   ["preparing", new Set(["ready", "cancelled"])],
@@ -57,6 +62,7 @@ function mapProduct(row, media = []) {
     names: { zh: row.name_zh, de: row.name_de, en: row.name_en },
     description: row.description,
     price: row.price_cents / 100,
+    vatPercent: row.vat_percent,
     allergens: parseJson(row.allergens_json, []),
     details: {
       time: row.prep_time,
@@ -93,6 +99,8 @@ function normalizeProduct(input, current = {}) {
   const printStation = input.printStation || current.print_station || (kind === "drink" ? "bar" : kind === "sushi" ? "sushi" : "kitchen");
   if (!PRODUCT_KINDS.has(kind)) throw new Error("Unsupported product kind");
   if (!PRINT_STATIONS.has(printStation)) throw new Error("Unsupported print station");
+  const vatPercent = Number(input.vatPercent ?? current.vat_percent ?? DEFAULT_VAT_PERCENT[kind]);
+  if (!VAT_PERCENTS.has(vatPercent)) throw new Error("Unsupported VAT percentage");
 
   return {
     id: String(input.id || current.id || randomUUID()),
@@ -104,7 +112,8 @@ function normalizeProduct(input, current = {}) {
     nameEn: String(names.en ?? input.nameEn ?? current.name_en ?? "").trim(),
     description: String(input.description ?? current.description ?? "").trim(),
     priceCents: input.price === undefined ? current.price_cents ?? 0 : priceToCents(input.price),
-    allergensJson: JSON.stringify(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, [])),
+    vatPercent,
+    allergensJson: JSON.stringify(normalizeAllergens(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, []))),
     prepTime: String(details.time ?? current.prep_time ?? "").trim(),
     portion: String(details.people ?? current.portion ?? "").trim(),
     level: String(details.level ?? current.level ?? "").trim(),
@@ -152,6 +161,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
+      vat_percent INTEGER NOT NULL DEFAULT 10,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -174,6 +184,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       status TEXT NOT NULL DEFAULT 'new',
       note TEXT NOT NULL DEFAULT '',
       total_cents INTEGER NOT NULL,
+      billed_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -186,7 +197,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       quantity INTEGER NOT NULL CHECK (quantity > 0),
       unit_price_cents INTEGER NOT NULL,
       print_station TEXT NOT NULL,
-      modifiers_json TEXT NOT NULL DEFAULT '[]'
+      modifiers_json TEXT NOT NULL DEFAULT '[]',
+      vat_percent INTEGER NOT NULL DEFAULT 10
     );
 
     CREATE TABLE IF NOT EXISTS service_requests (
@@ -194,6 +206,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       table_no TEXT NOT NULL,
       type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS restaurant_tables (
+      table_no TEXT PRIMARY KEY,
+      label TEXT NOT NULL DEFAULT '',
+      token TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -235,9 +256,20 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE order_items ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE print_jobs ADD COLUMN claimed_by TEXT",
     "ALTER TABLE print_jobs ADD COLUMN lease_until TEXT",
-    "ALTER TABLE print_jobs ADD COLUMN next_attempt_at TEXT"
+    "ALTER TABLE print_jobs ADD COLUMN next_attempt_at TEXT",
+    "ALTER TABLE products ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
+    "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
+    "ALTER TABLE orders ADD COLUMN billed_at TEXT"
   ]) {
-    try { db.exec(statement); } catch (error) { if (!String(error.message).includes("duplicate column name")) throw error; }
+    try {
+      db.exec(statement);
+      // Existing catalogs predate the VAT column: drinks are billed at the standard rate.
+      if (statement.startsWith("ALTER TABLE products ADD COLUMN vat_percent")) {
+        db.exec(`UPDATE products SET vat_percent = ${DEFAULT_VAT_PERCENT.drink} WHERE kind = 'drink'`);
+      }
+    } catch (error) {
+      if (!String(error.message).includes("duplicate column name")) throw error;
+    }
   }
   const currentSchemaVersion = Number(db.prepare("PRAGMA user_version").get().user_version || 0);
   if (currentSchemaVersion > SCHEMA_VERSION) throw new Error(`Unsupported database schema version: ${currentSchemaVersion}`);
@@ -254,14 +286,14 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       INSERT INTO products (
         id, sku, kind, category, name_zh, name_de, name_en, description, price_cents,
         allergens_json, prep_time, portion, level, ingredients, art, pattern, available,
-        published, sort_order, print_station, modifiers_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        published, sort_order, print_station, modifiers_json, vat_percent, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     updateProduct: db.prepare(`
       UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
         name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
         portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
-        published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, updated_at = ? WHERE id = ?
+        published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, vat_percent = ?, updated_at = ? WHERE id = ?
     `),
     deleteProduct: db.prepare("DELETE FROM products WHERE id = ?"),
     insertMedia: db.prepare("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"),
@@ -270,8 +302,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     orderById: db.prepare("SELECT * FROM orders WHERE id = ?"),
     orderItems: db.prepare("SELECT * FROM order_items WHERE order_id = ?"),
     listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?"),
+    openBillOrders: db.prepare("SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at"),
+    markOrdersBilled: db.prepare("UPDATE orders SET billed_at = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'"),
     insertOrder: db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)"),
-    insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+    insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
     updateOrderStatus: db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"),
     insertPrintJob: db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)"),
     listPrintJobs: db.prepare("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?"),
@@ -285,6 +319,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     requestById: db.prepare("SELECT * FROM service_requests WHERE id = ?"),
     insertRequest: db.prepare("INSERT INTO service_requests (id, table_no, type, status, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?)"),
     updateRequest: db.prepare("UPDATE service_requests SET status = ?, updated_at = ? WHERE id = ?"),
+    tableCount: db.prepare("SELECT COUNT(*) AS count FROM restaurant_tables"),
+    listTables: db.prepare("SELECT * FROM restaurant_tables ORDER BY table_no"),
+    tableByNo: db.prepare("SELECT * FROM restaurant_tables WHERE table_no = ?"),
+    upsertTable: db.prepare(`
+      INSERT INTO restaurant_tables (table_no, label, token, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(table_no) DO UPDATE SET label = excluded.label, token = excluded.token, enabled = excluded.enabled, updated_at = excluded.updated_at
+    `),
+    deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
     listPrinters: db.prepare("SELECT * FROM printer_profiles ORDER BY role, name"),
     printerById: db.prepare("SELECT * FROM printer_profiles WHERE id = ?"),
     insertPrinter: db.prepare("INSERT INTO printer_profiles (id, name, transport, address, port, role, enabled, capabilities_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
@@ -316,7 +359,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
         product.pattern, product.available, product.published, product.sortOrder,
-        product.printStation, product.modifiersJson, timestamp, product.id
+        product.printStation, product.modifiersJson, product.vatPercent, timestamp, product.id
       );
     } else {
       statements.insertProduct.run(
@@ -324,7 +367,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         product.nameDe, product.nameEn, product.description, product.priceCents,
         product.allergensJson, product.prepTime, product.portion, product.level,
         product.ingredients, product.art, product.pattern, product.available,
-        product.published, product.sortOrder, product.printStation, product.modifiersJson, timestamp, timestamp
+        product.published, product.sortOrder, product.printStation, product.modifiersJson,
+        product.vatPercent, timestamp, timestamp
       );
     }
     return getProduct(product.id);
@@ -359,8 +403,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         qty: item.quantity,
         unitPrice: item.unit_price_cents / 100,
         printStation: item.print_station,
+        vatPercent: item.vat_percent,
         modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
       })),
+      billedAt: row.billed_at ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -444,7 +490,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       const jobs = new Map();
       for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {
         const productName = product.name_zh || product.name_de || product.name_en;
-        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers));
+        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers), product.vat_percent);
         const stationItems = jobs.get(product.print_station) || [];
         stationItems.push({ sku: product.sku, name: productName, names: { zh: product.name_zh, de: product.name_de, en: product.name_en }, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names, price: modifier.priceCents / 100 })) });
         jobs.set(product.print_station, stationItems);
@@ -458,6 +504,72 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       throw error;
     }
     return orderView(statements.orderById.get(id));
+  }
+
+  /**
+   * Menu prices are gross, so VAT is extracted per rate group.
+   * This is an internal bill, not a fiscal receipt (RKSV/Belegerteilungspflicht).
+   */
+  function billForTable(tableNo) {
+    const orders = statements.openBillOrders.all(String(tableNo));
+    const items = [];
+    const groups = new Map();
+    let totalCents = 0;
+    for (const order of orders) {
+      for (const row of statements.orderItems.all(order.id)) {
+        const lineCents = row.unit_price_cents * row.quantity;
+        const vatPercent = row.vat_percent;
+        // Guests read the bill: keep the localized names next to the snapshot name.
+        const product = statements.productById.get(row.product_id);
+        items.push({
+          orderNo: order.order_no,
+          name: row.product_name,
+          names: product ? { zh: product.name_zh, de: product.name_de, en: product.name_en } : undefined,
+          qty: row.quantity,
+          unitPrice: row.unit_price_cents / 100,
+          lineTotal: lineCents / 100,
+          vatPercent,
+          modifiers: parseJson(row.modifiers_json, []).map((modifier) => ({ name: modifier.name, names: modifier.names }))
+        });
+        groups.set(vatPercent, (groups.get(vatPercent) || 0) + lineCents);
+        totalCents += lineCents;
+      }
+    }
+    const vatBreakdown = [...groups.entries()].sort(([left], [right]) => left - right).map(([percent, grossCents]) => {
+      const netCents = Math.round(grossCents / (1 + percent / 100));
+      return { percent, gross: grossCents / 100, net: netCents / 100, vat: (grossCents - netCents) / 100 };
+    });
+    return {
+      table: String(tableNo),
+      orderNos: orders.map((order) => order.order_no),
+      orderIds: orders.map((order) => order.id),
+      items,
+      vatBreakdown,
+      total: totalCents / 100,
+      issuedAt: now(),
+      fiscalReceipt: false
+    };
+  }
+
+  function settleTableBill(tableNo) {
+    const table = String(tableNo);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const bill = billForTable(table);
+      if (!bill.orderIds.length) {
+        db.exec("COMMIT");
+        return null;
+      }
+      const timestamp = now();
+      statements.markOrdersBilled.run(timestamp, timestamp, table);
+      const jobId = randomUUID();
+      statements.insertPrintJob.run(jobId, bill.orderIds[0], "front", JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp);
+      db.exec("COMMIT");
+      return { ...bill, issuedAt: timestamp, printJobId: jobId };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   function updateOrder(id, status) {
@@ -487,6 +599,25 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     }
     statements.updateRequest.run(status, now(), String(id));
     return serviceRequestView(statements.requestById.get(String(id)));
+  }
+
+  function tableView(row) {
+    return row ? { table: row.table_no, label: row.label, token: row.token, enabled: Boolean(row.enabled), createdAt: row.created_at, updatedAt: row.updated_at } : null;
+  }
+
+  function normalizeTableNo(value) {
+    const table = String(value ?? "").trim().toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9-]{0,7}$/.test(table)) throw new Error("Table number must be 1-8 letters or digits");
+    return table;
+  }
+
+  function saveTable(input) {
+    const table = normalizeTableNo(input.table);
+    const current = statements.tableByNo.get(table);
+    const timestamp = now();
+    const token = input.rotateToken || !current ? randomBytes(12).toString("base64url") : current.token;
+    statements.upsertTable.run(table, String(input.label ?? current?.label ?? "").trim(), token, bool(input.enabled, current ? Boolean(current.enabled) : true), current?.created_at ?? timestamp, timestamp);
+    return tableView(statements.tableByNo.get(table));
   }
 
   function savePrinter(input, id) {
@@ -567,9 +698,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),
     createOrder,
     updateOrder,
+    billForTable,
+    settleTableBill,
+    openBillTables: () => [...new Set(statements.listOrders.all(500).filter((order) => !order.billed_at && order.status !== "cancelled").map((order) => order.table_no))],
     listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
     createServiceRequest,
     updateServiceRequest,
+    hasTables: () => statements.tableCount.get().count > 0,
+    listTables: () => statements.listTables.all().map(tableView),
+    getTable: (table) => tableView(statements.tableByNo.get(String(table ?? "").trim().toUpperCase())),
+    saveTable,
+    deleteTable: (table) => statements.deleteTable.run(String(table ?? "").trim().toUpperCase()).changes > 0,
     listPrinters: () => statements.listPrinters.all().map((row) => ({ ...row, enabled: Boolean(row.enabled), capabilities: parseJson(row.capabilities_json, {}) })),
     savePrinter,
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
