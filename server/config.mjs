@@ -12,7 +12,11 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean) : false,
   databasePath: process.env.DATABASE_PATH || path.join(serverDir, "data", "restaurant.sqlite"),
   uploadDir: process.env.UPLOAD_DIR || path.join(serverDir, "uploads"),
-  webDir: path.join(projectDir, "dist", "web")
+  webDir: path.join(projectDir, "dist", "web"),
+  // Guest devices post orders and service calls without a token: cap the burst per client IP.
+  publicRateLimitWindowMs: Number(process.env.PUBLIC_RATE_LIMIT_WINDOW_MS || 60_000),
+  orderRateLimitMax: Number(process.env.ORDER_RATE_LIMIT_MAX || 60),
+  serviceRateLimitMax: Number(process.env.SERVICE_RATE_LIMIT_MAX || 20)
 };
 
 if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) {

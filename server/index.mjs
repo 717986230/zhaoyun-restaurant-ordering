@@ -40,6 +40,17 @@ export async function buildServer(overrides = {}) {
     });
   }
 
+  // Uploaded media is user-controlled: never let a browser sniff it into an active document.
+  app.addHook("onSend", async (request, reply, payload) => {
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("referrer-policy", "no-referrer");
+    reply.header("x-frame-options", "SAMEORIGIN");
+    if (request.url.startsWith("/media/")) {
+      reply.header("content-security-policy", "default-src 'none'; img-src 'self'; media-src 'self'; sandbox");
+    }
+    return payload;
+  });
+
   app.setErrorHandler((error, request, reply) => {
     const statusCode = error.validation ? 400 : (error.statusCode && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500);
     request.log.error({ err: error, requestId: request.id }, "request failed");

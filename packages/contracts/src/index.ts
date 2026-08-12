@@ -57,8 +57,40 @@ export interface ApiOrder {
   status: Static<typeof OrderStatusSchema>;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number; modifiers?: Array<{ id: string; name: string; price: number }> }>;
+  items: Array<{ id: string; name?: string; qty: number; unitPrice?: number; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export type PrintStationName = "kitchen" | "bar" | "sushi" | "front";
+
+export interface ApiServiceRequest {
+  id: string;
+  table: string;
+  type: string;
+  status: "open" | "acknowledged" | "completed" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";
+
+export interface ApiPrintJob {
+  id: string;
+  orderId: string | null;
+  printerRole: PrintStationName;
+  status: PrintJobStatus;
+  attempts: number;
+  error: string | null;
+  nextAttemptAt: string | null;
+  payload: {
+    orderNo?: string;
+    table?: string;
+    note?: string;
+    items?: Array<{ sku?: string; name?: string; quantity?: number }>;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RealtimeEnvelope<T = unknown> {

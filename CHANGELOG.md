@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-08-12
+
+### 多桌运营修复
+
+- 顾客端不再把所有订单写死到桌号 `08`：桌号来自 `?table=` 或首页设置并持久化到设备，订单、服务呼叫和打印小票都带真实桌号；未配置的设备会显式提示。
+- 管理台新增「订单看板」，从服务端读取全店订单、服务呼叫和失败打印任务，可推进订单状态、取消订单、标记呼叫已处理和重新排队打印任务。原先顾客端的员工看板只改本机状态，现已在页面上标明作用范围。
+- 服务请求和打印任务的 API 响应统一为 camelCase（`table`/`createdAt`/`printerRole`），与订单契约保持一致。
+
+### 稳定性与安全
+
+- SQLite 连接设置 `busy_timeout`（默认 5000ms）：API 服务与打印代理并发写同一个数据库文件时会等待写锁，而不是立刻抛出 `SQLITE_BUSY`。
+- 公开的下单和服务呼叫接口按客户端 IP 限流，超限返回 `429` 和 `Retry-After`。
+- 所有响应增加 `X-Content-Type-Options`、`Referrer-Policy` 和 `X-Frame-Options`；上传媒体额外返回锁死的 CSP。
+- 缺失的 `/assets/`、`/media/` 资源返回 404，不再回落到 HTML 外壳导致 MIME 报错。
+
+### Verification
+
+- `npm run typecheck`：通过
+- `npm run unit`：6/6 通过
+- `npm run server:test`：11/11 通过
+- `npm test`：44/44 通过（手机/平板横竖屏四种视口）
+- `npm run build`：通过
+
 ## 2026-08-05
 
 ### Production Candidate Hardening

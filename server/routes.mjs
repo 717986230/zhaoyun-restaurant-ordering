@@ -7,6 +7,7 @@ import {
   CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
   ProductBody, ServiceRequestBody, ServiceStatusBody
 } from "./schemas.mjs";
+import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
@@ -32,6 +33,10 @@ function errorReply(reply, error, statusCode = 400) {
 
 export function registerRoutes(app, { database, realtime, config }) {
   const authFailures = new Map();
+  const orderLimiter = createRateLimiter({ windowMs: config.publicRateLimitWindowMs, max: config.orderRateLimitMax });
+  const serviceLimiter = createRateLimiter({ windowMs: config.publicRateLimitWindowMs, max: config.serviceRateLimitMax });
+  const guardOrders = rateLimitGuard(orderLimiter, "Too many orders from this device");
+  const guardServiceRequests = rateLimitGuard(serviceLimiter, "Too many service requests from this device");
 
   function requireAdmin(request, reply, done) {
     const now = Date.now();
@@ -129,7 +134,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/orders", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     orders: database.listOrders(request.query.limit)
   }));
-  app.post("/api/orders", { schema: { body: CreateOrderBody } }, async (request, reply) => {
+  app.post("/api/orders", { preHandler: guardOrders, schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body || {});
       realtime.broadcast("order.changed", order);
@@ -153,7 +158,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/service-requests", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     requests: database.listServiceRequests(request.query.limit)
   }));
-  app.post("/api/service-requests", { schema: { body: ServiceRequestBody } }, async (request, reply) => {
+  app.post("/api/service-requests", { preHandler: guardServiceRequests, schema: { body: ServiceRequestBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.createServiceRequest(request.body || {});
       realtime.broadcast("service.changed", serviceRequest);
@@ -203,6 +208,11 @@ export function registerRoutes(app, { database, realtime, config }) {
 
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) return reply.code(404).send({ error: "API route not found" });
+    // Never answer a missing bundle with the HTML shell: browsers then fail on the MIME type
+    // instead of showing that the build is stale.
+    if (request.url.startsWith("/assets/") || request.url.startsWith("/media/")) {
+      return reply.code(404).send({ error: "Asset not found" });
+    }
     const fallback = path.join(config.webDir, request.url === "/admin" ? "admin.html" : "index.html");
     if (existsSync(fallback)) return reply.type("text/html").sendFile(path.basename(fallback), config.webDir);
     return reply.code(404).send({ error: "Run npm run build before using the production web server" });

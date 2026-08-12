@@ -11,7 +11,9 @@ const copy = {
     ingredients: "主要食材", allergens: "过敏原", time: "制作时间", portion: "份量 / 难度",
     submit: "确认下单", total: "合计", note: "订单备注", emptyCart: "购物车还是空的",
     backMenu: "返回菜单", noOrders: "还没有已提交订单", order: "订单", serviceSent: "请求已发送",
-    table: "桌号", dish: "菜品", category: "分类"
+    table: "桌号", dish: "菜品", category: "分类",
+    setTable: "设置桌号", tablePrompt: "请输入本设备所在的桌号（1-8 位字母或数字）", tableInvalid: "桌号无效，请使用 1-8 位字母或数字",
+    tableUnset: "本设备还没有分配桌号，订单会记到默认桌号"
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
@@ -20,7 +22,9 @@ const copy = {
     ingredients: "Zutaten", allergens: "Allergene", time: "Zubereitungszeit", portion: "Portion / Schärfe",
     submit: "Bestellung bestätigen", total: "Gesamt", note: "Bestellnotiz", emptyCart: "Der Warenkorb ist leer",
     backMenu: "Zur Speisekarte", noOrders: "Noch keine Bestellung", order: "Bestellung", serviceSent: "Anfrage gesendet",
-    table: "Tisch", dish: "Gericht", category: "Kategorie"
+    table: "Tisch", dish: "Gericht", category: "Kategorie",
+    setTable: "Tisch einstellen", tablePrompt: "Tischnummer dieses Geräts eingeben (1-8 Zeichen)", tableInvalid: "Ungültige Tischnummer: 1-8 Buchstaben oder Ziffern",
+    tableUnset: "Diesem Gerät ist noch kein Tisch zugewiesen"
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
@@ -29,7 +33,9 @@ const copy = {
     ingredients: "Ingredients", allergens: "Allergens", time: "Preparation time", portion: "Portion / level",
     submit: "Place order", total: "Total", note: "Order note", emptyCart: "Your cart is empty",
     backMenu: "Back to menu", noOrders: "No orders yet", order: "Order", serviceSent: "Request sent",
-    table: "Table", dish: "Dish", category: "Category"
+    table: "Table", dish: "Dish", category: "Category",
+    setTable: "Set table", tablePrompt: "Enter the table number of this device (1-8 characters)", tableInvalid: "Invalid table number: use 1-8 letters or digits",
+    tableUnset: "This device has no table assigned yet"
   }
 } as const;
 

@@ -5,6 +5,7 @@ import { OrderCard, orderStatusLabels } from "../orders/OrdersScreen";
 
 export function StaffScreen({ state, products, dispatch }: { state: CustomerState; products: Product[]; dispatch: CustomerDispatch }) {
   return <section id="staff" className="screen panel staff active"><header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button><div><h2>员工看板</h2><small>MITARBEITER</small></div></header><div id="staffContent" className="content">
+    <p className="staff-scope">本页只显示这台设备提交的订单和呼叫，状态变更不会写回服务器。全店实时看板请使用管理台的「订单看板」。</p>
     <h3 className="section-title">厨房订单</h3>
     {state.orders.length ? state.orders.map((order) => {
       const next = nextOperationalStatus(order.status);

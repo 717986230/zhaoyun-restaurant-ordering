@@ -4,6 +4,7 @@ import { ApiError } from "@zhaoyun/api-client";
 import { formatEuro, summarizeCart } from "@zhaoyun/domain";
 import type { Order, Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
+import { tableNo } from "../../app/table";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { productName, t } from "../../app/i18n";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
@@ -21,11 +22,12 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
     if (!entries.length || submitting) return;
     setSubmitting(true);
     const clientRequestId = crypto.randomUUID();
+    const table = tableNo();
     const baseOrder: Order = {
       id: clientRequestId,
       clientRequestId,
       no: String(Date.now()).slice(-6),
-      table: "08",
+      table,
       status: "pending-sync",
       note,
         items: entries.map(({ product, quantity, modifiers }) => ({ productId: product.id, quantity, name: productName(product, state.language), modifiers })),
@@ -34,7 +36,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
     };
     const command: CreateOrderCommand = {
         clientRequestId,
-        table: "08",
+        table,
         note,
         items: entries.map(({ product, quantity, modifiers }) => ({ id: product.id, qty: quantity, modifiers: modifiers.map((modifier) => ({ id: modifier.id })) }))
     };

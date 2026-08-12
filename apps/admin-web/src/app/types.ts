@@ -1,6 +1,7 @@
+import type { ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
-export type AdminTab = "catalog" | "printers" | "system";
+export type AdminTab = "catalog" | "board" | "printers" | "system";
 export type ProductFilter = "all" | "food" | "drink" | "sushi";
 
 export interface AdminState {
@@ -8,6 +9,10 @@ export interface AdminState {
   connected: boolean;
   connectionText: string;
   products: Product[];
+  orders: ApiOrder[];
+  requests: ApiServiceRequest[];
+  failedJobs: ApiPrintJob[];
+  boardBusy: boolean;
   printers: PrinterProfile[];
   discoveredPrinters: DiscoveredPrinter[];
   editingProduct: Product | null;

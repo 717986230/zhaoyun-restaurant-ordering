@@ -525,6 +525,125 @@ h2 {
   text-align: center;
 }
 
+#boardPanel > .list-head {
+  padding: 20px clamp(16px, 3vw, 30px) 0;
+}
+
+.ghost-action {
+  border: 1px solid #c8d0cc;
+  border-radius: 5px;
+  background: #fff;
+  color: #34433b;
+  padding: 11px 16px;
+  white-space: nowrap;
+}
+
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px clamp(16px, 3vw, 30px) 30px;
+}
+
+.board-column h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: #3c4b43;
+}
+
+.board-column h2 em {
+  font-style: normal;
+  color: #7c8781;
+}
+
+.board-column h2:not(:first-child) {
+  margin-top: 22px;
+}
+
+.board-list {
+  display: grid;
+  gap: 10px;
+}
+
+.board-list .admin-empty {
+  border: 1px dashed #d7ddda;
+  border-radius: 6px;
+  padding: 22px 12px;
+}
+
+.board-card {
+  border: 1px solid #d7ddda;
+  border-radius: 6px;
+  background: #fff;
+  padding: 12px 14px;
+}
+
+.board-card.failed {
+  border-color: #e0b4b4;
+}
+
+.board-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.board-card-head b {
+  font-size: 16px;
+}
+
+.board-card-head .status {
+  border-radius: 999px;
+  background: #dfe7e2;
+  color: #365343;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.board-card-head .status.failed {
+  background: #f4dede;
+  color: #8d3232;
+}
+
+.board-card small {
+  display: block;
+  margin-top: 4px;
+  color: #7c8781;
+  font-size: 12px;
+}
+
+.board-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.board-card ul em {
+  color: #7c8781;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.board-note {
+  margin: 8px 0 0;
+  color: #8d3232;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.board-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.board-actions button {
+  margin: 0;
+}
+
 .admin-toast {
   position: fixed;
   z-index: 99;
@@ -556,7 +675,8 @@ h2 {
 
 @media (max-width: 800px) {
   .catalog-layout,
-  .printer-layout {
+  .printer-layout,
+  .board-layout {
     grid-template-columns: 1fr;
   }
 

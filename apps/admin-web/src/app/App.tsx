@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminApi } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage } from "@zhaoyun/api-client";
-import type { ApiCatalogProduct } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
+import { BoardPanel } from "../features/board/BoardPanel";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
@@ -28,8 +29,11 @@ function mapProduct(product: ApiCatalogProduct): Product {
 
 const initialState: AdminState = {
   tab: "catalog", connected: false, connectionText: "未连接", products: [], printers: [],
+  orders: [], requests: [], failedJobs: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", toast: null
 };
+
+const BOARD_REFRESH_MS = 5000;
 
 export function App() {
   const [state, setState] = useState(initialState);
@@ -51,7 +55,37 @@ export function App() {
     }
   }, []);
 
+  const loadBoard = useCallback(async (silent = false) => {
+    if (!adminApi.storage.token) return;
+    try {
+      const [{ orders }, { requests }, { jobs }] = await Promise.all([adminApi.orders(), adminApi.serviceRequests(), adminApi.printJobs("failed")]);
+      setState((current) => ({ ...current, orders, requests, failedJobs: jobs }));
+    } catch (error) {
+      if (!silent) notify(error instanceof Error ? error.message : "看板加载失败", "error");
+    }
+  }, [notify]);
+
   useEffect(() => { void connect(); }, [connect]);
+
+  useEffect(() => {
+    if (state.tab !== "board") return undefined;
+    void loadBoard();
+    const timer = window.setInterval(() => void loadBoard(true), BOARD_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [state.tab, loadBoard]);
+
+  async function runBoardAction(action: () => Promise<unknown>, message: string) {
+    setState((current) => ({ ...current, boardBusy: true }));
+    try {
+      await action();
+      await loadBoard(true);
+      notify(message);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "操作失败", "error");
+    } finally {
+      setState((current) => ({ ...current, boardBusy: false }));
+    }
+  }
 
   async function saveProduct(input: AdminProductInput, id: string | null, media: File | null) {
     try {
@@ -107,9 +141,19 @@ export function App() {
 
   return <><div className="admin-shell">
     <header className="admin-head"><div><strong>赵云餐厅管理台</strong><small>ZHAO YUN OPERATIONS</small></div><div className="admin-head-actions"><div className="connection"><i className={state.connected ? "online" : ""} /><span>{state.connectionText}</span></div><button onClick={() => void returnToApp()}>返回点餐</button></div></header>
-    <nav className="admin-tabs" aria-label="管理模块"><button className={state.tab === "catalog" ? "active" : ""} onClick={() => setTab("catalog")}>商品与媒体</button><button className={state.tab === "printers" ? "active" : ""} onClick={() => setTab("printers")}>打印机</button><button className={state.tab === "system" ? "active" : ""} onClick={() => setTab("system")}>连接设置</button></nav>
+    <nav className="admin-tabs" aria-label="管理模块"><button className={state.tab === "catalog" ? "active" : ""} onClick={() => setTab("catalog")}>商品与媒体</button><button className={state.tab === "board" ? "active" : ""} onClick={() => setTab("board")}>订单看板</button><button className={state.tab === "printers" ? "active" : ""} onClick={() => setTab("printers")}>打印机</button><button className={state.tab === "system" ? "active" : ""} onClick={() => setTab("system")}>连接设置</button></nav>
     <main>
       {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onRefresh={connect} />}
+      {state.tab === "board" && <BoardPanel
+        orders={state.orders}
+        requests={state.requests}
+        failedJobs={state.failedJobs}
+        busy={state.boardBusy}
+        onRefresh={() => loadBoard()}
+        onOrderStatus={(id: string, status: ApiOrder["status"]) => runBoardAction(() => adminApi.updateOrderStatus(id, status), "订单状态已更新")}
+        onRequestStatus={(id: string, status: ApiServiceRequest["status"]) => runBoardAction(() => adminApi.updateServiceRequestStatus(id, status), "服务呼叫已处理")}
+        onRetryJob={(id: string) => runBoardAction(() => adminApi.retryPrintJob(id), "打印任务已重新排队")}
+      />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "system" && <SettingsPanel storage={storage} onSave={saveConnection} />}
     </main>

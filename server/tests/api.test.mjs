@@ -132,17 +132,20 @@ test("catalog, orders, service requests and print routing work together", async 
     headers: adminHeaders
   });
   assert.deepEqual(
-    jobs.json().jobs.map((job) => job.printer_role).sort(),
+    jobs.json().jobs.map((job) => job.printerRole).sort(),
     ["bar", "kitchen", "kitchen", "sushi"]
   );
 
   const service = await app.inject({
     method: "POST",
     url: "/api/service-requests",
-    payload: { table: "08", type: "pay" }
+    payload: { table: "12", type: "pay" }
   });
   assert.equal(service.statusCode, 201);
+  assert.equal(service.json().request.table, "12");
   const requestId = service.json().request.id;
+  const requestList = await app.inject({ method: "GET", url: "/api/service-requests", headers: adminHeaders });
+  assert.deepEqual(requestList.json().requests.map((row) => [row.table, row.type, row.status]), [["12", "pay", "open"]]);
   const completeService = await app.inject({
     method: "PATCH",
     url: `/api/service-requests/${requestId}/status`,
@@ -233,4 +236,87 @@ test("production bootstrap rejects short admin tokens even when overridden progr
     () => buildServer({ isProduction: true, adminToken: "short-token", logger: false }),
     /Production ADMIN_TOKEN must be at least 32 characters/
   );
+});
+
+test("orders and print jobs keep the table the device was assigned to", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-table-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const catalog = await app.inject({ method: "GET", url: "/api/catalog" });
+  const dish = catalog.json().products[0];
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "terrace-table-0001", table: "T-12", note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().order.table, "T-12");
+
+  const jobs = await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: { "x-admin-token": "test-admin-token" } });
+  assert.deepEqual(jobs.json().jobs.map((job) => job.payload.table), ["T-12"]);
+});
+
+test("public ordering endpoints throttle a single device", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-throttle-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    orderRateLimitMax: 2,
+    serviceRateLimitMax: 1,
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const catalog = await app.inject({ method: "GET", url: "/api/catalog" });
+  const dish = catalog.json().products[0];
+  const order = (index) => app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: `throttle-order-${index}`, table: "05", note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+  assert.equal((await order(1)).statusCode, 201);
+  assert.equal((await order(2)).statusCode, 201);
+  const throttled = await order(3);
+  assert.equal(throttled.statusCode, 429);
+  assert.equal(throttled.json().retryAfter > 0, true);
+  assert.equal(throttled.headers["retry-after"] > 0, true);
+
+  const service = () => app.inject({ method: "POST", url: "/api/service-requests", payload: { table: "05", type: "water" } });
+  assert.equal((await service()).statusCode, 201);
+  assert.equal((await service()).statusCode, 429);
+
+  const catalogStillOpen = await app.inject({ method: "GET", url: "/api/catalog" });
+  assert.equal(catalogStillOpen.statusCode, 200);
+});
+
+test("responses carry hardening headers", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-headers-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const response = await app.inject({ method: "GET", url: "/api/health" });
+  assert.equal(response.headers["x-content-type-options"], "nosniff");
+  assert.equal(response.headers["referrer-policy"], "no-referrer");
+  assert.equal(response.headers["x-frame-options"], "SAMEORIGIN");
 });

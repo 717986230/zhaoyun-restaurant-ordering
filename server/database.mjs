@@ -10,6 +10,7 @@ const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelle
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
 const SCHEMA_VERSION = 3;
+const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 const ORDER_TRANSITIONS = new Map([
   ["new", new Set(["preparing", "cancelled"])],
   ["preparing", new Set(["ready", "cancelled"])],
@@ -118,12 +119,16 @@ function normalizeProduct(input, current = {}) {
   };
 }
 
-export function createDatabase(databasePath) {
+export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS } = {}) {
   mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = new DatabaseSync(databasePath);
+  // The API server and every print agent open the same file from separate processes.
+  // Without a busy timeout the second writer fails immediately with SQLITE_BUSY.
   db.exec(`
     PRAGMA foreign_keys = ON;
     PRAGMA journal_mode = WAL;
+    PRAGMA busy_timeout = ${Number(busyTimeoutMs) || 0};
+    PRAGMA synchronous = NORMAL;
 
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
@@ -361,6 +366,35 @@ export function createDatabase(databasePath) {
     };
   }
 
+  function serviceRequestView(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      table: row.table_no,
+      type: row.type,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  function printJobView(row) {
+    return {
+      id: row.id,
+      orderId: row.order_id,
+      printerRole: row.printer_role,
+      status: row.status,
+      attempts: row.attempts,
+      error: row.error,
+      claimedBy: row.claimed_by,
+      leaseUntil: row.lease_until,
+      nextAttemptAt: row.next_attempt_at,
+      payload: parseJson(row.payload_json, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
   function resolveModifiers(product, requested = []) {
     const groups = parseJson(product.modifiers_json, []);
     const options = new Map(groups.flatMap((group) => group.options.map((option) => [option.id, { ...option, groupId: group.id, selection: group.selection }] )));
@@ -398,6 +432,7 @@ export function createDatabase(databasePath) {
     const timestamp = now();
     const orderNo = `${timestamp.slice(2, 10).replaceAll("-", "")}-${id.slice(0, 5).toUpperCase()}`;
 
+    const tableNo = String(input.table);
     db.exec("BEGIN IMMEDIATE");
     try {
       const committed = statements.orderByClientId.get(requestId);
@@ -405,7 +440,7 @@ export function createDatabase(databasePath) {
         db.exec("COMMIT");
         return orderView(committed);
       }
-      statements.insertOrder.run(id, orderNo, requestId, String(input.table || "08"), String(input.note || "").trim(), totalCents, timestamp, timestamp);
+      statements.insertOrder.run(id, orderNo, requestId, tableNo, String(input.note || "").trim(), totalCents, timestamp, timestamp);
       const jobs = new Map();
       for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {
         const productName = product.name_zh || product.name_de || product.name_en;
@@ -415,7 +450,7 @@ export function createDatabase(databasePath) {
         jobs.set(product.print_station, stationItems);
       }
       for (const [station, items] of jobs) {
-        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table: String(input.table || "08"), note: String(input.note || ""), items }), timestamp, timestamp);
+        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table: tableNo, note: String(input.note || ""), items }), timestamp, timestamp);
       }
       db.exec("COMMIT");
     } catch (error) {
@@ -439,8 +474,8 @@ export function createDatabase(databasePath) {
   function createServiceRequest(input) {
     const id = randomUUID();
     const timestamp = now();
-    statements.insertRequest.run(id, String(input.table || "08"), String(input.type || "").trim(), timestamp, timestamp);
-    return statements.requestById.get(id);
+    statements.insertRequest.run(id, String(input.table), String(input.type || "").trim(), timestamp, timestamp);
+    return serviceRequestView(statements.requestById.get(id));
   }
 
   function updateServiceRequest(id, status) {
@@ -451,7 +486,7 @@ export function createDatabase(databasePath) {
       throw new Error(`Invalid service request transition: ${current.status} -> ${status}`);
     }
     statements.updateRequest.run(status, now(), String(id));
-    return statements.requestById.get(String(id));
+    return serviceRequestView(statements.requestById.get(String(id)));
   }
 
   function savePrinter(input, id) {
@@ -532,13 +567,13 @@ export function createDatabase(databasePath) {
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),
     createOrder,
     updateOrder,
-    listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)),
+    listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
     createServiceRequest,
     updateServiceRequest,
     listPrinters: () => statements.listPrinters.all().map((row) => ({ ...row, enabled: Boolean(row.enabled), capabilities: parseJson(row.capabilities_json, {}) })),
     savePrinter,
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
-    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) })),
+    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map(printJobView),
     claimPrintJob: (role, workerId, leaseMs = 30_000) => {
       const timestamp = now();
       const leaseUntil = new Date(Date.now() + leaseMs).toISOString();
