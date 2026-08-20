@@ -17,6 +17,7 @@ const MEDIA_TYPES = new Map([
   ["video/webm", { type: "video", extension: ".webm" }]
 ]);
 
+const TABLE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,7}$/;
 const AUTH_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_MAX_FAILURES = 5;
 
@@ -45,8 +46,10 @@ export function registerRoutes(app, { database, realtime, config }) {
    */
   function requireTable(request, reply, done) {
     const table = String(request.body?.table ?? "").trim().toUpperCase();
-    if (!table) {
-      reply.code(400).send({ error: "Table is required" });
+    // Validated even in open mode: a table that cannot be registered later
+    // would otherwise be accepted now and become unbillable.
+    if (!TABLE_PATTERN.test(table)) {
+      reply.code(400).send({ error: "Table number must be 1-8 letters or digits" });
       return;
     }
     request.body.table = table;
@@ -94,7 +97,10 @@ export function registerRoutes(app, { database, realtime, config }) {
     timestamp: new Date().toISOString()
   }));
 
-  app.get("/ws", { websocket: true }, (socket) => realtime.connect(socket));
+  app.get("/ws", { websocket: true }, (socket, request) => {
+    const table = String(request.query?.table ?? "").trim().toUpperCase();
+    realtime.connect(socket, TABLE_PATTERN.test(table) ? table : null);
+  });
 
   app.get("/api/catalog", async () => ({ products: database.listProducts(true) }));
   app.get("/api/admin/products", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async () => ({ products: database.listProducts(false) }));
@@ -165,8 +171,8 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/orders", { preHandler: [guardOrders, requireTable], schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body || {});
-      realtime.broadcast("order.changed", order);
-      realtime.broadcast("print.queued", { orderId: order.id });
+      realtime.broadcast("order.changed", order, order.table);
+      realtime.broadcast("print.queued", { orderId: order.id }, order.table);
       return reply.code(201).send({ order });
     } catch (error) {
       return errorReply(reply, error);
@@ -176,7 +182,7 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const order = database.updateOrder(request.params.id, request.body?.status);
       if (!order) return errorReply(reply, new Error("Order not found"), 404);
-      realtime.broadcast("order.changed", order);
+      realtime.broadcast("order.changed", order, order.table);
       return { order };
     } catch (error) {
       return errorReply(reply, error);
@@ -189,7 +195,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/service-requests", { preHandler: [guardServiceRequests, requireTable], schema: { body: ServiceRequestBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.createServiceRequest(request.body || {});
-      realtime.broadcast("service.changed", serviceRequest);
+      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return reply.code(201).send({ request: serviceRequest });
     } catch (error) {
       return errorReply(reply, error);
@@ -199,7 +205,7 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const serviceRequest = database.updateServiceRequest(request.params.id, request.body?.status);
       if (!serviceRequest) return errorReply(reply, new Error("Service request not found"), 404);
-      realtime.broadcast("service.changed", serviceRequest);
+      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return { request: serviceRequest };
     } catch (error) {
       return errorReply(reply, error);
@@ -207,6 +213,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   });
 
   app.get("/api/admin/tables", { preHandler: requireAdmin }, async () => ({ tables: database.listTables() }));
+  app.get("/api/admin/tables/open", { preHandler: requireAdmin }, async () => ({ tables: database.openBillTables() }));
   app.post("/api/admin/tables", { preHandler: requireAdmin, schema: { body: TableBody } }, async (request, reply) => {
     try {
       return reply.code(201).send({ table: database.saveTable(request.body || {}) });
@@ -224,8 +231,8 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/tables/:table/bill/settle", { preHandler: requireAdmin, schema: { params: TableParams } }, async (request, reply) => {
     const bill = database.settleTableBill(request.params.table);
     if (!bill) return errorReply(reply, new Error("Table has no open orders to settle"), 409);
-    realtime.broadcast("bill.settled", { table: bill.table, total: bill.total });
-    realtime.broadcast("print.queued", { jobId: bill.printJobId });
+    realtime.broadcast("bill.settled", { table: bill.table, total: bill.total }, bill.table);
+    realtime.broadcast("print.queued", { jobId: bill.printJobId }, bill.table);
     return { bill };
   });
 

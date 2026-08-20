@@ -39,6 +39,7 @@ interface Props {
   requests: ApiServiceRequest[];
   failedJobs: ApiPrintJob[];
   bill: ApiBill | null;
+  openTables: string[];
   busy: boolean;
   onRefresh: () => Promise<void>;
   onOrderStatus: (id: string, status: ApiOrder["status"]) => Promise<void>;
@@ -52,7 +53,6 @@ interface Props {
 export function BoardPanel(props: Props) {
   const openOrders = props.orders.filter((order) => order.status !== "completed" && order.status !== "cancelled");
   const openRequests = props.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled");
-  const openTables = [...new Set(props.orders.filter((order) => !order.billedAt && order.status !== "cancelled").map((order) => order.table))];
 
   return <section id="boardPanel" className="admin-panel active">
     <div className="list-head"><div><h1>订单看板</h1><p>全店实时订单、服务呼叫和失败打印任务，每 5 秒自动刷新</p></div><button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>刷新</button></div>
@@ -76,8 +76,8 @@ export function BoardPanel(props: Props) {
       </section>
 
       <section className="board-column">
-        <h2>结账 <em>{openTables.length}</em></h2>
-        <div className="board-list">{openTables.length ? <div className="table-chips">{openTables.map((table) => <button key={table} className="ghost-action" disabled={props.busy} onClick={() => void props.onOpenBill(table)}>桌 {table}</button>)}</div> : <div className="admin-empty">没有待结账的桌</div>}</div>
+        <h2>结账 <em>{props.openTables.length}</em></h2>
+        <div className="board-list">{props.openTables.length ? <div className="table-chips">{props.openTables.map((table) => <button key={table} className="ghost-action" disabled={props.busy} onClick={() => void props.onOpenBill(table)}>桌 {table}</button>)}</div> : <div className="admin-empty">没有待结账的桌</div>}</div>
         {props.bill && <div className="bill-sheet" role="dialog" aria-label="账单">
           <div className="board-card-head"><b>桌 {props.bill.table} 账单</b><button className="ghost-action" onClick={props.onCloseBill}>关闭</button></div>
           {props.bill.items.length ? <>

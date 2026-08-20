@@ -488,3 +488,39 @@ test("bill tickets carry localized names", async (context) => {
   assert.match(ticket, new RegExp(dish.names.de));
   assert.match(ticket, /kein Kassenbeleg/);
 });
+
+test("the settle list and table validation do not depend on the recent-order window", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-open-tables-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products[0];
+  const order = (id, table) => app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: id, table, note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+
+  // The board pages orders; the settle list must not inherit that window.
+  await order("window-oldest-0001", "01");
+  await order("window-newest-0001", "02");
+
+  const page = (await app.inject({ method: "GET", url: "/api/orders?limit=1", headers: adminHeaders })).json().orders;
+  assert.equal(page.length, 1);
+  assert.equal(page[0].table, "02", "the page shows the newest order only");
+
+  const openTables = (await app.inject({ method: "GET", url: "/api/admin/tables/open", headers: adminHeaders })).json().tables;
+  assert.deepEqual(openTables, ["01", "02"]);
+
+  const rejected = await order("window-invalid-0001", "THIS-TABLE-IS-FAR-TOO-LONG");
+  assert.equal(rejected.statusCode, 400);
+});

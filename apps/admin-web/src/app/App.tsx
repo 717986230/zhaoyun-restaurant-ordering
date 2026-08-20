@@ -30,7 +30,7 @@ function mapProduct(product: ApiCatalogProduct): Product {
 
 const initialState: AdminState = {
   tab: "catalog", connected: false, connectionText: "未连接", products: [], printers: [],
-  orders: [], requests: [], failedJobs: [], bill: null, tables: [], boardBusy: false,
+  orders: [], requests: [], failedJobs: [], bill: null, tables: [], openTables: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", toast: null
 };
 
@@ -59,8 +59,8 @@ export function App() {
   const loadBoard = useCallback(async (silent = false) => {
     if (!adminApi.storage.token) return;
     try {
-      const [{ orders }, { requests }, { jobs }] = await Promise.all([adminApi.orders(), adminApi.serviceRequests(), adminApi.printJobs("failed")]);
-      setState((current) => ({ ...current, orders, requests, failedJobs: jobs }));
+      const [{ orders }, { requests }, { jobs }, { tables }] = await Promise.all([adminApi.orders(), adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.openTables()]);
+      setState((current) => ({ ...current, orders, requests, failedJobs: jobs, openTables: tables }));
     } catch (error) {
       if (!silent) notify(error instanceof Error ? error.message : "看板加载失败", "error");
     }
@@ -208,6 +208,7 @@ export function App() {
         onRequestStatus={(id: string, status: ApiServiceRequest["status"]) => runBoardAction(() => adminApi.updateServiceRequestStatus(id, status), "服务呼叫已处理")}
         onRetryJob={(id: string) => runBoardAction(() => adminApi.retryPrintJob(id), "打印任务已重新排队")}
         bill={state.bill}
+        openTables={state.openTables}
         onOpenBill={openBill}
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
         onSettleBill={settleBill}

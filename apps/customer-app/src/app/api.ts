@@ -1,14 +1,14 @@
 import { RestaurantApi } from "@zhaoyun/api-client";
 import type { ApiCatalogProduct } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { tableToken } from "./table";
+import { tableNo, tableToken } from "./table";
 
 export function apiBaseUrl(): string {
   const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : location.origin;
   return localStorage.getItem("zy_api_base") || fallback;
 }
 
-export const restaurantApi = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-table-token": tableToken() }) });
+export const restaurantApi = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-table-token": tableToken() }), socketParams: () => ({ table: tableNo() }) });
 
 export function mapApiProduct(product: ApiCatalogProduct): Product {
   return {

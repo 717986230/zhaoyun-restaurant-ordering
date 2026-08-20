@@ -8,6 +8,8 @@ export interface RestaurantApiOptions {
   baseUrl: () => string;
   /** Extra headers evaluated per request, e.g. the current table token. */
   headers?: () => Record<string, string>;
+  /** Query parameters for the realtime socket, e.g. the table it subscribes to. */
+  socketParams?: () => Record<string, string>;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -77,6 +79,7 @@ export class AdminApi {
   bill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill`); }
   settleBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/settle`, { method: "POST" }); }
   tables(): Promise<{ tables: RestaurantTable[] }> { return this.#request("/api/admin/tables"); }
+  openTables(): Promise<{ tables: string[] }> { return this.#request("/api/admin/tables/open"); }
   saveTable(input: { table: string; label?: string; enabled?: boolean; rotateToken?: boolean }): Promise<{ table: RestaurantTable }> { return this.#request("/api/admin/tables", { method: "POST", body: JSON.stringify(input) }); }
   deleteTable(table: string): Promise<void> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}`, { method: "DELETE" }); }
   printers(): Promise<{ printers: PrinterProfile[] }> { return this.#request("/api/admin/printers"); }
@@ -105,11 +108,13 @@ export class AdminApi {
 export class RestaurantApi {
   readonly #baseUrl: () => string;
   readonly #headers: () => Record<string, string>;
+  readonly #socketParams: () => Record<string, string>;
   readonly #fetch: typeof globalThis.fetch;
 
   constructor(options: RestaurantApiOptions) {
     this.#baseUrl = options.baseUrl;
     this.#headers = options.headers ?? (() => ({}));
+    this.#socketParams = options.socketParams ?? (() => ({}));
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -136,7 +141,8 @@ export class RestaurantApi {
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
     const open = () => {
-      socket = new WebSocket(`${base}/ws`);
+      const query = new URLSearchParams(this.#socketParams()).toString();
+      socket = new WebSocket(`${base}/ws${query ? `?${query}` : ""}`);
       socket.addEventListener("message", (event) => {
         try { onMessage(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Ignore malformed live events. */ }
       });

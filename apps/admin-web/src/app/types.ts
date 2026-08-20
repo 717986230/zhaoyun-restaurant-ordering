@@ -15,6 +15,7 @@ export interface AdminState {
   failedJobs: ApiPrintJob[];
   bill: ApiBill | null;
   tables: RestaurantTable[];
+  openTables: string[];
   boardBusy: boolean;
   printers: PrinterProfile[];
   discoveredPrinters: DiscoveredPrinter[];
