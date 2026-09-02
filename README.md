@@ -36,7 +36,7 @@ ADMIN_TOKEN='replace-with-a-long-random-token' npm run server
 
 完整 Android SDK、APK 安装、局域网部署和打印机说明见 [INSTALL.md](INSTALL.md)。
 
-部署前请先阅读 [INSTALL.md](INSTALL.md) 的生产环境要求；当前版本适合单机/单进程餐厅部署，多实例前需要将认证限流迁移到共享存储。放在反向代理后面时必须设置 `TRUST_PROXY`，否则限流会把所有请求算成同一个来源。
+部署前请先阅读 [INSTALL.md](INSTALL.md) 的生产环境要求；当前版本适合单机/单进程餐厅部署，多实例前需要将认证限流迁移到共享存储。放在反向代理后面时必须把可信代理地址填进 `TRUST_PROXY`，否则限流会把所有请求算成同一个来源。
 
 ## 开发命令
 

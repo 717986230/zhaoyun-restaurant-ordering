@@ -4,12 +4,22 @@ import { fileURLToPath } from "node:url";
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(serverDir, "..");
 
+/**
+ * Only an explicit list of trusted proxy addresses is accepted.
+ *
+ * A hop count (`TRUST_PROXY=2`) silently stops resolving forwarded addresses on fastify >= 5.12
+ * — the hardening for GHSA-3m5p-2c4r-xxw2 — so accepting it would leave every request looking
+ * like it came from the proxy and keep the auth rate limiter locking out all admins at once.
+ * `true` is worse: it takes the leftmost X-Forwarded-For entry, which any client can set.
+ * Both fail loudly here rather than appearing to work.
+ */
 function parseTrustProxy(value) {
-  if (!value) return false;
+  if (value === undefined || value.trim() === "") return false;
   const normalized = value.trim();
-  if (normalized === "true") return true;
   if (normalized === "false") return false;
-  if (/^\d+$/.test(normalized)) return Number(normalized);
+  if (normalized === "true" || /^\d+$/.test(normalized)) {
+    throw new Error("TRUST_PROXY must list trusted proxy addresses or subnets (for example 10.0.0.0/8,127.0.0.1); 'true' and hop counts are not supported");
+  }
   return normalized.split(",").map((entry) => entry.trim()).filter(Boolean);
 }
 

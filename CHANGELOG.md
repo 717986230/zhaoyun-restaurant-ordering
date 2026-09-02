@@ -27,6 +27,11 @@
 - Android 管理 PIN 改用随机盐 + PBKDF2（SHA-256，20 万次迭代；API 26 以下回退 PBKDF2-SHA1）
   存储，替换原先的单轮 SHA-256；旧记录在下次成功解锁时自动升级。
 - 升级 fast-uri 修复 GHSA-7p8r-x3mc-p8w7（high）。
+- 升级 fastify 到 5.12.1 并把依赖下限提到该版本，修复 GHSA-w2qp-rph6-63g4（schema 校验绕过）
+  与 GHSA-3m5p-2c4r-xxw2（trustProxy 跳数下的 `X-Forwarded-*` 伪造）。
+- `TRUST_PROXY` 只接受可信代理地址/网段。跳数写法在 fastify 5.12 之后不再解析转发地址——配了
+  等于没配，限流仍会锁住所有管理员——`true` 则采信客户端可伪造的最左侧地址；两者现在都在启动
+  时报错退出，并有集成测试固定该行为。
 
 ### Changed
 

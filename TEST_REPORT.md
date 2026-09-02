@@ -8,10 +8,14 @@
 |---|---|
 | `npm run typecheck` | 通过 |
 | `npm run unit` | 2/2 通过 |
-| `npm run server:test` | 7/7 通过 |
+| `npm run server:test` | 9/9 通过 |
 | `npm test`（Playwright，4 种视口 × 15 用例） | 60/60 通过 |
 | `npm run build` | 通过 |
-| `npm audit --omit=dev` | 0 漏洞（升级 fast-uri 修复 GHSA-7p8r-x3mc-p8w7 后） |
+| `npm audit --omit=dev` | 0 漏洞（升级 fast-uri 与 fastify 后） |
+
+生产依赖 0 漏洞。开发依赖仍有两条待处理，均需破坏性大版本升级、属于独立工程项：
+`esbuild <=0.24.2`（moderate，经 vite 5）与 `tar <=7.5.20`（critical，经 @capacitor/cli 6）。
+两者只在构建/同步阶段使用，不进入运行时产物。
 
 ## v0.4 生产候选验证
 
@@ -80,6 +84,7 @@ Node 测试覆盖：
 - 后台错误 token 第 6 次尝试触发 429 限流
 - 含空格分类（如 `HOT POT`）的 seed 商品可以从管理接口原样回写
 - 服务请求返回契约 DTO（`table`/`serviceType`/`createdAt`），不再泄漏数据库行字段
+- 可信代理列表下解析出真实客户端 IP；跳数与 `true` 写法在启动时被拒绝
 
 额外覆盖：
 
@@ -88,7 +93,7 @@ Node 测试覆盖：
 - 打印失败进入 `retry-wait` 并保留错误：Node 集成测试通过
 - SQLite `VACUUM INTO` 备份和 `integrity_check`：临时数据库演练通过
 
-最终结果：7 个后端/打印集成测试全部通过。
+最终结果：9 个后端/打印/代理集成测试全部通过。
 
 ## 管理台实测
 
@@ -152,7 +157,10 @@ Playwright 已验证详情与 3D 翻转交互；模拟器进入屏幕固定后�
 ## 安全防护补充
 
 - 管理 API 使用常量时间 token 比较；同一来源连续 5 次错误 token 后锁定 5 分钟并返回 `429`/`Retry-After`（`AUTH_WINDOW_MS`）。
-- 反向代理部署必须设置 `TRUST_PROXY`，否则限流按代理 IP 聚合，会把所有管理员一起锁住。
+- 反向代理部署必须把可信代理地址填进 `TRUST_PROXY`，否则限流按代理 IP 聚合，会把所有管理员
+  一起锁住。集成测试固定了这个行为：不配时不采信 `X-Forwarded-For`，配了可信地址才解析出真实
+  客户端；跳数写法和 `true` 在启动时被拒绝（前者在 fastify 5.12 之后不再解析转发地址，等于
+  配了没生效，后者采信客户端可伪造的最左侧地址）。
 - Android 管理 PIN 连续 5 次错误后锁定 60 秒，成功解锁后清除失败计数。
 - Android 管理 PIN 使用随机盐 + PBKDF2（SHA-256，20 万次迭代；API 26 以下回退 PBKDF2-SHA1）
   存储，旧版单轮 SHA-256 记录在下次成功解锁时自动升级；已用桩化 SharedPreferences 验证
