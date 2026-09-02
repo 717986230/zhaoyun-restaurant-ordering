@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminApi } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage } from "@zhaoyun/api-client";
-import type { ApiCatalogProduct } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, RealtimeEnvelope } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
+import { OrdersPanel } from "../features/orders/OrdersPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 
@@ -27,8 +28,9 @@ function mapProduct(product: ApiCatalogProduct): Product {
 }
 
 const initialState: AdminState = {
-  tab: "catalog", connected: false, connectionText: "未连接", products: [], printers: [],
-  discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", toast: null
+  tab: "orders", connected: false, connectionText: "未连接", products: [], orders: [], requests: [],
+  busyId: null, printers: [], discoveredPrinters: [], editingProduct: null, editingPrinter: null,
+  productFilter: "all", toast: null
 };
 
 export function App() {
@@ -40,11 +42,20 @@ export function App() {
     window.setTimeout(() => setState((current) => ({ ...current, toast: null })), 2400);
   }, []);
 
+  const loadBoard = useCallback(async () => {
+    try {
+      const [{ orders }, { requests }] = await Promise.all([adminApi.orders(), adminApi.serviceRequests()]);
+      setState((current) => ({ ...current, orders, requests }));
+    } catch { /* The connection banner already reports an unreachable server. */ }
+  }, []);
+
   const connect = useCallback(async () => {
     try {
       await adminApi.health();
-      const [{ products }, { printers }] = await Promise.all([adminApi.products(), adminApi.printers()]);
-      setState((current) => ({ ...current, connected: true, connectionText: "服务器在线", products: products.map(mapProduct), printers }));
+      const [{ products }, { printers }, { orders }, { requests }] = await Promise.all([
+        adminApi.products(), adminApi.printers(), adminApi.orders(), adminApi.serviceRequests()
+      ]);
+      setState((current) => ({ ...current, connected: true, connectionText: "服务器在线", products: products.map(mapProduct), printers, orders, requests }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "连接失败";
       setState((current) => ({ ...current, connected: false, connectionText: message, ...(!adminApi.storage.token ? { tab: "system" as const } : {}) }));
@@ -52,6 +63,32 @@ export function App() {
   }, []);
 
   useEffect(() => { void connect(); }, [connect]);
+
+  useEffect(() => adminApi.connect((message: RealtimeEnvelope) => {
+    if (message.type === "order.changed" || message.type === "service.changed") void loadBoard();
+  }), [loadBoard]);
+
+  async function updateOrderStatus(id: string, status: ApiOrder["status"]) {
+    setState((current) => ({ ...current, busyId: id }));
+    try {
+      const { order } = await adminApi.updateOrderStatus(id, status);
+      setState((current) => ({ ...current, busyId: null, orders: current.orders.map((row) => row.id === order.id ? order : row) }));
+    } catch (error) {
+      setState((current) => ({ ...current, busyId: null }));
+      notify(error instanceof Error ? error.message : "更新订单状态失败", "error");
+    }
+  }
+
+  async function updateRequestStatus(id: string, status: ApiServiceRequest["status"]) {
+    setState((current) => ({ ...current, busyId: id }));
+    try {
+      const { request } = await adminApi.updateServiceRequestStatus(id, status);
+      setState((current) => ({ ...current, busyId: null, requests: current.requests.map((row) => row.id === request.id ? request : row) }));
+    } catch (error) {
+      setState((current) => ({ ...current, busyId: null }));
+      notify(error instanceof Error ? error.message : "更新服务呼叫失败", "error");
+    }
+  }
 
   async function saveProduct(input: AdminProductInput, id: string | null, media: File | null) {
     try {
@@ -107,8 +144,9 @@ export function App() {
 
   return <><div className="admin-shell">
     <header className="admin-head"><div><strong>赵云餐厅管理台</strong><small>ZHAO YUN OPERATIONS</small></div><div className="admin-head-actions"><div className="connection"><i className={state.connected ? "online" : ""} /><span>{state.connectionText}</span></div><button onClick={() => void returnToApp()}>返回点餐</button></div></header>
-    <nav className="admin-tabs" aria-label="管理模块"><button className={state.tab === "catalog" ? "active" : ""} onClick={() => setTab("catalog")}>商品与媒体</button><button className={state.tab === "printers" ? "active" : ""} onClick={() => setTab("printers")}>打印机</button><button className={state.tab === "system" ? "active" : ""} onClick={() => setTab("system")}>连接设置</button></nav>
+    <nav className="admin-tabs" aria-label="管理模块"><button className={state.tab === "orders" ? "active" : ""} onClick={() => setTab("orders")}>订单看板</button><button className={state.tab === "catalog" ? "active" : ""} onClick={() => setTab("catalog")}>商品与媒体</button><button className={state.tab === "printers" ? "active" : ""} onClick={() => setTab("printers")}>打印机</button><button className={state.tab === "system" ? "active" : ""} onClick={() => setTab("system")}>连接设置</button></nav>
     <main>
+      {state.tab === "orders" && <OrdersPanel orders={state.orders} requests={state.requests} busyId={state.busyId} onOrderStatus={updateOrderStatus} onRequestStatus={updateRequestStatus} onRefresh={loadBoard} />}
       {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onRefresh={connect} />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "system" && <SettingsPanel storage={storage} onSave={saveConnection} />}

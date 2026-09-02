@@ -1,6 +1,17 @@
 # 测试报告
 
-日期：2026-08-05
+日期：2026-09-02
+
+## 本轮执行结果
+
+| 命令 | 结果 |
+|---|---|
+| `npm run typecheck` | 通过 |
+| `npm run unit` | 2/2 通过 |
+| `npm run server:test` | 7/7 通过 |
+| `npm test`（Playwright，4 种视口 × 15 用例） | 60/60 通过 |
+| `npm run build` | 通过 |
+| `npm audit --omit=dev` | 0 漏洞（升级 fast-uri 修复 GHSA-7p8r-x3mc-p8w7 后） |
 
 ## v0.4 生产候选验证
 
@@ -9,7 +20,7 @@
 - npm workspaces、TypeScript strict 和 Project References：通过。
 - `domain`、`contracts`、`api-client`、`native-bridge` 包构建：通过。
 - Vite 顾客端与管理台多页生产构建：通过。
-- `npm audit --omit=dev`：0 个生产依赖漏洞。
+- `npm audit --omit=dev`：0 个生产依赖漏洞（fast-uri 已升级到 3.1.6 / 4.1.3）。
 - Node 运行时约束：`>=22.5.0`，通过配置和 `package.json` engines 固化。
 
 ## 浏览器功能与响应式测试
@@ -33,12 +44,15 @@ Playwright 覆盖：
 - 固定时长 3D 翻转、视频 metadata 预加载和减少动画模式
 - 加入购物车、提交订单、查看状态
 - 服务呼叫、员工处理请求
-- 员工推进订单状态
+- 员工推进本机订单状态
 - 顶栏和购物车操作保持可见
+- `?table=` provision 的桌号写入下单与服务呼叫命令，并在无参数重载后保留
+- 同一菜品加两次累加为一条购物车行、数量为 2
+- 无缓存且目录接口失败时显示“菜单暂时不可用”，不再回退到 demo 菜单
 
-管理台同时验证商品目录、打印机模块、连接设置和响应式控件可用性；商品编辑器额外验证结构化选项 JSON 会加载到表单。
+管理台同时验证订单看板、商品目录、打印机模块、连接设置和响应式控件可用性；商品编辑器额外验证结构化选项 JSON 会加载到表单；订单看板验证后端订单渲染（桌号、菜品、选项、备注）、状态推进发出 `PATCH /api/orders/:id/status`，以及服务呼叫处理后从待办列表移除。
 
-最终结果：32/32 通过（包含本次 UI 修复后的回归）。
+最终结果：60/60 通过（15 个用例 × 4 种视口）。
 
 ## TypeScript 领域单元测试
 
@@ -64,6 +78,8 @@ Node 测试覆盖：
 - 订单状态更新
 - 请求 schema 拒绝非法订单/商品 payload
 - 后台错误 token 第 6 次尝试触发 429 限流
+- 含空格分类（如 `HOT POT`）的 seed 商品可以从管理接口原样回写
+- 服务请求返回契约 DTO（`table`/`serviceType`/`createdAt`），不再泄漏数据库行字段
 
 额外覆盖：
 
@@ -72,7 +88,7 @@ Node 测试覆盖：
 - 打印失败进入 `retry-wait` 并保留错误：Node 集成测试通过
 - SQLite `VACUUM INTO` 备份和 `integrity_check`：临时数据库演练通过
 
-最终结果：6 个后端/打印集成场景通过。
+最终结果：7 个后端/打印集成测试全部通过。
 
 ## 管理台实测
 
@@ -90,6 +106,10 @@ Node 测试覆盖：
 
 ## Android 构建与设备验证
 
+以下为 2026-08-05 版本的记录。本轮修改了 `KioskStore.java`（PIN 改用 PBKDF2），本机没有
+Android SDK，未重新执行 Gradle 构建和模拟器验证；下方的 APK SHA-256 对应旧源码，重新构建
+后会变化，发布前需按当前源码重跑 `npm run cap:sync` 与 `assembleDebug` 并重新记录。
+
 - React + TypeScript Vite 多页生产构建：通过
 - Capacitor Android 同步：通过
 - 原生 Kiosk 与 Printer 插件 Java 编译：通过
@@ -106,6 +126,9 @@ Playwright 已验证详情与 3D 翻转交互；模拟器进入屏幕固定后�
 
 ## 打印机验证边界
 
+注：本节记录的是原生插件层的验证边界。服务端打印代理（任务认领、租约、退避重试、人工重试
+接口）已在 2026-08-05 交付，见上文后端集成测试。
+
 已完成并通过编译：
 
 - 局域网 NSD 服务发现
@@ -120,7 +143,7 @@ Playwright 已验证详情与 3D 翻转交互；模拟器进入屏幕固定后�
 
 - 无实体打印机，未验证真实纸张输出
 - USB 写入需要具体打印机型号驱动
-- 打印任务自动消费、失败重试和回执仍需下一阶段打印代理
+- Android 端直连打印（蓝牙/USB）未在实体设备上验证
 
 ## Kiosk 边界
 
@@ -128,11 +151,16 @@ Playwright 已验证详情与 3D 翻转交互；模拟器进入屏幕固定后�
 
 ## 安全防护补充
 
-- 管理 API 使用常量时间 token 比较；同一来源连续 5 次错误 token 后锁定 60 秒并返回 `429`/`Retry-After`。
+- 管理 API 使用常量时间 token 比较；同一来源连续 5 次错误 token 后锁定 5 分钟并返回 `429`/`Retry-After`（`AUTH_WINDOW_MS`）。
+- 反向代理部署必须设置 `TRUST_PROXY`，否则限流按代理 IP 聚合，会把所有管理员一起锁住。
 - Android 管理 PIN 连续 5 次错误后锁定 60 秒，成功解锁后清除失败计数。
+- Android 管理 PIN 使用随机盐 + PBKDF2（SHA-256，20 万次迭代；API 26 以下回退 PBKDF2-SHA1）
+  存储，旧版单轮 SHA-256 记录在下次成功解锁时自动升级；已用桩化 SharedPreferences 验证
+  新建、校验、拒绝错误 PIN 和 legacy 升级四条路径。
 - 服务端请求 schema、状态迁移、生产配置校验和优雅停机已加入部署收口。
 - 已用 Node 集成测试验证管理员错误 token 的黑盒限流行为。
 - 当前限流状态为单进程内存状态；多实例部署必须迁移到 Redis 或其他共享限流存储。
+- 管理端仍是单一静态 token，没有账号体系和角色区分。
 - 本项目仍未完成专业渗透测试、沙盒逃逸测试、Device Owner 真机安全验证和实体打印机安全测试。
 
 ## iOS

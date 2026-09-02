@@ -140,4 +140,4 @@ export function formatEuro(cents: number): string {
   return `EUR ${(cents / 100).toFixed(2)}`;
 }
 
-export { dishes as seedDishes, orderStatuses as legacyOrderStatusLabels, services } from "./seed.js";
+export { services } from "./seed.js";

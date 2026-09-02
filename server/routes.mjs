@@ -18,6 +18,7 @@ const MEDIA_TYPES = new Map([
 
 const AUTH_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_MAX_FAILURES = 5;
+const AUTH_MAX_TRACKED_SOURCES = 10_000;
 
 function tokenMatches(provided, expected) {
   const providedBytes = Buffer.from(typeof provided === "string" ? provided : "", "utf8");
@@ -33,6 +34,12 @@ function errorReply(reply, error, statusCode = 400) {
 export function registerRoutes(app, { database, realtime, config }) {
   const authFailures = new Map();
 
+  function pruneAuthFailures(now) {
+    for (const [source, entry] of authFailures) {
+      if (entry.resetAt <= now) authFailures.delete(source);
+    }
+  }
+
   function requireAdmin(request, reply, done) {
     const now = Date.now();
     const key = request.ip || "unknown";
@@ -47,6 +54,7 @@ export function registerRoutes(app, { database, realtime, config }) {
     }
     if (!tokenMatches(request.headers["x-admin-token"], config.adminToken)) {
       const failures = (active?.failures ?? 0) + 1;
+      if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(now);
       authFailures.set(key, { failures, resetAt: now + AUTH_WINDOW_MS });
       reply.code(401).send({ error: "Admin authentication required" });
       return;
@@ -64,7 +72,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/ws", { websocket: true }, (socket) => realtime.connect(socket));
 
   app.get("/api/catalog", async () => ({ products: database.listProducts(true) }));
-  app.get("/api/admin/products", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async () => ({ products: database.listProducts(false) }));
+  app.get("/api/admin/products", { preHandler: requireAdmin }, async () => ({ products: database.listProducts(false) }));
   app.get("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const product = database.getProduct(request.params.id);
     return product || errorReply(reply, new Error("Product not found"), 404);

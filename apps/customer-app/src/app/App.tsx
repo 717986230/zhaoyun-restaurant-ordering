@@ -15,9 +15,9 @@ import { useKiosk } from "../features/kiosk/useKiosk";
 import { t } from "./i18n";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
-function HomeScreen({ onAdminTap, dispatch, language }: { onAdminTap: () => Promise<void>; dispatch: ReturnType<typeof useCustomerState>["dispatch"]; language: "zh" | "de" | "en" }) {
+function HomeScreen({ onAdminTap, dispatch, language, table }: { onAdminTap: () => Promise<void>; dispatch: ReturnType<typeof useCustomerState>["dispatch"]; language: "zh" | "de" | "en"; table: string }) {
   return <section id="home" className="screen home active">
-    <button className="brand brand-button" onClick={() => void onAdminTap()}><small>ZHAO YUN RESTAURANT</small><h1>赵云</h1><p>{t(language, "table")} 08 · 08</p></button>
+    <button className="brand brand-button" onClick={() => void onAdminTap()}><small>ZHAO YUN RESTAURANT</small><h1>赵云</h1><p>{t(language, "table")} {table}</p></button>
     <div className="home-actions">
       <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "menu" })}><span>01</span><b>{t(language, "start")}</b><small>SPEISEKARTE</small></button>
       <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "orders" })}><span>02</span><b>{t(language, "orders")}</b><small>MEINE BESTELLUNG</small></button>
@@ -71,7 +71,7 @@ export function App() {
 
   return <>
     <main className="app-shell">
-      {state.screen === "home" && <HomeScreen onAdminTap={handleAdminTap} dispatch={dispatch} language={state.language} />}
+      {state.screen === "home" && <HomeScreen onAdminTap={handleAdminTap} dispatch={dispatch} language={state.language} table={state.table} />}
       {state.screen === "menu" && <CatalogScreen state={state} dispatch={dispatch} products={products} />}
       {state.screen === "cart" && <CartScreen state={state} dispatch={dispatch} products={products} />}
       {state.screen === "orders" && <OrdersScreen orders={state.orders} products={products} dispatch={dispatch} language={state.language} />}

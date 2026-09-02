@@ -1,7 +1,9 @@
 # 目标系统架构
 
-状态：v0.4 生产候选收口中；顾客端、管理台、领域契约、离线订单重试、SQLite 备份和 LAN 打印代理已实现。服务端仍是带模块化边界的 ESM JavaScript，完整 API TypeScript 迁移、实体打印机和 Device Owner 验证仍需单独完成。
-更新：2026-08-01
+状态：v0.4 生产候选收口中；顾客端、管理台（含后端订单看板）、领域契约、离线订单重试、
+SQLite 备份和 LAN 打印代理已实现。服务端仍是带模块化边界的 ESM JavaScript，完整 API
+TypeScript 迁移、实体打印机和 Device Owner 验证仍需单独完成。
+更新：2026-09-02
 
 ## 1. 架构结论
 
@@ -31,30 +33,28 @@
 
 ## 3. 单仓库结构
 
+当前仓库实际结构：
+
 ```text
 apps/
   customer-app/             React 顾客端 + Capacitor Web 入口
-    src/app/                启动、路由、Providers
-    src/features/           catalog/cart/checkout/orders/service/kiosk
-    src/pages/              页面组合，不承载领域规则
+    src/app/                启动、状态、契约客户端、i18n、本机桌号
+    src/features/           catalog/cart/orders/service/staff/kiosk
   admin-web/                React 管理台
-    src/features/           products/media/orders/printers/settings
-  api/                      Fastify 组合根
-    src/bootstrap/          配置、日志、数据库、插件注册
-    src/modules/            catalog/order/service/printing/auth
-  print-agent/              局域网打印任务消费者
+    src/features/           orders/catalog/printers/settings
 packages/
-  domain/                   实体、值对象、状态机、纯业务规则
-  contracts/                TypeBox schema、DTO、事件、错误码
+  domain/                   实体、状态机、金额与购物车纯规则
+  contracts/                TypeBox schema 与 DTO
   api-client/               类型化 HTTP/WebSocket 客户端
-  application/              用例与 ports，不依赖具体基础设施
-  infrastructure/           SQLite repositories、媒体存储、outbox
   native-bridge/            Capacitor Printer/Kiosk 类型声明与适配器
-  ui/                       两端共享的基础控件和 design tokens
-  test-kit/                 builders、fixtures、fake adapters
+server/                     Fastify 组合根、SQLite、路由、打印代理（仍是 ESM JavaScript）
 android/                    Capacitor 生成工程及原生插件实现
 docs/adr/                   关键架构决策
 ```
+
+尚未建立、属于后续阶段的目录：`apps/api`（服务端 TypeScript 化）、`packages/application`、
+`packages/infrastructure`、`packages/ui`、`packages/test-kit`。当前服务端的组合根、仓储和用例
+仍集中在 `server/` 的模块化 ESM JavaScript 里。
 
 首轮迁移不引入 Nx/Turborepo。npm workspaces 和 TypeScript project references 已足够；当构建时间或 CI 任务图产生实际问题后再引入构建编排器。
 
@@ -79,7 +79,9 @@ ui -> 无业务包
 - 管理台导入顾客端 feature。
 - API 与客户端复制各自的状态字符串和 DTO。
 
-这些规则由 ESLint import boundaries、TypeScript project references 和 CI typecheck 强制执行。
+当前只有 TypeScript project references 与 `npm run typecheck` 机械强制其中一部分：包之间的
+依赖方向由 references 保证，`domain` 与 `contracts` 不引用 React/Fastify/SQLite 也已成立。
+仓库尚未配置 ESLint import boundaries，其余条目目前靠 review 保证。
 
 ## 5. 业务模块
 
@@ -120,8 +122,11 @@ queued -> claimed -> printing -> printed
 
 ### Identity And Device
 
-- 管理员认证使用服务端会话/短期 token 和角色权限，不再只靠前端保存的固定 token。
-- kiosk 管理员 PIN 只负责本机退出授权，使用 Android Keystore 派生/保存凭据。
+- 目标：管理员认证使用服务端会话/短期 token 和角色权限。当前实现仍是单一静态 `ADMIN_TOKEN`
+  经 `x-admin-token` 头校验，常量时间比较 + 来源限流，没有角色区分；会话化和 RBAC 未完成。
+- kiosk 管理员 PIN 只负责本机退出授权，使用 PBKDF2（SHA-256，20 万次迭代；API 26 以下回退
+  PBKDF2-SHA1）加随机盐存放在应用私有 SharedPreferences；旧版单轮 SHA-256 哈希在下次成功
+  解锁时自动升级。迁移到 Android Keystore 仍是后续工程。
 - 正式不可退出使用 Android Dedicated Device / Device Owner + Lock Task；普通 APK 的 screen pinning 仅作为测试模式。
 
 ## 6. 前端状态设计
@@ -175,7 +180,8 @@ queued -> claimed -> printing -> printed
 - `customer/admin`：React Testing Library 组件测试。
 - 关键流程：Playwright 覆盖下单、服务呼叫、后台上架、翻转、横竖屏。
 - Android：原生插件单测、instrumented test、真机打印 smoke test。
-- CI 必须通过 format、lint、typecheck、unit、integration、build；主分支不直接提交。
+- 本地质量门禁：`npm run typecheck`、`npm run unit`、`npm run server:test`、`npm test`、`npm run build`。
+- 仓库尚未配置 CI workflow 与 lint/format 工具，这是发布前要补的工程项，不能当成已完成。
 
 ## 11. 运行与部署边界
 
@@ -201,7 +207,7 @@ Admin web
 2. [x] 提取 `domain` 与 `contracts`，建立订单状态机和金额分模型。
 3. [x] 建立类型化 `api-client`、`native-bridge` 和离线状态模型。
 4. [x] 用 React 迁移顾客端：shell -> catalog -> detail/flip -> cart -> checkout -> orders/service。
-5. [x] 迁移管理台：catalog/media -> printers/settings。
+5. [x] 迁移管理台：catalog/media -> printers/settings -> 后端订单与服务呼叫看板。
 6. 将 Fastify 路由按模块迁移到 TypeScript plugins 和 repositories。
 7. 增加 transactional outbox 与 print-agent，完成打印回执和重试。
 8. 完成 Android 回归、响应式矩阵、APK 构建和旧 JS 删除。

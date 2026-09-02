@@ -136,13 +136,41 @@ test("catalog, orders, service requests and print routing work together", async 
     ["bar", "kitchen", "kitchen", "sushi"]
   );
 
+  const seededSpacedCategory = catalogProducts.find((product) => product.category.includes(" "));
+  assert.ok(seededSpacedCategory, "seed catalog contains a category with a space");
+  const resaveSpacedCategory = await app.inject({
+    method: "PUT",
+    url: `/api/admin/products/${seededSpacedCategory.id}`,
+    headers: adminHeaders,
+    payload: {
+      sku: seededSpacedCategory.sku,
+      kind: seededSpacedCategory.kind,
+      category: seededSpacedCategory.category,
+      names: seededSpacedCategory.names,
+      description: seededSpacedCategory.description,
+      price: seededSpacedCategory.price,
+      details: seededSpacedCategory.details,
+      allergens: seededSpacedCategory.allergens,
+      modifiers: seededSpacedCategory.modifiers ?? [],
+      printStation: seededSpacedCategory.printStation,
+      available: true,
+      published: true
+    }
+  });
+  assert.equal(resaveSpacedCategory.statusCode, 200);
+  assert.equal(resaveSpacedCategory.json().product.category, seededSpacedCategory.category);
+
   const service = await app.inject({
     method: "POST",
     url: "/api/service-requests",
     payload: { table: "08", type: "pay" }
   });
   assert.equal(service.statusCode, 201);
-  const requestId = service.json().request.id;
+  const serviceRequest = service.json().request;
+  assert.deepEqual(Object.keys(serviceRequest).sort(), ["createdAt", "id", "serviceType", "status", "table", "updatedAt"]);
+  assert.equal(serviceRequest.table, "08");
+  assert.equal(serviceRequest.serviceType, "pay");
+  const requestId = serviceRequest.id;
   const completeService = await app.inject({
     method: "PATCH",
     url: `/api/service-requests/${requestId}/status`,

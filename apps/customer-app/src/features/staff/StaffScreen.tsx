@@ -5,7 +5,8 @@ import { OrderCard, orderStatusLabels } from "../orders/OrdersScreen";
 
 export function StaffScreen({ state, products, dispatch }: { state: CustomerState; products: Product[]; dispatch: CustomerDispatch }) {
   return <section id="staff" className="screen panel staff active"><header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button><div><h2>员工看板</h2><small>MITARBEITER</small></div></header><div id="staffContent" className="content">
-    <h3 className="section-title">厨房订单</h3>
+    <p className="local-board-note">本机订单与呼叫，离线也可查看；全店订单看板在管理台。</p>
+    <h3 className="section-title">本机订单</h3>
     {state.orders.length ? state.orders.map((order) => {
       const next = nextOperationalStatus(order.status);
       return <article className="order staff-order" key={order.id}><OrderCard order={order} products={products} />{next && <button className="primary" onClick={() => dispatch({ type: "advance-order", orderId: order.id, status: next })}>更新为：{orderStatusLabels[next]}</button>}</article>;

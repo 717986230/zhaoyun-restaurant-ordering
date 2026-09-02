@@ -169,6 +169,69 @@ test("staff can advance order status", async ({ page }) => {
   await expect(page.locator("#staffContent")).toContainText("制作中");
 });
 
+test("table number is provisioned per device and reaches the order command", async ({ page }) => {
+  let submitted;
+  await page.unroute("**/api/orders");
+  await page.route("**/api/orders", async (route) => {
+    submitted = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
+      id: "table-order", clientRequestId: submitted.clientRequestId, no: "260902-007", table: submitted.table,
+      status: "new", note: submitted.note, total: 34.5, items: submitted.items, createdAt: new Date().toISOString()
+    } }) });
+  });
+  let serviceCommand;
+  await page.unroute("**/api/service-requests");
+  await page.route("**/api/service-requests", async (route) => {
+    serviceCommand = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ request: { id: "service-2" } }) });
+  });
+
+  await page.goto("/?table=17");
+  await expect(page.locator(".brand")).toContainText("17");
+
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await expect(page.locator(".topbar .title")).toContainText("TISCH 17");
+  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
+  await page.locator(".dish-detail-card .add").click();
+  await page.getByRole("button", { name: "关闭详情" }).click();
+  await page.locator(".cartbar").click();
+  await page.getByRole("button", { name: /确认下单/ }).click();
+  await expect.poll(() => submitted?.table).toBe("17");
+
+  // The provisioned number survives a reload without the query parameter.
+  await page.goto("/");
+  await expect(page.locator(".brand")).toContainText("17");
+  await page.getByRole("button", { name: /呼叫服务员/ }).click();
+  await page.getByRole("button", { name: /加水/ }).click();
+  await expect.poll(() => serviceCommand?.table).toBe("17");
+});
+
+test("adding the same dish twice accumulates one cart line", async ({ page }) => {
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  const beef = page.locator(".dish-card", { hasText: "黑椒牛柳" });
+  await beef.click();
+  await page.locator(".dish-detail-card .add").click();
+  await page.getByRole("button", { name: "关闭详情" }).click();
+  await beef.click();
+  await page.locator(".dish-detail-card .add").click();
+  await page.getByRole("button", { name: "关闭详情" }).click();
+  await expect(page.locator("#cartCount")).toHaveText("2");
+  await page.locator(".cartbar").click();
+  await expect(page.locator(".row")).toHaveCount(1);
+  await expect(page.locator(".row small").first()).toContainText("× 2");
+});
+
+test("catalog with no cached menu shows an explicit unavailable message", async ({ page }) => {
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "offline" }) }));
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await expect(page.locator(".stack .empty")).toContainText("菜单暂时不可用");
+  await expect(page.locator(".dish-card")).toHaveCount(0);
+});
+
 test("layout keeps main controls visible", async ({ page }) => {
   await expect(page.getByRole("button", { name: /开始点餐/ })).toBeInViewport();
   await page.getByRole("button", { name: /开始点餐/ }).click();

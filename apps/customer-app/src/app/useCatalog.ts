@@ -1,35 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { seedDishes } from "@zhaoyun/domain";
 import type { Product } from "@zhaoyun/domain";
 import { mapApiProduct, restaurantApi } from "./api";
 
 const cacheKey = "zy_catalog_cache_v2";
 
-function seedCatalog(): Product[] {
-  return seedDishes.map((dish) => ({
-    id: String(dish.id),
-    sku: `FOOD-${dish.id}`,
-    kind: "food",
-    category: dish.cat,
-    names: { zh: dish.zh, de: dish.de, en: dish.en },
-    description: dish.intro,
-    priceCents: Math.round(dish.price * 100),
-    allergens: dish.allergens.split(",").map((value) => value.trim()).filter(Boolean),
-    details: { time: dish.time, people: dish.people, level: dish.level, ingredients: dish.ingredients },
-    appearance: { art: dish.art, pattern: dish.pattern },
-    media: [],
-    available: true,
-    published: true,
-    printStation: "kitchen"
-  }));
-}
-
+/**
+ * Offline devices fall back to the last catalog the server actually served. There is deliberately
+ * no built-in demo menu: showing dishes the kitchen does not have produces orders the server
+ * rejects on reconnect.
+ */
 function cachedCatalog(): Product[] {
   try {
     const cached = JSON.parse(localStorage.getItem(cacheKey) || "null") as Product[] | null;
-    return Array.isArray(cached) && cached.length ? cached : seedCatalog();
+    return Array.isArray(cached) ? cached : [];
   } catch {
-    return seedCatalog();
+    return [];
   }
 }
 

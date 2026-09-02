@@ -2,7 +2,6 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { dishes } from "../src/data.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
@@ -97,7 +96,7 @@ function normalizeProduct(input, current = {}) {
     id: String(input.id || current.id || randomUUID()),
     sku: String(input.sku || current.sku || "").trim(),
     kind,
-    category: String(input.category || current.category || "OTHER").trim().toUpperCase(),
+    category: String(input.category || current.category || "OTHER").trim().replace(/\s+/g, " ").toUpperCase(),
     nameZh: String(names.zh ?? input.nameZh ?? current.name_zh ?? "").trim(),
     nameDe: String(names.de ?? input.nameDe ?? current.name_de ?? "").trim(),
     nameEn: String(names.en ?? input.nameEn ?? current.name_en ?? "").trim(),
@@ -382,6 +381,8 @@ export function createDatabase(databasePath) {
     const requestId = String(input.clientRequestId || randomUUID());
     const existing = statements.orderByClientId.get(requestId);
     if (existing) return orderView(existing);
+    const table = String(input.table || "").trim();
+    if (!table) throw new Error("Order requires a table number");
     if (!Array.isArray(input.items) || !input.items.length) throw new Error("Order requires at least one item");
 
     const resolvedItems = input.items.map((item) => {
@@ -405,7 +406,7 @@ export function createDatabase(databasePath) {
         db.exec("COMMIT");
         return orderView(committed);
       }
-      statements.insertOrder.run(id, orderNo, requestId, String(input.table || "08"), String(input.note || "").trim(), totalCents, timestamp, timestamp);
+      statements.insertOrder.run(id, orderNo, requestId, table, String(input.note || "").trim(), totalCents, timestamp, timestamp);
       const jobs = new Map();
       for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {
         const productName = product.name_zh || product.name_de || product.name_en;
@@ -415,7 +416,7 @@ export function createDatabase(databasePath) {
         jobs.set(product.print_station, stationItems);
       }
       for (const [station, items] of jobs) {
-        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table: String(input.table || "08"), note: String(input.note || ""), items }), timestamp, timestamp);
+        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table, note: String(input.note || ""), items }), timestamp, timestamp);
       }
       db.exec("COMMIT");
     } catch (error) {
@@ -436,11 +437,25 @@ export function createDatabase(databasePath) {
     return orderView(statements.orderById.get(String(id)));
   }
 
+  function serviceRequestView(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      table: row.table_no,
+      serviceType: row.type,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
   function createServiceRequest(input) {
     const id = randomUUID();
     const timestamp = now();
-    statements.insertRequest.run(id, String(input.table || "08"), String(input.type || "").trim(), timestamp, timestamp);
-    return statements.requestById.get(id);
+    const table = String(input.table || "").trim();
+    if (!table) throw new Error("Service request requires a table number");
+    statements.insertRequest.run(id, table, String(input.type || "").trim(), timestamp, timestamp);
+    return serviceRequestView(statements.requestById.get(id));
   }
 
   function updateServiceRequest(id, status) {
@@ -451,7 +466,23 @@ export function createDatabase(databasePath) {
       throw new Error(`Invalid service request transition: ${current.status} -> ${status}`);
     }
     statements.updateRequest.run(status, now(), String(id));
-    return statements.requestById.get(String(id));
+    return serviceRequestView(statements.requestById.get(String(id)));
+  }
+
+  function printerView(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      transport: row.transport,
+      address: row.address,
+      port: row.port,
+      role: row.role,
+      enabled: Boolean(row.enabled),
+      capabilities: parseJson(row.capabilities_json, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   function savePrinter(input, id) {
@@ -477,7 +508,7 @@ export function createDatabase(databasePath) {
     } else {
       statements.insertPrinter.run(printer.id, printer.name, printer.transport, printer.address, printer.port, printer.role, printer.enabled, printer.capabilities, timestamp, timestamp);
     }
-    return statements.printerById.get(printer.id);
+    return printerView(statements.printerById.get(printer.id));
   }
 
   function seed() {
@@ -494,10 +525,9 @@ export function createDatabase(databasePath) {
       }
       return;
     }
-    const catalog = photoMenuDishes.length ? photoMenuDishes : dishes;
     db.exec("BEGIN");
     try {
-      catalog.forEach((dish, index) => saveProduct({
+      photoMenuDishes.forEach((dish, index) => saveProduct({
         id: String(dish.id),
         sku: dish.sku || `FOOD-${dish.id}`,
         kind: dish.kind || "food",
@@ -532,10 +562,10 @@ export function createDatabase(databasePath) {
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),
     createOrder,
     updateOrder,
-    listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)),
+    listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
     createServiceRequest,
     updateServiceRequest,
-    listPrinters: () => statements.listPrinters.all().map((row) => ({ ...row, enabled: Boolean(row.enabled), capabilities: parseJson(row.capabilities_json, {}) })),
+    listPrinters: () => statements.listPrinters.all().map(printerView),
     savePrinter,
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
     listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) })),
@@ -566,7 +596,7 @@ export function createDatabase(databasePath) {
     retryPrintJob: (id) => statements.retryPrintJob.run(now(), String(id)).changes > 0,
     printerForRole: (role) => {
       const row = statements.listPrinters.all().find((printer) => printer.role === String(role) && printer.enabled);
-      return row ? { ...row, enabled: Boolean(row.enabled), capabilities: parseJson(row.capabilities_json, {}) } : null;
+      return printerView(row);
     }
   };
 }

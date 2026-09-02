@@ -28,7 +28,7 @@ const ModifierGroup = Type.Object({
 export const ProductBody = Type.Object({
   sku: Type.String({ maxLength: 64 }),
   kind: Type.Union([Type.Literal("food"), Type.Literal("drink"), Type.Literal("sushi")]),
-  category: Type.String({ minLength: 1, maxLength: 64, pattern: "^[A-Za-z0-9_-]+$" }),
+  category: Type.String({ minLength: 1, maxLength: 64, pattern: "^[A-Za-z0-9][A-Za-z0-9 _-]*$" }),
   names: Names,
   description: Type.Optional(Type.String({ maxLength: 2000 })),
   price: Type.Number({ minimum: 0, maximum: 100000 }),

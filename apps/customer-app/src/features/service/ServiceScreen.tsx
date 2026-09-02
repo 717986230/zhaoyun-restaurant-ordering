@@ -18,12 +18,12 @@ export function ServiceScreen({ state, dispatch }: { state: CustomerState; dispa
     let id: string = localId;
     let pendingSync = false;
     try {
-      const result = await restaurantApi.createServiceRequest({ table: "08", type: serviceType });
+      const result = await restaurantApi.createServiceRequest({ table: state.table, type: serviceType });
       id = result.request.id;
     } catch {
       pendingSync = true;
     }
-    dispatch({ type: "service-created", request: { id, table: "08", serviceType, label, status: "open", createdAt: new Date().toISOString(), ...(pendingSync ? { pendingSync: true } : {}) }, message: `${label}请求已发送，服务员马上过来` });
+    dispatch({ type: "service-created", request: { id, table: state.table, serviceType, label, status: "open", createdAt: new Date().toISOString(), ...(pendingSync ? { pendingSync: true } : {}) }, message: `${label}请求已发送，服务员马上过来` });
     dispatch({ type: "toast", message: pendingSync ? "服务请求等待同步" : "服务请求已发送" });
   }
 

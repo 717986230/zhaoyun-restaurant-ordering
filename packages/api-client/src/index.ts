@@ -1,4 +1,7 @@
-import type { ApiCatalogProduct, ApiOrder, CreateOrderCommand, CreateServiceRequestCommand, RealtimeEnvelope } from "@zhaoyun/contracts";
+import type {
+  ApiCatalogProduct, ApiOrder, ApiOrderStatus, ApiServiceRequest, ApiServiceRequestStatus,
+  CreateOrderCommand, CreateServiceRequestCommand, RealtimeEnvelope
+} from "@zhaoyun/contracts";
 import type { ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
 
 export interface RestaurantApiOptions {
@@ -24,6 +27,8 @@ export interface AdminProductInput {
 export interface AdminStorage {
   baseUrl: string;
   token: string;
+  /** Table this device orders for; shared with the customer app on the same origin. */
+  tableNumber: string;
 }
 
 export class ApiError extends Error {
@@ -41,13 +46,16 @@ export class AdminApi {
     const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : location.origin;
     return {
       baseUrl: localStorage.getItem("zy_api_base") || fallback,
-      token: sessionStorage.getItem("zy_admin_token") || ""
+      token: sessionStorage.getItem("zy_admin_token") || "",
+      tableNumber: localStorage.getItem("zy_table_no") || ""
     };
   }
 
   configure(storage: AdminStorage): void {
     localStorage.setItem("zy_api_base", storage.baseUrl.replace(/\/+$/, ""));
     sessionStorage.setItem("zy_admin_token", storage.token);
+    const table = storage.tableNumber.trim().slice(0, 32);
+    if (table) localStorage.setItem("zy_table_no", table);
   }
 
   mediaUrl(path: string): string { return `${this.storage.baseUrl}${path}`; }
@@ -60,6 +68,33 @@ export class AdminApi {
   createPrinter(profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request("/api/admin/printers", { method: "POST", body: JSON.stringify(profile) }); }
   updatePrinter(id: string, profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(profile) }); }
   retryPrintJob(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }
+  orders(limit = 100): Promise<{ orders: ApiOrder[] }> { return this.#request(`/api/orders?limit=${limit}`); }
+  updateOrderStatus(id: string, status: ApiOrderStatus): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
+  serviceRequests(limit = 100): Promise<{ requests: ApiServiceRequest[] }> { return this.#request(`/api/service-requests?limit=${limit}`); }
+  updateServiceRequestStatus(id: string, status: ApiServiceRequestStatus): Promise<{ request: ApiServiceRequest }> { return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
+
+  connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
+    const base = this.storage.baseUrl.replace(/^http/, "ws");
+    if (!base) return () => undefined;
+    let socket: WebSocket | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+    const open = () => {
+      socket = new WebSocket(`${base}/ws`);
+      socket.addEventListener("message", (event) => {
+        try { onMessage(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Ignore malformed live events. */ }
+      });
+      socket.addEventListener("close", () => {
+        if (!stopped) retryTimer = setTimeout(open, 2500);
+      });
+    };
+    open();
+    return () => {
+      stopped = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      socket?.close();
+    };
+  }
 
   async uploadMedia(id: string, file: File): Promise<{ product: ApiCatalogProduct }> {
     const form = new FormData();

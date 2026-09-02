@@ -16,7 +16,7 @@ export async function buildServer(overrides = {}) {
   }
 
   mkdirSync(settings.uploadDir, { recursive: true });
-  const app = Fastify({ logger: overrides.logger ?? true, bodyLimit: 2 * 1024 * 1024, requestIdHeader: "x-request-id" });
+  const app = Fastify({ logger: overrides.logger ?? true, bodyLimit: 2 * 1024 * 1024, requestIdHeader: "x-request-id", trustProxy: settings.trustProxy ?? false });
   const database = createDatabase(settings.databasePath);
   const realtime = createRealtimeHub();
 

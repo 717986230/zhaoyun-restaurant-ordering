@@ -25,7 +25,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
       id: clientRequestId,
       clientRequestId,
       no: String(Date.now()).slice(-6),
-      table: "08",
+      table: state.table,
       status: "pending-sync",
       note,
         items: entries.map(({ product, quantity, modifiers }) => ({ productId: product.id, quantity, name: productName(product, state.language), modifiers })),
@@ -34,7 +34,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
     };
     const command: CreateOrderCommand = {
         clientRequestId,
-        table: "08",
+        table: state.table,
         note,
         items: entries.map(({ product, quantity, modifiers }) => ({ id: product.id, qty: quantity, modifiers: modifiers.map((modifier) => ({ id: modifier.id })) }))
     };

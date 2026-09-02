@@ -61,6 +61,18 @@ export interface ApiOrder {
   createdAt: string;
 }
 
+export interface ApiServiceRequest {
+  id: string;
+  table: string;
+  serviceType: string;
+  status: "open" | "acknowledged" | "completed" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ApiOrderStatus = Static<typeof OrderStatusSchema>;
+export type ApiServiceRequestStatus = ApiServiceRequest["status"];
+
 export interface RealtimeEnvelope<T = unknown> {
   type: "connected" | "catalog.changed" | "order.changed" | "service.changed" | "print.queued";
   payload?: T;

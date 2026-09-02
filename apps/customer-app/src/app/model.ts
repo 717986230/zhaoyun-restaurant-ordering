@@ -1,11 +1,13 @@
 import { useEffect, useReducer } from "react";
 import type { CreateOrderCommand } from "@zhaoyun/contracts";
 import type { CartLine, Order, OrderStatus, SelectedModifier, ServiceRequest } from "@zhaoyun/domain";
+import { tableNumber } from "./device";
 
 export type Screen = "home" | "menu" | "cart" | "orders" | "service" | "staff";
 
 export interface CustomerState {
   screen: Screen;
+  table: string;
   category: string;
   query: string;
   searchOpen: boolean;
@@ -27,7 +29,7 @@ type Action =
   | { type: "category"; category: string }
   | { type: "query"; query: string }
   | { type: "toggle-search" }
-  | { type: "open-product"; productId: string; quantity: number }
+  | { type: "open-product"; productId: string }
   | { type: "close-product" }
   | { type: "toggle-product-flip" }
   | { type: "detail-quantity"; quantity: number }
@@ -46,8 +48,10 @@ type Action =
   | { type: "toast"; message: string };
 
 const storageKey = "zy_customer_state_v4";
+const maxStoredOrders = 50;
 const initialState: CustomerState = {
   screen: "home",
+  table: tableNumber(),
   category: "ALLE",
   query: "",
   searchOpen: false,
@@ -69,7 +73,11 @@ function hydrate(): CustomerState {
     const stored = JSON.parse(localStorage.getItem(storageKey) || "null") as Partial<CustomerState> | null;
     if (!stored) return initialState;
     const cart = Object.fromEntries(Object.entries(stored.cart || {}).map(([key, value]) => [key, typeof value === "number" ? { productId: key, quantity: value, modifiers: [] } : value]));
-    return { ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {}, screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: "" };
+    return {
+      ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {},
+      orders: (stored.orders || []).slice(0, maxStoredOrders),
+      table: tableNumber(), screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: ""
+    };
   } catch {
     return initialState;
   }
@@ -81,7 +89,7 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     case "category": return { ...state, category: action.category };
     case "query": return { ...state, query: action.query };
     case "toggle-search": return { ...state, searchOpen: !state.searchOpen };
-    case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: action.quantity, detailModifiers: [] };
+    case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: 1, detailModifiers: [] };
     case "close-product": return { ...state, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "toggle-product-flip": return { ...state, productFlipped: !state.productFlipped };
     case "detail-quantity": return { ...state, detailQuantity: Math.max(1, Math.min(99, action.quantity)) };
@@ -89,14 +97,15 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     case "add-to-cart": {
       const modifierKey = action.modifiers.map((modifier) => modifier.id).sort().join(",");
       const key = `${action.productId}::${modifierKey}`;
-      return { ...state, cart: { ...state.cart, [key]: { productId: action.productId, quantity: action.quantity, modifiers: action.modifiers } } };
+      const quantity = Math.min(99, (state.cart[key]?.quantity ?? 0) + action.quantity);
+      return { ...state, cart: { ...state.cart, [key]: { productId: action.productId, quantity, modifiers: action.modifiers } } };
     }
     case "clear-cart": return { ...state, cart: {} };
-    case "order-created": return { ...state, cart: {}, orders: [action.order, ...state.orders] };
+    case "order-created": return { ...state, cart: {}, orders: [action.order, ...state.orders].slice(0, maxStoredOrders) };
     case "order-queued": return {
       ...state,
       cart: {},
-      orders: [action.order, ...state.orders],
+      orders: [action.order, ...state.orders].slice(0, maxStoredOrders),
       pendingOrders: { ...state.pendingOrders, [action.command.clientRequestId]: { command: action.command, attempts: 0, nextAttemptAt: 0 } }
     };
     case "order-synced": {

@@ -2,21 +2,22 @@
 
 ## 交付内容
 
-- Android v0.4 production-candidate Debug APK：`dist/zhaoyun-ordering-v0.4.0-production-candidate-debug.apk`
-- 完整源码包：`dist/zhaoyun-ordering-v0.4.0-source.zip`
-- 顾客端、管理台、Fastify/SQLite 后端和 Android 原生工程
+- 顾客端、管理台、Fastify/SQLite 后端和 Android 原生工程（本仓库源码）
+- 构建产物需自行生成，不随仓库提供：`npm run android:debug` 产出 APK，
+  `npm run package:source` 产出源码包，两者都写入被 gitignore 的 `dist/`
 - React + TypeScript workspace：`apps/customer-app`、`apps/admin-web`
 - 共享包：`packages/domain`、`contracts`、`api-client`、`native-bridge`
 - 架构说明：`ARCHITECTURE.md`
 - 测试报告：`TEST_REPORT.md`
 
-## 已安装的开发环境
+## 构建环境要求
 
-- Android Studio 2026.1.2.11：`/Applications/Android Studio.app`
-- OpenJDK 17.0.20：`/opt/homebrew/opt/openjdk@17`
-- Android SDK：`/Users/xinglong/Library/Android/sdk`
-- Android Platform、Build Tools、ADB、Emulator、ARM64 平板镜像
-- Playwright Chromium
+- Node `>=22.5.0`（后端使用 `node:sqlite`）
+- OpenJDK 17
+- Android Studio 与 Android SDK（Platform、Build Tools、ADB、Emulator）
+- Playwright Chromium（`npx playwright install chromium`）
+
+下文示例里的 `JAVA_HOME` / `ANDROID_HOME` 路径按本机实际安装位置替换。
 
 ## 启动后端与管理台
 
@@ -52,16 +53,30 @@ npm run backup
 http://192.168.1.9:8787
 ```
 
-生产部署必须设置至少 32 个字符的随机 `ADMIN_TOKEN`，不能使用 `local-dev-admin`。管理员错误 token 会按来源限流；单进程限流适合单机部署，多实例部署前需要把限流状态迁移到 Redis。跨域管理台只有在明确设置 `CORS_ORIGIN` 时才开放。
+生产部署必须设置至少 32 个字符的随机 `ADMIN_TOKEN`，不能使用 `local-dev-admin`。管理员错误 token 会按来源限流：同一来源连续 5 次错误后返回 `429` 并附 `Retry-After`，窗口 5 分钟。单进程限流适合单机部署，多实例部署前需要把限流状态迁移到 Redis。跨域管理台只有在明确设置 `CORS_ORIGIN` 时才开放。
+
+**放在反向代理后面时必须设置 `TRUST_PROXY`**，否则所有请求的来源 IP 都是代理地址，任何人
+连错 5 次就会把全部管理员一起锁住：
+
+```bash
+TRUST_PROXY=1            # 信任最近 1 跳代理的 X-Forwarded-For
+TRUST_PROXY=10.0.0.0/8   # 或给出可信代理网段，逗号分隔
+```
+
+直连局域网、前面没有代理时保持不设置（默认 `false`）。
 
 ## 管理菜品、酒水和寿司
 
 1. 打开管理台的“连接设置”。
 2. 填写 API 地址和 `ADMIN_TOKEN`。
-3. 在“商品与媒体”选择菜品、酒水或寿司。
-4. 填写三语名称、价格、分类和出单档口。
-5. 可上传 JPEG、PNG、WebP、MP4 或 WebM，单文件最大 50 MB。
-6. 保存后，在线顾客端通过 WebSocket 自动刷新目录。
+3. 填写“本机桌号”，这台设备下单和呼叫服务都会用它。
+4. 在“商品与媒体”选择菜品、酒水或寿司。
+5. 填写三语名称、价格、分类和出单档口。
+6. 可上传 JPEG、PNG、WebP、MP4 或 WebM，单文件最大 50 MB。
+7. 保存后，在线顾客端通过 WebSocket 自动刷新目录。
+
+“订单看板”页显示后端的全部订单和服务呼叫，通过 WebSocket 实时刷新；推进订单状态和处理
+服务呼叫都走后端状态机，对所有设备生效。顾客端首页的“员工看板”只显示本机记录，用于离线查看。
 
 Android App 内进入管理台：在首页顶部“赵云”区域 4 秒内连续点击 7 次，输入管理员 PIN。管理完成后点击“返回点餐”，App 会重新进入终端锁定。
 
@@ -95,9 +110,9 @@ npm run print-agent
 npm run build
 npm run cap:sync
 cd android
-JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
-ANDROID_HOME=/Users/xinglong/Library/Android/sdk \
-ANDROID_SDK_ROOT=/Users/xinglong/Library/Android/sdk \
+JAVA_HOME=<你的 OpenJDK 17 路径> \
+ANDROID_HOME=<你的 Android SDK 路径> \
+ANDROID_SDK_ROOT=<你的 Android SDK 路径> \
 ./gradlew assembleDebug
 ```
 
@@ -123,17 +138,16 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 设备直接安装：
 
-1. 将 `dist/zhaoyun-ordering-v0.4.0-production-candidate-debug.apk` 传到手机或平板。
+1. 将 `android/app/build/outputs/apk/debug/app-debug.apk` 传到手机或平板。
 2. 允许文件管理器“安装未知应用”。
 3. 安装并打开。
-4. 首次启动设置 6-12 位管理员数字 PIN。
-5. 通过管理后门设置餐厅服务器地址。
+4. 首次启动设置 6-12 位管理员数字 PIN（使用随机盐 + PBKDF2 存储，不保存明文）。
+5. 通过管理后门设置餐厅服务器地址和本机桌号。
 
 ADB 安装：
 
 ```bash
-/Users/xinglong/Library/Android/sdk/platform-tools/adb install -r \
-  dist/zhaoyun-ordering-v0.4.0-production-candidate-debug.apk
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## 不可退出终端模式

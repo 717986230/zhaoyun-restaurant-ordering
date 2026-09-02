@@ -4,6 +4,15 @@ import { fileURLToPath } from "node:url";
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(serverDir, "..");
 
+function parseTrustProxy(value) {
+  if (!value) return false;
+  const normalized = value.trim();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  if (/^\d+$/.test(normalized)) return Number(normalized);
+  return normalized.split(",").map((entry) => entry.trim()).filter(Boolean);
+}
+
 export const config = {
   host: process.env.HOST || "0.0.0.0",
   port: Number(process.env.PORT || 8787),
@@ -12,6 +21,7 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean) : false,
   databasePath: process.env.DATABASE_PATH || path.join(serverDir, "data", "restaurant.sqlite"),
   uploadDir: process.env.UPLOAD_DIR || path.join(serverDir, "uploads"),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   webDir: path.join(projectDir, "dist", "web")
 };
 

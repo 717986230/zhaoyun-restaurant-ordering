@@ -100,7 +100,7 @@ export function CatalogScreen({ state, dispatch, products }: Props) {
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
       <button className="icon-btn back" aria-label="返回" onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button>
-      <div className="title"><strong>La Carte</strong><small>TISCH 08</small></div>
+      <div className="title"><strong>La Carte</strong><small>TISCH {state.table}</small></div>
       <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
     </header>
     <div id="searchBox" className={`search-box ${state.searchOpen ? "open" : ""}`}>
@@ -108,9 +108,9 @@ export function CatalogScreen({ state, dispatch, products }: Props) {
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
     <nav id="chips" className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} onClick={() => dispatch({ type: "category", category })}>{category}</button>)}</nav>
-    <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id, quantity: Object.values(state.cart).find((line) => line.productId === product.id)?.quantity ?? 1 })}>
+    <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
       <div className="summary"><span className="number">{product.sku}</span><div><h3>{productName(product, state.language)}</h3><p>{product.names.de}</p></div><span className="cat">{product.category}</span></div>
-    </article>) : <div className="empty">{t(state.language, "empty")}</div>}</div>
+    </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}</div>
     {activeProduct && <ProductDetail product={activeProduct} state={state} dispatch={dispatch} />}
     <button className="cartbar" onClick={() => dispatch({ type: "navigate", screen: "cart" })}><span>{t(state.language, "cart")}</span><b id="cartCount">{summary.count}</b><em id="cartTotal">{formatEuro(summary.totalCents)}</em></button>
   </section>;
