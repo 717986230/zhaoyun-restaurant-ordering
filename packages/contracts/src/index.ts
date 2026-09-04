@@ -1,30 +1,27 @@
-import { Static, Type } from "@sinclair/typebox";
+/**
+ * Types for the wire format. The request shapes are validated at runtime by
+ * `src/contracts.js`, which both the server and these types describe; the
+ * parity test in `test/parity.test.ts` fails if the two drift apart.
+ */
 
-export const OrderStatusSchema = Type.Union([
-  Type.Literal("new"), Type.Literal("preparing"), Type.Literal("ready"),
-  Type.Literal("completed"), Type.Literal("cancelled")
-]);
+export type OrderStatus = "new" | "preparing" | "ready" | "completed" | "cancelled";
+export type ServiceStatus = "open" | "acknowledged" | "completed" | "cancelled";
 
-export const CreateOrderSchema = Type.Object({
-  clientRequestId: Type.String({ minLength: 8, maxLength: 128 }),
-  table: Type.String({ minLength: 1, maxLength: 32 }),
-  note: Type.String({ maxLength: 500 }),
-  items: Type.Array(Type.Object({
-    id: Type.String({ minLength: 1 }),
-    qty: Type.Integer({ minimum: 1, maximum: 99 }),
-    modifiers: Type.Optional(Type.Array(Type.Object({
-      id: Type.String({ minLength: 1, maxLength: 64 })
-    }), { maxItems: 32 }))
-  }), { minItems: 1, maxItems: 100 })
-});
+export interface CreateOrderCommand {
+  clientRequestId: string;
+  table: string;
+  note: string;
+  items: Array<{
+    id: string;
+    qty: number;
+    modifiers?: Array<{ id: string }>;
+  }>;
+}
 
-export const CreateServiceRequestSchema = Type.Object({
-  table: Type.String({ minLength: 1, maxLength: 32 }),
-  type: Type.String({ minLength: 1, maxLength: 64 })
-});
-
-export type CreateOrderCommand = Static<typeof CreateOrderSchema>;
-export type CreateServiceRequestCommand = Static<typeof CreateServiceRequestSchema>;
+export interface CreateServiceRequestCommand {
+  table: string;
+  type: string;
+}
 
 export interface ApiCatalogProduct {
   id: string;
@@ -55,7 +52,7 @@ export interface ApiOrder {
   clientRequestId: string;
   no: string;
   table: string;
-  status: Static<typeof OrderStatusSchema>;
+  status: OrderStatus;
   note: string;
   total: number;
   items: Array<{ id: string; name?: string; qty: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
@@ -95,7 +92,7 @@ export interface ApiServiceRequest {
   id: string;
   table: string;
   type: string;
-  status: "open" | "acknowledged" | "completed" | "cancelled";
+  status: ServiceStatus;
   createdAt: string;
   updatedAt: string;
 }
