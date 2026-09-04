@@ -1,0 +1,32 @@
+# One instance per print station, e.g.
+#   sudo systemctl enable --now zhaoyun-print-agent@kitchen
+#   sudo systemctl enable --now zhaoyun-print-agent@bar
+[Unit]
+Description=Zhao Yun print agent (%i station)
+After=zhaoyun-server.service
+Wants=zhaoyun-server.service
+
+[Service]
+Type=simple
+User=zhaoyun
+WorkingDirectory=/opt/zhaoyun
+EnvironmentFile=/etc/zhaoyun/zhaoyun.env
+Environment=PRINTER_ROLE=%i
+Environment=PRINT_AGENT_ID=%i-1
+ExecStart=/usr/bin/node server/print-agent.mjs
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zhaoyun-print-%i
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# The agent shares the database file with the API service.
+ReadWritePaths=/opt/zhaoyun/server/data
+
+[Install]
+WantedBy=multi-user.target

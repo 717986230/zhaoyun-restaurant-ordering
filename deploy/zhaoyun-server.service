@@ -1,0 +1,33 @@
+# Linux (systemd). Install to /etc/systemd/system/zhaoyun-server.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now zhaoyun-server
+[Unit]
+Description=Zhao Yun ordering API
+Documentation=https://github.com/717986230/zhaoyun-restaurant-ordering
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zhaoyun
+WorkingDirectory=/opt/zhaoyun
+EnvironmentFile=/etc/zhaoyun/zhaoyun.env
+ExecStart=/usr/bin/node server/index.mjs
+# A restaurant must not need a person to notice the process died.
+Restart=always
+RestartSec=3
+# Do not give up after a burst of restarts during a bad evening.
+StartLimitIntervalSec=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zhaoyun-server
+
+# The service only needs its own data and upload directories.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/zhaoyun/server/data /opt/zhaoyun/server/uploads /opt/zhaoyun/server/backups
+
+[Install]
+WantedBy=multi-user.target

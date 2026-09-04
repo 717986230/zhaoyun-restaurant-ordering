@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { buildServer } from "../index.mjs";
+import { renderReceipt } from "../print-agent.mjs";
 
 test("catalog, orders, service requests and print routing work together", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-api-"));
@@ -319,4 +320,280 @@ test("responses carry hardening headers", async (context) => {
   assert.equal(response.headers["x-content-type-options"], "nosniff");
   assert.equal(response.headers["referrer-policy"], "no-referrer");
   assert.equal(response.headers["x-frame-options"], "SAMEORIGIN");
+});
+
+test("table bill splits VAT by rate and prints once", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-bill-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const catalog = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products;
+  const food = catalog.find((product) => product.sku === "R1");
+  const drink = catalog.find((product) => product.kind === "drink");
+  assert.equal(food.vatPercent, 10);
+  assert.equal(drink.vatPercent, 20);
+
+  await app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "bill-order-0001", table: "07", note: "", items: [{ id: food.id, qty: 2 }, { id: drink.id, qty: 1 }] }
+  });
+
+  const preview = (await app.inject({ method: "GET", url: "/api/admin/tables/07/bill", headers: adminHeaders })).json().bill;
+  const grossFood = food.price * 2;
+  const expectedTotal = Number((grossFood + drink.price).toFixed(2));
+  assert.equal(preview.total, expectedTotal);
+  assert.equal(preview.fiscalReceipt, false);
+  assert.deepEqual(preview.vatBreakdown.map((group) => group.percent), [10, 20]);
+  const reduced = preview.vatBreakdown.find((group) => group.percent === 10);
+  assert.equal(reduced.gross, grossFood);
+  assert.equal(Number((reduced.net + reduced.vat).toFixed(2)), grossFood);
+  assert.equal(reduced.net, Math.round((grossFood * 100) / 1.1) / 100);
+
+  const settled = (await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/settle", headers: adminHeaders })).json().bill;
+  assert.equal(settled.total, expectedTotal);
+  assert.ok(settled.printJobId);
+
+  const jobs = (await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: adminHeaders })).json().jobs;
+  const billJob = jobs.find((job) => job.payload.kind === "bill");
+  assert.equal(billJob.printerRole, "front");
+  assert.equal(billJob.payload.table, "07");
+
+  const emptied = await app.inject({ method: "GET", url: "/api/admin/tables/07/bill", headers: adminHeaders });
+  assert.deepEqual(emptied.json().bill.items, []);
+  const again = await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/settle", headers: adminHeaders });
+  assert.equal(again.statusCode, 409);
+
+  const orders = (await app.inject({ method: "GET", url: "/api/orders", headers: adminHeaders })).json().orders;
+  assert.ok(orders[0].billedAt);
+});
+
+test("allergen codes are validated and normalized", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-allergens-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const base = {
+    sku: "TEST-ALLERGEN-01",
+    kind: "food",
+    category: "MAIN",
+    names: { zh: "测试", de: "Test", en: "Test" },
+    price: 9.9,
+    printStation: "kitchen",
+    published: true,
+    available: true
+  };
+
+  const rejected = await app.inject({ method: "POST", url: "/api/admin/products", headers: adminHeaders, payload: { ...base, allergens: ["Gluten"] } });
+  assert.equal(rejected.statusCode, 400);
+
+  const created = await app.inject({ method: "POST", url: "/api/admin/products", headers: adminHeaders, payload: { ...base, allergens: ["G", "A", "A"] } });
+  assert.equal(created.statusCode, 201);
+  assert.deepEqual(created.json().product.allergens, ["A", "G"]);
+  assert.equal(created.json().product.vatPercent, 10);
+});
+
+test("registered tables require their own token", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-tables-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products[0];
+  const order = (id, table, headers = {}) => app.inject({
+    method: "POST",
+    url: "/api/orders",
+    headers,
+    payload: { clientRequestId: id, table, note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+
+  // An empty registry keeps a fresh install usable.
+  assert.equal((await order("open-mode-0001", "09")).statusCode, 201);
+
+  const registered = (await app.inject({ method: "POST", url: "/api/admin/tables", headers: adminHeaders, payload: { table: "t-9", label: "Terrasse" } })).json().table;
+  assert.equal(registered.table, "T-9");
+  assert.ok(registered.token.length >= 12);
+
+  assert.equal((await order("guarded-0001", "T-9")).statusCode, 403);
+  assert.equal((await order("guarded-0002", "T-9", { "x-table-token": "wrong" })).statusCode, 403);
+  assert.equal((await order("guarded-0003", "99", { "x-table-token": registered.token })).statusCode, 403);
+
+  const accepted = await order("guarded-0004", "t-9", { "x-table-token": registered.token });
+  assert.equal(accepted.statusCode, 201);
+  assert.equal(accepted.json().order.table, "T-9");
+
+  const service = await app.inject({ method: "POST", url: "/api/service-requests", headers: { "x-table-token": registered.token }, payload: { table: "T-9", type: "water" } });
+  assert.equal(service.statusCode, 201);
+  const deniedService = await app.inject({ method: "POST", url: "/api/service-requests", payload: { table: "T-9", type: "water" } });
+  assert.equal(deniedService.statusCode, 403);
+
+  const listed = (await app.inject({ method: "GET", url: "/api/admin/tables", headers: adminHeaders })).json().tables;
+  assert.deepEqual(listed.map((row) => row.table), ["T-9"]);
+  const rotated = (await app.inject({ method: "POST", url: "/api/admin/tables", headers: adminHeaders, payload: { table: "T-9", rotateToken: true } })).json().table;
+  assert.notEqual(rotated.token, registered.token);
+  assert.equal((await order("guarded-0005", "T-9", { "x-table-token": registered.token })).statusCode, 403);
+});
+
+test("bill tickets carry localized names", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-bill-i18n-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products.find((product) => product.sku === "R1");
+  await app.inject({ method: "POST", url: "/api/orders", payload: { clientRequestId: "bill-i18n-0001", table: "04", note: "", items: [{ id: dish.id, qty: 1 }] } });
+  const bill = (await app.inject({ method: "GET", url: "/api/admin/tables/04/bill", headers: adminHeaders })).json().bill;
+  assert.equal(bill.items[0].names.de, dish.names.de);
+
+  const settled = await app.inject({ method: "POST", url: "/api/admin/tables/04/bill/settle", headers: adminHeaders });
+  assert.equal(settled.statusCode, 200);
+  const jobs = (await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: adminHeaders })).json().jobs;
+  const billJob = jobs.find((job) => job.payload.kind === "bill");
+  const ticket = renderReceipt(billJob.payload, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(ticket, /Rechnung/);
+  assert.match(ticket, new RegExp(dish.names.de));
+  assert.match(ticket, /kein Kassenbeleg/);
+});
+
+test("the settle list and table validation do not depend on the recent-order window", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-open-tables-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-admin-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const adminHeaders = { "x-admin-token": "test-admin-token" };
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products[0];
+  const order = (id, table) => app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: id, table, note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+
+  // The board pages orders; the settle list must not inherit that window.
+  await order("window-oldest-0001", "01");
+  await order("window-newest-0001", "02");
+
+  const page = (await app.inject({ method: "GET", url: "/api/orders?limit=1", headers: adminHeaders })).json().orders;
+  assert.equal(page.length, 1);
+  assert.equal(page[0].table, "02", "the page shows the newest order only");
+
+  const openTables = (await app.inject({ method: "GET", url: "/api/admin/tables/open", headers: adminHeaders })).json().tables;
+  assert.deepEqual(openTables, ["01", "02"]);
+
+  const rejected = await order("window-invalid-0001", "THIS-TABLE-IS-FAR-TOO-LONG");
+  assert.equal(rejected.statusCode, 400);
+});
+
+test("roles separate the floor from the office, and writes are recorded", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-roles-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-manager-token",
+    staffToken: "test-staff-token",
+    kitchenToken: "test-kitchen-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const manager = { "x-admin-token": "test-manager-token" };
+  const staff = { "x-admin-token": "test-staff-token" };
+  const kitchen = { "x-admin-token": "test-kitchen-token" };
+
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/session", headers: manager })).json().role, "manager");
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/session", headers: staff })).json().role, "staff");
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/session", headers: kitchen })).json().role, "kitchen");
+
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products[0];
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "role-order-0001", table: "06", note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+  const orderId = created.json().order.id;
+
+  // Kitchen moves orders along and sees nothing else.
+  assert.equal((await app.inject({ method: "PATCH", url: `/api/orders/${orderId}/status`, headers: kitchen, payload: { status: "preparing" } })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/api/service-requests", headers: kitchen })).statusCode, 403);
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/products", headers: kitchen })).statusCode, 403);
+
+  // Staff runs the floor but must not touch prices or the catalog.
+  assert.equal((await app.inject({ method: "GET", url: "/api/service-requests", headers: staff })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: "/api/admin/tables/06/bill/settle", headers: staff })).statusCode, 200);
+  const priceEdit = await app.inject({
+    method: "PUT",
+    url: `/api/admin/products/${dish.id}`,
+    headers: staff,
+    payload: { sku: dish.sku, kind: dish.kind, category: dish.category, names: dish.names, price: 0.01, printStation: dish.printStation }
+  });
+  assert.equal(priceEdit.statusCode, 403);
+  assert.equal((await app.inject({ method: "DELETE", url: `/api/admin/products/${dish.id}`, headers: staff })).statusCode, 403);
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/audit", headers: staff })).statusCode, 403);
+
+  const unchanged = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products.find((row) => row.id === dish.id);
+  assert.equal(unchanged.price, dish.price, "the refused edit must not have changed the price");
+
+  const entries = (await app.inject({ method: "GET", url: "/api/admin/audit", headers: manager })).json().entries;
+  const kitchenAdvance = entries.find((row) => row.role === "kitchen" && row.method === "PATCH" && row.status === 200);
+  assert.equal(kitchenAdvance.detail.status, "preparing");
+  const refusedEdit = entries.find((row) => row.role === "staff" && row.status === 403 && row.method === "PUT");
+  assert.equal(refusedEdit.detail.denied, "manager");
+  assert.ok(entries.some((row) => row.role === "staff" && row.method === "POST" && row.route.includes("settle")));
+  // Reads are noise in an audit log; only writes and refusals are kept.
+  assert.equal(entries.some((row) => row.method === "GET" && row.status === 200), false);
+});
+
+test("optional role tokens are rejected when they collide or are too weak", async () => {
+  await assert.rejects(
+    () => buildServer({ adminToken: "same-token-for-both", staffToken: "same-token-for-both", logger: false }),
+    /STAFF_TOKEN must differ from ADMIN_TOKEN/
+  );
+  await assert.rejects(
+    () => buildServer({ isProduction: true, adminToken: "a".repeat(32), staffToken: "too-short", logger: false }),
+    /Production STAFF_TOKEN must be at least 32 characters/
+  );
 });

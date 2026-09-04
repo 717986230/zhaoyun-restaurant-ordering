@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
-import { config } from "./config.mjs";
+import { assertRoleTokens, config } from "./config.mjs";
 import { createDatabase } from "./database.mjs";
 import { createRealtimeHub } from "./realtime.mjs";
 import { registerRoutes } from "./routes.mjs";
@@ -15,6 +15,8 @@ export async function buildServer(overrides = {}) {
     throw new Error("Production ADMIN_TOKEN must be at least 32 characters and must not use the development token");
   }
 
+  assertRoleTokens(settings);
+
   mkdirSync(settings.uploadDir, { recursive: true });
   const app = Fastify({ logger: overrides.logger ?? true, bodyLimit: 2 * 1024 * 1024, requestIdHeader: "x-request-id" });
   const database = createDatabase(settings.databasePath);
@@ -22,7 +24,7 @@ export async function buildServer(overrides = {}) {
 
   await app.register(cors, {
     origin: settings.isProduction ? settings.corsOrigin : true,
-    allowedHeaders: ["content-type", "x-admin-token"]
+    allowedHeaders: ["content-type", "x-admin-token", "x-table-token"]
   });
   await app.register(websocket);
   await app.register(multipart);

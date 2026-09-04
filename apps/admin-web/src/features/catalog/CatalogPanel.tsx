@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
+import { ALLERGENS } from "../../../../../src/allergens.js";
 import { formatEuro } from "@zhaoyun/domain";
-import type { ModifierGroup, Product } from "@zhaoyun/domain";
+import type { ModifierGroup, Product, VatPercent } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
 
@@ -62,7 +63,8 @@ export function CatalogPanel(props: Props) {
       description: readText(data, "description"),
       price: Number(data.get("price")),
       details: { ingredients: readText(data, "ingredients"), time: readText(data, "time"), people: readText(data, "people"), level: readText(data, "level") },
-      allergens: readText(data, "allergens").split(",").map((item) => item.trim()).filter(Boolean),
+      allergens: data.getAll("allergens").map((value) => String(value)),
+      vatPercent: (Number(data.get("vatPercent")) || 10) as VatPercent,
       modifiers: readModifiers(data),
       printStation: readText(data, "printStation") as AdminProductInput["printStation"],
       available: data.get("available") === "on",
@@ -82,10 +84,10 @@ export function CatalogPanel(props: Props) {
       <label><span>德文名称</span><input name="nameDe" defaultValue={product?.names.de ?? ""} /></label>
       <label><span>英文名称</span><input name="nameEn" defaultValue={product?.names.en ?? ""} /></label>
       <label><span>简介</span><textarea name="description" rows={3} defaultValue={product?.description ?? ""} /></label>
-      <div className="field-grid"><label><span>价格 EUR</span><input name="price" required type="number" min="0" step="0.01" defaultValue={product ? product.priceCents / 100 : ""} /></label><label><span>出单档口</span><select name="printStation" defaultValue={product?.printStation ?? "kitchen"}>{[["kitchen", "厨房"], ["bar", "吧台"], ["sushi", "寿司台"], ["front", "前台"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
+      <div className="field-grid three"><label><span>价格 EUR（含税）</span><input name="price" required type="number" min="0" step="0.01" defaultValue={product ? product.priceCents / 100 : ""} /></label><label><span>出单档口</span><select name="printStation" defaultValue={product?.printStation ?? "kitchen"}>{[["kitchen", "厨房"], ["bar", "吧台"], ["sushi", "寿司台"], ["front", "前台"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>税率</span><select name="vatPercent" defaultValue={String(product?.vatPercent ?? 10)}>{[["10", "10%（餐食）"], ["13", "13%"], ["20", "20%（酒水）"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
       <label><span>主要食材</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
       <div className="field-grid three"><label><span>制作时间</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>份量</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>口味/难度</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
-      <label><span>过敏原（逗号分隔）</span><input name="allergens" defaultValue={product?.allergens.join(", ") ?? ""} /></label>
+      <fieldset className="allergen-picker"><legend>过敏原（奥地利 A–R 代码）</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {allergen.zh} · {allergen.de}</span></label>)}</fieldset>
       <label><span>点餐选项（JSON）</span><textarea name="modifiers" rows={8} spellCheck={false} defaultValue={JSON.stringify(product?.modifiers ?? [], null, 2)} placeholder={'[{"id":"spice","names":{"zh":"辣度","de":"Scharf","en":"Spice"},"selection":"single","options":[]}]'} /><small>选项会进入订单和打印单；价格使用 priceCents（分）。</small></label>
       <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>选择图片或视频</b><small>JPEG、PNG、WebP、MP4、WebM，最大 50 MB</small></label>
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>可售</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>前台显示</span></label></div>
