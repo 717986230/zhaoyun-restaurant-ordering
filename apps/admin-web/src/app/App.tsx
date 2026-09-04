@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminApi } from "@zhaoyun/api-client";
-import type { AdminProductInput, AdminStorage } from "@zhaoyun/api-client";
+import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
 import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
@@ -29,15 +29,36 @@ function mapProduct(product: ApiCatalogProduct): Product {
 }
 
 const initialState: AdminState = {
-  tab: "catalog", connected: false, connectionText: "未连接", products: [], printers: [],
+  tab: "catalog", role: null, auditEntries: [],
+  connected: false, connectionText: "未连接", products: [], printers: [],
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], openTables: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", toast: null
 };
 
 const BOARD_REFRESH_MS = 5000;
 
+// The waiter tablet and the kitchen screen open the same console; the role
+// decides which of it exists at all, so nobody is offered a 403.
+const TABS_BY_ROLE: Record<StaffRole, AdminTab[]> = {
+  manager: ["catalog", "board", "printers", "system"],
+  staff: ["board"],
+  kitchen: ["board"]
+};
+
+const ROLE_LABELS: Record<StaffRole, string> = { manager: "经理", staff: "服务员", kitchen: "厨房" };
+
+const TAB_LABELS: Record<AdminTab, string> = {
+  catalog: "商品与媒体",
+  board: "订单看板",
+  printers: "打印机",
+  system: "连接设置"
+};
+
 export function App() {
   const [state, setState] = useState(initialState);
+  // The board polls on an interval; keeping the role in a ref avoids rebuilding
+  // that callback (and restarting the timer) on every reconnect.
+  const roleRef = useRef<StaffRole | null>(null);
   const storage = useMemo(() => adminApi.storage, [state.connected, state.tab]);
 
   const notify = useCallback((message: string, kind: "success" | "warning" | "error" = "success") => {
@@ -48,8 +69,21 @@ export function App() {
   const connect = useCallback(async () => {
     try {
       await adminApi.health();
-      const [{ products }, { printers }] = await Promise.all([adminApi.products(), adminApi.printers()]);
-      setState((current) => ({ ...current, connected: true, connectionText: "服务器在线", products: products.map(mapProduct), printers }));
+      const { role } = await adminApi.session();
+      roleRef.current = role;
+      const manager = role === "manager";
+      const [catalog, printerList] = manager
+        ? await Promise.all([adminApi.products(), adminApi.printers()])
+        : [{ products: [] }, { printers: [] }];
+      setState((current) => ({
+        ...current,
+        role,
+        connected: true,
+        connectionText: `服务器在线 · ${ROLE_LABELS[role]}`,
+        products: catalog.products.map(mapProduct),
+        printers: printerList.printers,
+        tab: TABS_BY_ROLE[role].includes(current.tab) ? current.tab : TABS_BY_ROLE[role][0] ?? "board"
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "连接失败";
       setState((current) => ({ ...current, connected: false, connectionText: message, ...(!adminApi.storage.token ? { tab: "system" as const } : {}) }));
@@ -59,8 +93,13 @@ export function App() {
   const loadBoard = useCallback(async (silent = false) => {
     if (!adminApi.storage.token) return;
     try {
-      const [{ orders }, { requests }, { jobs }, { tables }] = await Promise.all([adminApi.orders(), adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.openTables()]);
-      setState((current) => ({ ...current, orders, requests, failedJobs: jobs, openTables: tables }));
+      const { orders } = await adminApi.orders();
+      // The kitchen screen may only read orders; asking for the rest would 403.
+      const floor = roleRef.current === "kitchen"
+        ? { requests: [], jobs: [], tables: [] }
+        : await Promise.all([adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.openTables()])
+          .then(([a, b, c]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables }));
+      setState((current) => ({ ...current, orders, requests: floor.requests, failedJobs: floor.jobs, openTables: floor.tables }));
     } catch (error) {
       if (!silent) notify(error instanceof Error ? error.message : "看板加载失败", "error");
     }
@@ -71,8 +110,8 @@ export function App() {
   const loadTables = useCallback(async () => {
     if (!adminApi.storage.token) return;
     try {
-      const { tables } = await adminApi.tables();
-      setState((current) => ({ ...current, tables }));
+      const [{ tables }, { entries }] = await Promise.all([adminApi.tables(), adminApi.audit(50)]);
+      setState((current) => ({ ...current, tables, auditEntries: entries }));
     } catch {
       /* The connection form stays usable while the server is unreachable. */
     }
@@ -195,7 +234,7 @@ export function App() {
 
   return <><div className="admin-shell">
     <header className="admin-head"><div><strong>赵云餐厅管理台</strong><small>ZHAO YUN OPERATIONS</small></div><div className="admin-head-actions"><div className="connection"><i className={state.connected ? "online" : ""} /><span>{state.connectionText}</span></div><button onClick={() => void returnToApp()}>返回点餐</button></div></header>
-    <nav className="admin-tabs" aria-label="管理模块"><button className={state.tab === "catalog" ? "active" : ""} onClick={() => setTab("catalog")}>商品与媒体</button><button className={state.tab === "board" ? "active" : ""} onClick={() => setTab("board")}>订单看板</button><button className={state.tab === "printers" ? "active" : ""} onClick={() => setTab("printers")}>打印机</button><button className={state.tab === "system" ? "active" : ""} onClick={() => setTab("system")}>连接设置</button></nav>
+    <nav className="admin-tabs" aria-label="管理模块">{(state.role ? TABS_BY_ROLE[state.role] : (["system"] as AdminTab[])).map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} onClick={() => setTab(tab)}>{TAB_LABELS[tab]}</button>)}</nav>
     <main>
       {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onRefresh={connect} />}
       {state.tab === "board" && <BoardPanel
@@ -212,9 +251,10 @@ export function App() {
         onOpenBill={openBill}
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
         onSettleBill={settleBill}
+        role={state.role}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
-      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} />}
+      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} />}
     </main>
   </div><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;
 }

@@ -524,3 +524,76 @@ test("the settle list and table validation do not depend on the recent-order win
   const rejected = await order("window-invalid-0001", "THIS-TABLE-IS-FAR-TOO-LONG");
   assert.equal(rejected.statusCode, 400);
 });
+
+test("roles separate the floor from the office, and writes are recorded", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-roles-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: "test-manager-token",
+    staffToken: "test-staff-token",
+    kitchenToken: "test-kitchen-token",
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const manager = { "x-admin-token": "test-manager-token" };
+  const staff = { "x-admin-token": "test-staff-token" };
+  const kitchen = { "x-admin-token": "test-kitchen-token" };
+
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/session", headers: manager })).json().role, "manager");
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/session", headers: staff })).json().role, "staff");
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/session", headers: kitchen })).json().role, "kitchen");
+
+  const dish = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products[0];
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/orders",
+    payload: { clientRequestId: "role-order-0001", table: "06", note: "", items: [{ id: dish.id, qty: 1 }] }
+  });
+  const orderId = created.json().order.id;
+
+  // Kitchen moves orders along and sees nothing else.
+  assert.equal((await app.inject({ method: "PATCH", url: `/api/orders/${orderId}/status`, headers: kitchen, payload: { status: "preparing" } })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/api/service-requests", headers: kitchen })).statusCode, 403);
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/products", headers: kitchen })).statusCode, 403);
+
+  // Staff runs the floor but must not touch prices or the catalog.
+  assert.equal((await app.inject({ method: "GET", url: "/api/service-requests", headers: staff })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: "/api/admin/tables/06/bill/settle", headers: staff })).statusCode, 200);
+  const priceEdit = await app.inject({
+    method: "PUT",
+    url: `/api/admin/products/${dish.id}`,
+    headers: staff,
+    payload: { sku: dish.sku, kind: dish.kind, category: dish.category, names: dish.names, price: 0.01, printStation: dish.printStation }
+  });
+  assert.equal(priceEdit.statusCode, 403);
+  assert.equal((await app.inject({ method: "DELETE", url: `/api/admin/products/${dish.id}`, headers: staff })).statusCode, 403);
+  assert.equal((await app.inject({ method: "GET", url: "/api/admin/audit", headers: staff })).statusCode, 403);
+
+  const unchanged = (await app.inject({ method: "GET", url: "/api/catalog" })).json().products.find((row) => row.id === dish.id);
+  assert.equal(unchanged.price, dish.price, "the refused edit must not have changed the price");
+
+  const entries = (await app.inject({ method: "GET", url: "/api/admin/audit", headers: manager })).json().entries;
+  const kitchenAdvance = entries.find((row) => row.role === "kitchen" && row.method === "PATCH" && row.status === 200);
+  assert.equal(kitchenAdvance.detail.status, "preparing");
+  const refusedEdit = entries.find((row) => row.role === "staff" && row.status === 403 && row.method === "PUT");
+  assert.equal(refusedEdit.detail.denied, "manager");
+  assert.ok(entries.some((row) => row.role === "staff" && row.method === "POST" && row.route.includes("settle")));
+  // Reads are noise in an audit log; only writes and refusals are kept.
+  assert.equal(entries.some((row) => row.method === "GET" && row.status === 200), false);
+});
+
+test("optional role tokens are rejected when they collide or are too weak", async () => {
+  await assert.rejects(
+    () => buildServer({ adminToken: "same-token-for-both", staffToken: "same-token-for-both", logger: false }),
+    /STAFF_TOKEN must differ from ADMIN_TOKEN/
+  );
+  await assert.rejects(
+    () => buildServer({ isProduction: true, adminToken: "a".repeat(32), staffToken: "too-short", logger: false }),
+    /Production STAFF_TOKEN must be at least 32 characters/
+  );
+});

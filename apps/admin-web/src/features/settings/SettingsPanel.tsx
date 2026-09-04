@@ -1,12 +1,22 @@
 import type { FormEvent } from "react";
-import type { AdminStorage, RestaurantTable } from "@zhaoyun/api-client";
+import type { AdminStorage, AuditEntry, RestaurantTable } from "@zhaoyun/api-client";
 
 interface Props {
   storage: AdminStorage;
   tables: RestaurantTable[];
+  auditEntries: AuditEntry[];
   onSave: (storage: AdminStorage) => Promise<void>;
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<void>;
   onDeleteTable: (table: string) => Promise<void>;
+}
+
+const ROLE_LABELS: Record<string, string> = { manager: "经理", staff: "服务员", kitchen: "厨房" };
+
+function detailSummary(entry: AuditEntry): string {
+  const parts = Object.entries(entry.detail)
+    .filter(([key, value]) => key !== "params" && value !== undefined && value !== null)
+    .map(([key, value]) => `${key}=${String(value)}`);
+  return parts.length ? ` · ${parts.join(" ")}` : "";
 }
 
 function entryUrl(baseUrl: string, table: RestaurantTable): string {
@@ -52,5 +62,12 @@ export function SettingsPanel(props: Props) {
         <button className="ghost-action" onClick={() => void props.onDeleteTable(table.table)}>删除</button>
       </div>
     </div>) : <div className="admin-empty">还没有登记桌台，任何设备都可以自报桌号</div>}</div>
+
+    <h1>操作记录</h1>
+    <p>所有带令牌的写操作和被拒绝的越权尝试。共享令牌记不到人，但记得到「什么被改了、什么时候、哪台设备、什么角色」。</p>
+    <div className="audit-list">{props.auditEntries.length ? props.auditEntries.map((entry) => <div className={`audit-row ${entry.status >= 400 ? "denied" : ""}`} key={entry.id}>
+      <span className="audit-role">{ROLE_LABELS[entry.role] ?? entry.role}</span>
+      <span className="audit-what"><b>{entry.method} {entry.route}</b><small>{new Date(entry.at).toLocaleString("de-AT")} · {entry.ip} · {entry.status}{detailSummary(entry)}</small></span>
+    </div>) : <div className="admin-empty">还没有记录</div>}</div>
   </div></section>;
 }

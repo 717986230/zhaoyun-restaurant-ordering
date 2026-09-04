@@ -29,6 +29,19 @@ export interface AdminProductInput {
   modifiers?: ModifierGroup[];
 }
 
+export type StaffRole = "manager" | "staff" | "kitchen";
+
+export interface AuditEntry {
+  id: string;
+  at: string;
+  role: StaffRole;
+  ip: string;
+  method: string;
+  route: string;
+  status: number;
+  detail: Record<string, unknown>;
+}
+
 export interface RestaurantTable {
   table: string;
   label: string;
@@ -71,6 +84,8 @@ export class AdminApi {
   createProduct(product: AdminProductInput): Promise<{ product: ApiCatalogProduct }> { return this.#request("/api/admin/products", { method: "POST", body: JSON.stringify(product) }); }
   updateProduct(id: string, product: AdminProductInput): Promise<{ product: ApiCatalogProduct }> { return this.#request(`/api/admin/products/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(product) }); }
   deleteProduct(id: string): Promise<void> { return this.#request(`/api/admin/products/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  session(): Promise<{ role: StaffRole }> { return this.#request("/api/admin/session"); }
+  audit(limit = 100): Promise<{ entries: AuditEntry[] }> { return this.#request(`/api/admin/audit?limit=${limit}`); }
   orders(limit = 100): Promise<{ orders: ApiOrder[] }> { return this.#request(`/api/orders?limit=${limit}`); }
   updateOrderStatus(id: string, status: ApiOrder["status"]): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   serviceRequests(limit = 100): Promise<{ requests: ApiServiceRequest[] }> { return this.#request(`/api/service-requests?limit=${limit}`); }

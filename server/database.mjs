@@ -10,7 +10,7 @@ const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cance
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 const VAT_PERCENTS = new Set([10, 13, 20]);
 // Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
@@ -210,6 +210,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      at TEXT NOT NULL,
+      role TEXT NOT NULL,
+      ip TEXT NOT NULL DEFAULT '',
+      method TEXT NOT NULL,
+      route TEXT NOT NULL,
+      status INTEGER NOT NULL,
+      detail_json TEXT NOT NULL DEFAULT '{}'
+    );
+
     CREATE TABLE IF NOT EXISTS restaurant_tables (
       table_no TEXT PRIMARY KEY,
       label TEXT NOT NULL DEFAULT '',
@@ -250,6 +261,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
   `);
   for (const statement of [
     "ALTER TABLE products ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
@@ -320,6 +332,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     requestById: db.prepare("SELECT * FROM service_requests WHERE id = ?"),
     insertRequest: db.prepare("INSERT INTO service_requests (id, table_no, type, status, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?)"),
     updateRequest: db.prepare("UPDATE service_requests SET status = ?, updated_at = ? WHERE id = ?"),
+    insertAudit: db.prepare("INSERT INTO audit_log (id, at, role, ip, method, route, status, detail_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+    listAudit: db.prepare("SELECT * FROM audit_log ORDER BY at DESC, rowid DESC LIMIT ?"),
     tableCount: db.prepare("SELECT COUNT(*) AS count FROM restaurant_tables"),
     listTables: db.prepare("SELECT * FROM restaurant_tables ORDER BY table_no"),
     tableByNo: db.prepare("SELECT * FROM restaurant_tables WHERE table_no = ?"),
@@ -705,6 +719,13 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
     createServiceRequest,
     updateServiceRequest,
+    recordAudit: (entry) => {
+      statements.insertAudit.run(randomUUID(), now(), String(entry.role), String(entry.ip ?? ""), String(entry.method), String(entry.route), Number(entry.status), JSON.stringify(entry.detail ?? {}));
+    },
+    listAudit: (limit = 100) => statements.listAudit.all(Math.min(Number(limit) || 100, 500)).map((row) => ({
+      id: row.id, at: row.at, role: row.role, ip: row.ip, method: row.method,
+      route: row.route, status: row.status, detail: parseJson(row.detail_json, {})
+    })),
     hasTables: () => statements.tableCount.get().count > 0,
     listTables: () => statements.listTables.all().map(tableView),
     getTable: (table) => tableView(statements.tableByNo.get(String(table ?? "").trim().toUpperCase())),

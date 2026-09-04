@@ -1,3 +1,4 @@
+import type { StaffRole } from "@zhaoyun/api-client";
 import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
 
 const orderStatusLabels: Record<ApiOrder["status"], string> = {
@@ -40,6 +41,7 @@ interface Props {
   failedJobs: ApiPrintJob[];
   bill: ApiBill | null;
   openTables: string[];
+  role: StaffRole | null;
   busy: boolean;
   onRefresh: () => Promise<void>;
   onOrderStatus: (id: string, status: ApiOrder["status"]) => Promise<void>;
@@ -51,6 +53,9 @@ interface Props {
 }
 
 export function BoardPanel(props: Props) {
+  // The kitchen screen only moves orders along; billing and service calls are
+  // not its job and the server would refuse them anyway.
+  const floor = props.role !== "kitchen";
   const openOrders = props.orders.filter((order) => order.status !== "completed" && order.status !== "cancelled");
   const openRequests = props.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled");
 
@@ -69,13 +74,13 @@ export function BoardPanel(props: Props) {
             {order.note && <p className="board-note">备注：{order.note}</p>}
             <div className="board-actions">
               {next && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOrderStatus(order.id, next)}>更新为：{orderStatusLabels[next]}</button>}
-              <button className="ghost-action" disabled={props.busy} onClick={() => void props.onOrderStatus(order.id, "cancelled")}>取消订单</button>
+              {floor && <button className="ghost-action" disabled={props.busy} onClick={() => void props.onOrderStatus(order.id, "cancelled")}>取消订单</button>}
             </div>
           </article>;
         }) : <div className="admin-empty">暂无进行中的订单</div>}</div>
       </section>
 
-      <section className="board-column">
+      {floor && <section className="board-column">
         <h2>结账 <em>{props.openTables.length}</em></h2>
         <div className="board-list">{props.openTables.length ? <div className="table-chips">{props.openTables.map((table) => <button key={table} className="ghost-action" disabled={props.busy} onClick={() => void props.onOpenBill(table)}>桌 {table}</button>)}</div> : <div className="admin-empty">没有待结账的桌</div>}</div>
         {props.bill && <div className="bill-sheet" role="dialog" aria-label="账单">
@@ -103,7 +108,7 @@ export function BoardPanel(props: Props) {
           {job.error && <p className="board-note">{job.error}</p>}
           <div className="board-actions"><button className="primary-action" disabled={props.busy} onClick={() => void props.onRetryJob(job.id)}>重新打印</button></div>
         </article>) : <div className="admin-empty">没有失败的打印任务</div>}</div>
-      </section>
+      </section>}
     </div>
   </section>;
 }

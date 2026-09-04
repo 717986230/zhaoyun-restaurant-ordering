@@ -711,6 +711,49 @@ h2 {
   overflow-x: auto;
 }
 
+.audit-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.audit-row {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid #e2e7e5;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.audit-row.denied {
+  border-color: #e0b4b4;
+  background: #fdf7f7;
+}
+
+.audit-role {
+  color: #4e6659;
+  font-size: 12px;
+}
+
+.audit-what b {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.audit-what small {
+  display: block;
+  margin-top: 3px;
+  color: #7c8781;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .table-list {
   display: grid;
   gap: 8px;
