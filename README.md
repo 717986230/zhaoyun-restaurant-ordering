@@ -37,6 +37,8 @@ ADMIN_TOKEN='replace-with-a-long-random-token' npm run server
 - 管理台：`http://127.0.0.1:8787/admin.html`
 
 完整 Android SDK、APK 安装、局域网部署和打印机说明见 [INSTALL.md](INSTALL.md)。
+正式营业请用 [deploy/](deploy/README.md) 里的 systemd / launchd 单元托管服务和打印代理：
+断电或崩溃后必须自动拉起，没人会在营业中去手动敲 `npm run server`。
 
 部署前请先阅读 [INSTALL.md](INSTALL.md) 的生产环境要求；当前版本适合单机/单进程餐厅部署，多实例前需要将认证限流迁移到共享存储。
 
@@ -112,6 +114,7 @@ npm run android:release # 使用环境变量签名构建 Release APK
 - [系统架构](ARCHITECTURE.md)
 - [测试报告](TEST_REPORT.md)
 - [变更记录](CHANGELOG.md)
+- [部署单元与备份](deploy/README.md)
 - [ADR-0001：TypeScript 模块化单体](docs/adr/0001-modular-monolith-typescript.md)
 
 ## 已知边界
@@ -125,3 +128,4 @@ LAN 打印代理已完成任务租约、失败重试和人工重试接口，但�
 - 认证限流和公开接口限流都是单进程内存状态；本项目按单机单进程部署设计，多实例部署前需迁移到共享存储。
 - 桌台令牌保存在设备 localStorage，防的是误用和随手冒用，不能防拿到链接的人。
 - 顾客端「员工看板」的状态变更只作用于本机，不写回服务器。
+- 管理端仍是单一共享令牌，没有经理/服务员/厨房的角色区分，也没有操作审计。

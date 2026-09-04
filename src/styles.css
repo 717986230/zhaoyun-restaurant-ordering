@@ -154,6 +154,44 @@ html.plt-android .screen.active {
   border-color: rgba(122, 150, 126, 0.72);
 }
 
+.crash {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 24px calc(32px + env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.crash h1 {
+  font-family: Georgia, "Noto Serif SC", serif;
+  font-size: clamp(40px, 9vw, 72px);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  margin: 0 0 10px;
+}
+
+.crash p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.crash button {
+  margin-top: 22px;
+  min-width: 240px;
+}
+
+.crash code {
+  margin-top: 18px;
+  color: #7d6a58;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .allergen-list {
   display: flex;
   flex-wrap: wrap;

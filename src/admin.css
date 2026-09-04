@@ -688,6 +688,29 @@ h2 {
   font-size: 12px;
 }
 
+.admin-crash {
+  max-width: 640px;
+  margin: 12vh auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.admin-crash p {
+  color: #758079;
+}
+
+.admin-crash pre {
+  margin-top: 20px;
+  padding: 12px;
+  border: 1px solid #d7ddda;
+  border-radius: 6px;
+  background: #fff;
+  color: #8d3232;
+  font-size: 12px;
+  text-align: left;
+  overflow-x: auto;
+}
+
 .table-list {
   display: grid;
   gap: 8px;
