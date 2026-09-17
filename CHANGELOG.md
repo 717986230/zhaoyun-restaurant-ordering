@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-09-17
+
+### Changed
+
+- 统一动效节奏：`--ease-out` 和 `--dur-*` 令牌集中在 `:root`，顾客端详情卡的 JS 动画沿用同一组
+  数值，遮罩、卡片入场和 3D 翻转现在是一套动作而不是三套。翻转从 0.58s 收到 0.42s。
+- 详情卡增加退场动画（`AnimatePresence`）。此前关闭是直接卸载，开有动画、关没有。
+
+### Fixed
+
+- **`prefers-reduced-motion` 对 JS 动画无效**。CSS 里的 reduced-motion 块只能压住 CSS 过渡，
+  管不到 motion/react 驱动的详情卡入场和翻转——开了"减少动画"的设备照样看到 0.58s 的翻转。
+  改用 `useReducedMotion()` 把这些时长归零，并加了一对 Playwright 用例钉住：开启时翻转在
+  250ms 内落位，未开启时 120ms 仍在运动中。
+- 所有可点元素补上按下反馈。全局 `-webkit-tap-highlight-color: transparent` 清掉了系统的触摸
+  反馈却没有替代，平板上每个按钮按下去都没反应。现在按下有 scale 回弹，且在 reduced-motion
+  下关闭。
+
+### Performance
+
+- 移除菜单列表上无用的 3D 上下文：`.stack` 的 `perspective` 和 `.dish-card` 的
+  `transform-style: preserve-3d`。详情卡是 `.stack` 的兄弟节点而非后代，这个 3D 上下文没有
+  任何作用对象，却让最常滚动的列表为每张卡多一层合成。`.dish-card` 上那条 height/margin
+  过渡也一并删除——它服务的是早已被覆盖式详情卡取代的内联展开，且已被后面的同名声明覆盖。
+- 背景列表虚化不再做过渡动画。逐帧重算整列的模糊半径是这里最贵的一步，改为模糊直接落位、
+  只过渡暗化。
+
 ## 2026-09-02
 
 ### Fixed

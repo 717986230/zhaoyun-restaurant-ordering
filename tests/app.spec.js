@@ -232,6 +232,34 @@ test("catalog with no cached menu shows an explicit unavailable message", async 
   await expect(page.locator(".dish-card")).toHaveCount(0);
 });
 
+// The CSS prefers-reduced-motion block cannot reach motion/react's JS-driven
+// animations, so the flip has to opt out in JS. The 250ms budget sits well
+// inside the 0.42s an animated flip takes, with frames to spare on a slow
+// runner. `test.use({ reducedMotion })` does not reach the page under these
+// device projects, so the preference is emulated on the page directly.
+const flippedTransform = "matrix3d(-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1)";
+
+async function flipDetailCard(page) {
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
+  await expect(page.locator(".detail-front")).toBeVisible();
+  await page.locator(".detail-heading").click();
+}
+
+test("detail flip settles immediately when the device asks for reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await flipDetailCard(page);
+  await expect(page.locator(".detail-flip-inner")).toHaveCSS("transform", flippedTransform, { timeout: 250 });
+});
+
+test("detail flip is animated when the device does not ask for reduced motion", async ({ page }) => {
+  await flipDetailCard(page);
+  // Still in flight at the point the reduced-motion run has already settled.
+  await expect(page.locator(".detail-flip-inner")).not.toHaveCSS("transform", flippedTransform, { timeout: 120 });
+  await expect(page.locator(".detail-flip-inner")).toHaveCSS("transform", flippedTransform, { timeout: 2000 });
+});
+
 test("layout keeps main controls visible", async ({ page }) => {
   await expect(page.getByRole("button", { name: /开始点餐/ })).toBeInViewport();
   await page.getByRole("button", { name: /开始点餐/ }).click();

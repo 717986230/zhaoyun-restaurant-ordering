@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { formatEuro, summarizeCart } from "@zhaoyun/domain";
 import type { ModifierGroup, ModifierOption, Product, SelectedModifier } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
@@ -6,6 +6,14 @@ import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { productName, t } from "../../app/i18n";
 
 interface Props { state: CustomerState; dispatch: CustomerDispatch; products: Product[] }
+
+/**
+ * Shared with the `--ease-out` / `--dur-*` tokens in styles.css. The CSS
+ * `prefers-reduced-motion` block cannot reach these JS-driven animations, so
+ * every duration goes through `useReducedMotion` below instead.
+ */
+const EASE = [0.2, 0.8, 0.2, 1] as const;
+const DURATION = { backdrop: 0.2, card: 0.26, flip: 0.42 };
 
 function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
   return names[language] || names.de || names.en;
@@ -28,12 +36,18 @@ function ProductMedia({ product }: { product: Product }) {
 }
 
 function ProductDetail({ product, state, dispatch }: { product: Product; state: CustomerState; dispatch: CustomerDispatch }) {
-  return <div id="dishOverlay" className="dish-overlay open" aria-hidden="false" onClick={(event) => {
-    if (event.target === event.currentTarget) dispatch({ type: "close-product" });
-  }}>
-    <motion.div className="dish-detail-card" data-detail-id={product.id} initial={{ opacity: 0, y: 16, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}>
+  const reduceMotion = useReducedMotion();
+  const seconds = (value: number) => (reduceMotion ? 0 : value);
+
+  return <motion.div id="dishOverlay" className="dish-overlay open" aria-hidden="false"
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    transition={{ duration: seconds(DURATION.backdrop), ease: EASE }}
+    onClick={(event) => {
+      if (event.target === event.currentTarget) dispatch({ type: "close-product" });
+    }}>
+    <motion.div className="dish-detail-card" data-detail-id={product.id} initial={{ y: 16, scale: 0.985 }} animate={{ y: 0, scale: 1 }} exit={{ y: 10, scale: 0.99 }} transition={{ duration: seconds(DURATION.card), ease: EASE }}>
       <button className="detail-close" aria-label="关闭详情" onClick={() => dispatch({ type: "close-product" })}>×</button>
-      <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`} animate={{ rotateY: state.productFlipped ? 180 : 0 }} transition={{ duration: 0.58, ease: [0.22, 0.75, 0.2, 1] }}>
+      <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`} animate={{ rotateY: state.productFlipped ? 180 : 0 }} transition={{ duration: seconds(DURATION.flip), ease: EASE }}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
             <span className="number">{product.sku}</span><span className="cat">{product.category}</span>
@@ -82,7 +96,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
         </section>
       </motion.div>
     </motion.div>
-  </div>;
+  </motion.div>;
 }
 
 export function CatalogScreen({ state, dispatch, products }: Props) {
@@ -111,7 +125,7 @@ export function CatalogScreen({ state, dispatch, products }: Props) {
     <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
       <div className="summary"><span className="number">{product.sku}</span><div><h3>{productName(product, state.language)}</h3><p>{product.names.de}</p></div><span className="cat">{product.category}</span></div>
     </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}</div>
-    {activeProduct && <ProductDetail product={activeProduct} state={state} dispatch={dispatch} />}
+    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} state={state} dispatch={dispatch} />}</AnimatePresence>
     <button className="cartbar" onClick={() => dispatch({ type: "navigate", screen: "cart" })}><span>{t(state.language, "cart")}</span><b id="cartCount">{summary.count}</b><em id="cartTotal">{formatEuro(summary.totalCents)}</em></button>
   </section>;
 }

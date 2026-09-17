@@ -7,6 +7,16 @@
   --muted: #aaa097;
   --gold: #b99a70;
   --accent: #d6b47f;
+
+  /* One easing and one duration scale for the whole app. The JS animations in
+     CatalogScreen use the same numbers so the overlay, the card and the flip
+     read as a single movement. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-press: 0.09s;
+  --dur-fast: 0.18s;
+  --dur-base: 0.24s;
+  --dur-slow: 0.35s;
+
   color: var(--ink);
   background: #050505;
   font-family: Inter, system-ui, -apple-system, "Noto Sans SC", sans-serif;
@@ -304,7 +314,6 @@ html.plt-android .screen.active {
   height: calc(100dvh - 116px - env(safe-area-inset-top));
   overflow-y: auto;
   padding: 8px 18px 158px;
-  perspective: 1200px;
   scrollbar-width: none;
 }
 
@@ -313,8 +322,6 @@ html.plt-android .screen.active {
   margin: 0 0 -7px;
   position: relative;
   border-radius: 7px;
-  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1), margin 0.38s ease, transform 0.38s ease;
-  transform-style: preserve-3d;
 }
 
 .dish-card.expanded {
@@ -854,7 +861,7 @@ html.plt-android .screen.active {
 
 /* Shared-element menu detail used by the current customer app. */
 .stack {
-  transition: filter 0.35s ease, opacity 0.35s ease;
+  transition: opacity var(--dur-slow) var(--ease-out);
 }
 
 .dish-card {
@@ -891,16 +898,6 @@ html.plt-android .menu.detail-open .stack {
 
 .dish-overlay.open {
   display: block;
-  animation: overlay-in 0.38s ease both;
-}
-
-@keyframes overlay-in {
-  from {
-    background: rgba(5, 5, 5, 0);
-  }
-  to {
-    background: rgba(5, 5, 5, 0.2);
-  }
 }
 
 .dish-detail-card {
@@ -1168,6 +1165,65 @@ html.plt-android .menu.detail-open .stack {
 
   .detail-buy .primary.add {
     min-height: 40px;
+  }
+}
+
+/* Touch feedback. The reset above clears the platform tap highlight, so each
+   control answers a press itself; transform-only so it composites. */
+.home-btn,
+.service,
+.primary,
+.secondary,
+.chip,
+.icon-btn,
+.qty button,
+.cartbar,
+.langs button,
+.dish-card {
+  transition: transform var(--dur-press) var(--ease-out), opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.home-btn:active,
+.service:active,
+.primary:active,
+.secondary:active,
+.chip:active,
+.qty button:active,
+.langs button:active {
+  transform: scale(0.97);
+}
+
+.icon-btn:active,
+.detail-close:active {
+  transform: scale(0.9);
+}
+
+.cartbar:active {
+  transform: translateY(1px);
+}
+
+.dish-card:active {
+  transform: scale(0.994);
+}
+
+.primary:disabled:active,
+.secondary:disabled:active {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-btn:active,
+  .service:active,
+  .primary:active,
+  .secondary:active,
+  .chip:active,
+  .qty button:active,
+  .langs button:active,
+  .icon-btn:active,
+  .detail-close:active,
+  .cartbar:active,
+  .dish-card:active {
+    transform: none;
   }
 }
 
