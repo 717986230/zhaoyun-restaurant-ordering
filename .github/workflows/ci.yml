@@ -2,9 +2,15 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
+
+# A push to a pull request branch would otherwise run this twice, and the
+# Android job is the expensive half.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks:
@@ -68,9 +74,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # ubuntu-latest ships an Android SDK; this puts it on PATH and accepts
-      # the licences the Gradle plugin checks for.
+      # Puts the SDK on PATH and accepts the licences the Gradle plugin checks
+      # for. `packages` is set because the action still defaults to installing
+      # `tools`, which Google removed from the repository — sdkmanager exits 1
+      # on "Failed to find package 'tools'" and takes the job with it.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - run: npm ci
 
@@ -86,11 +96,15 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace
 
+      # On a pull_request event GITHUB_SHA is the merge commit, which exists in
+      # no branch — name the APK after the commit a person can actually check out.
       - name: Name the APK after the commit
+        env:
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p dist/apk
           cp android/app/build/outputs/apk/debug/app-debug.apk \
-             "dist/apk/zhaoyun-ordering-${GITHUB_SHA::7}-debug.apk"
+             "dist/apk/zhaoyun-ordering-${COMMIT:0:7}-debug.apk"
           sha256sum dist/apk/*.apk
 
       - name: Upload APK
