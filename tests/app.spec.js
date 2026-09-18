@@ -312,3 +312,45 @@ test("layout keeps main controls visible", async ({ page }) => {
   await expect(page.locator(".cartbar")).toBeInViewport();
   await expect(page.locator(".topbar")).toBeInViewport();
 });
+
+test("the panel header switcher sits beside the title instead of over it", async ({ page }) => {
+  // The switcher was laid out in a 56px grid track and centred inside it, so
+  // three ~250px pills overflowed the track both ways: on a 412px phone the
+  // first covered the title and the last ended at x=489, off the screen.
+  // Measure the buttons, not the .langs box — the box stays inside the track
+  // whatever its children do, which is why nothing caught this.
+  for (const [pill, title] of [["中文", /订单状态/], ["Deutsch", /Bestellstatus/], ["English", /Order status/]]) {
+    await page.getByRole("button", { name: pill }).click();
+    await page.getByRole("button", { name: title }).click();
+    const head = page.locator("#orders .panel-head");
+    await expect(head).toBeVisible();
+
+    const layout = await head.evaluate((node) => {
+      const header = node.getBoundingClientRect();
+      return {
+        heading: node.querySelector("h2").getBoundingClientRect().right,
+        clipped: node.querySelector("h2").scrollWidth > node.querySelector("h2").clientWidth,
+        header: { top: header.top, bottom: header.bottom },
+        pills: [...node.querySelectorAll(".langs button")].map((button) => {
+          const box = button.getBoundingClientRect();
+          return { label: button.getAttribute("aria-label"), left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+        })
+      };
+    });
+    const width = page.viewportSize().width;
+
+    for (const pillBox of layout.pills) {
+      expect(pillBox.left, `${pillBox.label} starts off-screen`).toBeGreaterThanOrEqual(0);
+      expect(pillBox.right, `${pillBox.label} runs past the right edge`).toBeLessThanOrEqual(width);
+      expect(pillBox.left, `${pillBox.label} overlaps the title`).toBeGreaterThanOrEqual(layout.heading);
+      // Vertical too: a stray `min-height` once stretched these to 120px inside
+      // an 82px header, and a horizontal-only check said nothing.
+      expect(pillBox.top, `${pillBox.label} is cut off at the top`).toBeGreaterThanOrEqual(layout.header.top);
+      expect(pillBox.bottom, `${pillBox.label} is cut off at the bottom`).toBeLessThanOrEqual(layout.header.bottom);
+    }
+    // The title column is wide enough for the title, rather than clipping it.
+    expect(layout.clipped).toBe(false);
+
+    await head.locator(".back").click();
+  }
+});

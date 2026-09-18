@@ -64,7 +64,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
   }
 
   return <section id="cart" className="screen panel active">
-    <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>{t(state.language, "cart")}</h2><small>WARENKORB</small></div><LanguageSwitcher language={state.language} dispatch={dispatch} /></header>
+    <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>{t(state.language, "cart")}</h2><small>WARENKORB</small></div><LanguageSwitcher compact language={state.language} dispatch={dispatch} /></header>
     <div id="cartContent" className="content">{entries.length ? <>
       {entries.map(({ product, quantity, modifiers }) => <div className="row" key={`${product.id}-${modifiers.map((modifier) => modifier.id).join(",")}`}><div><h3>{productName(product, state.language)}</h3><small>{product.names.de} × {quantity}</small>{modifiers.length > 0 && <small className="modifier-summary">{modifiers.map((modifier) => modifier.name).join(" · ")}</small>}</div><strong>{formatEuro((product.priceCents + modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0)) * quantity)}</strong></div>)}
       <label className="note-label">{t(state.language, "note")}<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t(state.language, "notePlaceholder")} /></label>
