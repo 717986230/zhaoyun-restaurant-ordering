@@ -11,7 +11,7 @@
 import {
   assertOrderTransition, assertRequestTransition, boundedLimit, mapProduct, normalizePrinter,
   normalizeProduct, now, orderProductIds, orderView, parseJson, planOrder, planPrintFailure,
-  printerView, serviceRequestView, uuid
+  printerView, printJobView, serviceRequestView, uuid
 } from "../shared/rules.mjs";
 
 const PRODUCT_COLUMNS = [
@@ -214,7 +214,7 @@ export function createStore(db) {
     deletePrinter: async (id) => (await run("DELETE FROM printer_profiles WHERE id = ?", String(id))) > 0,
     listPrintJobs: async (status = "queued", limit = 100) =>
       (await all("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?", String(status), boundedLimit(limit)))
-        .map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) })),
+        .map(printJobView),
     retryPrintJob: async (id) =>
       (await run(
         "UPDATE print_jobs SET status = 'queued', attempts = 0, error = NULL, claimed_by = NULL, lease_until = NULL, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = 'failed'",

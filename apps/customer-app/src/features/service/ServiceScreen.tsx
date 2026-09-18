@@ -1,5 +1,6 @@
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { restaurantApi } from "../../app/api";
+import { tableNo } from "../../app/table";
 import { services } from "@zhaoyun/domain";
 import { format, serviceName, t } from "../../app/i18n";
 
@@ -15,15 +16,16 @@ const iconPaths: Record<string, string> = {
 export function ServiceScreen({ state, dispatch }: { state: CustomerState; dispatch: CustomerDispatch }) {
   async function requestService(serviceType: (typeof services)[number]["id"]) {
     const localId = crypto.randomUUID();
+    const table = tableNo();
     let id: string = localId;
     let pendingSync = false;
     try {
-      const result = await restaurantApi.createServiceRequest({ table: state.table, type: serviceType });
+      const result = await restaurantApi.createServiceRequest({ table: table, type: serviceType });
       id = result.request.id;
     } catch {
       pendingSync = true;
     }
-    dispatch({ type: "service-created", request: { id, table: state.table, serviceType, status: "open", createdAt: new Date().toISOString(), ...(pendingSync ? { pendingSync: true } : {}) } });
+    dispatch({ type: "service-created", request: { id, table: table, serviceType, status: "open", createdAt: new Date().toISOString(), ...(pendingSync ? { pendingSync: true } : {}) } });
     dispatch({ type: "toast", message: t(state.language, pendingSync ? "serviceQueued" : "serviceSent") });
   }
 

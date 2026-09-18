@@ -1,13 +1,13 @@
 /**
  * Everything the ordering rules decide, with no database attached.
  *
- * The Node server holds a synchronous `node:sqlite` handle and the Worker holds
- * an asynchronous D1 binding, so they cannot share the code that reads and
- * writes rows. They can share everything that decides *what* the rows should
- * be, and this is that: the row-to-DTO shapes the clients are typed against,
- * the validation, the status machines, and the whole of what placing an order
- * means. Two backends reimplementing an order total is a bug waiting for a
- * Saturday night; this way there is one copy and the drivers only carry it out.
+ * This is the Worker's copy. The Node server in server/database.mjs grew its
+ * own after the billing and table work landed there, so the two are held
+ * together by shared/contract-suite.mjs instead — it runs the same assertions
+ * against both and fails when they disagree, which is how the two mismatches
+ * this file had (`serviceType` for `type`, and a raw print-job row) were found.
+ * Folding the Node server back onto this module is worth doing; it is a change
+ * of its own, not a rider on a merge.
  *
  * Nothing here may import `node:` anything, so it runs unchanged on Workers.
  */
@@ -168,7 +168,7 @@ export function serviceRequestView(row) {
   return {
     id: row.id,
     table: row.table_no,
-    serviceType: row.type,
+    type: row.type,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -311,6 +311,24 @@ export function planOrder(input, productRows) {
     order: { id, orderNo, clientRequestId, table, note, totalCents, timestamp },
     items,
     printJobs
+  };
+}
+
+export function printJobView(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    orderId: row.order_id,
+    printerRole: row.printer_role,
+    status: row.status,
+    attempts: row.attempts,
+    error: row.error,
+    claimedBy: row.claimed_by,
+    leaseUntil: row.lease_until,
+    nextAttemptAt: row.next_attempt_at,
+    payload: parseJson(row.payload_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 

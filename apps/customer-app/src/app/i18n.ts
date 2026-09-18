@@ -33,7 +33,9 @@ const copy = {
     staffLocalNote: "本机订单与呼叫，离线也可查看；全店订单看板在管理台。",
     staffLocalOrders: "本机订单", staffServiceCalls: "服务呼叫",
     staffNoOrders: "暂无订单", staffNoRequests: "暂无服务请求",
-    staffAdvanceTo: "更新为", staffHandled: "已处理", staffPending: "待同步"
+    staffAdvanceTo: "更新为", staffHandled: "已处理", staffPending: "待同步",
+    setTable: "设置桌号", tablePrompt: "请输入本设备所在的桌号（1-8 位字母或数字）", tableInvalid: "桌号无效，请使用 1-8 位字母或数字",
+    tableUnset: "本设备还没有分配桌号，订单会记到默认桌号"
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
@@ -63,7 +65,9 @@ const copy = {
     staffLocalNote: "Bestellungen und Rufe dieses Geräts, auch offline sichtbar. Die Übersicht für das ganze Lokal liegt in der Verwaltung.",
     staffLocalOrders: "Bestellungen dieses Geräts", staffServiceCalls: "Service-Rufe",
     staffNoOrders: "Keine Bestellungen", staffNoRequests: "Keine Service-Rufe",
-    staffAdvanceTo: "Ändern auf", staffHandled: "Erledigt", staffPending: "Wird übertragen"
+    staffAdvanceTo: "Ändern auf", staffHandled: "Erledigt", staffPending: "Wird übertragen",
+    setTable: "Tisch einstellen", tablePrompt: "Tischnummer dieses Geräts eingeben (1-8 Zeichen)", tableInvalid: "Ungültige Tischnummer: 1-8 Buchstaben oder Ziffern",
+    tableUnset: "Diesem Gerät ist noch kein Tisch zugewiesen"
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
@@ -93,7 +97,9 @@ const copy = {
     staffLocalNote: "Orders and calls from this device, visible offline. The board for the whole restaurant is in the admin console.",
     staffLocalOrders: "Orders from this device", staffServiceCalls: "Service calls",
     staffNoOrders: "No orders yet", staffNoRequests: "No service calls",
-    staffAdvanceTo: "Change to", staffHandled: "Done", staffPending: "sending"
+    staffAdvanceTo: "Change to", staffHandled: "Done", staffPending: "sending",
+    setTable: "Set table", tablePrompt: "Enter the table number of this device (1-8 characters)", tableInvalid: "Invalid table number: use 1-8 letters or digits",
+    tableUnset: "This device has no table assigned yet"
   }
 } as const;
 

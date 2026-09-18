@@ -23,6 +23,7 @@ CREATE TABLE products (
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
+      vat_percent INTEGER NOT NULL DEFAULT 10,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -43,6 +44,7 @@ CREATE TABLE orders (
       status TEXT NOT NULL DEFAULT 'new',
       note TEXT NOT NULL DEFAULT '',
       total_cents INTEGER NOT NULL,
+      billed_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -54,13 +56,32 @@ CREATE TABLE order_items (
       quantity INTEGER NOT NULL CHECK (quantity > 0),
       unit_price_cents INTEGER NOT NULL,
       print_station TEXT NOT NULL,
-      modifiers_json TEXT NOT NULL DEFAULT '[]'
+      modifiers_json TEXT NOT NULL DEFAULT '[]',
+      vat_percent INTEGER NOT NULL DEFAULT 10
     );
 CREATE TABLE service_requests (
       id TEXT PRIMARY KEY,
       table_no TEXT NOT NULL,
       type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE audit_log (
+      id TEXT PRIMARY KEY,
+      at TEXT NOT NULL,
+      role TEXT NOT NULL,
+      ip TEXT NOT NULL DEFAULT '',
+      method TEXT NOT NULL,
+      route TEXT NOT NULL,
+      status INTEGER NOT NULL,
+      detail_json TEXT NOT NULL DEFAULT '{}'
+    );
+CREATE TABLE restaurant_tables (
+      table_no TEXT PRIMARY KEY,
+      label TEXT NOT NULL DEFAULT '',
+      token TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -93,3 +114,4 @@ CREATE TABLE print_jobs (
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
 CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);
+CREATE INDEX idx_audit_at ON audit_log(at DESC);

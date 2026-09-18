@@ -10,30 +10,73 @@ function line(value = "") {
 }
 
 const labels = {
-  zh: { title: "赵云餐厅", order: "订单", table: "桌号", note: "备注" },
-  de: { title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz" },
-  en: { title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note" }
+  zh: {
+    title: "赵云餐厅", order: "订单", table: "桌号", note: "备注",
+    bill: "账单", total: "合计", net: "净额", vat: "增值税", rate: "税率",
+    disclaimer: "内部账单，不是税务收据"
+  },
+  de: {
+    title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz",
+    bill: "Rechnung", total: "Gesamt", net: "Netto", vat: "MwSt", rate: "Satz",
+    disclaimer: "Interne Rechnung, kein Kassenbeleg"
+  },
+  en: {
+    title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note",
+    bill: "Bill", total: "Total", net: "Net", vat: "VAT", rate: "Rate",
+    disclaimer: "Internal bill, not a fiscal receipt"
+  }
 };
+
+const RULE = "--------------------------------";
+
+function money(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function orderLines(payload, copy, language) {
+  const lines = [
+    copy.title,
+    `${copy.order} ${payload.orderNo || ""}  ${copy.table} ${payload.table || ""}`,
+    RULE
+  ];
+  for (const item of payload.items || []) {
+    lines.push(`${item.quantity} x ${item.names?.[language] || item.name || item.sku || "Item"}`);
+    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}${modifier.price ? ` (+${money(modifier.price)})` : ""}`);
+  }
+  if (payload.note) lines.push(`${copy.note}: ${payload.note}`);
+  lines.push(RULE, "\n");
+  return lines;
+}
+
+function billLines(payload, copy, language) {
+  const lines = [
+    copy.title,
+    `${copy.bill}  ${copy.table} ${payload.table || ""}`,
+    payload.issuedAt ? new Date(payload.issuedAt).toLocaleString("de-AT") : "",
+    RULE
+  ];
+  for (const item of payload.items || []) {
+    lines.push(`${item.qty} x ${item.names?.[language] || item.name || "Item"}`);
+    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}`);
+    lines.push(`      ${money(item.lineTotal)}  ${item.vatPercent}%`);
+  }
+  lines.push(RULE, `${copy.total}: EUR ${money(payload.total)}`);
+  for (const group of payload.vatBreakdown || []) {
+    lines.push(`${copy.rate} ${group.percent}%  ${copy.net} ${money(group.net)}  ${copy.vat} ${money(group.vat)}`);
+  }
+  lines.push(RULE, copy.disclaimer, "\n");
+  return lines;
+}
 
 export function renderReceipt(payload, printer = {}) {
   const capabilities = printer.capabilities || {};
   const language = ["zh", "de", "en"].includes(capabilities.printLanguage) ? capabilities.printLanguage : "zh";
   const encoding = ["utf8", "gb18030", "shift_jis", "cp437"].includes(capabilities.encoding) ? capabilities.encoding : "utf8";
   const copy = labels[language];
-  const lines = [
-    copy.title,
-    `${copy.order} ${payload.orderNo || ""}  ${copy.table} ${payload.table || ""}`,
-    "--------------------------------"
-  ];
-  for (const item of payload.items || []) {
-    lines.push(`${item.quantity} x ${item.names?.[language] || item.name || item.sku || "Item"}`);
-    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}${modifier.price ? ` (+${Number(modifier.price).toFixed(2)})` : ""}`);
-  }
-  if (payload.note) lines.push(`${copy.note}: ${payload.note}`);
-  lines.push("--------------------------------", "\n");
+  const lines = payload.kind === "bill" ? billLines(payload, copy, language) : orderLines(payload, copy, language);
   return Buffer.concat([
     Buffer.from([ESC, 0x40]),
-    iconv.encode(lines.map(line).join(""), encoding),
+    iconv.encode(lines.filter((value) => value !== "").map(line).join(""), encoding),
     Buffer.from([GS, 0x56, 0x00])
   ]);
 }

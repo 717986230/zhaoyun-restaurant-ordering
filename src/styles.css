@@ -164,6 +164,98 @@ html.plt-android .screen.active {
   border-color: rgba(122, 150, 126, 0.72);
 }
 
+.crash {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 24px calc(32px + env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.crash h1 {
+  font-family: Georgia, "Noto Serif SC", serif;
+  font-size: clamp(40px, 9vw, 72px);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  margin: 0 0 10px;
+}
+
+.crash p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.crash button {
+  margin-top: 22px;
+  min-width: 240px;
+}
+
+.crash code {
+  margin-top: 18px;
+  color: #7d6a58;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.allergen-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.allergen {
+  border: 1px solid rgba(185, 154, 112, 0.42);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.staff-scope {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(185, 154, 112, 0.32);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.table-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0 auto 18px;
+}
+
+.table-button {
+  border: 1px solid rgba(185, 154, 112, 0.4);
+  border-radius: 999px;
+  background: #1e1a18;
+  color: var(--muted);
+  padding: 8px 16px;
+  letter-spacing: 0.08em;
+}
+
+.table-button.unset {
+  border-color: #b4543f;
+  color: #e8b7a6;
+}
+
+.table-setup small {
+  color: #b4543f;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
 .langs {
   display: flex;
   justify-content: center;

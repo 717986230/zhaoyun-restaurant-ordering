@@ -354,3 +354,28 @@ test("the language is chosen once on the home screen, not again inside every pan
   // And it is still there where it belongs.
   await expect(page.locator("#home .langs button")).toHaveCount(3);
 });
+
+test("the kiosk table number travels with the order", async ({ page }) => {
+  let submitted;
+  await page.unroute("**/api/orders");
+  await page.route("**/api/orders", async (route) => {
+    submitted = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
+      id: "table-21-order", clientRequestId: submitted.clientRequestId, no: "260812-001", table: submitted.table,
+      status: "new", note: submitted.note, total: 34.5, items: submitted.items, createdAt: new Date().toISOString()
+    } }) });
+  });
+  await page.goto("/?table=21");
+  await expect(page.locator(".brand p")).toContainText("21");
+  await expect(page.locator(".table-setup small")).toHaveCount(0);
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
+  await page.locator(".dish-detail-card .add").click();
+  await page.getByRole("button", { name: "关闭详情" }).click();
+  await page.locator(".cartbar").click();
+  await page.getByRole("button", { name: /确认下单/ }).click();
+  await expect.poll(() => submitted?.table).toBe("21");
+
+  await page.goto("/");
+  await expect(page.locator(".brand p")).toContainText("21");
+});

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS (launchd). Install to /Library/LaunchDaemons/at.zhaoyun.server.plist
+    sudo chown root:wheel /Library/LaunchDaemons/at.zhaoyun.server.plist
+    sudo launchctl load -w /Library/LaunchDaemons/at.zhaoyun.server.plist
+  Set PRINTER_ROLE and run a second copy of this file per print station.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>at.zhaoyun.server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/opt/zhaoyun/server/index.mjs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/opt/zhaoyun</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <key>PORT</key>
+    <string>8787</string>
+    <key>ADMIN_TOKEN</key>
+    <string>replace-with-a-long-random-token</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/var/log/zhaoyun-server.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/zhaoyun-server.error.log</string>
+</dict>
+</plist>

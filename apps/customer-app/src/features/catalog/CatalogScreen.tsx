@@ -1,8 +1,10 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { formatEuro, summarizeCart } from "@zhaoyun/domain";
 import type { ModifierGroup, ModifierOption, Product, SelectedModifier } from "@zhaoyun/domain";
+import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
+import { tableNo } from "../../app/table";
 import { productName, t } from "../../app/i18n";
 
 interface Props { state: CustomerState; dispatch: CustomerDispatch; products: Product[]; offlineMenu?: boolean }
@@ -89,7 +91,9 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
           <div><small>{product.sku} · {product.category}</small><h3>{productName(product, state.language)}</h3><p>{product.description}</p></div>
           <dl>
             <div><dt>{t(state.language, "ingredients")}</dt><dd>{product.details.ingredients}</dd></div>
-            <div><dt>{t(state.language, "allergens")}</dt><dd>{product.allergens.join(", ") || "—"}</dd></div>
+            <div><dt>{t(state.language, "allergens")}</dt><dd>{product.allergens.length
+              ? <span className="allergen-list">{product.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, state.language)}>{code} {allergenLabel(code, state.language)}</b>)}</span>
+              : "—"}</dd></div>
             <div><dt>{t(state.language, "time")}</dt><dd>{product.details.time}</dd></div>
             <div><dt>{t(state.language, "portion")}</dt><dd>{product.details.people} · {product.details.level}</dd></div>
           </dl>
@@ -114,7 +118,7 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false }
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
       <button className="icon-btn back" aria-label={t(state.language, "goBack")} onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button>
-      <div className="title"><strong>La Carte</strong><small>TISCH {state.table}</small></div>
+      <div className="title"><strong>La Carte</strong><small>TISCH {tableNo()}</small></div>
       <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
     </header>
     <div id="searchBox" className={`search-box ${state.searchOpen ? "open" : ""}`}>

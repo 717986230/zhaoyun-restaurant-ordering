@@ -11,6 +11,7 @@
     },
     "description": "Ramen, Gemüse, Ei",
     "price": 12.5,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -142,6 +143,7 @@
     },
     "description": "Ramen, Huhn, Gemüse, Ei",
     "price": 13.5,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -273,6 +275,7 @@
     },
     "description": "Ramen, Rind, Gemüse, Ei",
     "price": 14.5,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -404,6 +407,7 @@
     },
     "description": "Ramen, Garnelen, Gemüse, Ei",
     "price": 14.5,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -536,6 +540,7 @@
     },
     "description": "Rind, Gemüse, Szechuan-Chili, Koriander",
     "price": 17.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -610,6 +615,7 @@
     },
     "description": "Huhn, Gemüse, Koriander",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -683,6 +689,7 @@
     },
     "description": "Garnelen, Gemüse, Koriander",
     "price": 18.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -757,6 +764,7 @@
     },
     "description": "Tofu, Gemüse, Szechuan-Chili",
     "price": 11.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -830,6 +838,7 @@
     },
     "description": "Tofu, Huhn, Gemüse, Szechuan-Chili",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -903,6 +912,7 @@
     },
     "description": "Salat, Tofu, Mango, Karotten, Gurken, Soße",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F"
@@ -975,6 +985,7 @@
     },
     "description": "Hühnerfilet, Karotten, Gurken, Soße",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F"
@@ -1047,6 +1058,7 @@
     },
     "description": "Koreanisches Rindfleisch, Karotten, Gurken",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F"
@@ -1119,6 +1131,7 @@
     },
     "description": "Ente, Karotten, Gurken, Soße",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F"
@@ -1191,6 +1204,7 @@
     },
     "description": "Saison-Gemüse, Tofu, Glasnudel, Udon, Reiskuchen, Gyoza",
     "price": 23.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "E",
@@ -1322,6 +1336,7 @@
     },
     "description": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Rindfleisch",
     "price": 25.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "E",
@@ -1453,6 +1468,7 @@
     },
     "description": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Meeresfrüchte",
     "price": 25.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -1585,6 +1601,7 @@
     },
     "description": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Lammfleisch",
     "price": 25.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -1717,6 +1734,7 @@
     },
     "description": "Lachs, Reis",
     "price": 9.9,
+    "vatPercent": 10,
     "allergens": [
       "B",
       "D"
@@ -1750,6 +1768,7 @@
     },
     "description": "Lachs, Reis",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "B",
       "D"
@@ -1783,6 +1802,7 @@
     },
     "description": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado",
     "price": 9.9,
+    "vatPercent": 10,
     "allergens": [
       "B",
       "D"
@@ -1816,6 +1836,7 @@
     },
     "description": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "B",
       "D"
@@ -1849,6 +1870,7 @@
     },
     "description": "Lachs, Thunfisch",
     "price": 10.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -1881,6 +1903,7 @@
     },
     "description": "Lachs, Thunfisch",
     "price": 15.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -1913,6 +1936,7 @@
     },
     "description": "Thunfisch",
     "price": 11.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -1945,6 +1969,7 @@
     },
     "description": "Thunfisch",
     "price": 16.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -1977,6 +2002,7 @@
     },
     "description": "Gurke, Reis, Nori",
     "price": 7.9,
+    "vatPercent": 10,
     "allergens": [],
     "details": {
       "time": "10 min",
@@ -2007,6 +2033,7 @@
     },
     "description": "Lachs, Reis, Nori",
     "price": 8.5,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -2039,6 +2066,7 @@
     },
     "description": "Avocado, Reis, Nori",
     "price": 8.5,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -2071,6 +2099,7 @@
     },
     "description": "Avocado, Mango, Reis, Sesam",
     "price": 6.5,
+    "vatPercent": 10,
     "allergens": [
       "N"
     ],
@@ -2103,6 +2132,7 @@
     },
     "description": "Avocado, Garnelen, Reis, Sesam",
     "price": 8.5,
+    "vatPercent": 10,
     "allergens": [
       "B",
       "N"
@@ -2136,6 +2166,7 @@
     },
     "description": "Avocado, Lachs, Reis, Sesam",
     "price": 8.5,
+    "vatPercent": 10,
     "allergens": [
       "D",
       "N"
@@ -2169,6 +2200,7 @@
     },
     "description": "Lachs",
     "price": 16.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -2201,6 +2233,7 @@
     },
     "description": "Lachs",
     "price": 28.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -2233,6 +2266,7 @@
     },
     "description": "Lachs, Thunfisch",
     "price": 17.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -2265,6 +2299,7 @@
     },
     "description": "Lachs, Thunfisch",
     "price": 29.9,
+    "vatPercent": 10,
     "allergens": [
       "D"
     ],
@@ -2297,6 +2332,7 @@
     },
     "description": "Lachs, Thunfisch, Hamachi",
     "price": 17.9,
+    "vatPercent": 10,
     "allergens": [
       "B",
       "D"
@@ -2330,6 +2366,7 @@
     },
     "description": "Lachs, Thunfisch, Hamachi",
     "price": 29.9,
+    "vatPercent": 10,
     "allergens": [
       "B",
       "D"
@@ -2363,10 +2400,11 @@
     },
     "description": "Lachs, Thunfisch, Hamachi, Avocado, Kresse",
     "price": 15.9,
+    "vatPercent": 10,
     "allergens": [
       "C",
-      "F",
-      "D"
+      "D",
+      "F"
     ],
     "details": {
       "time": "10 min",
@@ -2397,6 +2435,7 @@
     },
     "description": "Lachstempura, Salat, Crispy Panko, Mayo, Teriyaki",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -2432,6 +2471,7 @@
     },
     "description": "Lachs, Cream Cheese, Avocado, Masago",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "D",
       "N"
@@ -2465,6 +2505,7 @@
     },
     "description": "Thunfisch, Avocado, Masago, Spicy Mayo",
     "price": 15.9,
+    "vatPercent": 10,
     "allergens": [
       "D",
       "N"
@@ -2498,6 +2539,7 @@
     },
     "description": "Garnelen, Avocado, flambierter Aal, Sushi-Soße",
     "price": 16.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -2532,6 +2574,7 @@
     },
     "description": "Knusperente, Gurken, Jungzwiebel, Teriyaki",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F"
@@ -2565,6 +2608,7 @@
     },
     "description": "Avocado, Mango, flambierter Lachs",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "D",
       "F"
@@ -2598,6 +2642,7 @@
     },
     "description": "Süßkartoffeltempura, Mango, Gurke, Basilikum",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "C",
       "F"
@@ -2631,6 +2676,7 @@
     },
     "description": "Erdnuss, Avocado, Kresse",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "E",
@@ -2665,6 +2711,7 @@
     },
     "description": "Hühnerstreifen, Gemüse, Sesam",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -2739,6 +2786,7 @@
     },
     "description": "Hühnerfleisch, Kokosmilch, Gemüse, Basilikum",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [],
     "details": {
       "time": "20 min",
@@ -2808,6 +2856,7 @@
     },
     "description": "Ananas, Mango, Hühnerfleisch, Gemüse, Kokosmilch",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "A"
     ],
@@ -2879,6 +2928,7 @@
     },
     "description": "Hühnerfilet, Panko, Gemüse",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -2953,6 +3003,7 @@
     },
     "description": "Rind, Gemüse, frischer Chili",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "F"
     ],
@@ -3024,6 +3075,7 @@
     },
     "description": "Rindfleisch, Zwiebel, Gemüse",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "F",
       "N"
@@ -3096,6 +3148,7 @@
     },
     "description": "Ente, Gemüse, trockener Chili",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F"
@@ -3168,6 +3221,7 @@
     },
     "description": "Lachs, Gemüse, Teriyaki-Soße",
     "price": 14.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "D",
@@ -3242,6 +3296,7 @@
     },
     "description": "Garnelen, Gemüse, Thai-Kräuter",
     "price": 17.9,
+    "vatPercent": 10,
     "allergens": [
       "B"
     ],
@@ -3313,6 +3368,7 @@
     },
     "description": "Tofu, Pak Choi, Gemüse",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "F"
     ],
@@ -3384,6 +3440,7 @@
     },
     "description": "Eierreis, Gemüse, Entenfleisch, gelbes Curry",
     "price": 11.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -3457,6 +3514,7 @@
     },
     "description": "Reiskuchen, Gemüse, koreanisch",
     "price": 11.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -3530,6 +3588,7 @@
     },
     "description": "Reiskuchen, Gemüse, Garnelen",
     "price": 13.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -3604,6 +3663,7 @@
     },
     "description": "Teigtaschen, Gemüse, Glasnudel",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -3677,6 +3737,7 @@
     },
     "description": "Teigtaschen, Hühnerfleisch, Bärlauch",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -3750,6 +3811,7 @@
     },
     "description": "Sojabohnen, Meersalz",
     "price": 4.5,
+    "vatPercent": 10,
     "allergens": [
       "F"
     ],
@@ -3821,6 +3883,7 @@
     },
     "description": "Gurke, Mango, Avocado, Reisnudeln, Basilikum",
     "price": 6.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "E",
@@ -3894,6 +3957,7 @@
     },
     "description": "Gurke, Mango, Avocado, Garnelen, Basilikum",
     "price": 7.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -3968,6 +4032,7 @@
     },
     "description": "Gemüse, Teig",
     "price": 3.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -4041,6 +4106,7 @@
     },
     "description": "Teigtaschen, Gemüse",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -4114,6 +4180,7 @@
     },
     "description": "Teigtaschen, Hühnerfleisch, Gemüse",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -4187,6 +4254,7 @@
     },
     "description": "Teigtaschen, Rindfleisch, Gemüse",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -4260,6 +4328,7 @@
     },
     "description": "Oktopus-Bällchen, Mayo-Soße",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -4335,9 +4404,10 @@
     },
     "description": "Koreanischer scharfer Salat",
     "price": 4.5,
+    "vatPercent": 10,
     "allergens": [
-      "F",
-      "D"
+      "D",
+      "F"
     ],
     "details": {
       "time": "20 min",
@@ -4407,6 +4477,7 @@
     },
     "description": "Salat, Avocado",
     "price": 6.9,
+    "vatPercent": 10,
     "allergens": [
       "D",
       "N"
@@ -4479,6 +4550,7 @@
     },
     "description": "Lachs-Tatar, Mango, Avocado, Salat",
     "price": 8.9,
+    "vatPercent": 10,
     "allergens": [
       "D",
       "N"
@@ -4551,6 +4623,7 @@
     },
     "description": "Gebackene Garnelen",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B"
@@ -4623,6 +4696,7 @@
     },
     "description": "Hühnerfleisch, Garnelen, Koriander",
     "price": 5.5,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -4697,6 +4771,7 @@
     },
     "description": "Miso, Tofu, Algen",
     "price": 3.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F"
@@ -4769,6 +4844,7 @@
     },
     "description": "Hühnerfleisch, Garnelen, Gemüse",
     "price": 5.5,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -4843,6 +4919,7 @@
     },
     "description": "Garnelen, Gemüse, Koriander",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "B"
     ],
@@ -4914,6 +4991,7 @@
     },
     "description": "Hühnerfleisch, Gemüse, Kokosmilch",
     "price": 5.5,
+    "vatPercent": 10,
     "allergens": [
       "F"
     ],
@@ -4985,6 +5063,7 @@
     },
     "description": "Gedämpfte Teigtaschen, Garnelen",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "B",
@@ -5059,6 +5138,7 @@
     },
     "description": "Udon, Gemüse",
     "price": 10.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -5190,6 +5270,7 @@
     },
     "description": "Udon, Hühnerfleisch, Gemüse",
     "price": 11.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -5321,6 +5402,7 @@
     },
     "description": "Udon, Rindfleisch, Gemüse",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -5452,6 +5534,7 @@
     },
     "description": "Udon, Entenfleisch, Gemüse",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "F",
@@ -5583,10 +5666,11 @@
     },
     "description": "Udon, Garnelen, Gemüse",
     "price": 12.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
-      "F",
       "D",
+      "F",
       "N"
     ],
     "details": {
@@ -5715,6 +5799,7 @@
     },
     "description": "Gekochter Reis",
     "price": 2,
+    "vatPercent": 10,
     "allergens": [],
     "details": {
       "time": "20 min",
@@ -5784,6 +5869,7 @@
     },
     "description": "Ei, Gemüse",
     "price": 4.9,
+    "vatPercent": 10,
     "allergens": [
       "C",
       "F"
@@ -5856,6 +5942,7 @@
     },
     "description": "Mochi, Eis",
     "price": 6.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "G"
@@ -5928,6 +6015,7 @@
     },
     "description": "Matcha, Mascarpone, Biskuit",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C",
@@ -6001,6 +6089,7 @@
     },
     "description": "Apfel, Teigtaschen",
     "price": 5.9,
+    "vatPercent": 10,
     "allergens": [
       "A",
       "C"
@@ -6073,6 +6162,7 @@
     },
     "description": "0.33L",
     "price": 3.8,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6103,6 +6193,7 @@
     },
     "description": "0.33L",
     "price": 3.8,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6133,6 +6224,7 @@
     },
     "description": "0.50L",
     "price": 3.2,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6163,6 +6255,7 @@
     },
     "description": "0.50L",
     "price": 4.8,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6193,6 +6286,7 @@
     },
     "description": "0.33L",
     "price": 3.3,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6223,6 +6317,7 @@
     },
     "description": "0.33L",
     "price": 3.3,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6253,6 +6348,7 @@
     },
     "description": "0.25L",
     "price": 3.9,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6283,6 +6379,7 @@
     },
     "description": "0.33L",
     "price": 3.9,
+    "vatPercent": 20,
     "allergens": [
       "A"
     ],
@@ -6315,6 +6412,7 @@
     },
     "description": "0.50L",
     "price": 4.9,
+    "vatPercent": 20,
     "allergens": [
       "A"
     ],
@@ -6347,6 +6445,7 @@
     },
     "description": "Flasche",
     "price": 4.5,
+    "vatPercent": 20,
     "allergens": [
       "A"
     ],
@@ -6379,6 +6478,7 @@
     },
     "description": "Flasche",
     "price": 4.5,
+    "vatPercent": 20,
     "allergens": [
       "A"
     ],
@@ -6411,6 +6511,7 @@
     },
     "description": "0.125L",
     "price": 4.5,
+    "vatPercent": 20,
     "allergens": [
       "O"
     ],
@@ -6443,6 +6544,7 @@
     },
     "description": "0.125L",
     "price": 4.5,
+    "vatPercent": 20,
     "allergens": [
       "O"
     ],
@@ -6475,6 +6577,7 @@
     },
     "description": "0.25L",
     "price": 3.5,
+    "vatPercent": 20,
     "allergens": [
       "O"
     ],
@@ -6507,6 +6610,7 @@
     },
     "description": "Aperol",
     "price": 4.5,
+    "vatPercent": 20,
     "allergens": [
       "O"
     ],
@@ -6539,6 +6643,7 @@
     },
     "description": "Prosecco",
     "price": 5.5,
+    "vatPercent": 20,
     "allergens": [
       "O"
     ],
@@ -6571,6 +6676,7 @@
     },
     "description": "Holunder, Minze, Limette",
     "price": 5.5,
+    "vatPercent": 20,
     "allergens": [
       "O"
     ],
@@ -6603,6 +6709,7 @@
     },
     "description": "0.10L",
     "price": 5.5,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",
@@ -6633,6 +6740,7 @@
     },
     "description": "Kaffee",
     "price": 2.9,
+    "vatPercent": 20,
     "allergens": [
       "G"
     ],
@@ -6665,6 +6773,7 @@
     },
     "description": "Kaffee, Milch",
     "price": 4.2,
+    "vatPercent": 20,
     "allergens": [
       "G"
     ],
@@ -6697,6 +6806,7 @@
     },
     "description": "Kaffee, Milch",
     "price": 4.5,
+    "vatPercent": 20,
     "allergens": [
       "G"
     ],
@@ -6729,6 +6839,7 @@
     },
     "description": "Tee",
     "price": 3.5,
+    "vatPercent": 20,
     "allergens": [],
     "details": {
       "time": "2 min",

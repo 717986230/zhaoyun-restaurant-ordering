@@ -51,7 +51,7 @@ export function contractChecks(call, assert) {
 
       const jobs = await call("GET", "/api/admin/print-jobs?status=queued", { admin: true });
       assert.equal(jobs.status, 200);
-      const roles = jobs.json.jobs.map((job) => job.printer_role).sort();
+      const roles = jobs.json.jobs.map((job) => job.printerRole).sort();
       assert.deepEqual(roles, ["kitchen", "sushi"], "a ramen and a nigiri are two stations");
       for (const job of jobs.json.jobs) assert.equal(job.payload.table, "17");
     }],
@@ -111,7 +111,7 @@ export function contractChecks(call, assert) {
     ["a service request opens and closes", async () => {
       const created = await call("POST", "/api/service-requests", { body: { table: "17", type: "water" } });
       assert.equal(created.status, 201);
-      assert.equal(created.json.request.serviceType, "water");
+      assert.equal(created.json.request.type, "water");
       assert.equal(created.json.request.status, "open");
       assert.equal(created.json.request.table, "17");
       // The row columns must not leak: the app is typed against `table`, not `table_no`.
@@ -135,6 +135,7 @@ export function contractChecks(call, assert) {
       assert.equal(created.status, 201);
       assert.equal(created.json.printer.enabled, true);
       assert.equal(created.json.printer.capabilities_json, undefined, "row columns must not leak");
+      assert.equal(created.json.printer.capabilities && typeof created.json.printer.capabilities, "object");
 
       const badPort = await call("POST", "/api/admin/printers", {
         admin: true, body: { name: "X", transport: "lan", address: "10.0.0.1", port: 99999, role: "kitchen", enabled: true }

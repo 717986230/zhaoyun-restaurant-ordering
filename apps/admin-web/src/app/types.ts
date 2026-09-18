@@ -1,17 +1,24 @@
-import type { ApiOrder, ApiServiceRequest } from "@zhaoyun/contracts";
+import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
+import type { AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
-export type AdminTab = "orders" | "catalog" | "printers" | "system";
+export type AdminTab = "catalog" | "board" | "printers" | "system";
 export type ProductFilter = "all" | "food" | "drink" | "sushi";
 
 export interface AdminState {
   tab: AdminTab;
+  role: StaffRole | null;
+  auditEntries: AuditEntry[];
   connected: boolean;
   connectionText: string;
   products: Product[];
   orders: ApiOrder[];
   requests: ApiServiceRequest[];
-  busyId: string | null;
+  failedJobs: ApiPrintJob[];
+  bill: ApiBill | null;
+  tables: RestaurantTable[];
+  openTables: string[];
+  boardBusy: boolean;
   printers: PrinterProfile[];
   discoveredPrinters: DiscoveredPrinter[];
   editingProduct: Product | null;

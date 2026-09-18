@@ -5,8 +5,9 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
   CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody
-} from "../shared/schemas.mjs";
+  ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody, TableParams
+} from "./schemas.mjs";
+import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
@@ -16,6 +17,7 @@ const MEDIA_TYPES = new Map([
   ["video/webm", { type: "video", extension: ".webm" }]
 ]);
 
+const TABLE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,7}$/;
 const AUTH_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_MAX_FAILURES = 5;
 const AUTH_MAX_TRACKED_SOURCES = 10_000;
@@ -31,37 +33,133 @@ function errorReply(reply, error, statusCode = 400) {
   return reply.code(statusCode).send({ error: error.message || "Request failed" });
 }
 
+// Manager can do everything; staff runs the floor; kitchen only moves orders along.
+const ROLE_RANK = { manager: 3, staff: 2, kitchen: 1 };
+
 export function registerRoutes(app, { database, realtime, config }) {
   const authFailures = new Map();
 
-  function pruneAuthFailures(now) {
+  /** The failure table is keyed by client address, so it grows without a bound
+   *  of its own. Drop expired entries before it can become one. */
+  function pruneAuthFailures(moment) {
     for (const [source, entry] of authFailures) {
-      if (entry.resetAt <= now) authFailures.delete(source);
+      if (entry.resetAt <= moment) authFailures.delete(source);
     }
   }
+  const orderLimiter = createRateLimiter({ windowMs: config.publicRateLimitWindowMs, max: config.orderRateLimitMax });
+  const serviceLimiter = createRateLimiter({ windowMs: config.publicRateLimitWindowMs, max: config.serviceRateLimitMax });
+  const guardOrders = rateLimitGuard(orderLimiter, "Too many orders from this device");
+  const guardServiceRequests = rateLimitGuard(serviceLimiter, "Too many service requests from this device");
 
-  function requireAdmin(request, reply, done) {
-    const now = Date.now();
-    const key = request.ip || "unknown";
-    const current = authFailures.get(key);
-    if (current && current.resetAt <= now) authFailures.delete(key);
-    const active = authFailures.get(key);
-    if (active && active.failures >= AUTH_MAX_FAILURES) {
-      const retryAfter = Math.max(1, Math.ceil((active.resetAt - now) / 1000));
-      reply.header("retry-after", retryAfter);
-      reply.code(429).send({ error: "Too many authentication attempts", retryAfter });
+  /**
+   * Guest devices declare their own table. Once tables are registered the server
+   * only accepts a known table plus its token; an empty registry stays open so a
+   * fresh install works before any table has been set up.
+   */
+  function requireTable(request, reply, done) {
+    const table = String(request.body?.table ?? "").trim().toUpperCase();
+    // Validated even in open mode: a table that cannot be registered later
+    // would otherwise be accepted now and become unbillable.
+    if (!TABLE_PATTERN.test(table)) {
+      reply.code(400).send({ error: "Table number must be 1-8 letters or digits" });
       return;
     }
-    if (!tokenMatches(request.headers["x-admin-token"], config.adminToken)) {
-      const failures = (active?.failures ?? 0) + 1;
-      if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(now);
-      authFailures.set(key, { failures, resetAt: now + AUTH_WINDOW_MS });
-      reply.code(401).send({ error: "Admin authentication required" });
+    request.body.table = table;
+    if (!database.hasTables()) {
+      done();
       return;
     }
-    authFailures.delete(key);
+    const registered = database.getTable(table);
+    if (!registered || !registered.enabled) {
+      reply.code(403).send({ error: "Unknown table" });
+      return;
+    }
+    if (!tokenMatches(request.headers["x-table-token"], registered.token)) {
+      reply.code(403).send({ error: "Table token is invalid" });
+      return;
+    }
     done();
   }
+
+  function resolveRole(request) {
+    const provided = request.headers["x-admin-token"];
+    if (tokenMatches(provided, config.adminToken)) return "manager";
+    if (config.staffToken && tokenMatches(provided, config.staffToken)) return "staff";
+    if (config.kitchenToken && tokenMatches(provided, config.kitchenToken)) return "kitchen";
+    return null;
+  }
+
+  /** @param {"manager"|"staff"|"kitchen"} minimumRole */
+  function requireRole(minimumRole) {
+    const required = ROLE_RANK[minimumRole];
+    return function guard(request, reply, done) {
+      const now = Date.now();
+      const key = request.ip || "unknown";
+      const current = authFailures.get(key);
+      if (current && current.resetAt <= now) authFailures.delete(key);
+      const active = authFailures.get(key);
+      if (active && active.failures >= AUTH_MAX_FAILURES) {
+        const retryAfter = Math.max(1, Math.ceil((active.resetAt - now) / 1000));
+        reply.header("retry-after", retryAfter);
+        reply.code(429).send({ error: "Too many authentication attempts", retryAfter });
+        return;
+      }
+      const role = resolveRole(request);
+      if (!role) {
+        const failures = (active?.failures ?? 0) + 1;
+        if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(now);
+        authFailures.set(key, { failures, resetAt: now + AUTH_WINDOW_MS });
+        reply.code(401).send({ error: "Admin authentication required" });
+        return;
+      }
+      authFailures.delete(key);
+      request.staffRole = role;
+      if (ROLE_RANK[role] < required) {
+        // A valid token used beyond its role is worth recording, not just refusing.
+        request.auditedDenial = true;
+        database.recordAudit({ role, ip: request.ip, method: request.method, route: request.url, status: 403, detail: { denied: minimumRole } });
+        reply.code(403).send({ error: `This role may not perform ${minimumRole} actions` });
+        return;
+      }
+      done();
+    };
+  }
+
+  const requireAdmin = requireRole("manager");
+  const requireFloor = requireRole("staff");
+  const requireKitchen = requireRole("kitchen");
+
+  // Business fields worth keeping; the request body is never stored wholesale.
+  const AUDIT_FIELDS = ["status", "table", "sku", "price", "vatPercent", "published", "available", "name", "role", "enabled", "rotateToken"];
+
+  /**
+   * Every write made with a staff token is recorded. One shared token per role
+   * means the log cannot name a person, but it does answer what changed, when,
+   * from which device and under which role.
+   */
+  app.addHook("onResponse", async (request, reply) => {
+    if (!request.staffRole || request.auditedDenial) return;
+    if (request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS") return;
+    const detail = { params: request.params ?? {} };
+    const body = request.body;
+    if (body && typeof body === "object" && !Buffer.isBuffer(body)) {
+      for (const field of AUDIT_FIELDS) {
+        if (body[field] !== undefined) detail[field] = body[field];
+      }
+    }
+    try {
+      database.recordAudit({
+        role: request.staffRole,
+        ip: request.ip,
+        method: request.method,
+        route: request.routeOptions?.url ?? request.url,
+        status: reply.statusCode,
+        detail
+      });
+    } catch (error) {
+      request.log.error({ err: error }, "audit write failed");
+    }
+  });
 
   app.get("/api/health", async () => ({
     ok: true,
@@ -69,10 +167,13 @@ export function registerRoutes(app, { database, realtime, config }) {
     timestamp: new Date().toISOString()
   }));
 
-  app.get("/ws", { websocket: true }, (socket) => realtime.connect(socket));
+  app.get("/ws", { websocket: true }, (socket, request) => {
+    const table = String(request.query?.table ?? "").trim().toUpperCase();
+    realtime.connect(socket, TABLE_PATTERN.test(table) ? table : null);
+  });
 
   app.get("/api/catalog", async () => ({ products: database.listProducts(true) }));
-  app.get("/api/admin/products", { preHandler: requireAdmin }, async () => ({ products: database.listProducts(false) }));
+  app.get("/api/admin/products", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async () => ({ products: database.listProducts(false) }));
   app.get("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const product = database.getProduct(request.params.id);
     return product || errorReply(reply, new Error("Product not found"), 404);
@@ -134,51 +235,79 @@ export function registerRoutes(app, { database, realtime, config }) {
     }
   });
 
-  app.get("/api/orders", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
+  app.get("/api/orders", { preHandler: requireKitchen, schema: { querystring: LimitQuery } }, async (request) => ({
     orders: database.listOrders(request.query.limit)
   }));
-  app.post("/api/orders", { schema: { body: CreateOrderBody } }, async (request, reply) => {
+  app.post("/api/orders", { preHandler: [guardOrders, requireTable], schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body || {});
-      realtime.broadcast("order.changed", order);
-      realtime.broadcast("print.queued", { orderId: order.id });
+      realtime.broadcast("order.changed", order, order.table);
+      realtime.broadcast("print.queued", { orderId: order.id }, order.table);
       return reply.code(201).send({ order });
     } catch (error) {
       return errorReply(reply, error);
     }
   });
-  app.patch("/api/orders/:id/status", { preHandler: requireAdmin, schema: { params: IdParams, body: OrderStatusBody } }, async (request, reply) => {
+  app.patch("/api/orders/:id/status", { preHandler: requireKitchen, schema: { params: IdParams, body: OrderStatusBody } }, async (request, reply) => {
     try {
       const order = database.updateOrder(request.params.id, request.body?.status);
       if (!order) return errorReply(reply, new Error("Order not found"), 404);
-      realtime.broadcast("order.changed", order);
+      realtime.broadcast("order.changed", order, order.table);
       return { order };
     } catch (error) {
       return errorReply(reply, error);
     }
   });
 
-  app.get("/api/service-requests", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
+  app.get("/api/service-requests", { preHandler: requireFloor, schema: { querystring: LimitQuery } }, async (request) => ({
     requests: database.listServiceRequests(request.query.limit)
   }));
-  app.post("/api/service-requests", { schema: { body: ServiceRequestBody } }, async (request, reply) => {
+  app.post("/api/service-requests", { preHandler: [guardServiceRequests, requireTable], schema: { body: ServiceRequestBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.createServiceRequest(request.body || {});
-      realtime.broadcast("service.changed", serviceRequest);
+      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return reply.code(201).send({ request: serviceRequest });
     } catch (error) {
       return errorReply(reply, error);
     }
   });
-  app.patch("/api/service-requests/:id/status", { preHandler: requireAdmin, schema: { params: IdParams, body: ServiceStatusBody } }, async (request, reply) => {
+  app.patch("/api/service-requests/:id/status", { preHandler: requireFloor, schema: { params: IdParams, body: ServiceStatusBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.updateServiceRequest(request.params.id, request.body?.status);
       if (!serviceRequest) return errorReply(reply, new Error("Service request not found"), 404);
-      realtime.broadcast("service.changed", serviceRequest);
+      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return { request: serviceRequest };
     } catch (error) {
       return errorReply(reply, error);
     }
+  });
+
+  app.get("/api/admin/session", { preHandler: requireKitchen }, async (request) => ({ role: request.staffRole }));
+  app.get("/api/admin/audit", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
+    entries: database.listAudit(request.query.limit)
+  }));
+  app.get("/api/admin/tables", { preHandler: requireAdmin }, async () => ({ tables: database.listTables() }));
+  app.get("/api/admin/tables/open", { preHandler: requireFloor }, async () => ({ tables: database.openBillTables() }));
+  app.post("/api/admin/tables", { preHandler: requireAdmin, schema: { body: TableBody } }, async (request, reply) => {
+    try {
+      return reply.code(201).send({ table: database.saveTable(request.body || {}) });
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+  app.delete("/api/admin/tables/:table", { preHandler: requireAdmin, schema: { params: TableParams } }, async (request, reply) => {
+    if (!database.deleteTable(request.params.table)) return errorReply(reply, new Error("Table not found"), 404);
+    return reply.code(204).send();
+  });
+  app.get("/api/admin/tables/:table/bill", { preHandler: requireFloor, schema: { params: TableParams } }, async (request) => ({
+    bill: database.billForTable(request.params.table)
+  }));
+  app.post("/api/admin/tables/:table/bill/settle", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
+    const bill = database.settleTableBill(request.params.table);
+    if (!bill) return errorReply(reply, new Error("Table has no open orders to settle"), 409);
+    realtime.broadcast("bill.settled", { table: bill.table, total: bill.total }, bill.table);
+    realtime.broadcast("print.queued", { jobId: bill.printJobId }, bill.table);
+    return { bill };
   });
 
   app.get("/api/admin/printers", { preHandler: requireAdmin }, async () => ({ printers: database.listPrinters() }));
@@ -201,16 +330,21 @@ export function registerRoutes(app, { database, realtime, config }) {
     if (!database.deletePrinter(request.params.id)) return errorReply(reply, new Error("Printer not found"), 404);
     return reply.code(204).send();
   });
-  app.get("/api/admin/print-jobs", { preHandler: requireAdmin, schema: { querystring: PrintJobsQuery } }, async (request) => ({
+  app.get("/api/admin/print-jobs", { preHandler: requireFloor, schema: { querystring: PrintJobsQuery } }, async (request) => ({
     jobs: database.listPrintJobs(request.query.status, request.query.limit)
   }));
-  app.post("/api/admin/print-jobs/:id/retry", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
+  app.post("/api/admin/print-jobs/:id/retry", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => {
     if (!database.retryPrintJob(request.params.id)) return errorReply(reply, new Error("Only failed print jobs can be retried"), 409);
     return { ok: true, id: request.params.id };
   });
 
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) return reply.code(404).send({ error: "API route not found" });
+    // Never answer a missing bundle with the HTML shell: browsers then fail on the MIME type
+    // instead of showing that the build is stale.
+    if (request.url.startsWith("/assets/") || request.url.startsWith("/media/")) {
+      return reply.code(404).send({ error: "Asset not found" });
+    }
     const fallback = path.join(config.webDir, request.url === "/admin" ? "admin.html" : "index.html");
     if (existsSync(fallback)) return reply.type("text/html").sendFile(path.basename(fallback), config.webDir);
     return reply.code(404).send({ error: "Run npm run build before using the production web server" });

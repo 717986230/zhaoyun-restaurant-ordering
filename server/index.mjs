@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
-import { config } from "./config.mjs";
+import { assertRoleTokens, config } from "./config.mjs";
 import { createDatabase } from "./database.mjs";
 import { createRealtimeHub } from "./realtime.mjs";
 import { registerRoutes } from "./routes.mjs";
@@ -15,6 +15,8 @@ export async function buildServer(overrides = {}) {
     throw new Error("Production ADMIN_TOKEN must be at least 32 characters and must not use the development token");
   }
 
+  assertRoleTokens(settings);
+
   mkdirSync(settings.uploadDir, { recursive: true });
   const app = Fastify({ logger: overrides.logger ?? true, bodyLimit: 2 * 1024 * 1024, requestIdHeader: "x-request-id", trustProxy: settings.trustProxy ?? false });
   const database = createDatabase(settings.databasePath);
@@ -22,7 +24,7 @@ export async function buildServer(overrides = {}) {
 
   await app.register(cors, {
     origin: settings.isProduction ? settings.corsOrigin : true,
-    allowedHeaders: ["content-type", "x-admin-token"]
+    allowedHeaders: ["content-type", "x-admin-token", "x-table-token"]
   });
   await app.register(websocket);
   await app.register(multipart);
@@ -39,6 +41,17 @@ export async function buildServer(overrides = {}) {
       wildcard: false
     });
   }
+
+  // Uploaded media is user-controlled: never let a browser sniff it into an active document.
+  app.addHook("onSend", async (request, reply, payload) => {
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("referrer-policy", "no-referrer");
+    reply.header("x-frame-options", "SAMEORIGIN");
+    if (request.url.startsWith("/media/")) {
+      reply.header("content-security-policy", "default-src 'none'; img-src 'self'; media-src 'self'; sandbox");
+    }
+    return payload;
+  });
 
   app.setErrorHandler((error, request, reply) => {
     const statusCode = error.validation ? 400 : (error.statusCode && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500);

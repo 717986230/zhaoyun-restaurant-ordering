@@ -16,6 +16,52 @@
 生产依赖 0 漏洞。开发依赖仍有两条待处理，均需破坏性大版本升级、属于独立工程项：
 `esbuild <=0.24.2`（moderate，经 vite 5）与 `tar <=7.5.20`（critical，经 @capacitor/cli 6）。
 两者只在构建/同步阶段使用，不进入运行时产物。
+## v0.6 结账、税率、过敏原与桌台令牌
+
+日期：2026-08-12
+
+自动化：
+
+- `npm run typecheck`：通过
+- `npm run unit`：9/9 通过（新增桌台令牌解析用例）
+- `npm run server:test`：15/15 通过（新增账单税率拆分、过敏原枚举、桌台令牌校验、账单小票三语输出）
+- `npm test`：44/44 通过
+- `npm run build`：通过
+
+真实服务实测（Fastify + SQLite + 生产构建）：
+
+- 未登记桌台时下单成功；登记桌 12 后，无令牌下单返回 403、令牌错误返回 403、带正确令牌返回 201；换令牌后旧令牌立即失效。
+- 桌 12 账单：25.00（10%）+ 3.80（20%）= 28.80；净额 22.73 / 3.17，税额 2.27 / 0.63。
+- 管理台点击「打印账单并结账」后，订单标记为已结账，前台队列出现 `kind: bill` 打印任务。
+- 德文账单小票输出商品德文名、税率明细和 `Interne Rechnung, kein Kassenbeleg`。
+- 顾客端从 `?table=12&k=<令牌>` 进入后保存令牌并成功下单；菜品详情显示 `A 含麸质谷物 / C 蛋 / F 大豆`。
+
+未验证：实体打印机纸张输出、Device Owner 真机、iOS 工程、支付流程（本项目不含支付）。
+
+## v0.5 多桌运营验证
+
+日期：2026-08-12
+
+自动化：
+
+- `npm run typecheck`：通过
+- `npm run unit`：6/6 通过（新增桌号解析用例）
+- `npm run server:test`：11/11 通过（新增桌号透传、公开接口限流、安全响应头、SQLite 写锁等待）
+- `npm test`：44/44 通过（新增「桌号随订单提交」用例，覆盖四种视口）
+- `npm run build`：通过
+
+真实服务实测（Fastify + SQLite + 生产构建）：
+
+- 顾客端 `?table=12` 下单：服务端订单 `table=12`，厨房打印任务 payload `table=12`。
+- 管理台订单看板：读取到真实订单和服务呼叫；点击「更新为：制作中」后服务端订单状态变为 `preparing`；点击「已处理」后服务请求状态变为 `completed`。
+- `curl -I /api/health`：返回 `x-content-type-options: nosniff`、`referrer-policy: no-referrer`、`x-frame-options: SAMEORIGIN`。
+- 请求不存在的 `/assets/*.css`：返回 404 JSON，不再返回 HTML。
+
+未验证（与上一版本相同的边界）：实体打印机纸张输出、Device Owner 真机、iOS 工程。
+
+## v0.4 生产候选验证
+
+日期：2026-08-05
 
 ## v0.4 生产候选验证
 

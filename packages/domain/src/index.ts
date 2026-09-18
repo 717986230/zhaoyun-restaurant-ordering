@@ -1,4 +1,5 @@
 export type ProductKind = "food" | "drink" | "sushi";
+export type VatPercent = 10 | 13 | 20;
 export type PrintStation = "kitchen" | "bar" | "sushi" | "front";
 export type OrderStatus = "pending-sync" | "sync-failed" | "new" | "preparing" | "ready" | "completed" | "cancelled";
 
@@ -37,6 +38,7 @@ export interface Product {
   names: { zh: string; de: string; en: string };
   description: string;
   priceCents: number;
+  vatPercent: VatPercent;
   allergens: string[];
   details: { time: string; people: string; level: string; ingredients: string };
   appearance: { art: string; pattern: string };

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ApiOrder, RealtimeEnvelope } from "@zhaoyun/contracts";
 import type { OrderStatus } from "@zhaoyun/domain";
@@ -13,11 +13,26 @@ import { ServiceScreen } from "../features/service/ServiceScreen";
 import { StaffScreen } from "../features/staff/StaffScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
 import { t } from "./i18n";
+import { setTableNo, tableIdentity } from "./table";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
-function HomeScreen({ onAdminTap, dispatch, language, table }: { onAdminTap: () => Promise<void>; dispatch: ReturnType<typeof useCustomerState>["dispatch"]; language: "zh" | "de" | "en"; table: string }) {
+function HomeScreen({ onAdminTap, dispatch, language }: { onAdminTap: () => Promise<void>; dispatch: ReturnType<typeof useCustomerState>["dispatch"]; language: "zh" | "de" | "en" }) {
+  const [table, setTable] = useState(tableIdentity);
+
+  function changeTable() {
+    const input = window.prompt(t(language, "tablePrompt"), table.tableNo);
+    if (input === null) return;
+    const saved = setTableNo(input);
+    if (!saved) {
+      window.alert(t(language, "tableInvalid"));
+      return;
+    }
+    setTable((current) => ({ ...current, tableNo: saved, configured: true }));
+  }
+
   return <section id="home" className="screen home active">
-    <button className="brand brand-button" onClick={() => void onAdminTap()}><small>ZHAO YUN RESTAURANT</small><h1>赵云</h1><p>{t(language, "table")} {table}</p></button>
+    <button className="brand brand-button" onClick={() => void onAdminTap()}><small>ZHAO YUN RESTAURANT</small><h1>赵云</h1><p>{t(language, "table")} {table.tableNo}</p></button>
+    <div className="table-setup"><button className={`table-button ${table.configured ? "" : "unset"}`} onClick={changeTable}>{t(language, "setTable")} · {table.tableNo}</button>{!table.configured && <small>{t(language, "tableUnset")}</small>}</div>
     <div className="home-actions">
       <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "menu" })}><span>01</span><b>{t(language, "start")}</b><small>SPEISEKARTE</small></button>
       <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "orders" })}><span>02</span><b>{t(language, "orders")}</b><small>MEINE BESTELLUNG</small></button>
@@ -71,7 +86,7 @@ export function App() {
 
   return <>
     <main className="app-shell">
-      {state.screen === "home" && <HomeScreen onAdminTap={handleAdminTap} dispatch={dispatch} language={state.language} table={state.table} />}
+      {state.screen === "home" && <HomeScreen onAdminTap={handleAdminTap} dispatch={dispatch} language={state.language} />}
       {state.screen === "menu" && <CatalogScreen state={state} dispatch={dispatch} products={products} offlineMenu={usingBundledMenu} />}
       {state.screen === "cart" && <CartScreen state={state} dispatch={dispatch} products={products} />}
       {state.screen === "orders" && <OrdersScreen orders={state.orders} products={products} dispatch={dispatch} language={state.language} />}

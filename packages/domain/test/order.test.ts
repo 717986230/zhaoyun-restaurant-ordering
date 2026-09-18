@@ -10,6 +10,7 @@ const product: Product = {
   names: { zh: "黑椒牛柳", de: "Rinderfilet", en: "Beef fillet" },
   description: "",
   priceCents: 3450,
+  vatPercent: 10,
   allergens: [],
   details: { time: "35 min", people: "2", level: "Mittel", ingredients: "Rind" },
   appearance: { art: "#111", pattern: "ring" },

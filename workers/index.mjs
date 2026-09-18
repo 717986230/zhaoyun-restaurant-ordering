@@ -18,7 +18,7 @@ import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
   CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody
-} from "../shared/schemas.mjs";
+} from "../src/contracts.js";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 

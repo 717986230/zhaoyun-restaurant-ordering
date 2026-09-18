@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from "react";
 import type { CreateOrderCommand } from "@zhaoyun/contracts";
 import type { CartLine, Order, OrderStatus, SelectedModifier, ServiceRequest } from "@zhaoyun/domain";
-import { tableNumber } from "./device";
+import { tableNo } from "./table";
 
 export type Screen = "home" | "menu" | "cart" | "orders" | "service" | "staff";
 
@@ -52,7 +52,7 @@ const storageKey = "zy_customer_state_v4";
 const maxStoredOrders = 50;
 const initialState: CustomerState = {
   screen: "home",
-  table: tableNumber(),
+  table: tableNo(),
   category: "ALLE",
   query: "",
   searchOpen: false,
@@ -77,7 +77,7 @@ function hydrate(): CustomerState {
     return {
       ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {},
       orders: (stored.orders || []).slice(0, maxStoredOrders),
-      table: tableNumber(), screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: ""
+      table: tableNo(), screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: ""
     };
   } catch {
     return initialState;
