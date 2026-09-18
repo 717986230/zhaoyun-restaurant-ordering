@@ -5,7 +5,7 @@ import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { productName, t } from "../../app/i18n";
 
-interface Props { state: CustomerState; dispatch: CustomerDispatch; products: Product[] }
+interface Props { state: CustomerState; dispatch: CustomerDispatch; products: Product[]; offlineMenu?: boolean }
 
 /**
  * Shared with the `--ease-out` / `--dur-*` tokens in styles.css. The CSS
@@ -99,7 +99,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
   </motion.div>;
 }
 
-export function CatalogScreen({ state, dispatch, products }: Props) {
+export function CatalogScreen({ state, dispatch, products, offlineMenu = false }: Props) {
   const query = state.query.trim().toLowerCase();
   const visible = products.filter((product) => {
     const categoryMatch = state.category === "ALLE" || product.category === state.category;
@@ -121,6 +121,7 @@ export function CatalogScreen({ state, dispatch, products }: Props) {
       <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={`${t(state.language, "search")} / SKU`} autoFocus={state.searchOpen} />
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
+    {offlineMenu && <p className="local-board-note">{t(state.language, "menuOffline")}</p>}
     <nav id="chips" className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} onClick={() => dispatch({ type: "category", category })}>{category}</button>)}</nav>
     <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
       <div className="summary"><span className="number">{product.sku}</span><div><h3>{productName(product, state.language)}</h3><p>{product.names.de}</p></div><span className="cat">{product.category}</span></div>

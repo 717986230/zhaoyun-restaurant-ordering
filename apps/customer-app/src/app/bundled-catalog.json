@@ -1,0 +1,6750 @@
+[
+  {
+    "id": "photo-r1",
+    "sku": "R1",
+    "kind": "food",
+    "category": "RAMEN",
+    "names": {
+      "zh": "蔬菜拉面",
+      "de": "Ramen mit Gemüse",
+      "en": "Ramen with Vegetables"
+    },
+    "description": "Ramen, Gemüse, Ei",
+    "price": 12.5,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ramen, Gemüse, Ei"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 0,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-r2",
+    "sku": "R2",
+    "kind": "food",
+    "category": "RAMEN",
+    "names": {
+      "zh": "鸡肉拉面",
+      "de": "Ramen mit Huhn",
+      "en": "Ramen with Chicken"
+    },
+    "description": "Ramen, Huhn, Gemüse, Ei",
+    "price": 13.5,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ramen, Huhn, Gemüse, Ei"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-r3",
+    "sku": "R3",
+    "kind": "food",
+    "category": "RAMEN",
+    "names": {
+      "zh": "牛肉拉面",
+      "de": "Ramen mit Rind",
+      "en": "Ramen with Beef"
+    },
+    "description": "Ramen, Rind, Gemüse, Ei",
+    "price": 14.5,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ramen, Rind, Gemüse, Ei"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 2,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-r4",
+    "sku": "R4",
+    "kind": "food",
+    "category": "RAMEN",
+    "names": {
+      "zh": "虾仁拉面",
+      "de": "Ramen mit Garnelen",
+      "en": "Ramen with Shrimp"
+    },
+    "description": "Ramen, Garnelen, Gemüse, Ei",
+    "price": 14.5,
+    "allergens": [
+      "A",
+      "B",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ramen, Garnelen, Gemüse, Ei"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 3,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-t1",
+    "sku": "T1",
+    "kind": "food",
+    "category": "SPECIALS",
+    "names": {
+      "zh": "水煮牛肉",
+      "de": "Szechuan Rind",
+      "en": "Szechuan Boiled Beef"
+    },
+    "description": "Rind, Gemüse, Szechuan-Chili, Koriander",
+    "price": 17.9,
+    "allergens": [
+      "A",
+      "C",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Rind, Gemüse, Szechuan-Chili, Koriander"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 4,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-t2",
+    "sku": "T2",
+    "kind": "food",
+    "category": "SPECIALS",
+    "names": {
+      "zh": "辣子鸡",
+      "de": "Scharfes knuspriges Huhn",
+      "en": "Spicy Crispy Chicken"
+    },
+    "description": "Huhn, Gemüse, Koriander",
+    "price": 14.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Huhn, Gemüse, Koriander"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 5,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-t3",
+    "sku": "T3",
+    "kind": "food",
+    "category": "SPECIALS",
+    "names": {
+      "zh": "香辣虾",
+      "de": "Scharfe knusprige Garnelen",
+      "en": "Spicy Crispy King Prawns"
+    },
+    "description": "Garnelen, Gemüse, Koriander",
+    "price": 18.9,
+    "allergens": [
+      "A",
+      "B",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Garnelen, Gemüse, Koriander"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 6,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-t4",
+    "sku": "T4",
+    "kind": "food",
+    "category": "SPECIALS",
+    "names": {
+      "zh": "麻婆豆腐",
+      "de": "Mapo Tofu",
+      "en": "Mapo Tofu"
+    },
+    "description": "Tofu, Gemüse, Szechuan-Chili",
+    "price": 11.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Tofu, Gemüse, Szechuan-Chili"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 7,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-t4c",
+    "sku": "T4C",
+    "kind": "food",
+    "category": "SPECIALS",
+    "names": {
+      "zh": "鸡肉麻婆豆腐",
+      "de": "Mapo Tofu mit Huhn",
+      "en": "Mapo Tofu with Chicken"
+    },
+    "description": "Tofu, Huhn, Gemüse, Szechuan-Chili",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Tofu, Huhn, Gemüse, Szechuan-Chili"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 8,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-a1",
+    "sku": "A1",
+    "kind": "food",
+    "category": "BAO",
+    "names": {
+      "zh": "素食刈包（2个）",
+      "de": "Veggie Bao (2 Stück)",
+      "en": "Veggie Bao (2 pieces)"
+    },
+    "description": "Salat, Tofu, Mango, Karotten, Gurken, Soße",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Salat, Tofu, Mango, Karotten, Gurken, Soße"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 9,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-a2",
+    "sku": "A2",
+    "kind": "food",
+    "category": "BAO",
+    "names": {
+      "zh": "鸡肉刈包（2个）",
+      "de": "Chicken Bao (2 Stück)",
+      "en": "Chicken Bao (2 pieces)"
+    },
+    "description": "Hühnerfilet, Karotten, Gurken, Soße",
+    "price": 13.9,
+    "allergens": [
+      "A",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Hühnerfilet, Karotten, Gurken, Soße"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 10,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-a3",
+    "sku": "A3",
+    "kind": "food",
+    "category": "BAO",
+    "names": {
+      "zh": "韩式牛肉刈包（2个）",
+      "de": "Bulgogi Bao (2 Stück)",
+      "en": "Bulgogi Bao (2 pieces)"
+    },
+    "description": "Koreanisches Rindfleisch, Karotten, Gurken",
+    "price": 13.9,
+    "allergens": [
+      "A",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Koreanisches Rindfleisch, Karotten, Gurken"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 11,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-a4",
+    "sku": "A4",
+    "kind": "food",
+    "category": "BAO",
+    "names": {
+      "zh": "脆皮鸭刈包（2个）",
+      "de": "Crispy Duck Bao (2 Stück)",
+      "en": "Crispy Duck Bao (2 pieces)"
+    },
+    "description": "Ente, Karotten, Gurken, Soße",
+    "price": 13.9,
+    "allergens": [
+      "A",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ente, Karotten, Gurken, Soße"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 12,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-h1",
+    "sku": "H1",
+    "kind": "food",
+    "category": "HOT POT",
+    "names": {
+      "zh": "素食火锅",
+      "de": "Veggie Hot Pot",
+      "en": "Veggie Hot Pot"
+    },
+    "description": "Saison-Gemüse, Tofu, Glasnudel, Udon, Reiskuchen, Gyoza",
+    "price": 23.9,
+    "allergens": [
+      "A",
+      "E",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Udon, Reiskuchen, Gyoza"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 13,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-h2",
+    "sku": "H2",
+    "kind": "food",
+    "category": "HOT POT",
+    "names": {
+      "zh": "牛肉火锅",
+      "de": "Beef Hot Pot",
+      "en": "Beef Hot Pot"
+    },
+    "description": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Rindfleisch",
+    "price": 25.9,
+    "allergens": [
+      "A",
+      "E",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Rindfleisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 14,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-h3",
+    "sku": "H3",
+    "kind": "food",
+    "category": "HOT POT",
+    "names": {
+      "zh": "海鲜火锅",
+      "de": "Seafood Hot Pot",
+      "en": "Seafood Hot Pot"
+    },
+    "description": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Meeresfrüchte",
+    "price": 25.9,
+    "allergens": [
+      "A",
+      "B",
+      "E",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Meeresfrüchte"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 15,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-h4",
+    "sku": "H4",
+    "kind": "food",
+    "category": "HOT POT",
+    "names": {
+      "zh": "羊肉火锅",
+      "de": "Lamm Hot Pot",
+      "en": "Lamb Hot Pot"
+    },
+    "description": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Lammfleisch",
+    "price": 25.9,
+    "allergens": [
+      "A",
+      "B",
+      "E",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Lammfleisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 16,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-n1-6",
+    "sku": "N1-6",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "三文鱼握寿司 6个",
+      "de": "Sake Set 6 Stück",
+      "en": "Salmon Nigiri Set 6 pcs"
+    },
+    "description": "Lachs, Reis",
+    "price": 9.9,
+    "allergens": [
+      "B",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Reis"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 17,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-n1-10",
+    "sku": "N1-10",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "三文鱼握寿司 10个",
+      "de": "Sake Set 10 Stück",
+      "en": "Salmon Nigiri Set 10 pcs"
+    },
+    "description": "Lachs, Reis",
+    "price": 14.9,
+    "allergens": [
+      "B",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Reis"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 18,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-n2-6",
+    "sku": "N2-6",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "混合握寿司 6个",
+      "de": "Mix Set 6 Stück",
+      "en": "Mixed Nigiri Set 6 pcs"
+    },
+    "description": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado",
+    "price": 9.9,
+    "allergens": [
+      "B",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 19,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-n2-10",
+    "sku": "N2-10",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "混合握寿司 10个",
+      "de": "Mix Set 10 Stück",
+      "en": "Mixed Nigiri Set 10 pcs"
+    },
+    "description": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado",
+    "price": 14.9,
+    "allergens": [
+      "B",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 20,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-n3-6",
+    "sku": "N3-6",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "三文鱼金枪鱼握寿司 6个",
+      "de": "Sake Maguro Set 6 Stück",
+      "en": "Salmon Tuna Nigiri Set 6 pcs"
+    },
+    "description": "Lachs, Thunfisch",
+    "price": 10.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 21,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-n3-10",
+    "sku": "N3-10",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "三文鱼金枪鱼握寿司 10个",
+      "de": "Sake Maguro Set 10 Stück",
+      "en": "Salmon Tuna Nigiri Set 10 pcs"
+    },
+    "description": "Lachs, Thunfisch",
+    "price": 15.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 22,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-n4-6",
+    "sku": "N4-6",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "金枪鱼握寿司 6个",
+      "de": "Maguro Set 6 Stück",
+      "en": "Tuna Nigiri Set 6 pcs"
+    },
+    "description": "Thunfisch",
+    "price": 11.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Thunfisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 23,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-n4-10",
+    "sku": "N4-10",
+    "kind": "sushi",
+    "category": "NIGIRI",
+    "names": {
+      "zh": "金枪鱼握寿司 10个",
+      "de": "Maguro Set 10 Stück",
+      "en": "Tuna Nigiri Set 10 pcs"
+    },
+    "description": "Thunfisch",
+    "price": 16.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Thunfisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 24,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-m1",
+    "sku": "M1",
+    "kind": "sushi",
+    "category": "MAKI",
+    "names": {
+      "zh": "黄瓜卷 12个",
+      "de": "Kappa Maki 12 Stück",
+      "en": "Cucumber Maki 12 pcs"
+    },
+    "description": "Gurke, Reis, Nori",
+    "price": 7.9,
+    "allergens": [],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Gurke, Reis, Nori"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 25,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-m2",
+    "sku": "M2",
+    "kind": "sushi",
+    "category": "MAKI",
+    "names": {
+      "zh": "三文鱼卷 12个",
+      "de": "Sake Maki 12 Stück",
+      "en": "Salmon Maki 12 pcs"
+    },
+    "description": "Lachs, Reis, Nori",
+    "price": 8.5,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Reis, Nori"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 26,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-m3",
+    "sku": "M3",
+    "kind": "sushi",
+    "category": "MAKI",
+    "names": {
+      "zh": "牛油果卷 12个",
+      "de": "Avocado Maki 12 Stück",
+      "en": "Avocado Maki 12 pcs"
+    },
+    "description": "Avocado, Reis, Nori",
+    "price": 8.5,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Avocado, Reis, Nori"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 27,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-m5",
+    "sku": "M5",
+    "kind": "sushi",
+    "category": "MAKI SESAM",
+    "names": {
+      "zh": "牛油果芒果卷 8个",
+      "de": "Avocado Mango Maki 8 Stück",
+      "en": "Avocado Mango Maki 8 pcs"
+    },
+    "description": "Avocado, Mango, Reis, Sesam",
+    "price": 6.5,
+    "allergens": [
+      "N"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Avocado, Mango, Reis, Sesam"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 28,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-m6",
+    "sku": "M6",
+    "kind": "sushi",
+    "category": "MAKI SESAM",
+    "names": {
+      "zh": "牛油果虾卷 8个",
+      "de": "Avocado Ebi Maki 8 Stück",
+      "en": "Avocado Shrimp Maki 8 pcs"
+    },
+    "description": "Avocado, Garnelen, Reis, Sesam",
+    "price": 8.5,
+    "allergens": [
+      "B",
+      "N"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Avocado, Garnelen, Reis, Sesam"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 29,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-m7",
+    "sku": "M7",
+    "kind": "sushi",
+    "category": "MAKI SESAM",
+    "names": {
+      "zh": "牛油果三文鱼卷 8个",
+      "de": "Avocado Sake Maki 8 Stück",
+      "en": "Avocado Salmon Maki 8 pcs"
+    },
+    "description": "Avocado, Lachs, Reis, Sesam",
+    "price": 8.5,
+    "allergens": [
+      "D",
+      "N"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Avocado, Lachs, Reis, Sesam"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 30,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-s1-9",
+    "sku": "S1-9",
+    "kind": "sushi",
+    "category": "SASHIMI",
+    "names": {
+      "zh": "三文鱼刺身 9个",
+      "de": "Sake Set 9 Stück",
+      "en": "Salmon Sashimi Set 9 pcs"
+    },
+    "description": "Lachs",
+    "price": 16.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 31,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-s1-18",
+    "sku": "S1-18",
+    "kind": "sushi",
+    "category": "SASHIMI",
+    "names": {
+      "zh": "三文鱼刺身 18个",
+      "de": "Sake Set 18 Stück",
+      "en": "Salmon Sashimi Set 18 pcs"
+    },
+    "description": "Lachs",
+    "price": 28.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 32,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-s2-9",
+    "sku": "S2-9",
+    "kind": "sushi",
+    "category": "SASHIMI",
+    "names": {
+      "zh": "三文鱼金枪鱼刺身 9个",
+      "de": "Sake Maguro Set 9 Stück",
+      "en": "Salmon Tuna Sashimi 9 pcs"
+    },
+    "description": "Lachs, Thunfisch",
+    "price": 17.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 33,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-s2-18",
+    "sku": "S2-18",
+    "kind": "sushi",
+    "category": "SASHIMI",
+    "names": {
+      "zh": "三文鱼金枪鱼刺身 18个",
+      "de": "Sake Maguro Set 18 Stück",
+      "en": "Salmon Tuna Sashimi 18 pcs"
+    },
+    "description": "Lachs, Thunfisch",
+    "price": 29.9,
+    "allergens": [
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 34,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-s3-9",
+    "sku": "S3-9",
+    "kind": "sushi",
+    "category": "SASHIMI",
+    "names": {
+      "zh": "混合刺身 9个",
+      "de": "Mix Set 9 Stück",
+      "en": "Mixed Sashimi Set 9 pcs"
+    },
+    "description": "Lachs, Thunfisch, Hamachi",
+    "price": 17.9,
+    "allergens": [
+      "B",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch, Hamachi"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 35,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-s3-18",
+    "sku": "S3-18",
+    "kind": "sushi",
+    "category": "SASHIMI",
+    "names": {
+      "zh": "混合刺身 18个",
+      "de": "Mix Set 18 Stück",
+      "en": "Mixed Sashimi Set 18 pcs"
+    },
+    "description": "Lachs, Thunfisch, Hamachi",
+    "price": 29.9,
+    "allergens": [
+      "B",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch, Hamachi"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 36,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x1",
+    "sku": "X1",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "彩虹卷 8个",
+      "de": "Rainbow Roll 8 Stück",
+      "en": "Rainbow Roll 8 pcs"
+    },
+    "description": "Lachs, Thunfisch, Hamachi, Avocado, Kresse",
+    "price": 15.9,
+    "allergens": [
+      "C",
+      "F",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Thunfisch, Hamachi, Avocado, Kresse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 37,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x2",
+    "sku": "X2",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "脆皮三文鱼卷 8个",
+      "de": "Crunchy Salmon Roll 8 Stück",
+      "en": "Crunchy Salmon Roll 8 pcs"
+    },
+    "description": "Lachstempura, Salat, Crispy Panko, Mayo, Teriyaki",
+    "price": 14.9,
+    "allergens": [
+      "A",
+      "C",
+      "D",
+      "F"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachstempura, Salat, Crispy Panko, Mayo, Teriyaki"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 38,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x3",
+    "sku": "X3",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "粉色阿拉斯加卷 8个",
+      "de": "Pink Alaska 8 Stück",
+      "en": "Pink Alaska Roll 8 pcs"
+    },
+    "description": "Lachs, Cream Cheese, Avocado, Masago",
+    "price": 12.9,
+    "allergens": [
+      "D",
+      "N"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Cream Cheese, Avocado, Masago"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 39,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x4",
+    "sku": "X4",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "辣金枪鱼卷 8个",
+      "de": "Spicy Tuna 8 Stück",
+      "en": "Spicy Tuna Roll 8 pcs"
+    },
+    "description": "Thunfisch, Avocado, Masago, Spicy Mayo",
+    "price": 15.9,
+    "allergens": [
+      "D",
+      "N"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Thunfisch, Avocado, Masago, Spicy Mayo"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 40,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x5",
+    "sku": "X5",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "龙卷 8个",
+      "de": "Dragon Roll 8 Stück",
+      "en": "Dragon Roll 8 pcs"
+    },
+    "description": "Garnelen, Avocado, flambierter Aal, Sushi-Soße",
+    "price": 16.9,
+    "allergens": [
+      "A",
+      "C",
+      "D"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Garnelen, Avocado, flambierter Aal, Sushi-Soße"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 41,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x6",
+    "sku": "X6",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "鸭肉卷 8个",
+      "de": "Agamo Roll 8 Stück",
+      "en": "Agamo Roll 8 pcs"
+    },
+    "description": "Knusperente, Gurken, Jungzwiebel, Teriyaki",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Knusperente, Gurken, Jungzwiebel, Teriyaki"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 42,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x7",
+    "sku": "X7",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "甜力卷 8个",
+      "de": "Sweet Power 8 Stück",
+      "en": "Sweet Power Roll 8 pcs"
+    },
+    "description": "Avocado, Mango, flambierter Lachs",
+    "price": 13.9,
+    "allergens": [
+      "D",
+      "F"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Avocado, Mango, flambierter Lachs"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 43,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x8",
+    "sku": "X8",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "甜绿卷 8个",
+      "de": "Sweet Green 8 Stück",
+      "en": "Sweet Green Roll 8 pcs"
+    },
+    "description": "Süßkartoffeltempura, Mango, Gurke, Basilikum",
+    "price": 12.9,
+    "allergens": [
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Süßkartoffeltempura, Mango, Gurke, Basilikum"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 44,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-x9",
+    "sku": "X9",
+    "kind": "sushi",
+    "category": "CHIRI ROLLS",
+    "names": {
+      "zh": "御卷 8个",
+      "de": "Mikado Roll 8 Stück",
+      "en": "Mikado Roll 8 pcs"
+    },
+    "description": "Erdnuss, Avocado, Kresse",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "E",
+      "F"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Erdnuss, Avocado, Kresse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 45,
+    "printStation": "sushi",
+    "media": []
+  },
+  {
+    "id": "photo-b1",
+    "sku": "B1",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "芝麻鸡",
+      "de": "Sesam Chicken",
+      "en": "Sesame Chicken"
+    },
+    "description": "Hühnerstreifen, Gemüse, Sesam",
+    "price": 13.9,
+    "allergens": [
+      "A",
+      "C",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Hühnerstreifen, Gemüse, Sesam"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 46,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b2",
+    "sku": "B2",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "红咖喱鸡",
+      "de": "Red Thai Curry Chicken",
+      "en": "Red Thai Curry Chicken"
+    },
+    "description": "Hühnerfleisch, Kokosmilch, Gemüse, Basilikum",
+    "price": 13.9,
+    "allergens": [],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Hühnerfleisch, Kokosmilch, Gemüse, Basilikum"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 47,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b3",
+    "sku": "B3",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "夏威夷鸡",
+      "de": "Hawaii Chicken",
+      "en": "Hawaii Chicken"
+    },
+    "description": "Ananas, Mango, Hühnerfleisch, Gemüse, Kokosmilch",
+    "price": 13.9,
+    "allergens": [
+      "A"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ananas, Mango, Hühnerfleisch, Gemüse, Kokosmilch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 48,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b4",
+    "sku": "B4",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "脆皮鸡",
+      "de": "Crispy Panko Chicken",
+      "en": "Crispy Panko Chicken"
+    },
+    "description": "Hühnerfilet, Panko, Gemüse",
+    "price": 13.9,
+    "allergens": [
+      "A",
+      "C",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Hühnerfilet, Panko, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 49,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b5",
+    "sku": "B5",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "辣椒牛肉",
+      "de": "Chili Beef",
+      "en": "Chili Beef"
+    },
+    "description": "Rind, Gemüse, frischer Chili",
+    "price": 14.9,
+    "allergens": [
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Rind, Gemüse, frischer Chili"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 50,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b6",
+    "sku": "B6",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "韩式烤牛肉",
+      "de": "Bulgogi",
+      "en": "Bulgogi Beef"
+    },
+    "description": "Rindfleisch, Zwiebel, Gemüse",
+    "price": 14.9,
+    "allergens": [
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Rindfleisch, Zwiebel, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 51,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b7",
+    "sku": "B7",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "宫保脆皮鸭",
+      "de": "Gongbao Crispy Duck",
+      "en": "Gongbao Crispy Duck"
+    },
+    "description": "Ente, Gemüse, trockener Chili",
+    "price": 14.9,
+    "allergens": [
+      "A",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ente, Gemüse, trockener Chili"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 52,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b8",
+    "sku": "B8",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "照烧三文鱼",
+      "de": "Sake Teriyaki",
+      "en": "Salmon Teriyaki"
+    },
+    "description": "Lachs, Gemüse, Teriyaki-Soße",
+    "price": 14.9,
+    "allergens": [
+      "A",
+      "D",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs, Gemüse, Teriyaki-Soße"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 53,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b9",
+    "sku": "B9",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "冬阴功虾",
+      "de": "Tom Yam Prawns",
+      "en": "Tom Yam Prawns"
+    },
+    "description": "Garnelen, Gemüse, Thai-Kräuter",
+    "price": 17.9,
+    "allergens": [
+      "B"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Garnelen, Gemüse, Thai-Kräuter"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 54,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b10",
+    "sku": "B10",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "豆腐上海青",
+      "de": "Tofu Pak Choi",
+      "en": "Tofu Pak Choi"
+    },
+    "description": "Tofu, Pak Choi, Gemüse",
+    "price": 12.9,
+    "allergens": [
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Tofu, Pak Choi, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 55,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b11",
+    "sku": "B11",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "印尼炒饭",
+      "de": "Nasi Goreng",
+      "en": "Nasi Goreng"
+    },
+    "description": "Eierreis, Gemüse, Entenfleisch, gelbes Curry",
+    "price": 11.9,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Eierreis, Gemüse, Entenfleisch, gelbes Curry"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 56,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b12",
+    "sku": "B12",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "素食辣炒年糕",
+      "de": "Veggie Tteokbokki",
+      "en": "Veggie Tteokbokki"
+    },
+    "description": "Reiskuchen, Gemüse, koreanisch",
+    "price": 11.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Reiskuchen, Gemüse, koreanisch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 57,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b13",
+    "sku": "B13",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "虾仁辣炒年糕",
+      "de": "Shrimps Tteokbokki",
+      "en": "Shrimp Tteokbokki"
+    },
+    "description": "Reiskuchen, Gemüse, Garnelen",
+    "price": 13.9,
+    "allergens": [
+      "A",
+      "B",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Reiskuchen, Gemüse, Garnelen"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 58,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b14",
+    "sku": "B14",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "素食饺子 12个",
+      "de": "Veggie Dumplings 12 Stück",
+      "en": "Veggie Dumplings 12 pcs"
+    },
+    "description": "Teigtaschen, Gemüse, Glasnudel",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Teigtaschen, Gemüse, Glasnudel"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 59,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-b15",
+    "sku": "B15",
+    "kind": "food",
+    "category": "MAIN DISHES",
+    "names": {
+      "zh": "鸡肉饺子 12个",
+      "de": "Chicken Dumplings 12 Stück",
+      "en": "Chicken Dumplings 12 pcs"
+    },
+    "description": "Teigtaschen, Hühnerfleisch, Bärlauch",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Teigtaschen, Hühnerfleisch, Bärlauch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 60,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v1",
+    "sku": "V1",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "毛豆",
+      "de": "Edamame",
+      "en": "Edamame"
+    },
+    "description": "Sojabohnen, Meersalz",
+    "price": 4.5,
+    "allergens": [
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Sojabohnen, Meersalz"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 61,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v2",
+    "sku": "V2",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "素春卷 2个",
+      "de": "Summerrolls Veggie 2 Stück",
+      "en": "Veggie Summer Rolls 2 pcs"
+    },
+    "description": "Gurke, Mango, Avocado, Reisnudeln, Basilikum",
+    "price": 6.9,
+    "allergens": [
+      "A",
+      "E",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Gurke, Mango, Avocado, Reisnudeln, Basilikum"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 62,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v3",
+    "sku": "V3",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "虾仁春卷 2个",
+      "de": "Summerrolls Shrimp 2 Stück",
+      "en": "Shrimp Summer Rolls 2 pcs"
+    },
+    "description": "Gurke, Mango, Avocado, Garnelen, Basilikum",
+    "price": 7.9,
+    "allergens": [
+      "A",
+      "B",
+      "E",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Gurke, Mango, Avocado, Garnelen, Basilikum"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 63,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v4",
+    "sku": "V4",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "迷你春卷 6个",
+      "de": "Mini Springroll 6 Stück",
+      "en": "Mini Spring Rolls 6 pcs"
+    },
+    "description": "Gemüse, Teig",
+    "price": 3.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Gemüse, Teig"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 64,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v5",
+    "sku": "V5",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "素食锅贴 6个",
+      "de": "Veggie Gyoza 6 Stück",
+      "en": "Veggie Gyoza 6 pcs"
+    },
+    "description": "Teigtaschen, Gemüse",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Teigtaschen, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 65,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v6",
+    "sku": "V6",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "鸡肉锅贴 6个",
+      "de": "Chicken Gyoza 6 Stück",
+      "en": "Chicken Gyoza 6 pcs"
+    },
+    "description": "Teigtaschen, Hühnerfleisch, Gemüse",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Teigtaschen, Hühnerfleisch, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 66,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v7",
+    "sku": "V7",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "牛肉锅贴 6个",
+      "de": "Beef Gyoza 6 Stück",
+      "en": "Beef Gyoza 6 pcs"
+    },
+    "description": "Teigtaschen, Rindfleisch, Gemüse",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Teigtaschen, Rindfleisch, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 67,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v8",
+    "sku": "V8",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "章鱼烧 6个",
+      "de": "Takoyaki 6 Stück",
+      "en": "Takoyaki 6 pcs"
+    },
+    "description": "Oktopus-Bällchen, Mayo-Soße",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "C",
+      "F",
+      "G",
+      "R"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Oktopus-Bällchen, Mayo-Soße"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 68,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v9",
+    "sku": "V9",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "泡菜沙拉",
+      "de": "Kimchi Salat",
+      "en": "Kimchi Salad"
+    },
+    "description": "Koreanischer scharfer Salat",
+    "price": 4.5,
+    "allergens": [
+      "F",
+      "D"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Koreanischer scharfer Salat"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 69,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v10",
+    "sku": "V10",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "牛油果沙拉",
+      "de": "Avocado Salat",
+      "en": "Avocado Salad"
+    },
+    "description": "Salat, Avocado",
+    "price": 6.9,
+    "allergens": [
+      "D",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Salat, Avocado"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 70,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v11",
+    "sku": "V11",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "三文鱼塔塔沙拉",
+      "de": "Salmon Tatar Salat",
+      "en": "Salmon Tartar Salad"
+    },
+    "description": "Lachs-Tatar, Mango, Avocado, Salat",
+    "price": 8.9,
+    "allergens": [
+      "D",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Lachs-Tatar, Mango, Avocado, Salat"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 71,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v12",
+    "sku": "V12",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "椰香虾 5个",
+      "de": "Cocos Shrimp 5 Stück",
+      "en": "Coconut Shrimp 5 pcs"
+    },
+    "description": "Gebackene Garnelen",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "B"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Gebackene Garnelen"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 72,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v13",
+    "sku": "V13",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "红油抄手",
+      "de": "Chili Wonton",
+      "en": "Chili Wonton"
+    },
+    "description": "Hühnerfleisch, Garnelen, Koriander",
+    "price": 5.5,
+    "allergens": [
+      "A",
+      "B",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Hühnerfleisch, Garnelen, Koriander"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 73,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v14",
+    "sku": "V14",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "味噌汤",
+      "de": "Miso Soup",
+      "en": "Miso Soup"
+    },
+    "description": "Miso, Tofu, Algen",
+    "price": 3.9,
+    "allergens": [
+      "A",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Miso, Tofu, Algen"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 74,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v15",
+    "sku": "V15",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "云吞汤",
+      "de": "Wonton Soup",
+      "en": "Wonton Soup"
+    },
+    "description": "Hühnerfleisch, Garnelen, Gemüse",
+    "price": 5.5,
+    "allergens": [
+      "A",
+      "B",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Hühnerfleisch, Garnelen, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 75,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v16",
+    "sku": "V16",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "冬阴功汤",
+      "de": "Tom Yam Gung Soup",
+      "en": "Tom Yam Gung Soup"
+    },
+    "description": "Garnelen, Gemüse, Koriander",
+    "price": 5.9,
+    "allergens": [
+      "B"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Garnelen, Gemüse, Koriander"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 76,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v17",
+    "sku": "V17",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "椰奶鸡汤",
+      "de": "Tom Kha Gai Soup",
+      "en": "Tom Kha Gai Soup"
+    },
+    "description": "Hühnerfleisch, Gemüse, Kokosmilch",
+    "price": 5.5,
+    "allergens": [
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Hühnerfleisch, Gemüse, Kokosmilch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 77,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-v18",
+    "sku": "V18",
+    "kind": "food",
+    "category": "STARTER",
+    "names": {
+      "zh": "虾饺 4个",
+      "de": "Shrimp Dumplings 4 Stück",
+      "en": "Shrimp Dumplings 4 pcs"
+    },
+    "description": "Gedämpfte Teigtaschen, Garnelen",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "B",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Gedämpfte Teigtaschen, Garnelen"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 78,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-u1",
+    "sku": "U1",
+    "kind": "food",
+    "category": "FRIED UDON",
+    "names": {
+      "zh": "蔬菜炒乌冬",
+      "de": "Yaki Udon Yasai",
+      "en": "Yaki Udon Yasai"
+    },
+    "description": "Udon, Gemüse",
+    "price": 10.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Udon, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 79,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-u2",
+    "sku": "U2",
+    "kind": "food",
+    "category": "FRIED UDON",
+    "names": {
+      "zh": "鸡肉炒乌冬",
+      "de": "Yaki Udon Toriniku",
+      "en": "Yaki Udon Chicken"
+    },
+    "description": "Udon, Hühnerfleisch, Gemüse",
+    "price": 11.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Udon, Hühnerfleisch, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 80,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-u3",
+    "sku": "U3",
+    "kind": "food",
+    "category": "FRIED UDON",
+    "names": {
+      "zh": "牛肉炒乌冬",
+      "de": "Yaki Udon Gyuniku",
+      "en": "Yaki Udon Beef"
+    },
+    "description": "Udon, Rindfleisch, Gemüse",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Udon, Rindfleisch, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 81,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-u4",
+    "sku": "U4",
+    "kind": "food",
+    "category": "FRIED UDON",
+    "names": {
+      "zh": "鸭肉炒乌冬",
+      "de": "Yaki Udon Kamoniku",
+      "en": "Yaki Udon Duck"
+    },
+    "description": "Udon, Entenfleisch, Gemüse",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Udon, Entenfleisch, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 82,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-u5",
+    "sku": "U5",
+    "kind": "food",
+    "category": "FRIED UDON",
+    "names": {
+      "zh": "虾仁炒乌冬",
+      "de": "Yaki Udon Ebi",
+      "en": "Yaki Udon Shrimp"
+    },
+    "description": "Udon, Garnelen, Gemüse",
+    "price": 12.9,
+    "allergens": [
+      "A",
+      "F",
+      "D",
+      "N"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Udon, Garnelen, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "extras",
+        "names": {
+          "zh": "加料",
+          "de": "Extras",
+          "en": "Add-ons"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "extra-noodles",
+            "names": {
+              "zh": "加面",
+              "de": "Extra Nudeln",
+              "en": "Extra noodles"
+            },
+            "priceCents": 250
+          }
+        ]
+      },
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      },
+      {
+        "id": "spice",
+        "names": {
+          "zh": "辣度",
+          "de": "Scharf",
+          "en": "Spice"
+        },
+        "selection": "single",
+        "options": [
+          {
+            "id": "no-spicy",
+            "names": {
+              "zh": "不辣",
+              "de": "Nicht scharf",
+              "en": "Not spicy"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "normal-spicy",
+            "names": {
+              "zh": "正常辣",
+              "de": "Normal scharf",
+              "en": "Regular spice"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "extra-chili",
+            "names": {
+              "zh": "加辣椒",
+              "de": "Extra Chili",
+              "en": "Extra chili"
+            },
+            "priceCents": 50
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 83,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-side-rice",
+    "sku": "SIDE-RICE",
+    "kind": "food",
+    "category": "SIDE DISHES",
+    "names": {
+      "zh": "米饭",
+      "de": "Reis",
+      "en": "Steamed Rice"
+    },
+    "description": "Gekochter Reis",
+    "price": 2,
+    "allergens": [],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Gekochter Reis"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 84,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-side-fried-rice",
+    "sku": "SIDE-FRIED-RICE",
+    "kind": "food",
+    "category": "SIDE DISHES",
+    "names": {
+      "zh": "炒饭",
+      "de": "Gebratener Reis",
+      "en": "Fried Rice"
+    },
+    "description": "Ei, Gemüse",
+    "price": 4.9,
+    "allergens": [
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Ei, Gemüse"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 85,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-d1",
+    "sku": "D1",
+    "kind": "food",
+    "category": "DESSERT",
+    "names": {
+      "zh": "麻薯",
+      "de": "Mochi",
+      "en": "Mochi"
+    },
+    "description": "Mochi, Eis",
+    "price": 6.9,
+    "allergens": [
+      "A",
+      "G"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Mochi, Eis"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 86,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-d2",
+    "sku": "D2",
+    "kind": "food",
+    "category": "DESSERT",
+    "names": {
+      "zh": "抹茶提拉米苏",
+      "de": "Matcha Tiramisu",
+      "en": "Matcha Tiramisu"
+    },
+    "description": "Matcha, Mascarpone, Biskuit",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "C",
+      "G"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Matcha, Mascarpone, Biskuit"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 87,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-d3",
+    "sku": "D3",
+    "kind": "food",
+    "category": "DESSERT",
+    "names": {
+      "zh": "苹果饺子 5个",
+      "de": "Apfel Gyoza 5 Stück",
+      "en": "Apple Gyoza 5 pcs"
+    },
+    "description": "Apfel, Teigtaschen",
+    "price": 5.9,
+    "allergens": [
+      "A",
+      "C"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Apfel, Teigtaschen"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [
+      {
+        "id": "exclusions",
+        "names": {
+          "zh": "去除配料",
+          "de": "Zutaten entfernen",
+          "en": "Remove ingredients"
+        },
+        "selection": "multi",
+        "options": [
+          {
+            "id": "no-scallion",
+            "names": {
+              "zh": "不要葱",
+              "de": "Ohne Zwiebel",
+              "en": "No scallion"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-cilantro",
+            "names": {
+              "zh": "不要香菜",
+              "de": "Ohne Koriander",
+              "en": "No cilantro"
+            },
+            "priceCents": 0
+          },
+          {
+            "id": "no-chili",
+            "names": {
+              "zh": "不要辣椒",
+              "de": "Ohne Chili",
+              "en": "No chili"
+            },
+            "priceCents": 0
+          }
+        ]
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 88,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "photo-dr-cola",
+    "sku": "DR-COLA",
+    "kind": "drink",
+    "category": "NON-ALCOHOLIC",
+    "names": {
+      "zh": "可乐 / 无糖可乐",
+      "de": "Cola / Cola Zero",
+      "en": "Cola / Cola Zero"
+    },
+    "description": "0.33L",
+    "price": 3.8,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.33L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 89,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-dr-eistee",
+    "sku": "DR-EISTEE",
+    "kind": "drink",
+    "category": "NON-ALCOHOLIC",
+    "names": {
+      "zh": "冰茶 / 芬达",
+      "de": "Eistee / Fanta",
+      "en": "Iced Tea / Fanta"
+    },
+    "description": "0.33L",
+    "price": 3.8,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.33L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 90,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-dr-water",
+    "sku": "DR-WATER",
+    "kind": "drink",
+    "category": "NON-ALCOHOLIC",
+    "names": {
+      "zh": "静水 / 气泡水",
+      "de": "Römerquelle Still / Prickelnd",
+      "en": "Still / Sparkling Water"
+    },
+    "description": "0.50L",
+    "price": 3.2,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.50L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 91,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-dr-aloe",
+    "sku": "DR-ALOE",
+    "kind": "drink",
+    "category": "NON-ALCOHOLIC",
+    "names": {
+      "zh": "芦荟汁",
+      "de": "Aloe Vera",
+      "en": "Aloe Vera"
+    },
+    "description": "0.50L",
+    "price": 4.8,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.50L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 92,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-dr-apple",
+    "sku": "DR-APPLE",
+    "kind": "drink",
+    "category": "NON-ALCOHOLIC",
+    "names": {
+      "zh": "苹果汁",
+      "de": "Apfelsaft",
+      "en": "Apple Juice"
+    },
+    "description": "0.33L",
+    "price": 3.3,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.33L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 93,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-dr-orange",
+    "sku": "DR-ORANGE",
+    "kind": "drink",
+    "category": "NON-ALCOHOLIC",
+    "names": {
+      "zh": "橙汁",
+      "de": "Orangensaft",
+      "en": "Orange Juice"
+    },
+    "description": "0.33L",
+    "price": 3.3,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.33L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 94,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-dr-redbull",
+    "sku": "DR-REDBULL",
+    "kind": "drink",
+    "category": "NON-ALCOHOLIC",
+    "names": {
+      "zh": "红牛",
+      "de": "Red Bull",
+      "en": "Red Bull"
+    },
+    "description": "0.25L",
+    "price": 3.9,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.25L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 95,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-beer-wiesel-fass",
+    "sku": "BEER-WIESEL-FASS",
+    "kind": "drink",
+    "category": "BEER",
+    "names": {
+      "zh": "维瑟堡生啤",
+      "de": "Wieselburger Fass",
+      "en": "Wieselburger Draft Beer"
+    },
+    "description": "0.33L",
+    "price": 3.9,
+    "allergens": [
+      "A"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.33L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 96,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-beer-wiesel-stamm",
+    "sku": "BEER-WIESEL-STAMM",
+    "kind": "drink",
+    "category": "BEER",
+    "names": {
+      "zh": "维瑟堡啤酒",
+      "de": "Wieselburger Stammbräu",
+      "en": "Wieselburger Lager"
+    },
+    "description": "0.50L",
+    "price": 4.9,
+    "allergens": [
+      "A"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.50L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 97,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-beer-nonalc",
+    "sku": "BEER-NONALC",
+    "kind": "drink",
+    "category": "BEER",
+    "names": {
+      "zh": "无酒精啤酒",
+      "de": "Alkoholfreies Bier",
+      "en": "Non-alcoholic Beer"
+    },
+    "description": "Flasche",
+    "price": 4.5,
+    "allergens": [
+      "A"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Flasche"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 98,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-beer-japan",
+    "sku": "BEER-JAPAN",
+    "kind": "drink",
+    "category": "BEER",
+    "names": {
+      "zh": "日本啤酒",
+      "de": "Japanisches Bier",
+      "en": "Japanese Beer"
+    },
+    "description": "Flasche",
+    "price": 4.5,
+    "allergens": [
+      "A"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Flasche"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 99,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-wine-white",
+    "sku": "WINE-WHITE",
+    "kind": "drink",
+    "category": "WINE APERITIF",
+    "names": {
+      "zh": "白葡萄酒 1/8",
+      "de": "Weißwein Grüner Veltliner 1/8",
+      "en": "White Wine Grüner Veltliner 1/8"
+    },
+    "description": "0.125L",
+    "price": 4.5,
+    "allergens": [
+      "O"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.125L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 100,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-wine-red",
+    "sku": "WINE-RED",
+    "kind": "drink",
+    "category": "WINE APERITIF",
+    "names": {
+      "zh": "红葡萄酒 1/8",
+      "de": "Rotwein Zweigelt 1/8",
+      "en": "Red Wine Zweigelt 1/8"
+    },
+    "description": "0.125L",
+    "price": 4.5,
+    "allergens": [
+      "O"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.125L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 101,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-wine-spritzer",
+    "sku": "WINE-SPRITZER",
+    "kind": "drink",
+    "category": "WINE APERITIF",
+    "names": {
+      "zh": "白葡萄酒苏打",
+      "de": "Weißer Spritzer",
+      "en": "White Wine Spritzer"
+    },
+    "description": "0.25L",
+    "price": 3.5,
+    "allergens": [
+      "O"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.25L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 102,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-aperol",
+    "sku": "APEROL",
+    "kind": "drink",
+    "category": "WINE APERITIF",
+    "names": {
+      "zh": "阿佩罗",
+      "de": "Aperol",
+      "en": "Aperol"
+    },
+    "description": "Aperol",
+    "price": 4.5,
+    "allergens": [
+      "O"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Aperol"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 103,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-aperol-prosecco",
+    "sku": "APEROL-PROSECCO",
+    "kind": "drink",
+    "category": "WINE APERITIF",
+    "names": {
+      "zh": "阿佩罗起泡酒",
+      "de": "Aperol Prosecco",
+      "en": "Aperol Prosecco"
+    },
+    "description": "Prosecco",
+    "price": 5.5,
+    "allergens": [
+      "O"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Prosecco"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 104,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-hugo",
+    "sku": "HUGO",
+    "kind": "drink",
+    "category": "WINE APERITIF",
+    "names": {
+      "zh": "雨果鸡尾酒",
+      "de": "Hugo",
+      "en": "Hugo"
+    },
+    "description": "Holunder, Minze, Limette",
+    "price": 5.5,
+    "allergens": [
+      "O"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Holunder, Minze, Limette"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 105,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-sake",
+    "sku": "SAKE",
+    "kind": "drink",
+    "category": "WINE APERITIF",
+    "names": {
+      "zh": "清酒",
+      "de": "Sake",
+      "en": "Sake"
+    },
+    "description": "0.10L",
+    "price": 5.5,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "0.10L"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 106,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-coffee-espresso",
+    "sku": "COFFEE-ESPRESSO",
+    "kind": "drink",
+    "category": "COFFEE",
+    "names": {
+      "zh": "浓缩咖啡",
+      "de": "Espresso",
+      "en": "Espresso"
+    },
+    "description": "Kaffee",
+    "price": 2.9,
+    "allergens": [
+      "G"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Kaffee"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 107,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-coffee-cappuccino",
+    "sku": "COFFEE-CAPPUCCINO",
+    "kind": "drink",
+    "category": "COFFEE",
+    "names": {
+      "zh": "卡布奇诺",
+      "de": "Cappuccino",
+      "en": "Cappuccino"
+    },
+    "description": "Kaffee, Milch",
+    "price": 4.2,
+    "allergens": [
+      "G"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Kaffee, Milch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 108,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-coffee-latte",
+    "sku": "COFFEE-LATTE",
+    "kind": "drink",
+    "category": "COFFEE",
+    "names": {
+      "zh": "拿铁咖啡",
+      "de": "Latte Macchiato",
+      "en": "Latte Macchiato"
+    },
+    "description": "Kaffee, Milch",
+    "price": 4.5,
+    "allergens": [
+      "G"
+    ],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Kaffee, Milch"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 109,
+    "printStation": "bar",
+    "media": []
+  },
+  {
+    "id": "photo-tea",
+    "sku": "TEA",
+    "kind": "drink",
+    "category": "TEA",
+    "names": {
+      "zh": "茉莉花茶、绿茶、红茶",
+      "de": "Jasmintee, Grüntee, Schwarztee",
+      "en": "Jasmine, Green or Black Tea"
+    },
+    "description": "Tee",
+    "price": 3.5,
+    "allergens": [],
+    "details": {
+      "time": "2 min",
+      "people": "1 Person",
+      "level": "Mild",
+      "ingredients": "Tee"
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "available": true,
+    "published": true,
+    "sortOrder": 110,
+    "printStation": "bar",
+    "media": []
+  }
+]

@@ -30,7 +30,7 @@ function HomeScreen({ onAdminTap, dispatch, language, table }: { onAdminTap: () 
 
 export function App() {
   const { state, dispatch } = useCustomerState();
-  const { data: products } = useCatalog();
+  const { data: products, usingBundledMenu } = useCatalog();
   const queryClient = useQueryClient();
   const handleAdminTap = useKiosk();
   const syncingOrders = useRef(new Set<string>());
@@ -72,7 +72,7 @@ export function App() {
   return <>
     <main className="app-shell">
       {state.screen === "home" && <HomeScreen onAdminTap={handleAdminTap} dispatch={dispatch} language={state.language} table={state.table} />}
-      {state.screen === "menu" && <CatalogScreen state={state} dispatch={dispatch} products={products} />}
+      {state.screen === "menu" && <CatalogScreen state={state} dispatch={dispatch} products={products} offlineMenu={usingBundledMenu} />}
       {state.screen === "cart" && <CartScreen state={state} dispatch={dispatch} products={products} />}
       {state.screen === "orders" && <OrdersScreen orders={state.orders} products={products} dispatch={dispatch} language={state.language} />}
       {state.screen === "service" && <ServiceScreen state={state} dispatch={dispatch} />}

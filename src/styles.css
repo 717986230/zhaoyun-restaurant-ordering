@@ -210,10 +210,6 @@ html.plt-android .screen.active {
   height: 82px;
   border-bottom: 1px solid #403934;
   background: #11100e;
-  /* The third track holds the language switcher when a panel has one. It keeps
-     the back button's 56px as a floor so the title stays optically centred on
-     the panels that have no switcher, and grows to the pills otherwise. */
-  grid-template-columns: 56px minmax(0, 1fr) minmax(56px, auto);
 }
 
 .title,
@@ -230,23 +226,8 @@ html.plt-android .screen.active {
 .panel-head h2 {
   margin: 0;
   font-family: Georgia, "Noto Serif SC", serif;
-  /* Shrinks on a phone so a long title such as "Bestellstatus" still clears
-     the switcher; unchanged from 436px up, which covers every tablet. */
-  font-size: clamp(19px, 5.5vw, 24px);
+  font-size: 24px;
   font-weight: 500;
-  white-space: nowrap;
-}
-
-.panel-head .langs-compact {
-  margin-top: 0;
-  gap: 6px;
-}
-
-.panel-head .langs-compact button {
-  min-width: 34px;
-  padding: 6px 8px;
-  font-size: 12px;
-  letter-spacing: 0.04em;
 }
 
 .icon-btn {

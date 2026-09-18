@@ -223,15 +223,24 @@ test("adding the same dish twice accumulates one cart line", async ({ page }) =>
   await expect(page.locator(".row small").first()).toContainText("× 2");
 });
 
-test("catalog with no cached menu shows an explicit unavailable message", async ({ page }) => {
+test("a tablet that has never reached the server shows the menu the app ships with", async ({ page }) => {
+  // A freshly installed tablet has no cache and, until someone configures the
+  // API address, no server either. It used to invent 15 demo dishes whose ids
+  // the server had never issued, so anything ordered from them was rejected for
+  // good on reconnect; then it showed nothing at all. It now ships the real
+  // seeded catalogue, which is why the SKU below has to be one the server
+  // actually serves.
   await page.unroute("**/api/catalog");
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "offline" }) }));
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.getByRole("button", { name: /开始点餐/ }).click();
-  await expect(page.locator(".stack .empty")).toContainText("菜单暂时不可用");
-  await expect(page.locator(".dish-card")).toHaveCount(0);
+
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  expect(await page.locator(".dish-card").count()).toBeGreaterThan(100);
+  await expect(page.locator(".dish-card .number").first()).toHaveText("R1");
+  await expect(page.locator(".local-board-note")).toContainText("离线菜单");
 });
 
 // The CSS prefers-reduced-motion block cannot reach motion/react's JS-driven
@@ -313,44 +322,35 @@ test("layout keeps main controls visible", async ({ page }) => {
   await expect(page.locator(".topbar")).toBeInViewport();
 });
 
-test("the panel header switcher sits beside the title instead of over it", async ({ page }) => {
-  // The switcher was laid out in a 56px grid track and centred inside it, so
-  // three ~250px pills overflowed the track both ways: on a 412px phone the
-  // first covered the title and the last ended at x=489, off the screen.
-  // Measure the buttons, not the .langs box — the box stays inside the track
-  // whatever its children do, which is why nothing caught this.
-  for (const [pill, title] of [["中文", /订单状态/], ["Deutsch", /Bestellstatus/], ["English", /Order status/]]) {
-    await page.getByRole("button", { name: pill }).click();
-    await page.getByRole("button", { name: title }).click();
-    const head = page.locator("#orders .panel-head");
+test("the language is chosen once on the home screen, not again inside every panel", async ({ page }) => {
+  // The switcher used to be repeated in the cart and order-status headers,
+  // where it both asked a question already answered and overlapped the title:
+  // its three pills were centred in a 56px grid track, so on a 412px screen
+  // 中文 sat across the heading and English ended 77px off the right edge.
+  await page.getByRole("button", { name: "Deutsch" }).click();
+
+  for (const open of [
+    async () => page.getByRole("button", { name: /Bestellstatus/ }).click(),
+    async () => { await page.getByRole("button", { name: /Bestellen/ }).click(); await page.locator(".cartbar").click(); }
+  ]) {
+    await open();
+    const head = page.locator(".screen.active .panel-head");
     await expect(head).toBeVisible();
+    await expect(head.locator(".langs")).toHaveCount(0);
 
+    // The heading keeps the whole width between the two 56px edge tracks.
     const layout = await head.evaluate((node) => {
-      const header = node.getBoundingClientRect();
-      return {
-        heading: node.querySelector("h2").getBoundingClientRect().right,
-        clipped: node.querySelector("h2").scrollWidth > node.querySelector("h2").clientWidth,
-        header: { top: header.top, bottom: header.bottom },
-        pills: [...node.querySelectorAll(".langs button")].map((button) => {
-          const box = button.getBoundingClientRect();
-          return { label: button.getAttribute("aria-label"), left: box.left, right: box.right, top: box.top, bottom: box.bottom };
-        })
-      };
+      const box = node.getBoundingClientRect();
+      const heading = node.querySelector("h2");
+      return { clipped: heading.scrollWidth > heading.clientWidth, width: box.width };
     });
-    const width = page.viewportSize().width;
-
-    for (const pillBox of layout.pills) {
-      expect(pillBox.left, `${pillBox.label} starts off-screen`).toBeGreaterThanOrEqual(0);
-      expect(pillBox.right, `${pillBox.label} runs past the right edge`).toBeLessThanOrEqual(width);
-      expect(pillBox.left, `${pillBox.label} overlaps the title`).toBeGreaterThanOrEqual(layout.heading);
-      // Vertical too: a stray `min-height` once stretched these to 120px inside
-      // an 82px header, and a horizontal-only check said nothing.
-      expect(pillBox.top, `${pillBox.label} is cut off at the top`).toBeGreaterThanOrEqual(layout.header.top);
-      expect(pillBox.bottom, `${pillBox.label} is cut off at the bottom`).toBeLessThanOrEqual(layout.header.bottom);
-    }
-    // The title column is wide enough for the title, rather than clipping it.
     expect(layout.clipped).toBe(false);
+    expect(layout.width).toBe(page.viewportSize().width);
 
-    await head.locator(".back").click();
+    await page.locator(".screen.active .back").click();
+    if (await page.locator("#menu.active").count()) await page.locator(".screen.active .back").click();
   }
+
+  // And it is still there where it belongs.
+  await expect(page.locator("#home .langs button")).toHaveCount(3);
 });

@@ -15,5 +15,5 @@
     { "path": "../../packages/api-client/tsconfig.json" },
     { "path": "../../packages/native-bridge/tsconfig.json" }
   ],
-  "include": ["src"]
+  "include": ["src", "src/**/*.json"]
 }

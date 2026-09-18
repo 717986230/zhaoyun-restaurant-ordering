@@ -27,7 +27,8 @@
     "cap:sync": "cap sync android",
     "android:debug": "cd android && ./gradlew assembleDebug",
     "android:release": "cd android && ./gradlew assembleRelease",
-    "package:source": "zip -FS -r dist/zhaoyun-ordering-v0.4.0-source.zip . -x 'node_modules/*' '.npm-cache/*' 'android/.gradle/*' 'android/app/build/*' 'android/capacitor-cordova-android-plugins/build/*' 'android/local.properties' 'server/data/*' 'server/uploads/*' 'dist/*' 'apps/*/dist/*' 'packages/*/dist/*' 'apps/*/tsconfig.tsbuildinfo' 'packages/*/tsconfig.tsbuildinfo' 'test-results/*' 'playwright-report/*' 'sources/*' 'AGENTS.md' '.git/*' '.DS_Store'"
+    "package:source": "zip -FS -r dist/zhaoyun-ordering-v0.4.0-source.zip . -x 'node_modules/*' '.npm-cache/*' 'android/.gradle/*' 'android/app/build/*' 'android/capacitor-cordova-android-plugins/build/*' 'android/local.properties' 'server/data/*' 'server/uploads/*' 'dist/*' 'apps/*/dist/*' 'packages/*/dist/*' 'apps/*/tsconfig.tsbuildinfo' 'packages/*/tsconfig.tsbuildinfo' 'test-results/*' 'playwright-report/*' 'sources/*' 'AGENTS.md' '.git/*' '.DS_Store'",
+    "catalog:bundle": "node scripts/bundle-catalog.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
