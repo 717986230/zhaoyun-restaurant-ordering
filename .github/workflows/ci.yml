@@ -35,8 +35,15 @@ jobs:
       - name: Server integration tests
         run: npm run server:test
 
+
       - name: Web build
         run: npm run build
+
+      # The same contract suite the Node server just passed, run against the
+      # Worker on a local D1 — workerd and the real D1 engine, so it needs no
+      # Cloudflare credentials and runs on every pull request.
+      - name: Worker contract on D1
+        run: npm run worker:test
 
       - name: Production dependency audit
         run: npm audit --omit=dev

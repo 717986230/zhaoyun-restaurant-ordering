@@ -3,119 +3,13 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { photoMenuDishes } from "./photo-menu.mjs";
+import {
+  assertOrderTransition, assertRequestTransition, boundedLimit, mapProduct, normalizePrinter,
+  normalizeProduct, now, orderProductIds, orderView, parseJson, planOrder, planPrintFailure,
+  printerView, serviceRequestView
+} from "../shared/rules.mjs";
 
-const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
-const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
-const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
-const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
 const SCHEMA_VERSION = 3;
-const ORDER_TRANSITIONS = new Map([
-  ["new", new Set(["preparing", "cancelled"])],
-  ["preparing", new Set(["ready", "cancelled"])],
-  ["ready", new Set(["completed", "cancelled"])],
-  ["completed", new Set()],
-  ["cancelled", new Set()]
-]);
-const REQUEST_TRANSITIONS = new Map([
-  ["open", new Set(["acknowledged", "completed", "cancelled"])],
-  ["acknowledged", new Set(["completed", "cancelled"])],
-  ["completed", new Set()],
-  ["cancelled", new Set()]
-]);
-
-function now() {
-  return new Date().toISOString();
-}
-
-function bool(value, fallback = true) {
-  if (value === undefined) return fallback ? 1 : 0;
-  return value ? 1 : 0;
-}
-
-function priceToCents(value) {
-  const cents = Math.round(Number(value) * 100);
-  if (!Number.isFinite(cents) || cents < 0) throw new Error("Price must be a positive number");
-  return cents;
-}
-
-function parseJson(value, fallback) {
-  try {
-    return value ? JSON.parse(value) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function mapProduct(row, media = []) {
-  return {
-    id: row.id,
-    sku: row.sku,
-    kind: row.kind,
-    category: row.category,
-    names: { zh: row.name_zh, de: row.name_de, en: row.name_en },
-    description: row.description,
-    price: row.price_cents / 100,
-    allergens: parseJson(row.allergens_json, []),
-    details: {
-      time: row.prep_time,
-      people: row.portion,
-      level: row.level,
-      ingredients: row.ingredients
-    },
-    appearance: {
-      art: row.art,
-      pattern: row.pattern
-    },
-    modifiers: parseJson(row.modifiers_json, []),
-    available: Boolean(row.available),
-    published: Boolean(row.published),
-    sortOrder: row.sort_order,
-    printStation: row.print_station,
-    media: media.map((item) => ({
-      id: item.id,
-      type: item.type,
-      url: item.url,
-      posterUrl: item.poster_url,
-      sortOrder: item.sort_order
-    })),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function normalizeProduct(input, current = {}) {
-  const names = input.names || {};
-  const details = input.details || {};
-  const appearance = input.appearance || {};
-  const kind = input.kind || current.kind || "food";
-  const printStation = input.printStation || current.print_station || (kind === "drink" ? "bar" : kind === "sushi" ? "sushi" : "kitchen");
-  if (!PRODUCT_KINDS.has(kind)) throw new Error("Unsupported product kind");
-  if (!PRINT_STATIONS.has(printStation)) throw new Error("Unsupported print station");
-
-  return {
-    id: String(input.id || current.id || randomUUID()),
-    sku: String(input.sku || current.sku || "").trim(),
-    kind,
-    category: String(input.category || current.category || "OTHER").trim().replace(/\s+/g, " ").toUpperCase(),
-    nameZh: String(names.zh ?? input.nameZh ?? current.name_zh ?? "").trim(),
-    nameDe: String(names.de ?? input.nameDe ?? current.name_de ?? "").trim(),
-    nameEn: String(names.en ?? input.nameEn ?? current.name_en ?? "").trim(),
-    description: String(input.description ?? current.description ?? "").trim(),
-    priceCents: input.price === undefined ? current.price_cents ?? 0 : priceToCents(input.price),
-    allergensJson: JSON.stringify(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, [])),
-    prepTime: String(details.time ?? current.prep_time ?? "").trim(),
-    portion: String(details.people ?? current.portion ?? "").trim(),
-    level: String(details.level ?? current.level ?? "").trim(),
-    ingredients: String(details.ingredients ?? current.ingredients ?? "").trim(),
-    art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#384c3f,#151817 75%)"),
-    pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
-    modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
-    available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
-    published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
-    sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
-    printStation
-  };
-}
 
 export function createDatabase(databasePath) {
   mkdirSync(path.dirname(databasePath), { recursive: true });
@@ -301,8 +195,6 @@ export function createDatabase(databasePath) {
     const current = id ? statements.productById.get(String(id)) : null;
     if (id && !current) return null;
     const product = normalizeProduct({ ...input, id: id || input.id }, current || {});
-    if (!product.sku) product.sku = `ITEM-${product.id.slice(0, 8).toUpperCase()}`;
-    if (!product.nameZh && !product.nameDe && !product.nameEn) throw new Error("At least one product name is required");
     const timestamp = now();
     if (current) {
       statements.updateProduct.run(
@@ -337,116 +229,55 @@ export function createDatabase(databasePath) {
     return getProduct(productId);
   }
 
-  function orderView(row) {
-    if (!row) return null;
-    return {
-      id: row.id,
-      no: row.order_no,
-      clientRequestId: row.client_request_id,
-      table: row.table_no,
-      status: row.status,
-      note: row.note,
-      total: row.total_cents / 100,
-      items: statements.orderItems.all(row.id).map((item) => ({
-        id: item.product_id,
-        name: item.product_name,
-        qty: item.quantity,
-        unitPrice: item.unit_price_cents / 100,
-        printStation: item.print_station,
-        modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
-      })),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
-  }
-
-  function resolveModifiers(product, requested = []) {
-    const groups = parseJson(product.modifiers_json, []);
-    const options = new Map(groups.flatMap((group) => group.options.map((option) => [option.id, { ...option, groupId: group.id, selection: group.selection }] )));
-    const selected = [];
-    const selectedGroups = new Map();
-    for (const request of Array.isArray(requested) ? requested : []) {
-      const option = options.get(String(request.id));
-      if (!option) throw new Error(`Modifier ${request.id} is not available for ${product.sku}`);
-      const count = (selectedGroups.get(option.groupId) || 0) + 1;
-      if (option.selection === "single" && count > 1) throw new Error(`Only one modifier is allowed for ${option.groupId}`);
-      if (selected.some((item) => item.id === option.id)) throw new Error(`Duplicate modifier ${option.id}`);
-      selectedGroups.set(option.groupId, count);
-      selected.push({ id: option.id, name: option.names.zh, names: option.names, priceCents: Number(option.priceCents) || 0 });
-    }
-    return selected;
+  function viewOrder(row) {
+    return row ? orderView(row, statements.orderItems.all(row.id)) : null;
   }
 
   function createOrder(input) {
-    const requestId = String(input.clientRequestId || randomUUID());
-    const existing = statements.orderByClientId.get(requestId);
-    if (existing) return orderView(existing);
-    const table = String(input.table || "").trim();
-    if (!table) throw new Error("Order requires a table number");
-    if (!Array.isArray(input.items) || !input.items.length) throw new Error("Order requires at least one item");
+    const requestId = String(input.clientRequestId || "");
+    if (requestId) {
+      const existing = statements.orderByClientId.get(requestId);
+      if (existing) return viewOrder(existing);
+    }
 
-    const resolvedItems = input.items.map((item) => {
-      const product = statements.productById.get(String(item.id));
-      const quantity = Number(item.qty);
-      if (!product || !product.published || !product.available) throw new Error(`Product ${item.id} is unavailable`);
-      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error("Invalid item quantity");
-      const modifiers = resolveModifiers(product, item.modifiers);
-      const modifierTotalCents = modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);
-      return { product, quantity, modifiers, unitPriceCents: product.price_cents + modifierTotalCents };
-    });
-    const totalCents = resolvedItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
-    const id = randomUUID();
-    const timestamp = now();
-    const orderNo = `${timestamp.slice(2, 10).replaceAll("-", "")}-${id.slice(0, 5).toUpperCase()}`;
+    const products = new Map();
+    for (const productId of orderProductIds(input)) {
+      const row = statements.productById.get(productId);
+      if (row) products.set(productId, row);
+    }
+    const plan = planOrder(input, products);
 
     db.exec("BEGIN IMMEDIATE");
     try {
-      const committed = statements.orderByClientId.get(requestId);
+      // Re-read inside the transaction: two tablets retrying the same queued
+      // order is exactly the case this id exists for.
+      const committed = statements.orderByClientId.get(plan.clientRequestId);
       if (committed) {
         db.exec("COMMIT");
-        return orderView(committed);
+        return viewOrder(committed);
       }
-      statements.insertOrder.run(id, orderNo, requestId, table, String(input.note || "").trim(), totalCents, timestamp, timestamp);
-      const jobs = new Map();
-      for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {
-        const productName = product.name_zh || product.name_de || product.name_en;
-        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers));
-        const stationItems = jobs.get(product.print_station) || [];
-        stationItems.push({ sku: product.sku, name: productName, names: { zh: product.name_zh, de: product.name_de, en: product.name_en }, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names, price: modifier.priceCents / 100 })) });
-        jobs.set(product.print_station, stationItems);
+      const { id, orderNo, clientRequestId, table, note, totalCents, timestamp } = plan.order;
+      statements.insertOrder.run(id, orderNo, clientRequestId, table, note, totalCents, timestamp, timestamp);
+      for (const item of plan.items) {
+        statements.insertOrderItem.run(item.id, item.orderId, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson);
       }
-      for (const [station, items] of jobs) {
-        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table, note: String(input.note || ""), items }), timestamp, timestamp);
+      for (const job of plan.printJobs) {
+        statements.insertPrintJob.run(job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp);
       }
       db.exec("COMMIT");
+      return viewOrder(statements.orderById.get(id));
     } catch (error) {
       db.exec("ROLLBACK");
       throw error;
     }
-    return orderView(statements.orderById.get(id));
   }
 
   function updateOrder(id, status) {
-    if (!ORDER_STATUSES.has(status)) throw new Error("Unsupported order status");
     const current = statements.orderById.get(String(id));
     if (!current) return null;
-    if (current.status !== status && !ORDER_TRANSITIONS.get(current.status)?.has(status)) {
-      throw new Error(`Invalid order transition: ${current.status} -> ${status}`);
-    }
+    assertOrderTransition(current.status, status);
     statements.updateOrderStatus.run(status, now(), String(id));
-    return orderView(statements.orderById.get(String(id)));
-  }
-
-  function serviceRequestView(row) {
-    if (!row) return null;
-    return {
-      id: row.id,
-      table: row.table_no,
-      serviceType: row.type,
-      status: row.status,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
+    return viewOrder(statements.orderById.get(String(id)));
   }
 
   function createServiceRequest(input) {
@@ -459,49 +290,17 @@ export function createDatabase(databasePath) {
   }
 
   function updateServiceRequest(id, status) {
-    if (!REQUEST_STATUSES.has(status)) throw new Error("Unsupported service request status");
     const current = statements.requestById.get(String(id));
     if (!current) return null;
-    if (current.status !== status && !REQUEST_TRANSITIONS.get(current.status)?.has(status)) {
-      throw new Error(`Invalid service request transition: ${current.status} -> ${status}`);
-    }
+    assertRequestTransition(current.status, status);
     statements.updateRequest.run(status, now(), String(id));
     return serviceRequestView(statements.requestById.get(String(id)));
-  }
-
-  function printerView(row) {
-    if (!row) return null;
-    return {
-      id: row.id,
-      name: row.name,
-      transport: row.transport,
-      address: row.address,
-      port: row.port,
-      role: row.role,
-      enabled: Boolean(row.enabled),
-      capabilities: parseJson(row.capabilities_json, {}),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
   }
 
   function savePrinter(input, id) {
     const current = id ? statements.printerById.get(String(id)) : null;
     if (id && !current) return null;
-    const printer = {
-      id: String(id || input.id || randomUUID()),
-      name: String(input.name ?? current?.name ?? "").trim(),
-      transport: String(input.transport ?? current?.transport ?? "lan"),
-      address: String(input.address ?? current?.address ?? "").trim(),
-      port: input.port === null ? null : Number(input.port ?? current?.port ?? 9100),
-      role: String(input.role ?? current?.role ?? "front"),
-      enabled: bool(input.enabled, current ? Boolean(current.enabled) : true),
-      capabilities: JSON.stringify(input.capabilities ?? parseJson(current?.capabilities_json, {}))
-    };
-    if (!printer.name || !printer.address) throw new Error("Printer name and address are required");
-    if (!["lan", "bluetooth", "usb"].includes(printer.transport)) throw new Error("Unsupported printer transport");
-    if (!PRINT_STATIONS.has(printer.role)) throw new Error("Unsupported printer role");
-    if (printer.port !== null && (!Number.isInteger(printer.port) || printer.port < 1 || printer.port > 65535)) throw new Error("Printer port must be between 1 and 65535");
+    const printer = normalizePrinter({ ...input, id: id || input.id }, current);
     const timestamp = now();
     if (current) {
       statements.updatePrinter.run(printer.name, printer.transport, printer.address, printer.port, printer.role, printer.enabled, printer.capabilities, timestamp, printer.id);
@@ -559,16 +358,16 @@ export function createDatabase(databasePath) {
     deleteProduct: (id) => statements.deleteProduct.run(String(id)).changes > 0,
     addMedia,
     deleteMedia: (id) => statements.deleteMedia.run(String(id)).changes > 0,
-    listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),
+    listOrders: (limit = 100) => statements.listOrders.all(boundedLimit(limit)).map(viewOrder),
     createOrder,
     updateOrder,
-    listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
+    listServiceRequests: (limit = 100) => statements.listRequests.all(boundedLimit(limit)).map(serviceRequestView),
     createServiceRequest,
     updateServiceRequest,
     listPrinters: () => statements.listPrinters.all().map(printerView),
     savePrinter,
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
-    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) })),
+    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), boundedLimit(limit)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) })),
     claimPrintJob: (role, workerId, leaseMs = 30_000) => {
       const timestamp = now();
       const leaseUntil = new Date(Date.now() + leaseMs).toISOString();
@@ -588,9 +387,7 @@ export function createDatabase(databasePath) {
     failPrintJob: (id, workerId, error, maxAttempts = 5) => {
       const current = statements.printJobById.get(String(id));
       if (!current || current.claimed_by !== String(workerId)) return false;
-      const attempts = Number(current.attempts || 0) + 1;
-      const status = attempts >= maxAttempts ? "failed" : "retry-wait";
-      const nextAttemptAt = status === "failed" ? null : new Date(Date.now() + Math.min(300_000, 2_000 * 2 ** Math.min(attempts, 7))).toISOString();
+      const { status, nextAttemptAt } = planPrintFailure(current.attempts, maxAttempts);
       return statements.failPrintJob.run(status, String(error).slice(0, 1000), nextAttemptAt, now(), String(id), String(workerId)).changes > 0;
     },
     retryPrintJob: (id) => statements.retryPrintJob.run(now(), String(id)).changes > 0,

@@ -1,11 +1,21 @@
 name = "zhaoyun-ordering"
+account_id = "567821d20c9f5cb759b0b218d0ba0c39"
+main = "workers/index.mjs"
 compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
 
-# Fill database_id in from `wrangler d1 create zhaoyun-ordering`. The name is
-# only a label; the id is what binds this project to your database, and it is
-# not a secret — it identifies the database, it does not grant access to it.
+# The built web app ships with the Worker, so one deployment serves both and the
+# tablets have no separate API address to configure.
+[assets]
+directory = "dist/web"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# The account and database ids identify resources; neither grants access to
+# them, so both belong in the repository. The credential is CLOUDFLARE_API_TOKEN,
+# which lives only in a repository secret.
 [[d1_databases]]
 binding = "DB"
 database_name = "zhaoyun-ordering"
-database_id = "REPLACE_WITH_DATABASE_ID"
+database_id = "8c8d9548-60c3-451d-939d-b5461a89c7ed"
 migrations_dir = "migrations"

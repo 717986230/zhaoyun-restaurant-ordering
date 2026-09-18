@@ -6,7 +6,7 @@ import { pipeline } from "node:stream/promises";
 import {
   CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
   ProductBody, ServiceRequestBody, ServiceStatusBody
-} from "./schemas.mjs";
+} from "../shared/schemas.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
