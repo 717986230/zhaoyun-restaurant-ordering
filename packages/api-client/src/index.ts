@@ -66,7 +66,8 @@ export class ApiError extends Error {
 
 export class AdminApi {
   get storage(): AdminStorage {
-    const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : location.origin;
+    const built = import.meta.env?.VITE_API_BASE?.replace(/\/+$/, "");
+    const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : built || location.origin;
     return {
       baseUrl: localStorage.getItem("zy_api_base") || fallback,
       token: sessionStorage.getItem("zy_admin_token") || ""

@@ -4,7 +4,11 @@ import type { Product } from "@zhaoyun/domain";
 import { tableNo, tableToken } from "./table";
 
 export function apiBaseUrl(): string {
-  const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : location.origin;
+  // A device configured by hand wins; then the address baked in at build time;
+  // then the origin, which inside the Capacitor shell is localhost and has
+  // nothing listening on it.
+  const built = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+  const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : built || location.origin;
   return localStorage.getItem("zy_api_base") || fallback;
 }
 
