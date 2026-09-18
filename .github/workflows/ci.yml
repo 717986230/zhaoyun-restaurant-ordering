@@ -68,6 +68,8 @@ jobs:
   android:
     name: Android debug APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     # The APK is the artefact the restaurant actually installs, so it is built
     # from the same commit the checks above ran on.
     needs: checks
@@ -130,3 +132,20 @@ jobs:
           name: zhaoyun-ordering-debug-apk
           path: dist/apk/*.apk
           retention-days: 30
+
+      # Also attach it to a rolling prerelease. An Actions artifact is a zip
+      # behind a login and is served from storage some networks cannot reach; a
+      # release asset is the apk itself, on a stable link, and replaces the
+      # previous one so the tag always means "the latest build of this branch".
+      - name: Publish the APK as a rolling prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          tag="apk-$(echo "$GITHUB_REF_NAME" | tr '/' '-')"
+          gh release delete "$tag" --cleanup-tag --yes || true
+          gh release create "$tag" dist/apk/*.apk \
+            --prerelease \
+            --target "$COMMIT" \
+            --title "Debug APK (${COMMIT:0:7})" \
+            --notes "Debug-signed build of ${COMMIT:0:7}. Replaced on every build of this branch."
