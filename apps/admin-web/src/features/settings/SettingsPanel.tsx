@@ -1,5 +1,7 @@
 import type { FormEvent } from "react";
+import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable } from "@zhaoyun/api-client";
+import { TableCards } from "./TableCards";
 
 interface Props {
   storage: AdminStorage;
@@ -24,6 +26,8 @@ function entryUrl(baseUrl: string, table: RestaurantTable): string {
 }
 
 export function SettingsPanel(props: Props) {
+  const [showCards, setShowCards] = useState(false);
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -55,6 +59,12 @@ export function SettingsPanel(props: Props) {
       </div>
       <button className="primary-action" type="submit">登记桌台</button>
     </form>
+    {props.tables.length > 0 && <div className="table-cards-launch">
+      <button className="ghost-action" onClick={() => setShowCards(true)}>生成桌卡（二维码，可打印）</button>
+      <small>客人用自己的手机扫码进入，桌号和令牌随链接带上。同一个链接写进 NFC 标签也可以，安卓碰一下就会打开。</small>
+    </div>}
+    {showCards && <TableCards tables={props.tables} entryUrl={(table) => entryUrl(props.storage.baseUrl, table)} onClose={() => setShowCards(false)} />}
+
     <div className="table-list">{props.tables.length ? props.tables.map((table) => <div className="table-row" key={table.table}>
       <div><b>桌 {table.table}</b>{table.label && <small> · {table.label}</small>}<code>{entryUrl(props.storage.baseUrl, table)}</code></div>
       <div className="table-row-actions">

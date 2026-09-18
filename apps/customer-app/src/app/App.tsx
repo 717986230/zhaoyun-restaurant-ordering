@@ -32,12 +32,18 @@ function HomeScreen({ onAdminTap, dispatch, language }: { onAdminTap: () => Prom
 
   return <section id="home" className="screen home active">
     <button className="brand brand-button" onClick={() => void onAdminTap()}><small>ZHAO YUN RESTAURANT</small><h1>赵云</h1><p>{t(language, "table")} {table.tableNo}</p></button>
-    <div className="table-setup"><button className={`table-button ${table.configured ? "" : "unset"}`} onClick={changeTable}>{t(language, "setTable")} · {table.tableNo}</button>{!table.configured && <small>{t(language, "tableUnset")}</small>}</div>
+    {/* A table that arrived from a scanned card needs no setting, so the control
+        only appears when the device has not been told which table it is. */}
+    {!table.configured && <div className="table-setup"><button className="table-button unset" onClick={changeTable}>{t(language, "setTable")} · {table.tableNo}</button><small>{t(language, "tableUnset")}</small></div>}
     <div className="home-actions">
-      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "menu" })}><span>01</span><b>{t(language, "start")}</b><small>SPEISEKARTE</small></button>
-      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "orders" })}><span>02</span><b>{t(language, "orders")}</b><small>MEINE BESTELLUNG</small></button>
-      <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "service" })}><span>03</span><b>{t(language, "service")}</b><small>SERVICE RUFEN</small></button>
-      <button className="home-btn staff-link" onClick={() => dispatch({ type: "navigate", screen: "staff" })}><span>04</span><b>{t(language, "staff")}</b><small>MITARBEITER</small></button>
+      <button className="home-btn home-lead" onClick={() => dispatch({ type: "navigate", screen: "menu" })}><b>{t(language, "start")}</b><small>SPEISEKARTE</small></button>
+      <div className="home-secondary">
+        <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "service" })}><b>{t(language, "service")}</b><small>SERVICE RUFEN</small></button>
+        <button className="home-btn" onClick={() => dispatch({ type: "navigate", screen: "orders" })}><b>{t(language, "orders")}</b><small>MEINE BESTELLUNG</small></button>
+      </div>
+      {/* Staff still need this, guests never do: same control, no longer
+          competing with the two things a guest came here to do. */}
+      <button className="staff-link" onClick={() => dispatch({ type: "navigate", screen: "staff" })}>{t(language, "staff")}</button>
     </div>
     <LanguageSwitcher language={language} dispatch={dispatch} />
   </section>;

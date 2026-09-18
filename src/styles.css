@@ -127,6 +127,43 @@ html.plt-android .screen.active {
   margin: 0 auto;
 }
 
+.home-secondary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* Its own name, not `primary`: that class already paints a gold fill for the
+   cart and detail buttons, and inheriting it put a gold subtitle on a gold
+   card. The lead action is the gold one here on purpose, with the contrast set
+   deliberately rather than picked up by accident. */
+.home-btn.home-lead {
+  min-height: 132px;
+  border-color: var(--accent);
+  background: linear-gradient(140deg, rgba(214, 180, 127, 0.22), rgba(36, 29, 25, 0.98) 72%);
+}
+
+.home-btn.home-lead b {
+  font-size: clamp(24px, 5.2vw, 34px);
+  color: var(--ink);
+}
+
+.home-btn.home-lead small {
+  color: var(--accent);
+}
+
+.staff-link {
+  justify-self: center;
+  margin-top: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  padding: 10px 14px;
+  opacity: 0.72;
+}
+
 .home-btn {
   min-height: 92px;
   border: 1px solid rgba(185, 154, 112, 0.52);
@@ -134,7 +171,6 @@ html.plt-android .screen.active {
   background: linear-gradient(140deg, rgba(47, 39, 35, 0.98), rgba(24, 20, 18, 0.98));
   color: var(--ink);
   display: grid;
-  grid-template-columns: 48px 1fr;
   align-content: center;
   text-align: left;
   padding: 18px;

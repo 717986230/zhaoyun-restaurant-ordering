@@ -379,3 +379,24 @@ test("the kiosk table number travels with the order", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".brand p")).toContainText("21");
 });
+
+test("the platform class is set, and it is what turns the expensive blur off", async ({ page }) => {
+  // `html.plt-android` rules were written and never applied: the class is
+  // Ionic's convention and this app is bare Capacitor, so nothing set it. The
+  // consequence was a real-time blur(3px) over the whole card stack on every
+  // dish tap, on exactly the hardware least able to afford it.
+  await expect(page.locator("html")).toHaveClass(/\bplt-/);
+
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await page.locator(".dish-card").first().click();
+  const stack = page.locator("#stack");
+  await expect(page.locator(".menu.detail-open")).toBeVisible();
+
+  const onWeb = await stack.evaluate((node) => getComputedStyle(node).filter);
+  expect(onWeb, "a browser keeps the blur").toContain("blur");
+
+  // Prove the override the tablet relies on, without a tablet.
+  await page.evaluate(() => document.documentElement.classList.add("plt-android"));
+  const onAndroid = await stack.evaluate((node) => getComputedStyle(node).filter);
+  expect(onAndroid, "the Android rule must drop the blur").toBe("none");
+});

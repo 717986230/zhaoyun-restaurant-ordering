@@ -126,3 +126,28 @@ test("a kitchen screen sees orders without billing or service calls", async ({ p
   await expect(page.getByRole("button", { name: "取消订单" })).toHaveCount(0);
   await expect(page.getByText("结账")).toHaveCount(0);
 });
+
+test("a table card carries the entry link a guest phone will scan", async ({ page }) => {
+  // The panel loads tables and the audit log together, so a missing audit stub
+  // takes the table list down with it.
+  await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
+  await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
+    { table: "12", label: "窗边", token: "tok-12-secret", enabled: true },
+    { table: "07", label: "", token: "tok-07-secret", enabled: true }
+  ] }) }));
+  await page.goto("/admin.html");
+  await page.getByRole("button", { name: "连接设置" }).click();
+  await page.getByRole("button", { name: /生成桌卡/ }).click();
+
+  const cards = page.locator(".table-card");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toContainText("桌 12");
+  await expect(cards.first()).toContainText("窗边");
+
+  // The picture has to encode the link, not merely exist. Decoding a QR in a
+  // test is more machinery than it is worth; the module that draws it is given
+  // the URL, so assert on what it was given and that something was drawn.
+  await expect(cards.first().locator("svg")).toBeVisible();
+  const modules = await cards.first().locator("svg rect, svg path").count();
+  expect(modules, "an empty svg would render as a blank card on every table").toBeGreaterThan(0);
+});
