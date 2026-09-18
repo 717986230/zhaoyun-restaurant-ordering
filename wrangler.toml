@@ -1,0 +1,11 @@
+name = "zhaoyun-ordering"
+compatibility_date = "2026-09-01"
+
+# Fill database_id in from `wrangler d1 create zhaoyun-ordering`. The name is
+# only a label; the id is what binds this project to your database, and it is
+# not a secret — it identifies the database, it does not grant access to it.
+[[d1_databases]]
+binding = "DB"
+database_name = "zhaoyun-ordering"
+database_id = "REPLACE_WITH_DATABASE_ID"
+migrations_dir = "migrations"

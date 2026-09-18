@@ -15,3 +15,4 @@ dist/web/
 test-results/
 playwright-report/
 *.tsbuildinfo
+.wrangler/

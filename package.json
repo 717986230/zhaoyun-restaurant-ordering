@@ -28,7 +28,8 @@
     "android:debug": "cd android && ./gradlew assembleDebug",
     "android:release": "cd android && ./gradlew assembleRelease",
     "package:source": "zip -FS -r dist/zhaoyun-ordering-v0.4.0-source.zip . -x 'node_modules/*' '.npm-cache/*' 'android/.gradle/*' 'android/app/build/*' 'android/capacitor-cordova-android-plugins/build/*' 'android/local.properties' 'server/data/*' 'server/uploads/*' 'dist/*' 'apps/*/dist/*' 'packages/*/dist/*' 'apps/*/tsconfig.tsbuildinfo' 'packages/*/tsconfig.tsbuildinfo' 'test-results/*' 'playwright-report/*' 'sources/*' 'AGENTS.md' '.git/*' '.DS_Store'",
-    "catalog:bundle": "node scripts/bundle-catalog.mjs"
+    "catalog:bundle": "node scripts/bundle-catalog.mjs",
+    "d1:migrations": "node scripts/export-d1-migrations.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
@@ -56,6 +57,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "typescript": "^5.9.2",
     "vite": "^5.4.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.134.0"
   }
 }
