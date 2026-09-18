@@ -48,15 +48,15 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
         totalCents: Math.round(order.total * 100),
         createdAt: order.createdAt
       } });
-      dispatch({ type: "toast", message: "订单已提交" });
+      dispatch({ type: "toast", message: t(state.language, "orderPlaced") });
     } catch (error) {
       const retryable = !(error instanceof ApiError) || error.status >= 500;
       if (retryable) {
         dispatch({ type: "order-queued", order: { ...baseOrder, status: "sync-failed" }, command });
-        dispatch({ type: "toast", message: "服务器离线，订单已保存并等待自动重试" });
+        dispatch({ type: "toast", message: t(state.language, "orderQueued") });
       } else {
         dispatch({ type: "order-created", order: { ...baseOrder, status: "sync-failed" } });
-        dispatch({ type: "toast", message: "订单未被接受，请检查菜品或购物车" });
+        dispatch({ type: "toast", message: t(state.language, "orderRejected") });
       }
     } finally {
       setSubmitting(false);
@@ -67,10 +67,10 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
     <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>{t(state.language, "cart")}</h2><small>WARENKORB</small></div><LanguageSwitcher language={state.language} dispatch={dispatch} /></header>
     <div id="cartContent" className="content">{entries.length ? <>
       {entries.map(({ product, quantity, modifiers }) => <div className="row" key={`${product.id}-${modifiers.map((modifier) => modifier.id).join(",")}`}><div><h3>{productName(product, state.language)}</h3><small>{product.names.de} × {quantity}</small>{modifiers.length > 0 && <small className="modifier-summary">{modifiers.map((modifier) => modifier.name).join(" · ")}</small>}</div><strong>{formatEuro((product.priceCents + modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0)) * quantity)}</strong></div>)}
-      <label className="note-label">{t(state.language, "note")}<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder={state.language === "zh" ? "例如：少盐、不要香菜" : state.language === "de" ? "z. B. wenig Salz" : "e.g. less salt"} /></label>
+      <label className="note-label">{t(state.language, "note")}<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t(state.language, "notePlaceholder")} /></label>
       <div className="total"><span>{t(state.language, "total")}</span><b>{formatEuro(summary.totalCents)}</b></div>
       <button id="submitOrder" className="primary" disabled={submitting} onClick={submitOrder}>{submitting ? "…" : t(state.language, "submit")}</button>
-      <button id="clearCart" className="secondary" onClick={() => dispatch({ type: "clear-cart" })}>{state.language === "zh" ? "清空购物车" : state.language === "de" ? "Warenkorb leeren" : "Clear cart"}</button>
+      <button id="clearCart" className="secondary" onClick={() => dispatch({ type: "clear-cart" })}>{t(state.language, "clearCart")}</button>
     </> : <div className="empty">{t(state.language, "emptyCart")}<button className="secondary" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>{t(state.language, "backMenu")}</button></div>}</div>
   </section>;
 }

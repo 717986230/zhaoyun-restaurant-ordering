@@ -72,8 +72,8 @@ export interface Order {
 export interface ServiceRequest {
   id: string;
   table: string;
+  /** Resolved to a display name at render time; never stored localized. */
   serviceType: string;
-  label: string;
   status: "open" | "acknowledged" | "completed" | "cancelled";
   createdAt: string;
   pendingSync?: boolean;
@@ -141,3 +141,4 @@ export function formatEuro(cents: number): string {
 }
 
 export { services } from "./seed.js";
+export type { ServiceId } from "./seed.js";

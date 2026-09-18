@@ -62,7 +62,9 @@ test("language switcher changes home and menu copy", async ({ page }) => {
   await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
   await expect(page.locator(".menu .langs")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "English" })).toHaveCount(0);
-  await page.getByRole("button", { name: "返回" }).click();
+  // The back control's accessible name follows the language too — it read 返回
+  // to a German screen-reader user before the labels were translated.
+  await page.getByRole("button", { name: "Zurück" }).click();
   await page.getByRole("button", { name: "English" }).click();
   await page.getByRole("button", { name: /Start order/ }).click();
   await expect(page.locator(".dish-card", { hasText: "Black Pepper Beef Fillet" })).toBeVisible();
@@ -258,6 +260,50 @@ test("detail flip is animated when the device does not ask for reduced motion", 
   // Still in flight at the point the reduced-motion run has already settled.
   await expect(page.locator(".detail-flip-inner")).not.toHaveCSS("transform", flippedTransform, { timeout: 120 });
   await expect(page.locator(".detail-flip-inner")).toHaveCSS("transform", flippedTransform, { timeout: 2000 });
+});
+
+// The app is sold as trilingual for an Austrian restaurant, so a German guest
+// must not meet Chinese anywhere on the path from ordering to order status.
+test("German carries all the way through ordering, status and service", async ({ page }) => {
+  const chinese = /[\u4e00-\u9fa5]/;
+  const readable = (locator) => locator.innerText();
+
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  await page.getByRole("button", { name: /Bestellen/ }).click();
+  await page.locator(".dish-card", { hasText: "Rinderfilet" }).click();
+  await page.locator(".dish-detail-card .add").click();
+  await page.getByRole("button", { name: "Vorderseite" }).or(page.locator(".detail-close")).first().click();
+  await page.locator(".cartbar").click();
+
+  // Cart: note placeholder and the clear-cart control.
+  await expect(page.locator("#orderNote")).toHaveAttribute("placeholder", /wenig Salz/);
+  await expect(page.locator("#clearCart")).toHaveText("Warenkorb leeren");
+
+  await page.getByRole("button", { name: /Bestellung bestätigen/ }).click();
+  await page.locator(".screen.active .back").click();
+  await page.locator(".screen.active .back").click();
+
+  // Order status: this is the label that used to read 新订单 in German.
+  await page.getByRole("button", { name: /Bestellstatus/ }).click();
+  await expect(page.locator(".order-head span")).toHaveText("Neu");
+  const orders = await readable(page.locator("#ordersContent"));
+  expect(orders, `Chinese leaked into the German order list:\n${orders}`).not.toMatch(chinese);
+
+  // Service calls: the labels only had Chinese and German before.
+  await page.locator(".screen.active .back").click();
+  await page.getByRole("button", { name: /Service rufen/ }).click();
+  await expect(page.locator("#serviceStatus")).toHaveText("Bitte gewünschten Service wählen");
+  await page.getByRole("button", { name: /Wasser/ }).click();
+  await expect(page.locator("#serviceStatus")).toContainText("Anfrage gesendet");
+  const service = await readable(page.locator("#serviceGrid"));
+  expect(service, `Chinese leaked into the German service grid:\n${service}`).not.toMatch(chinese);
+});
+
+test("English service labels are English, not Chinese with a German subtitle", async ({ page }) => {
+  await page.getByRole("button", { name: "English" }).click();
+  await page.getByRole("button", { name: /Call service/ }).click();
+  const names = await page.locator("#serviceGrid b").allInnerTexts();
+  expect(names).toEqual(["Water", "Cutlery", "Napkins", "To go", "Clear plates", "Pay"]);
 });
 
 test("layout keeps main controls visible", async ({ page }) => {

@@ -46,7 +46,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
       if (event.target === event.currentTarget) dispatch({ type: "close-product" });
     }}>
     <motion.div className="dish-detail-card" data-detail-id={product.id} initial={{ y: 16, scale: 0.985 }} animate={{ y: 0, scale: 1 }} exit={{ y: 10, scale: 0.99 }} transition={{ duration: seconds(DURATION.card), ease: EASE }}>
-      <button className="detail-close" aria-label="关闭详情" onClick={() => dispatch({ type: "close-product" })}>×</button>
+      <button className="detail-close" aria-label={t(state.language, "close")} onClick={() => dispatch({ type: "close-product" })}>×</button>
       <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`} animate={{ rotateY: state.productFlipped ? 180 : 0 }} transition={{ duration: seconds(DURATION.flip), ease: EASE }}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
@@ -84,7 +84,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
             }}>{t(state.language, "add")}</button>
           </div>
         </section>
-        <section className="detail-face detail-back" aria-label="菜品详细信息" onClick={() => dispatch({ type: "toggle-product-flip" })}>
+        <section className="detail-face detail-back" aria-label={t(state.language, "detailRegion")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <button className="flip-back" onClick={(event) => { event.stopPropagation(); dispatch({ type: "toggle-product-flip" }); }}>{t(state.language, "back")}</button>
           <div><small>{product.sku} · {product.category}</small><h3>{productName(product, state.language)}</h3><p>{product.description}</p></div>
           <dl>
@@ -113,7 +113,7 @@ export function CatalogScreen({ state, dispatch, products }: Props) {
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
-      <button className="icon-btn back" aria-label="返回" onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button>
+      <button className="icon-btn back" aria-label={t(state.language, "goBack")} onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button>
       <div className="title"><strong>La Carte</strong><small>TISCH {state.table}</small></div>
       <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
     </header>

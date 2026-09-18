@@ -1,4 +1,4 @@
-import { formatEuro, nextOperationalStatus } from "@zhaoyun/domain";
+import { formatEuro, nextOperationalStatus, services } from "@zhaoyun/domain";
 import type { OrderStatus } from "@zhaoyun/domain";
 import type { ApiOrder, ApiServiceRequest } from "@zhaoyun/contracts";
 
@@ -17,9 +17,10 @@ const orderLabels: Record<ApiOrder["status"], string> = {
 const requestLabels: Record<ApiServiceRequest["status"], string> = {
   open: "待处理", acknowledged: "已响应", completed: "已完成", cancelled: "已取消"
 };
-const serviceLabels: Record<string, string> = {
-  water: "加水", utensils: "餐具", napkin: "纸巾", takeaway: "打包", clear: "收空盘", pay: "结账"
-};
+// The admin console is staff-facing and stays Chinese, but the names come from
+// the same catalogue the guest app renders so the two cannot drift apart.
+const serviceLabels: Record<string, string> =
+  Object.fromEntries(services.map((service) => [service.id, service.names.zh]));
 
 function clockTime(value: string): string {
   return new Date(value).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });

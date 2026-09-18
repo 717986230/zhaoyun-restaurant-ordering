@@ -20,7 +20,8 @@ export interface CustomerState {
   pendingOrders: Record<string, { command: CreateOrderCommand; attempts: number; nextAttemptAt: number }>;
   requests: ServiceRequest[];
   language: "zh" | "de" | "en";
-  serviceMessage: string;
+  /** Last service the guest called, resolved to a name at render time. */
+  lastServiceType: string | null;
   toast: string;
 }
 
@@ -42,7 +43,7 @@ type Action =
   | { type: "order-retry-scheduled"; clientRequestId: string }
   | { type: "order-status"; orderId: string; clientRequestId?: string; status: OrderStatus; totalCents?: number }
   | { type: "advance-order"; orderId: string; status: OrderStatus }
-  | { type: "service-created"; request: ServiceRequest; message: string }
+  | { type: "service-created"; request: ServiceRequest }
   | { type: "service-done"; requestId: string }
   | { type: "language"; language: CustomerState["language"] }
   | { type: "toast"; message: string };
@@ -64,7 +65,7 @@ const initialState: CustomerState = {
   pendingOrders: {},
   requests: [],
   language: "zh",
-  serviceMessage: "请选择需要的服务",
+  lastServiceType: null,
   toast: ""
 };
 
@@ -126,7 +127,7 @@ function reducer(state: CustomerState, action: Action): CustomerState {
         : order)
     };
     case "advance-order": return { ...state, orders: state.orders.map((order) => order.id === action.orderId ? { ...order, status: action.status } : order) };
-    case "service-created": return { ...state, requests: [action.request, ...state.requests], serviceMessage: action.message };
+    case "service-created": return { ...state, requests: [action.request, ...state.requests], lastServiceType: action.request.serviceType };
     case "service-done": return { ...state, requests: state.requests.map((request) => request.id === action.requestId ? { ...request, status: "completed" } : request) };
     case "language": return { ...state, language: action.language };
     case "toast": return { ...state, toast: action.message };
