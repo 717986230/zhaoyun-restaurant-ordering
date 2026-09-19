@@ -6,7 +6,11 @@ import test from "node:test";
 import { buildServer } from "../index.mjs";
 import { contractChecks } from "../../shared/contract-suite.mjs";
 
-const ADMIN_TOKEN = "contract-admin-token-contract-admin-token";
+const TOKENS = {
+  manager: "contract-admin-token-contract-admin-token",
+  staff: "contract-staff-token-contract-staff-token",
+  kitchen: "contract-kitchen-token-contract-kitchen-tok"
+};
 
 /**
  * The shared contract, run against the Fastify server.
@@ -20,7 +24,9 @@ test("Node server satisfies the API contract", async (context) => {
   const app = await buildServer({
     databasePath: path.join(directory, "restaurant.sqlite"),
     uploadDir: path.join(directory, "media"),
-    adminToken: ADMIN_TOKEN,
+    adminToken: TOKENS.manager,
+    staffToken: TOKENS.staff,
+    kitchenToken: TOKENS.kitchen,
     logger: false
   });
   context.after(async () => {
@@ -32,7 +38,7 @@ test("Node server satisfies the API contract", async (context) => {
     const response = await app.inject({
       method,
       url,
-      ...(options.admin ? { headers: { "x-admin-token": ADMIN_TOKEN } } : {}),
+      ...(options.admin || options.role ? { headers: { "x-admin-token": TOKENS[options.role || "manager"] } } : {}),
       ...(options.body ? { payload: options.body } : {})
     });
     let json = {};

@@ -18,6 +18,63 @@ export const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 export const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
 export const PRINTER_TRANSPORTS = new Set(["lan", "bluetooth", "usb"]);
 
+/**
+ * Who may do what.
+ *
+ * Three shared tokens, one per role, and a rank so a route can ask for a
+ * minimum rather than enumerate. A manager outranks a waiter outranks the
+ * kitchen screen, and the catalogue — the menu, its prices and its allergen
+ * declarations — is manager-only on both backends.
+ *
+ * This lives here because it is the one rule that must not differ between the
+ * Node server and the Worker. It did: the Worker had a single token and no
+ * roles at all, so a waiter tablet pointed at the Cloudflare deployment would
+ * have been able to edit the menu. `shared/contract-suite.mjs` now asks both.
+ */
+export const STAFF_ROLES = ["kitchen", "staff", "manager"];
+export const ROLE_RANK = { kitchen: 1, staff: 2, manager: 3 };
+
+/**
+ * `matches(expected)` is the runtime's own constant-time comparison against the
+ * token the request carried — `node:crypto` on the server, a hand-rolled loop
+ * on the Worker — so only the precedence lives here.
+ *
+ * Order matters: the manager token wins, and an unset staff or kitchen token
+ * never matches, so a deployment that configures only ADMIN_TOKEN has exactly
+ * one role rather than three aliases of it.
+ */
+export function resolveStaffRole(matches, tokens = {}) {
+  if (tokens.manager && matches(tokens.manager)) return "manager";
+  if (tokens.staff && matches(tokens.staff)) return "staff";
+  if (tokens.kitchen && matches(tokens.kitchen)) return "kitchen";
+  return null;
+}
+
+export function roleAllows(role, minimumRole) {
+  return Boolean(role) && ROLE_RANK[role] >= ROLE_RANK[minimumRole];
+}
+
+const TABLE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,7}$/;
+
+export function normalizeTableNo(value) {
+  const table = String(value ?? "").trim().toUpperCase();
+  if (!TABLE_PATTERN.test(table)) throw new Error("Table number must be 1-8 letters or digits");
+  return table;
+}
+
+export function tableView(row) {
+  return row
+    ? { table: row.table_no, label: row.label, token: row.token, enabled: Boolean(row.enabled), createdAt: row.created_at, updatedAt: row.updated_at }
+    : null;
+}
+
+export function auditView(row) {
+  return {
+    id: row.id, at: row.at, role: row.role, ip: row.ip, method: row.method,
+    route: row.route, status: row.status, detail: parseJson(row.detail_json, {})
+  };
+}
+
 export const ORDER_TRANSITIONS = new Map([
   ["new", new Set(["preparing", "cancelled"])],
   ["preparing", new Set(["ready", "cancelled"])],

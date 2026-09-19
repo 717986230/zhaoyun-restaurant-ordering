@@ -17,8 +17,9 @@
 import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
-  CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody
+  CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody
 } from "../src/contracts.js";
+import { resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 
@@ -86,12 +87,28 @@ function clientKey(request) {
   return request.headers.get("cf-connecting-ip") || "unknown";
 }
 
-function requireAdmin(request, env) {
+/**
+ * Authenticate, then check rank.
+ *
+ * Three shared tokens, one per role, exactly as the Node server has: the
+ * manager token is `ADMIN_TOKEN`, and `STAFF_TOKEN` / `KITCHEN_TOKEN` are
+ * optional secrets a deployment may add. Leave them unset and there is one
+ * role, not three aliases of it.
+ *
+ * This deployment had no roles at all until now — one token opened everything,
+ * so a waiter tablet pointed at it could edit the menu, its prices and its
+ * allergen declarations. `shared/contract-suite.mjs` asks both backends about
+ * it now, which is what stops the two drifting apart again.
+ *
+ * Returns `{ role }` when the request may proceed and `{ denied }` when it may
+ * not, so a caller cannot forget to check.
+ */
+async function requireRole(request, env, store, minimumRole) {
   const expected = env.ADMIN_TOKEN;
   if (!expected || String(expected).length < 32) {
     // Refuse rather than fall back to a default: a deployed backend with a weak
     // admin token is worse than one that plainly is not configured yet.
-    return fail("ADMIN_TOKEN is not configured on this deployment", 503);
+    return { denied: fail("ADMIN_TOKEN is not configured on this deployment", 503) };
   }
   const moment = Date.now();
   const key = clientKey(request);
@@ -100,16 +117,31 @@ function requireAdmin(request, env) {
   const active = authFailures.get(key);
   if (active && active.failures >= AUTH_MAX_FAILURES) {
     const retryAfter = Math.max(1, Math.ceil((active.resetAt - moment) / 1000));
-    return json({ error: "Too many authentication attempts", retryAfter }, 429, { "retry-after": String(retryAfter) });
+    return { denied: json({ error: "Too many authentication attempts", retryAfter }, 429, { "retry-after": String(retryAfter) }) };
   }
-  if (!tokenMatches(request.headers.get("x-admin-token"), expected)) {
+  const provided = request.headers.get("x-admin-token");
+  const role = resolveStaffRole((token) => tokenMatches(provided, token), {
+    manager: expected,
+    staff: env.STAFF_TOKEN,
+    kitchen: env.KITCHEN_TOKEN
+  });
+  if (!role) {
     const failures = (active?.failures ?? 0) + 1;
     if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(moment);
     authFailures.set(key, { failures, resetAt: moment + AUTH_WINDOW_MS });
-    return json({ error: "Admin authentication required" }, 401);
+    return { denied: json({ error: "Admin authentication required" }, 401) };
   }
   authFailures.delete(key);
-  return null;
+  if (!roleAllows(role, minimumRole)) {
+    // A valid token used beyond its role is worth recording, not just refusing.
+    const url = new URL(request.url);
+    await store.recordAudit({
+      role, ip: clientKey(request), method: request.method,
+      route: url.pathname + url.search, status: 403, detail: { denied: minimumRole }
+    });
+    return { denied: json({ error: `This role may not perform ${minimumRole} actions` }, 403) };
+  }
+  return { role };
 }
 
 /**
@@ -142,7 +174,7 @@ async function handle(request, env) {
   const store = createStore(env.DB);
   const limit = url.searchParams.get("limit") ?? undefined;
 
-  const admin = () => requireAdmin(request, env);
+  const gate = (minimumRole) => requireRole(request, env, store, minimumRole);
 
   // /api/health
   if (path.length === 2 && path[0] === "api" && path[1] === "health" && method === "GET") {
@@ -157,7 +189,7 @@ async function handle(request, env) {
   // /api/orders and /api/orders/:id/status
   if (path[0] === "api" && path[1] === "orders") {
     if (path.length === 2 && method === "GET") {
-      const denied = admin();
+      const { denied } = await gate("kitchen");
       if (denied) return denied;
       return json({ orders: await store.listOrders(limit) });
     }
@@ -171,7 +203,7 @@ async function handle(request, env) {
       }
     }
     if (path.length === 4 && path[3] === "status" && method === "PATCH") {
-      const denied = admin();
+      const { denied } = await gate("kitchen");
       if (denied) return denied;
       try {
         const { value, invalid } = await body(request, OrderStatusBody);
@@ -187,7 +219,7 @@ async function handle(request, env) {
   // /api/service-requests and /api/service-requests/:id/status
   if (path[0] === "api" && path[1] === "service-requests") {
     if (path.length === 2 && method === "GET") {
-      const denied = admin();
+      const { denied } = await gate("staff");
       if (denied) return denied;
       return json({ requests: await store.listServiceRequests(limit) });
     }
@@ -201,7 +233,7 @@ async function handle(request, env) {
       }
     }
     if (path.length === 4 && path[3] === "status" && method === "PATCH") {
-      const denied = admin();
+      const { denied } = await gate("staff");
       if (denied) return denied;
       try {
         const { value, invalid } = await body(request, ServiceStatusBody);
@@ -215,8 +247,85 @@ async function handle(request, env) {
   }
 
   if (path[0] === "api" && path[1] === "admin") {
-    const denied = admin();
+    // The three routes a waiter tablet and the kitchen screen legitimately
+    // reach. They are guarded at their own rank, before the manager gate that
+    // covers everything below them — which is what keeps the catalogue, and so
+    // the menu's prices and allergen declarations, manager-only.
+    if (path.length === 3 && path[2] === "session" && method === "GET") {
+      const { denied, role } = await gate("kitchen");
+      return denied || json({ role });
+    }
+    if (path.length === 4 && path[2] === "tables" && path[3] === "open" && method === "GET") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      return json({ tables: await store.openBillTables() });
+    }
+    // Billing is the floor's, so it answers at the floor's rank rather than
+    // refusing a waiter for the wrong reason. It is not ported yet: the bill
+    // and its settle are the one piece of logic still living only in
+    // server/database.mjs, and a guessed reimplementation of a VAT split is
+    // not something to have two of. See docs/D1.md.
+    if (path[2] === "tables" && path.length >= 5 && path[4] === "bill") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      return fail("Billing is not implemented on this deployment; it still runs on the Node server", 501);
+    }
+    if (path[2] === "print-jobs") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      if (path.length === 3 && method === "GET") {
+        return json({ jobs: await store.listPrintJobs(url.searchParams.get("status") || "queued", limit) });
+      }
+      if (path.length === 5 && path[4] === "retry" && method === "POST") {
+        return (await store.retryPrintJob(path[3]))
+          ? json({ ok: true, id: path[3] })
+          : fail("Only failed print jobs can be retried", 409);
+      }
+      if (path.length === 4 && path[3] === "claim" && method === "POST") {
+        const { value: payload } = await body(request);
+        const job = await store.claimPrintJob(payload.role, payload.workerId, Number(payload.leaseMs) || 30_000);
+        return json({ job });
+      }
+      if (path.length === 5 && path[4] === "complete" && method === "POST") {
+        const { value: payload } = await body(request);
+        return json({ ok: await store.completePrintJob(path[3], payload.workerId) });
+      }
+      if (path.length === 5 && path[4] === "fail" && method === "POST") {
+        const { value: payload } = await body(request);
+        return json({ ok: await store.failPrintJob(path[3], payload.workerId, payload.error) });
+      }
+    }
+
+    const { denied } = await gate("manager");
     if (denied) return denied;
+
+    // /api/admin/audit
+    if (path.length === 3 && path[2] === "audit" && method === "GET") {
+      return json({ entries: await store.listAudit(limit) });
+    }
+
+    // /api/admin/tables[/:table]
+    if (path[2] === "tables") {
+      if (path.length === 3 && method === "GET") return json({ tables: await store.listTables() });
+      if (path.length === 3 && method === "POST") {
+        try {
+          const { value, invalid } = await body(request, TableBody);
+          if (invalid) return invalid;
+          return json({ table: await store.saveTable(value) }, 201);
+        } catch (error) {
+          return fail(error.message);
+        }
+      }
+      if (path.length === 4 && method === "DELETE") {
+        try {
+          return (await store.deleteTable(path[3]))
+            ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
+            : fail("Table not found", 404);
+        } catch (error) {
+          return fail(error.message);
+        }
+      }
+    }
 
     // /api/admin/products[/:id][/media]
     if (path[2] === "products") {
@@ -280,31 +389,6 @@ async function handle(request, env) {
         return (await store.deletePrinter(path[3]))
           ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
           : fail("Printer not found", 404);
-      }
-    }
-
-    // /api/admin/print-jobs[/:id/retry], and the agent's claim/complete/fail
-    if (path[2] === "print-jobs") {
-      if (path.length === 3 && method === "GET") {
-        return json({ jobs: await store.listPrintJobs(url.searchParams.get("status") || "queued", limit) });
-      }
-      if (path.length === 5 && path[4] === "retry" && method === "POST") {
-        return (await store.retryPrintJob(path[3]))
-          ? json({ ok: true, id: path[3] })
-          : fail("Only failed print jobs can be retried", 409);
-      }
-      if (path.length === 4 && path[3] === "claim" && method === "POST") {
-        const { value: payload } = await body(request);
-        const job = await store.claimPrintJob(payload.role, payload.workerId, Number(payload.leaseMs) || 30_000);
-        return json({ job });
-      }
-      if (path.length === 5 && path[4] === "complete" && method === "POST") {
-        const { value: payload } = await body(request);
-        return json({ ok: await store.completePrintJob(path[3], payload.workerId) });
-      }
-      if (path.length === 5 && path[4] === "fail" && method === "POST") {
-        const { value: payload } = await body(request);
-        return json({ ok: await store.failPrintJob(path[3], payload.workerId, payload.error) });
       }
     }
 

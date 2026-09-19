@@ -8,6 +8,8 @@ import {
   ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody, TableParams
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
+// Who outranks whom is the one rule the Worker must not decide differently.
+import { ROLE_RANK, resolveStaffRole } from "../shared/rules.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
@@ -34,7 +36,6 @@ function errorReply(reply, error, statusCode = 400) {
 }
 
 // Manager can do everything; staff runs the floor; kitchen only moves orders along.
-const ROLE_RANK = { manager: 3, staff: 2, kitchen: 1 };
 
 export function registerRoutes(app, { database, realtime, config }) {
   const authFailures = new Map();
@@ -83,10 +84,11 @@ export function registerRoutes(app, { database, realtime, config }) {
 
   function resolveRole(request) {
     const provided = request.headers["x-admin-token"];
-    if (tokenMatches(provided, config.adminToken)) return "manager";
-    if (config.staffToken && tokenMatches(provided, config.staffToken)) return "staff";
-    if (config.kitchenToken && tokenMatches(provided, config.kitchenToken)) return "kitchen";
-    return null;
+    return resolveStaffRole((expected) => tokenMatches(provided, expected), {
+      manager: config.adminToken,
+      staff: config.staffToken,
+      kitchen: config.kitchenToken
+    });
   }
 
   /** @param {"manager"|"staff"|"kitchen"} minimumRole */

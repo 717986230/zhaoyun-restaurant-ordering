@@ -167,6 +167,71 @@ export function contractChecks(call, assert) {
       assert.equal(gone.status, 404);
     }],
 
+    ["the menu belongs to the manager, and the board does not", async () => {
+      // The reason this check exists: the Worker had one token and no roles at
+      // all, so a waiter tablet pointed at the Cloudflare deployment could edit
+      // the menu, its prices and its allergen declarations. Hiding the tab in
+      // the console is not access control; this is.
+      for (const role of ["staff", "kitchen"]) {
+        const listed = await call("GET", "/api/admin/products", { role });
+        assert.equal(listed.status, 403, `${role} must not read the catalogue`);
+        const written = await call("POST", "/api/admin/products", {
+          role,
+          body: { sku: `DENY-${role}`, kind: "food", category: "MAIN", names: { zh: "x", de: "x", en: "x" }, price: 1, printStation: "kitchen" }
+        });
+        assert.equal(written.status, 403, `${role} must not write the catalogue`);
+        const printers = await call("GET", "/api/admin/printers", { role });
+        assert.equal(printers.status, 403, `${role} must not read printer profiles`);
+      }
+
+      // What each role may do instead. The console asks /session on connect and
+      // shows only the tabs that answer, so this is what decides what it shows.
+      for (const role of ["manager", "staff", "kitchen"]) {
+        const session = await call("GET", "/api/admin/session", { role });
+        assert.equal(session.status, 200);
+        assert.equal(session.json.role, role, "a token must report its own role");
+      }
+      assert.equal((await call("GET", "/api/orders", { role: "kitchen" })).status, 200, "the kitchen screen reads orders");
+      assert.equal((await call("GET", "/api/service-requests", { role: "kitchen" })).status, 403, "service calls are the floor's, not the kitchen's");
+      assert.equal((await call("GET", "/api/service-requests", { role: "staff" })).status, 200);
+      assert.equal((await call("GET", "/api/admin/print-jobs?status=queued", { role: "staff" })).status, 200);
+
+      // A valid token used beyond its role is recorded, not just refused.
+      const audit = await call("GET", "/api/admin/audit", { admin: true });
+      assert.equal(audit.status, 200);
+      assert.ok(
+        audit.json.entries.some((entry) => entry.status === 403 && entry.route.includes("/api/admin/products")),
+        "a refused catalogue read must leave an audit entry"
+      );
+    }],
+
+    ["a table round-trips with the token its card prints", async () => {
+      const created = await call("POST", "/api/admin/tables", { admin: true, body: { table: "c7", label: "Fenster" } });
+      assert.equal(created.status, 201);
+      assert.equal(created.json.table.table, "C7", "table numbers are upper-cased");
+      assert.equal(created.json.table.label, "Fenster");
+      assert.equal(created.json.table.enabled, true);
+      assert.ok(created.json.table.token, "the entry link needs a token to carry");
+      assert.equal(created.json.table.table_no, undefined, "row columns must not leak");
+
+      // A label fix must not invalidate every printed card.
+      const relabelled = await call("POST", "/api/admin/tables", { admin: true, body: { table: "C7", label: "Fenster links" } });
+      assert.equal(relabelled.json.table.token, created.json.table.token);
+      const rotated = await call("POST", "/api/admin/tables", { admin: true, body: { table: "C7", rotateToken: true } });
+      assert.notEqual(rotated.json.table.token, created.json.table.token);
+
+      const listed = await call("GET", "/api/admin/tables", { admin: true });
+      assert.ok(listed.json.tables.some((table) => table.table === "C7"));
+      assert.equal((await call("GET", "/api/admin/tables", { role: "staff" })).status, 403, "table tokens are manager-only");
+      assert.equal((await call("GET", "/api/admin/tables/open", { role: "staff" })).status, 200, "but the floor sees which tables are open");
+
+      const nonsense = await call("POST", "/api/admin/tables", { admin: true, body: { table: "no spaces here" } });
+      assert.equal(nonsense.status, 400);
+
+      assert.equal((await call("DELETE", "/api/admin/tables/C7", { admin: true })).status, 204);
+      assert.equal((await call("DELETE", "/api/admin/tables/C7", { admin: true })).status, 404);
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

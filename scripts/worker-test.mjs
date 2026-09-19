@@ -15,6 +15,10 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.WORKER_TEST_PORT || 8798);
 const ADMIN_TOKEN = "worker-contract-admin-token-worker-contract";
+// A deployment may run with only ADMIN_TOKEN, but the contract asks what the
+// other two roles may do, so the test deployment configures all three.
+const STAFF_TOKEN = "worker-contract-staff-token-worker-contract";
+const KITCHEN_TOKEN = "worker-contract-kitchen-token-worker-contract";
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 const state = mkdtempSync(path.join(tmpdir(), "zy-worker-"));
@@ -57,14 +61,20 @@ try {
   // A dev var file rather than an environment variable: wrangler only passes
   // these through to the Worker, and this is the mechanism the real deployment
   // uses too (there it is `wrangler secret put ADMIN_TOKEN`).
-  writeFileSync(path.join(state, ".dev.vars"), `ADMIN_TOKEN = "${ADMIN_TOKEN}"\n`);
+  writeFileSync(
+    path.join(state, ".dev.vars"),
+    `ADMIN_TOKEN = "${ADMIN_TOKEN}"\nSTAFF_TOKEN = "${STAFF_TOKEN}"\nKITCHEN_TOKEN = "${KITCHEN_TOKEN}"\n`
+  );
 
   const wranglerArgs = ["wrangler", "d1", "migrations", "apply", "zhaoyun-ordering", "--local", `--persist-to=${state}`];
   await run("npx", wranglerArgs);
 
   const dev = spawn("npx", [
     "wrangler", "dev", "--local", "--port", String(PORT), "--ip", "127.0.0.1",
-    `--persist-to=${state}`, "--var", `ADMIN_TOKEN:${ADMIN_TOKEN}`
+    `--persist-to=${state}`,
+    "--var", `ADMIN_TOKEN:${ADMIN_TOKEN}`,
+    "--var", `STAFF_TOKEN:${STAFF_TOKEN}`,
+    "--var", `KITCHEN_TOKEN:${KITCHEN_TOKEN}`
   ], { cwd: root, stdio: ["ignore", "pipe", "pipe"], detached: true });
   children.push(dev);
   dev.stdout.on("data", (chunk) => { devLog += chunk; });
@@ -74,7 +84,13 @@ try {
 
   await run(process.execPath, ["--test", "workers/contract.test.mjs"], {
     stdio: "inherit",
-    env: { ...process.env, WORKER_URL: BASE_URL, WORKER_ADMIN_TOKEN: ADMIN_TOKEN }
+    env: {
+      ...process.env,
+      WORKER_URL: BASE_URL,
+      WORKER_ADMIN_TOKEN: ADMIN_TOKEN,
+      WORKER_STAFF_TOKEN: STAFF_TOKEN,
+      WORKER_KITCHEN_TOKEN: KITCHEN_TOKEN
+    }
   });
   console.log("Worker contract passed");
 } catch (error) {

@@ -4,6 +4,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
+// The table and audit shapes the two backends must agree on, byte for byte.
+import { auditView, normalizeTableNo, tableView } from "../shared/rules.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
@@ -616,16 +618,6 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return serviceRequestView(statements.requestById.get(String(id)));
   }
 
-  function tableView(row) {
-    return row ? { table: row.table_no, label: row.label, token: row.token, enabled: Boolean(row.enabled), createdAt: row.created_at, updatedAt: row.updated_at } : null;
-  }
-
-  function normalizeTableNo(value) {
-    const table = String(value ?? "").trim().toUpperCase();
-    if (!/^[A-Z0-9][A-Z0-9-]{0,7}$/.test(table)) throw new Error("Table number must be 1-8 letters or digits");
-    return table;
-  }
-
   function saveTable(input) {
     const table = normalizeTableNo(input.table);
     const current = statements.tableByNo.get(table);
@@ -740,10 +732,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     recordAudit: (entry) => {
       statements.insertAudit.run(randomUUID(), now(), String(entry.role), String(entry.ip ?? ""), String(entry.method), String(entry.route), Number(entry.status), JSON.stringify(entry.detail ?? {}));
     },
-    listAudit: (limit = 100) => statements.listAudit.all(Math.min(Number(limit) || 100, 500)).map((row) => ({
-      id: row.id, at: row.at, role: row.role, ip: row.ip, method: row.method,
-      route: row.route, status: row.status, detail: parseJson(row.detail_json, {})
-    })),
+    listAudit: (limit = 100) => statements.listAudit.all(Math.min(Number(limit) || 100, 500)).map(auditView),
     hasTables: () => statements.tableCount.get().count > 0,
     listTables: () => statements.listTables.all().map(tableView),
     getTable: (table) => tableView(statements.tableByNo.get(String(table ?? "").trim().toUpperCase())),

@@ -9,9 +9,9 @@
  * atomic `batch()` here.
  */
 import {
-  assertOrderTransition, assertRequestTransition, boundedLimit, mapProduct, normalizePrinter,
-  normalizeProduct, now, orderProductIds, orderView, parseJson, planOrder, planPrintFailure,
-  printerView, printJobView, serviceRequestView, uuid
+  assertOrderTransition, assertRequestTransition, auditView, bool, boundedLimit, mapProduct,
+  normalizePrinter, normalizeProduct, normalizeTableNo, now, orderProductIds, orderView, parseJson,
+  planOrder, planPrintFailure, printerView, printJobView, serviceRequestView, tableView, uuid
 } from "../shared/rules.mjs";
 
 const PRODUCT_COLUMNS = [
@@ -36,6 +36,12 @@ export function createStore(db) {
       rows.push(...await all(sql.replace("(?)", `(${slice.map(() => "?").join(", ")})`), ...slice));
     }
     return rows;
+  }
+
+  /** 12 random bytes, base64url, the same shape the Node server prints on a card. */
+  function entryToken() {
+    const bytes = crypto.getRandomValues(new Uint8Array(12));
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 
   async function mediaFor(productIds) {
@@ -261,6 +267,51 @@ export function createStore(db) {
         status, String(error).slice(0, 1000), nextAttemptAt, now(), String(id), String(workerId)
       )) > 0;
     },
+    /**
+     * Tables, and the entry token printed on their card.
+     *
+     * The token is rotated by asking, never on every save: reprinting every
+     * card in the restaurant because someone fixed a typo in a label is not a
+     * thing anyone wants. `crypto.getRandomValues` is what a Worker has in
+     * place of `node:crypto`.
+     */
+    listTables: async () => (await all("SELECT * FROM restaurant_tables ORDER BY table_no")).map(tableView),
+    getTable: async (table) => tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))),
+    saveTable: async (input) => {
+      const table = normalizeTableNo(input.table);
+      const current = await first("SELECT * FROM restaurant_tables WHERE table_no = ?", table);
+      const timestamp = now();
+      const token = input.rotateToken || !current ? entryToken() : current.token;
+      await run(
+        `INSERT INTO restaurant_tables (table_no, label, token, enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(table_no) DO UPDATE SET label = excluded.label, token = excluded.token,
+           enabled = excluded.enabled, updated_at = excluded.updated_at`,
+        table,
+        String(input.label ?? current?.label ?? "").trim(),
+        token,
+        bool(input.enabled, current ? Boolean(current.enabled) : true) ? 1 : 0,
+        current?.created_at ?? timestamp,
+        timestamp
+      );
+      return tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", table));
+    },
+    deleteTable: async (table) => (await run("DELETE FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))) > 0,
+    openBillTables: async () =>
+      (await all("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"))
+        .map((row) => row.table_no),
+
+    // A valid token used beyond its role is worth recording, not just refusing.
+    recordAudit: async (entry) => {
+      await run(
+        "INSERT INTO audit_log (id, at, role, ip, method, route, status, detail_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        uuid(), now(), String(entry.role), String(entry.ip ?? ""), String(entry.method),
+        String(entry.route), Number(entry.status), JSON.stringify(entry.detail ?? {})
+      );
+    },
+    listAudit: async (limit = 100) =>
+      (await all("SELECT * FROM audit_log ORDER BY at DESC, rowid DESC LIMIT ?", boundedLimit(limit))).map(auditView),
+
     printerForRole: async (role) => {
       const row = await first("SELECT * FROM printer_profiles WHERE role = ? AND enabled = 1 ORDER BY name LIMIT 1", String(role));
       return printerView(row);
