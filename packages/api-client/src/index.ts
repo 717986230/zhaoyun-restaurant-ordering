@@ -64,6 +64,33 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Reads a response that is supposed to be this API answering.
+ *
+ * A body that does not parse as JSON is not an answer from this API, whatever
+ * status it arrives with: a hotel router's login page, a proxy's error page and
+ * a dev server's `index.html` are all served as 200 text/html. Treating those
+ * as an empty object produced a call that looked successful and whose every
+ * field was `undefined`, which the console then rendered — and a list that is
+ * `undefined` rather than empty takes the whole screen down.
+ *
+ * The restaurant's network is exactly where this happens, so it fails as a
+ * request failure and the callers' existing error handling takes it from there.
+ */
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const body = await response.text();
+  let payload: { error?: string } = {};
+  if (body) {
+    try {
+      payload = JSON.parse(body) as { error?: string };
+    } catch {
+      throw new ApiError(`Request failed (${response.status})`, response.status);
+    }
+  }
+  if (!response.ok) throw new ApiError(payload.error || `Request failed (${response.status})`, response.status);
+  return payload as T;
+}
+
 export class AdminApi {
   get storage(): AdminStorage {
     const built = import.meta.env?.VITE_API_BASE?.replace(/\/+$/, "");
@@ -141,9 +168,7 @@ export class AdminApi {
     if (options.body && !(options.body instanceof FormData)) headers.set("content-type", "application/json");
     const response = await fetch(`${this.storage.baseUrl}${path}`, { ...options, headers });
     if (response.status === 204) return undefined as T;
-    const payload = await response.json().catch(() => ({})) as { error?: string };
-    if (!response.ok) throw new ApiError(payload.error || `Request failed (${response.status})`, response.status);
-    return payload as T;
+    return parseJsonResponse<T>(response);
   }
 }
 
@@ -207,8 +232,6 @@ export class RestaurantApi {
       if (value) headers.set(name, value);
     }
     const response = await this.#fetch(`${this.#baseUrl()}${path}`, { ...options, headers });
-    const payload = await response.json().catch(() => ({})) as { error?: string };
-    if (!response.ok) throw new ApiError(payload.error || `Request failed (${response.status})`, response.status);
-    return payload as T;
+    return parseJsonResponse<T>(response);
   }
 }

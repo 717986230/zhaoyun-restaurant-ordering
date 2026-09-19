@@ -89,7 +89,10 @@ test("dish opens with shared-element detail, adds to cart, and submits an order"
   await expect(beef).toBeVisible();
   await beef.click();
   await expect(page.locator(".dish-overlay")).toHaveClass(/open/);
-  await expect(page.locator(".dish-detail-card")).toContainText("Rinderfilet, Pfeffer");
+  // The ingredients are still on the card, but as the parts the back face
+  // breaks them into rather than one comma-separated line.
+  await expect(page.locator(".dish-part").filter({ hasText: "Rinderfilet" })).toHaveCount(1);
+  await expect(page.locator(".dish-part").filter({ hasText: "Pfeffer" })).toHaveCount(1);
   await expect(page.locator(".menu")).toHaveClass(/detail-open/);
   await page.locator(".dish-detail-card .add").click();
   await expect(page.locator("#cartCount")).toHaveText("1");
