@@ -35,7 +35,8 @@ const copy = {
     staffNoOrders: "暂无订单", staffNoRequests: "暂无服务请求",
     staffAdvanceTo: "更新为", staffHandled: "已处理", staffPending: "待同步",
     setTable: "设置桌号", tablePrompt: "请输入本设备所在的桌号（1-8 位字母或数字）", tableInvalid: "桌号无效，请使用 1-8 位字母或数字",
-    tableUnset: "本设备还没有分配桌号，订单会记到默认桌号"
+    tableUnset: "本设备还没有分配桌号，订单会记到默认桌号",
+    breakdown: "拆解", parts: "组成", alsoContains: "另含（未标注到具体食材）", portionOf: "规格"
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
@@ -67,7 +68,8 @@ const copy = {
     staffNoOrders: "Keine Bestellungen", staffNoRequests: "Keine Service-Rufe",
     staffAdvanceTo: "Ändern auf", staffHandled: "Erledigt", staffPending: "Wird übertragen",
     setTable: "Tisch einstellen", tablePrompt: "Tischnummer dieses Geräts eingeben (1-8 Zeichen)", tableInvalid: "Ungültige Tischnummer: 1-8 Buchstaben oder Ziffern",
-    tableUnset: "Diesem Gerät ist noch kein Tisch zugewiesen"
+    tableUnset: "Diesem Gerät ist noch kein Tisch zugewiesen",
+    breakdown: "Aufgeschlüsselt", parts: "Bestandteile", alsoContains: "Außerdem enthalten (keiner Zutat zugeordnet)", portionOf: "Menge"
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
@@ -99,7 +101,8 @@ const copy = {
     staffNoOrders: "No orders yet", staffNoRequests: "No service calls",
     staffAdvanceTo: "Change to", staffHandled: "Done", staffPending: "sending",
     setTable: "Set table", tablePrompt: "Enter the table number of this device (1-8 characters)", tableInvalid: "Invalid table number: use 1-8 letters or digits",
-    tableUnset: "This device has no table assigned yet"
+    tableUnset: "This device has no table assigned yet",
+    breakdown: "Taken apart", parts: "Components", alsoContains: "Also contains (not tied to one ingredient)", portionOf: "Serving"
   }
 } as const;
 

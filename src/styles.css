@@ -546,11 +546,18 @@ html.plt-android .screen.active {
 
 .summary {
   height: 72px;
-  padding: 11px 16px;
+  padding: 11px 14px;
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 48px 44px minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
+}
+
+
+.row-price {
+  font: 15px Georgia, serif;
+  color: var(--ink-2);
+  white-space: nowrap;
 }
 
 .number {
@@ -619,6 +626,28 @@ html.plt-android .screen.active {
   overflow: hidden;
   background: var(--art);
   box-shadow: var(--inset-art);
+}
+
+/* The same slot at list size. It comes after `.art` on purpose: the artwork
+   rule sets a feature-sized height and these two have equal specificity, so
+   order is what decides. */
+.art.art-thumb,
+.dish-media.dish-media-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 5px;
+}
+
+.dish-media.dish-media-thumb {
+  object-fit: cover;
+}
+
+/* The artwork's sheen and its pattern are drawn for a 160px feature. At 48px
+   they turn into a barcode, identical on every row, so the list keeps only the
+   ground — a quiet tile that holds the place a photo will take. */
+.art.art-thumb::before,
+.art.art-thumb::after {
+  display: none;
 }
 
 .art::before {
@@ -1445,6 +1474,104 @@ html.plt-android .menu.detail-open .stack {
 .detail-back p,
 .detail-back small {
   color: var(--muted);
+}
+
+/* The back of the card scrolls on its own: the breakdown is as long as the
+   dish is complicated, and the heading above it should not scroll away. */
+.detail-back-scroll {
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  cursor: default;
+}
+
+.dish-parts-block {
+  margin: 0 0 18px;
+}
+
+.parts-heading {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The dish coming apart. The perspective is on the list so the rows separate
+   as one object rather than each tilting on its own. */
+.dish-parts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  perspective: 800px;
+}
+
+.dish-part {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 14px;
+  border: 1px solid var(--line-soft);
+  border-left: 2px solid var(--accent-line);
+  border-radius: 6px;
+  background: var(--wash);
+  transform-origin: left center;
+}
+
+.part-index {
+  font: 12px Georgia, serif;
+  color: var(--faint);
+}
+
+.part-name {
+  min-width: 0;
+}
+
+.part-name b {
+  display: block;
+  font-weight: 500;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-name small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-allergens {
+  justify-content: flex-end;
+}
+
+.parts-portion {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* What the ingredient line does not account for. Kept visible on purpose:
+   dropping it would quietly shrink a legal declaration. */
+.parts-loose {
+  margin: 12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
 }
 
 .detail-back dl {

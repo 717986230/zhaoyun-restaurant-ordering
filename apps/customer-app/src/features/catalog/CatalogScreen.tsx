@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { formatEuro, summarizeCart } from "@zhaoyun/domain";
-import type { ModifierGroup, ModifierOption, Product, SelectedModifier } from "@zhaoyun/domain";
+import { deconstruct, formatEuro, summarizeCart } from "@zhaoyun/domain";
+import type { DishPart, ModifierGroup, ModifierOption, Product, SelectedModifier } from "@zhaoyun/domain";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
@@ -28,13 +29,62 @@ function toggleModifier(group: ModifierGroup, option: ModifierOption, selected: 
   return [...selected.filter((item) => !group.options.some((candidate) => candidate.id === item.id)), ...next];
 }
 
-function ProductMedia({ product }: { product: Product }) {
+/**
+ * One dish, however it is illustrated.
+ *
+ * None of the 111 dishes has a photo yet, so what a guest sees today is the
+ * generated artwork. The slot is the same either way and appears in the list
+ * as well as the detail card, so the day photos exist they turn up everywhere
+ * at once rather than needing the layout rebuilt around them.
+ */
+function ProductMedia({ product, size = "feature" }: { product: Product; size?: "feature" | "thumb" }) {
   const media = product.media[0];
-  if (!media) return <div className={`art ${product.appearance.pattern}`} style={{ "--art": product.appearance.art } as React.CSSProperties} />;
+  if (!media) return <div className={`art ${size === "thumb" ? "art-thumb " : ""}${product.appearance.pattern}`} style={{ "--art": product.appearance.art } as React.CSSProperties} />;
   const source = restaurantApi.mediaUrl(media.url);
+  const className = size === "thumb" ? "dish-media dish-media-thumb" : "dish-media";
   return media.type === "video"
-    ? <video className="dish-media" src={source} poster={media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined} playsInline muted loop autoPlay preload="metadata" />
-    : <img className="dish-media" src={source} alt={product.names.zh || product.names.de} />;
+    ? <video className={className} src={source} poster={media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined} playsInline muted loop autoPlay preload="metadata" />
+    : <img className={className} src={source} alt={product.names.zh || product.names.de} loading="lazy" />;
+}
+
+/**
+ * The dish, taken apart.
+ *
+ * This is what a guest gets instead of a plate exploding into its ingredients:
+ * a flat photo has no alpha channel, so moving a layer off it does not remove
+ * it from the picture underneath, and the "3D split" reads as the dish drawn
+ * twice. What does work from the data that exists is the dish coming apart
+ * into named components, each carrying the allergens it is responsible for —
+ * which is also the thing a guest with an allergy actually wants, because
+ * `A · C · F` on the whole bowl does not say whether the egg can be left out.
+ *
+ * The letters here are never new information: `deconstruct` only ever
+ * redistributes what the kitchen already declared, and whatever it cannot
+ * place stays visible under its own heading rather than disappearing.
+ */
+function Deconstruction({ product, language, reduceMotion }: { product: Product; language: CustomerState["language"]; reduceMotion: boolean }) {
+  const { parts, portions, unattributed } = useMemo(() => deconstruct(product), [product]);
+  const name = (part: DishPart) => (language === "zh" ? part.zh : language === "en" ? part.en : part.de);
+  const second = (part: DishPart) => (language === "de" ? part.zh : part.de);
+
+  return <div className="dish-parts-block">
+    <p className="parts-heading">{t(language, "parts")}</p>
+    <ol className="dish-parts">{parts.map((part, index) => <motion.li className="dish-part" key={`${part.de}-${index}`}
+      initial={reduceMotion ? false : { opacity: 0, y: 14, rotateX: -12 }}
+      animate={{ opacity: 1, y: 0, rotateX: 0 }}
+      transition={{ delay: reduceMotion ? 0 : 0.06 + index * 0.05, duration: reduceMotion ? 0 : 0.32, ease: EASE }}>
+      <span className="part-index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="part-name"><b>{name(part)}</b><small>{second(part)}</small></span>
+      {part.allergens.length > 0 && <span className="allergen-list part-allergens">{part.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, language)}>{code}</b>)}</span>}
+    </motion.li>)}</ol>
+    {portions.length > 0 && <p className="parts-portion">{t(language, "portionOf")} · {portions.map((part) => name(part)).join(" / ")}</p>}
+    {/* When nothing could be attributed, this box would just repeat the
+        declared list a few lines further down, so it stays closed. */}
+    {unattributed.length > 0 && unattributed.length < product.allergens.length && <p className="parts-loose">
+      <span>{t(language, "alsoContains")}</span>
+      <span className="allergen-list">{unattributed.map((code) => <b className="allergen" key={code}>{code} {allergenLabel(code, language)}</b>)}</span>
+    </p>}
+  </div>;
 }
 
 function ProductDetail({ product, state, dispatch }: { product: Product; state: CustomerState; dispatch: CustomerDispatch }) {
@@ -88,15 +138,20 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
         </section>
         <section className="detail-face detail-back" aria-label={t(state.language, "detailRegion")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <button className="flip-back" onClick={(event) => { event.stopPropagation(); dispatch({ type: "toggle-product-flip" }); }}>{t(state.language, "back")}</button>
-          <div><small>{product.sku} · {product.category}</small><h3>{productName(product, state.language)}</h3><p>{product.description}</p></div>
-          <dl>
-            <div><dt>{t(state.language, "ingredients")}</dt><dd>{product.details.ingredients}</dd></div>
-            <div><dt>{t(state.language, "allergens")}</dt><dd>{product.allergens.length
-              ? <span className="allergen-list">{product.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, state.language)}>{code} {allergenLabel(code, state.language)}</b>)}</span>
-              : "—"}</dd></div>
-            <div><dt>{t(state.language, "time")}</dt><dd>{product.details.time}</dd></div>
-            <div><dt>{t(state.language, "portion")}</dt><dd>{product.details.people} · {product.details.level}</dd></div>
-          </dl>
+          <div><small>{product.sku} · {t(state.language, "breakdown")}</small><h3>{productName(product, state.language)}</h3><p>{product.description}</p></div>
+          <div className="detail-back-scroll" onClick={(event) => event.stopPropagation()}>
+            <Deconstruction product={product} language={state.language} reduceMotion={Boolean(reduceMotion)} />
+            <dl>
+              {/* The declared list stays whole and stays first among the facts:
+                  it is the legal statement, and the breakdown above only
+                  explains it. */}
+              <div><dt>{t(state.language, "allergens")}</dt><dd>{product.allergens.length
+                ? <span className="allergen-list">{product.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, state.language)}>{code} {allergenLabel(code, state.language)}</b>)}</span>
+                : "—"}</dd></div>
+              <div><dt>{t(state.language, "time")}</dt><dd>{product.details.time}</dd></div>
+              <div><dt>{t(state.language, "portion")}</dt><dd>{product.details.people} · {product.details.level}</dd></div>
+            </dl>
+          </div>
         </section>
       </motion.div>
     </motion.div>
@@ -128,7 +183,13 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false }
     {offlineMenu && <p className="local-board-note">{t(state.language, "menuOffline")}</p>}
     <nav id="chips" className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} onClick={() => dispatch({ type: "category", category })}>{category}</button>)}</nav>
     <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
-      <div className="summary"><span className="number">{product.sku}</span><div><h3>{productName(product, state.language)}</h3><p>{product.names.de}</p></div><span className="cat">{product.category}</span></div>
+      <div className="summary">
+        <ProductMedia product={product} size="thumb" />
+        <span className="number">{product.sku}</span>
+        <div><h3>{productName(product, state.language)}</h3><p>{product.names.de}</p></div>
+        {/* A menu without prices sends a guest into every dish to find one. */}
+        <span className="row-price">{formatEuro(product.priceCents)}</span>
+      </div>
     </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}</div>
     <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} state={state} dispatch={dispatch} />}</AnimatePresence>
     <button className="cartbar" onClick={() => dispatch({ type: "navigate", screen: "cart" })}><span>{t(state.language, "cart")}</span><b id="cartCount">{summary.count}</b><em id="cartTotal">{formatEuro(summary.totalCents)}</em></button>

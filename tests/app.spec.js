@@ -18,8 +18,21 @@ test.beforeEach(async ({ page }) => {
       id: "video-1", sku: "SUSHI-01", kind: "sushi", category: "SUSHI",
       names: { zh: "火炙三文鱼寿司", de: "Flambierter Lachs", en: "Torched Salmon Sushi" },
       description: "Flambierter Lachs.", price: 12.8,
-      allergens: ["D"], details: { time: "10 min", people: "1 Person", level: "Mild", ingredients: "Lachs, Reis" },
+      // Sesame is in the ingredients and deliberately not in the declaration:
+      // the glossary knows sesame carries N, and the test below is that it
+      // still does not put N on the dish. Only the kitchen declares.
+      allergens: ["D"], details: { time: "10 min", people: "1 Person", level: "Mild", ingredients: "Lachs, Reis, Sesam" },
       appearance: { art: "#37231d", pattern: "lines" }, media: [{ type: "video", url: "/media/demo.mp4" }]
+    },
+    {
+      // Every term here is in the ingredient glossary, which is what makes the
+      // breakdown assertions below about the feature rather than about a
+      // fixture nobody translated.
+      id: "ramen-1", sku: "R1", kind: "food", category: "RAMEN",
+      names: { zh: "蔬菜拉面", de: "Ramen mit Gemüse", en: "Ramen with Vegetables" },
+      description: "Ramen, Gemüse, Ei.", price: 12.5,
+      allergens: ["A", "C", "F"], details: { time: "20 min", people: "1 Person", level: "Mild", ingredients: "Ramen, Gemüse, Ei" },
+      appearance: { art: "#1d2320", pattern: "dots" }, media: []
     }
   ];
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products }) }));
@@ -399,4 +412,44 @@ test("the platform class is set, and it is what turns the expensive blur off", a
   await page.evaluate(() => document.documentElement.classList.add("plt-android"));
   const onAndroid = await stack.evaluate((node) => getComputedStyle(node).filter);
   expect(onAndroid, "the Android rule must drop the blur").toBe("none");
+});
+
+test("the list carries a price, so nothing has to be opened to find one", async ({ page }) => {
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  const row = page.locator(".dish-card", { hasText: "蔬菜拉面" });
+  await expect(row.locator(".row-price")).toHaveText("EUR 12.50");
+  // The picture slot is in the row whether or not a photo exists yet, so the
+  // layout does not move the day one is uploaded.
+  await expect(row.locator(".art, .dish-media")).toHaveCount(1);
+});
+
+test("the back of the card takes the dish apart and pins the allergens to its parts", async ({ page }) => {
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await page.locator(".dish-card", { hasText: "蔬菜拉面" }).click();
+  await page.locator(".detail-heading").click({ delay: 50 });
+  await expect(page.locator(".detail-flip-inner")).toHaveClass(/flipped/);
+
+  const parts = page.locator(".dish-part");
+  await expect(parts).toHaveCount(3);
+  await expect(parts.nth(0).locator(".part-name b")).toHaveText("拉面");
+  await expect(parts.nth(0).locator(".part-allergens")).toHaveText("A");
+  await expect(parts.nth(1).locator(".part-allergens")).toHaveCount(0);
+  await expect(parts.nth(2).locator(".part-name b")).toHaveText("鸡蛋");
+  await expect(parts.nth(2).locator(".part-allergens")).toHaveText("C");
+
+  // Soy is declared but no named ingredient carries it, and saying so is the
+  // point: a breakdown that silently dropped it would be shrinking a legal
+  // declaration.
+  await expect(page.locator(".parts-loose")).toContainText("F");
+  await expect(page.locator("dd .allergen-list").first()).toContainText("F 大豆");
+});
+
+test("a part never carries an allergen the dish does not declare", async ({ page }) => {
+  await page.getByRole("button", { name: /开始点餐/ }).click();
+  await page.locator(".dish-card", { hasText: "火炙三文鱼寿司" }).click();
+  await page.locator(".detail-heading").click({ delay: 50 });
+  // Salmon carries D and the dish declares D; rice carries nothing. Nothing
+  // else may appear, whatever the glossary knows about the terms.
+  const letters = await page.locator(".dish-part .allergen").allInnerTexts();
+  expect(letters).toEqual(["D"]);
 });
