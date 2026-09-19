@@ -9,7 +9,7 @@
  * atomic `batch()` here.
  */
 import {
-  assertOrderTransition, assertRequestTransition, auditView, bool, boundedLimit, mapProduct,
+  assertOrderTransition, assertRequestTransition, auditView, billView, bool, boundedLimit, mapProduct,
   normalizePrinter, normalizeProduct, normalizeTableNo, now, orderProductIds, orderView, parseJson,
   planOrder, planPrintFailure, printerView, printJobView, serviceRequestView, tableOverviewView,
   tableView, uuid
@@ -113,6 +113,29 @@ export function createStore(db) {
   async function viewOrder(row) {
     if (!row) return null;
     return orderView(row, await all("SELECT * FROM order_items WHERE order_id = ?", row.id));
+  }
+
+  /**
+   * The VAT split itself lives in `shared/rules.mjs`, so this computes a bill
+   * the same way the Node server does rather than a second, guessed way. All
+   * that is left here is reading the rows.
+   */
+  async function billForTable(tableNo) {
+    const orders = await all(
+      "SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at",
+      String(tableNo)
+    );
+    const itemsByOrderId = new Map();
+    const productIds = new Set();
+    for (const order of orders) {
+      const rows = await all("SELECT * FROM order_items WHERE order_id = ?", order.id);
+      itemsByOrderId.set(order.id, rows);
+      for (const row of rows) productIds.add(String(row.product_id));
+    }
+    const productsById = new Map(
+      (await selectByIds("SELECT * FROM products WHERE id IN (?)", [...productIds])).map((row) => [String(row.id), row])
+    );
+    return billView(tableNo, orders, itemsByOrderId, productsById);
   }
 
   async function createOrder(input) {
@@ -343,6 +366,43 @@ export function createStore(db) {
     openBillTables: async () =>
       (await all("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"))
         .map((row) => row.table_no),
+
+    billForTable,
+
+    /**
+     * Settling: mark the table's orders billed, release the lock, and queue the
+     * bill for the front printer.
+     *
+     * D1 has no interactive transaction, so the bill is read first and the
+     * three writes go in one `batch()`, which is atomic. Two waiters settling
+     * the same table at once would otherwise both read the same bill and both
+     * queue a ticket, so the INSERT is conditional in SQL and sits before the
+     * UPDATE: inside the batch it still sees the orders as unbilled, and the
+     * loser's INSERT matches nothing. That is the same race the order write
+     * hands to the UNIQUE index, solved the same way — in the database.
+     */
+    settleTableBill: async (tableNo) => {
+      const table = String(tableNo);
+      const bill = await billForTable(table);
+      if (!bill.orderIds.length) return null;
+      const timestamp = now();
+      const jobId = uuid();
+      const payload = JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp });
+      await db.batch([
+        db.prepare(
+          `INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at)
+           SELECT ?, ?, 'front', ?, 'queued', ?, ?
+           WHERE EXISTS (SELECT 1 FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled')`
+        ).bind(jobId, bill.orderIds[0], payload, timestamp, timestamp, table),
+        db.prepare("UPDATE orders SET billed_at = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'")
+          .bind(timestamp, timestamp, table),
+        // Paying is what frees the table, so the lock a waiter set before
+        // printing the bill does not have to be cleared by hand afterwards.
+        db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?")
+          .bind(timestamp, table.toUpperCase())
+      ]);
+      return { ...bill, issuedAt: timestamp, printJobId: jobId };
+    },
 
     // A valid token used beyond its role is worth recording, not just refusing.
     recordAudit: async (entry) => {

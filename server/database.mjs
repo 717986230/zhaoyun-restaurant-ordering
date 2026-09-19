@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
-import { auditView, normalizeTableNo, tableOverviewView, tableView } from "../shared/rules.mjs";
+import { auditView, billView, normalizeTableNo, tableOverviewView, tableView } from "../shared/rules.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
@@ -538,48 +538,22 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
   }
 
   /**
-   * Menu prices are gross, so VAT is extracted per rate group.
-   * This is an internal bill, not a fiscal receipt (RKSV/Belegerteilungspflicht).
+   * The VAT split itself lives in `shared/rules.mjs`, so the Worker computes a
+   * bill the same way rather than a second, guessed way. All that is left here
+   * is reading the rows, which is the one thing the two cannot share.
    */
   function billForTable(tableNo) {
     const orders = statements.openBillOrders.all(String(tableNo));
-    const items = [];
-    const groups = new Map();
-    let totalCents = 0;
-    for (const order of orders) {
-      for (const row of statements.orderItems.all(order.id)) {
-        const lineCents = row.unit_price_cents * row.quantity;
-        const vatPercent = row.vat_percent;
-        // Guests read the bill: keep the localized names next to the snapshot name.
+    const itemsByOrderId = new Map(orders.map((order) => [order.id, statements.orderItems.all(order.id)]));
+    const productsById = new Map();
+    for (const rows of itemsByOrderId.values()) {
+      for (const row of rows) {
+        if (productsById.has(row.product_id)) continue;
         const product = statements.productById.get(row.product_id);
-        items.push({
-          orderNo: order.order_no,
-          name: row.product_name,
-          names: product ? { zh: product.name_zh, de: product.name_de, en: product.name_en } : undefined,
-          qty: row.quantity,
-          unitPrice: row.unit_price_cents / 100,
-          lineTotal: lineCents / 100,
-          vatPercent,
-          modifiers: parseJson(row.modifiers_json, []).map((modifier) => ({ name: modifier.name, names: modifier.names }))
-        });
-        groups.set(vatPercent, (groups.get(vatPercent) || 0) + lineCents);
-        totalCents += lineCents;
+        if (product) productsById.set(row.product_id, product);
       }
     }
-    const vatBreakdown = [...groups.entries()].sort(([left], [right]) => left - right).map(([percent, grossCents]) => {
-      const netCents = Math.round(grossCents / (1 + percent / 100));
-      return { percent, gross: grossCents / 100, net: netCents / 100, vat: (grossCents - netCents) / 100 };
-    });
-    return {
-      table: String(tableNo),
-      orderNos: orders.map((order) => order.order_no),
-      orderIds: orders.map((order) => order.id),
-      items,
-      vatBreakdown,
-      total: totalCents / 100,
-      issuedAt: now(),
-      fiscalReceipt: false
-    };
+    return billView(tableNo, orders, itemsByOrderId, productsById);
   }
 
   function settleTableBill(tableNo) {

@@ -411,6 +411,66 @@ export function planOrder(input, productRows) {
   };
 }
 
+/**
+ * One table's open bill.
+ *
+ * Menu prices are gross, so VAT is extracted per rate group rather than added:
+ * a 10% line of 39.90 is 36.27 net and 3.63 tax, and getting that backwards is
+ * the mistake a POS integration most often arrives with. The rounding is done
+ * once per rate group, not per line, which is what the tax office expects and
+ * what keeps the group totals adding up to the printed total.
+ *
+ * This is an internal bill and says so. Under the RKSV the receipt a guest is
+ * owed comes from the Registrierkasse, not from here.
+ *
+ * Pure, over rows both backends already have: `node:sqlite` reads them
+ * synchronously and D1 does not, and that is the only difference between the
+ * two. It lives here because a second, guessed implementation of a tax
+ * calculation is the last thing this system needs.
+ */
+export function billView(tableNo, orderRows, itemsByOrderId, productsById, issuedAt = now()) {
+  const items = [];
+  const groups = new Map();
+  let totalCents = 0;
+
+  for (const order of orderRows) {
+    for (const row of itemsByOrderId.get(order.id) ?? []) {
+      const lineCents = row.unit_price_cents * row.quantity;
+      const vatPercent = row.vat_percent;
+      // Guests read the bill: keep the localized names next to the snapshot name.
+      const product = productsById.get(row.product_id);
+      items.push({
+        orderNo: order.order_no,
+        name: row.product_name,
+        names: product ? { zh: product.name_zh, de: product.name_de, en: product.name_en } : undefined,
+        qty: row.quantity,
+        unitPrice: row.unit_price_cents / 100,
+        lineTotal: lineCents / 100,
+        vatPercent,
+        modifiers: parseJson(row.modifiers_json, []).map((modifier) => ({ name: modifier.name, names: modifier.names }))
+      });
+      groups.set(vatPercent, (groups.get(vatPercent) || 0) + lineCents);
+      totalCents += lineCents;
+    }
+  }
+
+  const vatBreakdown = [...groups.entries()].sort(([left], [right]) => left - right).map(([percent, grossCents]) => {
+    const netCents = Math.round(grossCents / (1 + percent / 100));
+    return { percent, gross: grossCents / 100, net: netCents / 100, vat: (grossCents - netCents) / 100 };
+  });
+
+  return {
+    table: String(tableNo),
+    orderNos: orderRows.map((order) => order.order_no),
+    orderIds: orderRows.map((order) => order.id),
+    items,
+    vatBreakdown,
+    total: totalCents / 100,
+    issuedAt,
+    fiscalReceipt: false
+  };
+}
+
 export function printJobView(row) {
   if (!row) return null;
   return {

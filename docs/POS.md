@@ -26,7 +26,9 @@ The bill is gross-priced per line with the VAT rate on each line and a split
 per rate, which is the part a POS integration most often gets wrong.
 `docs/samples/bill.json` is a real payload produced by the server's own code
 (ids and order numbers replaced with fixed ones so the file does not change on
-every regeneration), spanning both rates:
+every regeneration), spanning both rates. The arithmetic lives once, in
+`shared/rules.mjs`, so the Node server and the Worker cannot compute a bill two
+different ways, and `shared/contract-suite.mjs` asserts the split against both:
 
 ```
 10 %  brutto 39.90   netto 36.27   USt 3.63

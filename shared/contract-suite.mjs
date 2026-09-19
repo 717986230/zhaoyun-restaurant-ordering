@@ -297,6 +297,37 @@ export function contractChecks(call, assert) {
       const missing = await call("POST", "/api/admin/tables/ZZ/lock", { role: "staff", body: { locked: true } });
       assert.equal(missing.status, 404);
 
+      // The bill, and what settling does to the table.
+      const bill = await call("GET", "/api/admin/tables/L1/bill", { role: "staff" });
+      assert.equal(bill.status, 200);
+      // Two orders survived above, one dish each at 12.50.
+      assert.equal(bill.json.bill.total, 25);
+      assert.equal(bill.json.bill.orderIds.length, 2);
+      assert.equal(bill.json.bill.fiscalReceipt, false, "this is an internal bill, never a Kassenbeleg");
+      // Menu prices are gross, so VAT comes out of the price rather than onto
+      // it — and the rounding happens once per rate group, not per line.
+      assert.deepEqual(bill.json.bill.vatBreakdown, [{ percent: 10, gross: 25, net: 22.73, vat: 2.27 }]);
+      assert.equal(bill.json.bill.items.length, 2);
+      assert.equal(bill.json.bill.items[0].unitPrice, 12.5);
+      assert.ok(bill.json.bill.items[0].names.de, "a guest reads the bill, so the localized names travel with it");
+
+      await call("POST", "/api/admin/tables/L1/lock", { role: "staff", body: { locked: true } });
+      const settled = await call("POST", "/api/admin/tables/L1/bill/settle", { role: "staff" });
+      assert.equal(settled.status, 200);
+      assert.equal(settled.json.bill.total, 25);
+      assert.ok(settled.json.bill.printJobId, "the bill goes to the front printer as a job");
+
+      const afterSettle = await call("GET", "/api/admin/tables/overview", { role: "staff" });
+      const freed = afterSettle.json.tables.find((entry) => entry.table === "L1");
+      assert.equal(freed.state, "free", "paying is what frees the table");
+      assert.equal(freed.locked, false, "and it clears the lock the waiter set");
+      assert.equal(freed.orders.length, 0, "settled orders leave the open bill");
+
+      const emptied = await call("GET", "/api/admin/tables/L1/bill", { role: "staff" });
+      assert.equal(emptied.json.bill.total, 0);
+      const again = await call("POST", "/api/admin/tables/L1/bill/settle", { role: "staff" });
+      assert.equal(again.status, 409, "a settled table cannot be settled twice");
+
       // Leave the room as it was found: a registered table changes how every
       // later order is authenticated.
       assert.equal((await call("DELETE", "/api/admin/tables/L1", { admin: true })).status, 204);

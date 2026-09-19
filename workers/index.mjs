@@ -313,15 +313,19 @@ async function handle(request, env) {
         return fail(error.message);
       }
     }
-    // Billing is the floor's, so it answers at the floor's rank rather than
-    // refusing a waiter for the wrong reason. It is not ported yet: the bill
-    // and its settle are the one piece of logic still living only in
-    // server/database.mjs, and a guessed reimplementation of a VAT split is
-    // not something to have two of. See docs/D1.md.
+    // The bill is the floor's, not the manager's.
     if (path[2] === "tables" && path.length >= 5 && path[4] === "bill") {
       const { denied } = await gate("staff");
       if (denied) return denied;
-      return fail("Billing is not implemented on this deployment; it still runs on the Node server", 501);
+      if (path.length === 5 && method === "GET") {
+        return json({ bill: await store.billForTable(path[3]) });
+      }
+      if (path.length === 6 && path[5] === "settle" && method === "POST") {
+        const bill = await store.settleTableBill(path[3]);
+        // Realtime is a Durable Object this deployment does not have, so the
+        // board finds out by polling rather than by being told.
+        return bill ? json({ bill }) : fail("Table has no open orders to settle", 409);
+      }
     }
     if (path[2] === "print-jobs") {
       const { denied } = await gate("staff");
