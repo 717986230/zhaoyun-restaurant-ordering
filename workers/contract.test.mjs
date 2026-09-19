@@ -23,7 +23,8 @@ test("Worker on D1 satisfies the API contract", { skip: baseUrl ? false : "set W
       method,
       headers: {
         ...(options.body ? { "content-type": "application/json" } : {}),
-        ...(options.admin || options.role ? { "x-admin-token": tokens[options.role || "manager"] } : {})
+        ...(options.admin || options.role ? { "x-admin-token": tokens[options.role || "manager"] } : {}),
+        ...(options.tableToken ? { "x-table-token": options.tableToken } : {})
       },
       ...(options.body ? { body: JSON.stringify(options.body) } : {})
     });

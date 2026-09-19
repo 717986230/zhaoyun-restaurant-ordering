@@ -1,5 +1,5 @@
 import type { StaffRole } from "@zhaoyun/api-client";
-import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
+import type { ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
 
 const orderStatusLabels: Record<ApiOrder["status"], string> = {
   new: "新订单",
@@ -39,22 +39,17 @@ interface Props {
   orders: ApiOrder[];
   requests: ApiServiceRequest[];
   failedJobs: ApiPrintJob[];
-  bill: ApiBill | null;
-  openTables: string[];
   role: StaffRole | null;
   busy: boolean;
   onRefresh: () => Promise<void>;
   onOrderStatus: (id: string, status: ApiOrder["status"]) => Promise<void>;
   onRequestStatus: (id: string, status: ApiServiceRequest["status"]) => Promise<void>;
   onRetryJob: (id: string) => Promise<void>;
-  onOpenBill: (table: string) => Promise<void>;
-  onCloseBill: () => void;
-  onSettleBill: (table: string) => Promise<void>;
 }
 
 export function BoardPanel(props: Props) {
-  // The kitchen screen only moves orders along; billing and service calls are
-  // not its job and the server would refuse them anyway.
+  // The kitchen screen only moves orders along; service calls and print
+  // failures are not its job and the server would refuse them anyway.
   const floor = props.role !== "kitchen";
   const openOrders = props.orders.filter((order) => order.status !== "completed" && order.status !== "cancelled");
   const openRequests = props.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled");
@@ -80,20 +75,9 @@ export function BoardPanel(props: Props) {
         }) : <div className="admin-empty">暂无进行中的订单</div>}</div>
       </section>
 
+      {/* Billing used to live here as a list of table numbers. It moved to the
+          桌位 tab, where the table it belongs to is on screen with it. */}
       {floor && <section className="board-column">
-        <h2>结账 <em>{props.openTables.length}</em></h2>
-        <div className="board-list">{props.openTables.length ? <div className="table-chips">{props.openTables.map((table) => <button key={table} className="ghost-action" disabled={props.busy} onClick={() => void props.onOpenBill(table)}>桌 {table}</button>)}</div> : <div className="admin-empty">没有待结账的桌</div>}</div>
-        {props.bill && <div className="bill-sheet" role="dialog" aria-label="账单">
-          <div className="board-card-head"><b>桌 {props.bill.table} 账单</b><button className="ghost-action" onClick={props.onCloseBill}>关闭</button></div>
-          {props.bill.items.length ? <>
-            <ul className="bill-items">{props.bill.items.map((item, index) => <li key={`${item.orderNo}-${index}`}><span>{item.qty} × {item.name}</span><span>{item.lineTotal.toFixed(2)} · {item.vatPercent}%</span></li>)}</ul>
-            <div className="bill-total"><span>合计</span><b>EUR {props.bill.total.toFixed(2)}</b></div>
-            <table className="bill-vat"><thead><tr><th>税率</th><th>净额</th><th>税额</th><th>含税</th></tr></thead><tbody>{props.bill.vatBreakdown.map((group) => <tr key={group.percent}><td>{group.percent}%</td><td>{group.net.toFixed(2)}</td><td>{group.vat.toFixed(2)}</td><td>{group.gross.toFixed(2)}</td></tr>)}</tbody></table>
-            <p className="bill-disclaimer">内部账单，不是税务收据；正式收据仍需由收银系统开具。</p>
-            <button className="primary-action" disabled={props.busy} onClick={() => void props.onSettleBill(props.bill!.table)}>打印账单并结账</button>
-          </> : <div className="admin-empty">这桌没有待结账的订单</div>}
-        </div>}
-
         <h2>服务呼叫 <em>{openRequests.length}</em></h2>
         <div className="board-list">{openRequests.length ? openRequests.map((request) => <article className="board-card compact" key={request.id}>
           <div className="board-card-head"><b>桌 {request.table}</b><span className={`status ${request.status}`}>{serviceLabels[request.type] || request.type}</span></div>

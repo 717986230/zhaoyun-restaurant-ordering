@@ -18,6 +18,7 @@ Everything a POS needs is already computed and already reachable:
 | | |
 |---|---|
 | One table's open bill | `GET /api/admin/tables/{table}/bill` |
+| Every table, with what is on it | `GET /api/admin/tables/overview` |
 | All orders | `GET /api/orders?limit=n` |
 | One order, as placed | inside the bill, grouped by `orderNo` |
 

@@ -603,6 +603,13 @@ h2 {
   white-space: nowrap;
 }
 
+/* Nothing in this console showed a disabled button as disabled, so a control
+   that was busy or unavailable looked exactly like one that would work. */
+.admin-shell button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .board-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -689,6 +696,138 @@ h2 {
   color: var(--a-faint);
   font-style: normal;
   font-size: 12px;
+}
+
+/* The room, one tile per table. Two columns on a phone is unreadable for a
+   tile that carries an order list, so the tiles set a minimum and the grid
+   decides how many fit. */
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.table-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--a-line);
+  border-left: 3px solid var(--a-line-2);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 12px 14px;
+}
+
+/* State is carried by the left edge as well as the pill: a glance across the
+   room should not need the labels to be read. */
+.table-tile.seated {
+  border-left-color: var(--a-accent);
+}
+
+.table-tile.locked {
+  border-left-color: var(--a-warn-solid);
+  background: var(--a-sunken);
+}
+
+.table-tile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.table-tile-head b {
+  font-size: 17px;
+}
+
+.table-tile-head .status {
+  border-radius: 999px;
+  background: var(--a-rail);
+  color: var(--a-muted);
+  padding: 3px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.table-tile-head .status.seated {
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.table-tile-head .status.locked {
+  background: var(--a-danger-wash);
+  color: var(--a-danger);
+}
+
+.table-tile-meta {
+  color: var(--a-faint);
+  font-size: 12px;
+}
+
+.table-tile-orders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.table-tile-orders > li {
+  border-top: 1px solid var(--a-line-soft);
+  padding-top: 8px;
+}
+
+.table-tile-order-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--a-faint);
+}
+
+.table-tile-order-head .status {
+  border-radius: 999px;
+  background: var(--a-rail);
+  color: var(--a-muted);
+  padding: 2px 8px;
+}
+
+.table-tile-orders ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.table-tile-orders ul em {
+  color: var(--a-faint);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.table-tile-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--a-line);
+  padding-top: 8px;
+  font-size: 13px;
+  color: var(--a-muted);
+}
+
+.table-tile-total b {
+  font-size: 16px;
+  color: var(--a-ink);
+}
+
+.table-tile-empty {
+  margin: 0;
+  color: var(--a-faint);
+  font-size: 13px;
+}
+
+.table-tile .board-actions {
+  margin-top: auto;
 }
 
 .table-chips {

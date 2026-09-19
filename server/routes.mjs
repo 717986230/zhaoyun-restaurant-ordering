@@ -5,7 +5,7 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
   CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody, TableParams
+  ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody, TableLockBody, TableParams
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
@@ -247,7 +247,10 @@ export function registerRoutes(app, { database, realtime, config }) {
       realtime.broadcast("print.queued", { orderId: order.id }, order.table);
       return reply.code(201).send({ order });
     } catch (error) {
-      return errorReply(reply, error);
+      // A locked table is a state the guest can wait out, not a malformed
+      // request, so the app can tell them to ask a waiter instead of telling
+      // them their cart is wrong.
+      return errorReply(reply, error, error.code === "TABLE_LOCKED" ? 409 : 400);
     }
   });
   app.patch("/api/orders/:id/status", { preHandler: requireKitchen, schema: { params: IdParams, body: OrderStatusBody } }, async (request, reply) => {
@@ -290,6 +293,24 @@ export function registerRoutes(app, { database, realtime, config }) {
   }));
   app.get("/api/admin/tables", { preHandler: requireAdmin }, async () => ({ tables: database.listTables() }));
   app.get("/api/admin/tables/open", { preHandler: requireFloor }, async () => ({ tables: database.openBillTables() }));
+
+  /**
+   * The floor's view of the room: every table, what is on it, and whether it
+   * is taking orders. The entry tokens are not in here — those stay on
+   * `/api/admin/tables`, which is the manager's.
+   */
+  app.get("/api/admin/tables/overview", { preHandler: requireFloor }, async () => ({ tables: database.tablesOverview() }));
+
+  app.post("/api/admin/tables/:table/lock", { preHandler: requireFloor, schema: { params: TableParams, body: TableLockBody } }, async (request, reply) => {
+    try {
+      const table = database.setTableLock(request.params.table, request.body.locked);
+      if (!table) return errorReply(reply, new Error("Table not found"), 404);
+      realtime.broadcast("table.changed", { table: table.table, locked: table.locked }, table.table);
+      return { table };
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
   app.post("/api/admin/tables", { preHandler: requireAdmin, schema: { body: TableBody } }, async (request, reply) => {
     try {
       return reply.code(201).send({ table: database.saveTable(request.body || {}) });

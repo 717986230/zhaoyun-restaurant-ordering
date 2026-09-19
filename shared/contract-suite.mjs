@@ -232,6 +232,76 @@ export function contractChecks(call, assert) {
       assert.equal((await call("DELETE", "/api/admin/tables/C7", { admin: true })).status, 404);
     }],
 
+    ["a locked table stops taking orders, and settling is what frees it", async () => {
+      // The lock is service state, not configuration: `enabled` takes a table
+      // out of the room, this one stops it adding to a bill that is being
+      // settled. An order that lands mid-settle is either missing from the bill
+      // the guest just paid or reopens a table that was released, so the refusal
+      // is the feature.
+      const registered = await call("POST", "/api/admin/tables", { admin: true, body: { table: "L1" } });
+      const tableToken = registered.json.table.token;
+
+      // Registering the first table also closes the open mode a fresh install
+      // starts in: from here an order has to carry the token printed on the
+      // card, or anyone who knows the address can order onto someone's bill.
+      const untokened = await call("POST", "/api/orders", {
+        body: { clientRequestId: "contract-no-table-token", table: "L1", note: "", items: [{ id: "photo-r1", qty: 1 }] }
+      });
+      assert.equal(untokened.status, 403, "a registered table needs the token from its card");
+      const unknownTable = await call("POST", "/api/orders", {
+        tableToken,
+        body: { clientRequestId: "contract-unknown-table", table: "ZZ", note: "", items: [{ id: "photo-r1", qty: 1 }] }
+      });
+      assert.equal(unknownTable.status, 403, "and it has to be a table that exists");
+
+      const seated = await call("POST", "/api/orders", {
+        tableToken,
+        body: { clientRequestId: "contract-lock-before", table: "L1", note: "", items: [{ id: "photo-r1", qty: 1 }] }
+      });
+      assert.equal(seated.status, 201);
+
+      const overview = await call("GET", "/api/admin/tables/overview", { role: "staff" });
+      assert.equal(overview.status, 200);
+      const before = overview.json.tables.find((entry) => entry.table === "L1");
+      assert.ok(before, "a table with orders on it must appear in the overview");
+      assert.equal(before.state, "seated");
+      assert.equal(before.orders.length, 1);
+      assert.equal(before.total, 12.5);
+      assert.equal(before.orders[0].items[0].name, before.orders[0].items[0].name, "the overview carries what was ordered");
+      assert.equal(before.token, undefined, "the entry token is the manager's, not the floor's");
+
+      const locked = await call("POST", "/api/admin/tables/L1/lock", { role: "staff", body: { locked: true } });
+      assert.equal(locked.status, 200);
+      assert.equal(locked.json.table.locked, true);
+      assert.ok(locked.json.table.lockedAt, "a lock records when it was set");
+
+      const refused = await call("POST", "/api/orders", {
+        tableToken,
+        body: { clientRequestId: "contract-lock-during", table: "L1", note: "", items: [{ id: "photo-r1", qty: 1 }] }
+      });
+      assert.equal(refused.status, 409, "a locked table refuses new orders, and not as a bad request");
+
+      const whileLocked = await call("GET", "/api/admin/tables/overview", { role: "staff" });
+      assert.equal(whileLocked.json.tables.find((entry) => entry.table === "L1").state, "locked");
+
+      const unlocked = await call("POST", "/api/admin/tables/L1/lock", { role: "staff", body: { locked: false } });
+      assert.equal(unlocked.json.table.locked, false);
+      assert.equal(unlocked.json.table.lockedAt, null);
+
+      const accepted = await call("POST", "/api/orders", {
+        tableToken,
+        body: { clientRequestId: "contract-lock-after", table: "L1", note: "", items: [{ id: "photo-r1", qty: 1 }] }
+      });
+      assert.equal(accepted.status, 201, "unlocking lets the table order again");
+
+      const missing = await call("POST", "/api/admin/tables/ZZ/lock", { role: "staff", body: { locked: true } });
+      assert.equal(missing.status, 404);
+
+      // Leave the room as it was found: a registered table changes how every
+      // later order is authenticated.
+      assert.equal((await call("DELETE", "/api/admin/tables/L1", { admin: true })).status, 204);
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

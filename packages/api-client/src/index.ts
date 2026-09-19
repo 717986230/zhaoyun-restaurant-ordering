@@ -47,6 +47,26 @@ export interface RestaurantTable {
   label: string;
   token: string;
   enabled: boolean;
+  /** Service state: a locked table refuses new orders until it is settled. */
+  locked: boolean;
+  lockedAt: string | null;
+}
+
+/**
+ * One table as the floor sees it. No entry token: that is the manager's, and
+ * this is served to every staff role.
+ */
+export interface TableOverview {
+  table: string;
+  label: string;
+  enabled: boolean;
+  locked: boolean;
+  lockedAt: string | null;
+  registered: boolean;
+  state: "free" | "seated" | "locked";
+  orders: ApiOrder[];
+  total: number;
+  since: string | null;
 }
 
 export interface AdminStorage {
@@ -126,6 +146,10 @@ export class AdminApi {
   settleBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/settle`, { method: "POST" }); }
   tables(): Promise<{ tables: RestaurantTable[] }> { return this.#request("/api/admin/tables"); }
   openTables(): Promise<{ tables: string[] }> { return this.#request("/api/admin/tables/open"); }
+  tableOverview(): Promise<{ tables: TableOverview[] }> { return this.#request("/api/admin/tables/overview"); }
+  setTableLock(table: string, locked: boolean): Promise<{ table: RestaurantTable }> {
+    return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/lock`, { method: "POST", body: JSON.stringify({ locked }) });
+  }
   saveTable(input: { table: string; label?: string; enabled?: boolean; rotateToken?: boolean }): Promise<{ table: RestaurantTable }> { return this.#request("/api/admin/tables", { method: "POST", body: JSON.stringify(input) }); }
   deleteTable(table: string): Promise<void> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}`, { method: "DELETE" }); }
   printers(): Promise<{ printers: PrinterProfile[] }> { return this.#request("/api/admin/printers"); }

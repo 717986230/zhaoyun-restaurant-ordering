@@ -6,6 +6,7 @@ import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
 import { BoardPanel } from "../features/board/BoardPanel";
+import { TablesPanel } from "../features/tables/TablesPanel";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
@@ -31,7 +32,7 @@ function mapProduct(product: ApiCatalogProduct): Product {
 const initialState: AdminState = {
   tab: "catalog", role: null, auditEntries: [],
   connected: false, connectionText: "未连接", products: [], printers: [],
-  orders: [], requests: [], failedJobs: [], bill: null, tables: [], openTables: [], boardBusy: false,
+  orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", toast: null
 };
 
@@ -40,8 +41,8 @@ const BOARD_REFRESH_MS = 5000;
 // The waiter tablet and the kitchen screen open the same console; the role
 // decides which of it exists at all, so nobody is offered a 403.
 const TABS_BY_ROLE: Record<StaffRole, AdminTab[]> = {
-  manager: ["catalog", "board", "printers", "system"],
-  staff: ["board"],
+  manager: ["catalog", "board", "tables", "printers", "system"],
+  staff: ["board", "tables"],
   kitchen: ["board"]
 };
 
@@ -50,6 +51,7 @@ const ROLE_LABELS: Record<StaffRole, string> = { manager: "经理", staff: "服�
 const TAB_LABELS: Record<AdminTab, string> = {
   catalog: "商品与媒体",
   board: "订单看板",
+  tables: "桌位",
   printers: "打印机",
   system: "连接设置"
 };
@@ -97,9 +99,9 @@ export function App() {
       // The kitchen screen may only read orders; asking for the rest would 403.
       const floor = roleRef.current === "kitchen"
         ? { requests: [], jobs: [], tables: [] }
-        : await Promise.all([adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.openTables()])
+        : await Promise.all([adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.tableOverview()])
           .then(([a, b, c]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables }));
-      setState((current) => ({ ...current, orders, requests: floor.requests, failedJobs: floor.jobs, openTables: floor.tables }));
+      setState((current) => ({ ...current, orders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables }));
     } catch (error) {
       if (!silent) notify(error instanceof Error ? error.message : "看板加载失败", "error");
     }
@@ -123,7 +125,7 @@ export function App() {
   }, [state.tab, loadTables]);
 
   useEffect(() => {
-    if (state.tab !== "board") return undefined;
+    if (state.tab !== "board" && state.tab !== "tables") return undefined;
     void loadBoard();
     const timer = window.setInterval(() => void loadBoard(true), BOARD_REFRESH_MS);
     return () => window.clearInterval(timer);
@@ -142,6 +144,10 @@ export function App() {
     }
   }
 
+  async function lockTable(table: string, locked: boolean) {
+    await runBoardAction(() => adminApi.setTableLock(table, locked), locked ? `桌 ${table} 已锁定，暂不接受新订单` : `桌 ${table} 已解除锁定`);
+  }
+
   async function openBill(table: string) {
     try {
       const { bill } = await adminApi.bill(table);
@@ -155,7 +161,7 @@ export function App() {
       const { bill } = await adminApi.settleBill(table);
       setState((current) => ({ ...current, bill: null }));
       await loadBoard(true);
-      notify(`桌 ${table} 已结账 EUR ${bill.total.toFixed(2)}，账单已送前台打印`);
+      notify(`桌 ${table} 已结账 EUR ${bill.total.toFixed(2)}，账单已送前台打印，桌位已释放`);
     } catch (error) {
       notify(error instanceof Error ? error.message : "结账失败", "error");
     } finally {
@@ -246,12 +252,18 @@ export function App() {
         onOrderStatus={(id: string, status: ApiOrder["status"]) => runBoardAction(() => adminApi.updateOrderStatus(id, status), "订单状态已更新")}
         onRequestStatus={(id: string, status: ApiServiceRequest["status"]) => runBoardAction(() => adminApi.updateServiceRequestStatus(id, status), "服务呼叫已处理")}
         onRetryJob={(id: string) => runBoardAction(() => adminApi.retryPrintJob(id), "打印任务已重新排队")}
+        role={state.role}
+      />}
+      {state.tab === "tables" && <TablesPanel
+        tables={state.tableOverview}
         bill={state.bill}
-        openTables={state.openTables}
+        role={state.role}
+        busy={state.boardBusy}
+        onRefresh={() => loadBoard()}
+        onLock={lockTable}
         onOpenBill={openBill}
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
         onSettleBill={settleBill}
-        role={state.role}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} />}

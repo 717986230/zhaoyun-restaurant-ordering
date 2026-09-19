@@ -82,6 +82,7 @@ CREATE TABLE restaurant_tables (
       label TEXT NOT NULL DEFAULT '',
       token TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
+      locked_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

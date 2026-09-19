@@ -11,7 +11,8 @@
 import {
   assertOrderTransition, assertRequestTransition, auditView, bool, boundedLimit, mapProduct,
   normalizePrinter, normalizeProduct, normalizeTableNo, now, orderProductIds, orderView, parseJson,
-  planOrder, planPrintFailure, printerView, printJobView, serviceRequestView, tableView, uuid
+  planOrder, planPrintFailure, printerView, printJobView, serviceRequestView, tableOverviewView,
+  tableView, uuid
 } from "../shared/rules.mjs";
 
 const PRODUCT_COLUMNS = [
@@ -128,6 +129,16 @@ export function createStore(db) {
     }
     const plan = planOrder(input, products);
     const { id, orderNo, clientRequestId, table, note, totalCents, timestamp } = plan.order;
+
+    // A locked table is one whose bill is being settled. Refusing here is the
+    // whole point of the lock: an order that lands mid-settle is either missing
+    // from the bill the guest just paid or reopens a table that was released.
+    const tableRow = await first("SELECT locked_at FROM restaurant_tables WHERE table_no = ?", String(table).toUpperCase());
+    if (tableRow?.locked_at) {
+      const error = new Error("This table is locked; please ask a waiter");
+      error.code = "TABLE_LOCKED";
+      throw error;
+    }
 
     // D1 has no interactive transaction, so the re-read that guards a retried
     // order cannot sit inside one. The UNIQUE index on client_request_id is what
@@ -275,6 +286,7 @@ export function createStore(db) {
      * thing anyone wants. `crypto.getRandomValues` is what a Worker has in
      * place of `node:crypto`.
      */
+    hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables LIMIT 1")),
     listTables: async () => (await all("SELECT * FROM restaurant_tables ORDER BY table_no")).map(tableView),
     getTable: async (table) => tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))),
     saveTable: async (input) => {
@@ -297,6 +309,37 @@ export function createStore(db) {
       return tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", table));
     },
     deleteTable: async (table) => (await run("DELETE FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))) > 0,
+    setTableLock: async (table, locked) => {
+      const tableNo = normalizeTableNo(table);
+      if (!await first("SELECT table_no FROM restaurant_tables WHERE table_no = ?", tableNo)) return null;
+      const timestamp = now();
+      await run("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?", locked ? timestamp : null, timestamp, tableNo);
+      return tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", tableNo));
+    },
+
+    /**
+     * Every table the floor has to look at, whether or not it is registered.
+     *
+     * An unregistered table with orders on it is real — someone scanned a card
+     * that was deleted, or typed a number — so it appears as seated rather
+     * than not appearing at all.
+     */
+    tablesOverview: async () => {
+      const orderRows = await all("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at");
+      const byTable = new Map();
+      for (const row of orderRows) {
+        const list = byTable.get(row.table_no) ?? [];
+        list.push(await viewOrder(row));
+        byTable.set(row.table_no, list);
+      }
+      const rows = await all("SELECT * FROM restaurant_tables ORDER BY table_no");
+      const known = new Set(rows.map((row) => row.table_no));
+      const overview = rows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? []));
+      for (const [tableNo, orders] of byTable) {
+        if (!known.has(tableNo)) overview.push(tableOverviewView(null, orders, tableNo));
+      }
+      return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+    },
     openBillTables: async () =>
       (await all("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"))
         .map((row) => row.table_no),

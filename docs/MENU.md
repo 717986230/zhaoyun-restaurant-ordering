@@ -94,3 +94,23 @@ photo has no alpha channel, so moving a layer off it does not remove it from
 the picture underneath and the dish appears twice. The breakdown above is what
 replaced it, and it has the advantage of working from data the menu already
 has.
+
+## The room
+
+`GET /api/admin/tables/overview` is the floor's view: every registered table,
+its state, and the orders on it that are not yet billed. It carries no entry
+tokens — those stay on `/api/admin/tables`, which is the manager's.
+
+A table is `free`, `seated` or `locked`. The first two follow from whether it
+has open orders. `locked` is set by hand from the 桌位 page and is service
+state, not configuration: `enabled` takes a table out of the room altogether,
+while a lock stops it adding to a bill that is about to be settled. A locked
+table refuses new orders with 409, and the guest app says why rather than
+telling them their cart is wrong.
+
+Settling the bill releases the lock, so nobody has to remember to unlock a
+table after the guests pay.
+
+A table with orders on it that nobody registered still appears, marked 未登记 —
+someone scanned a card that was later deleted, and hiding it would not make its
+bill go away.

@@ -17,11 +17,14 @@
 import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
-  CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody
+  CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
+  TableBody, TableLockBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
+
+const TABLE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,7}$/;
 
 const SECURITY_HEADERS = {
   "x-content-type-options": "nosniff",
@@ -77,7 +80,7 @@ function corsHeaders(request, env) {
   return {
     "access-control-allow-origin": allow,
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "access-control-allow-headers": "content-type,x-admin-token",
+    "access-control-allow-headers": "content-type,x-admin-token,x-table-token",
     "access-control-max-age": "86400",
     ...(allow === "*" ? {} : { vary: "origin" })
   };
@@ -85,6 +88,32 @@ function corsHeaders(request, env) {
 
 function clientKey(request) {
   return request.headers.get("cf-connecting-ip") || "unknown";
+}
+
+/**
+ * The table gate the Node server has had all along, and this one had not.
+ *
+ * Until a restaurant registers its first table the app runs in open mode, so a
+ * fresh install works before anything is set up. Once tables exist, an order
+ * has to name one of them and carry the token printed on its card — otherwise
+ * anyone who knows the address can put food on someone else's bill.
+ *
+ * The table is upper-cased in place, because that is what is stored and what
+ * the bill is grouped by.
+ */
+async function refuseUnknownTable(request, store, order) {
+  const table = String(order.table ?? "").trim().toUpperCase();
+  // Validated even in open mode: a table that cannot be registered later would
+  // otherwise be accepted now and become unbillable.
+  if (!TABLE_PATTERN.test(table)) return fail("Table number must be 1-8 letters or digits");
+  order.table = table;
+  if (!await store.hasTables()) return null;
+  const registered = await store.getTable(table);
+  if (!registered || !registered.enabled) return json({ error: "Unknown table" }, 403);
+  if (!tokenMatches(request.headers.get("x-table-token"), registered.token)) {
+    return json({ error: "Table token is invalid" }, 403);
+  }
+  return null;
 }
 
 /**
@@ -197,9 +226,14 @@ async function handle(request, env) {
       try {
         const { value, invalid } = await body(request, CreateOrderBody);
         if (invalid) return invalid;
+        const refused = await refuseUnknownTable(request, store, value);
+        if (refused) return refused;
         return json({ order: await store.createOrder(value) }, 201);
       } catch (error) {
-        return fail(error.message);
+        // A locked table is a state the guest can wait out, not a malformed
+        // request, so the app can tell them to ask a waiter instead of telling
+        // them their cart is wrong.
+        return fail(error.message, error.code === "TABLE_LOCKED" ? 409 : 400);
       }
     }
     if (path.length === 4 && path[3] === "status" && method === "PATCH") {
@@ -259,6 +293,25 @@ async function handle(request, env) {
       const { denied } = await gate("staff");
       if (denied) return denied;
       return json({ tables: await store.openBillTables() });
+    }
+    // The floor's view of the room. The entry tokens are not in it — those stay
+    // on /api/admin/tables, which is the manager's.
+    if (path.length === 4 && path[2] === "tables" && path[3] === "overview" && method === "GET") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      return json({ tables: await store.tablesOverview() });
+    }
+    if (path.length === 5 && path[2] === "tables" && path[4] === "lock" && method === "POST") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      try {
+        const { value, invalid } = await body(request, TableLockBody);
+        if (invalid) return invalid;
+        const table = await store.setTableLock(path[3], value.locked);
+        return table ? json({ table }) : fail("Table not found", 404);
+      } catch (error) {
+        return fail(error.message);
+      }
     }
     // Billing is the floor's, so it answers at the floor's rank rather than
     // refusing a waiter for the wrong reason. It is not ported yet: the bill

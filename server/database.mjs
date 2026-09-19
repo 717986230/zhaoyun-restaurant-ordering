@@ -5,13 +5,13 @@ import { DatabaseSync } from "node:sqlite";
 import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
-import { auditView, normalizeTableNo, tableView } from "../shared/rules.mjs";
+import { auditView, normalizeTableNo, tableOverviewView, tableView } from "../shared/rules.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 const VAT_PERCENTS = new Set([10, 13, 20]);
 // Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
@@ -227,6 +227,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       label TEXT NOT NULL DEFAULT '',
       token TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
+      locked_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -272,7 +273,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE print_jobs ADD COLUMN next_attempt_at TEXT",
     "ALTER TABLE products ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
     "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
-    "ALTER TABLE orders ADD COLUMN billed_at TEXT"
+    "ALTER TABLE orders ADD COLUMN billed_at TEXT",
+    "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT"
   ]) {
     try {
       db.exec(statement);
@@ -344,6 +346,9 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       ON CONFLICT(table_no) DO UPDATE SET label = excluded.label, token = excluded.token, enabled = excluded.enabled, updated_at = excluded.updated_at
     `),
     deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
+    setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
+    releaseTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?"),
+    openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
     listPrinters: db.prepare("SELECT * FROM printer_profiles ORDER BY role, name"),
     printerById: db.prepare("SELECT * FROM printer_profiles WHERE id = ?"),
     insertPrinter: db.prepare("INSERT INTO printer_profiles (id, name, transport, address, port, role, enabled, capabilities_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
@@ -496,6 +501,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     const tableNo = String(input.table ?? "").trim();
     if (!tableNo) throw new Error("Order requires a table number");
+    // A locked table is one whose bill is being settled. Refusing here is the
+    // whole point of the lock: an order that lands mid-settle is either missing
+    // from the bill the guest just paid or reopens a table that was released.
+    const tableRow = statements.tableByNo.get(tableNo.toUpperCase());
+    if (tableRow?.locked_at) {
+      const error = new Error("This table is locked; please ask a waiter");
+      error.code = "TABLE_LOCKED";
+      throw error;
+    }
     db.exec("BEGIN IMMEDIATE");
     try {
       const committed = statements.orderByClientId.get(requestId);
@@ -579,6 +593,9 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       }
       const timestamp = now();
       statements.markOrdersBilled.run(timestamp, timestamp, table);
+      // Paying is what frees the table, so the lock a waiter set before
+      // printing the bill does not have to be cleared by hand afterwards.
+      statements.releaseTableLock.run(timestamp, table);
       const jobId = randomUUID();
       statements.insertPrintJob.run(jobId, bill.orderIds[0], "front", JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp);
       db.exec("COMMIT");
@@ -733,6 +750,35 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       statements.insertAudit.run(randomUUID(), now(), String(entry.role), String(entry.ip ?? ""), String(entry.method), String(entry.route), Number(entry.status), JSON.stringify(entry.detail ?? {}));
     },
     listAudit: (limit = 100) => statements.listAudit.all(Math.min(Number(limit) || 100, 500)).map(auditView),
+    /**
+     * Every table the floor has to look at, whether or not it is registered.
+     *
+     * An unregistered table with orders on it is real — someone scanned a card
+     * that was deleted, or typed a number — so it appears as seated rather
+     * than not appearing at all.
+     */
+    tablesOverview: () => {
+      const byTable = new Map();
+      for (const row of statements.openOrdersForTables.all()) {
+        const list = byTable.get(row.table_no) ?? [];
+        list.push(orderView(row, statements.orderItems.all(row.id)));
+        byTable.set(row.table_no, list);
+      }
+      const rows = statements.listTables.all();
+      const known = new Set(rows.map((row) => row.table_no));
+      const overview = rows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? []));
+      for (const [tableNo, orders] of byTable) {
+        if (!known.has(tableNo)) overview.push(tableOverviewView(null, orders, tableNo));
+      }
+      return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+    },
+    setTableLock: (table, locked) => {
+      const tableNo = normalizeTableNo(table);
+      if (!statements.tableByNo.get(tableNo)) return null;
+      const timestamp = now();
+      statements.setTableLock.run(locked ? timestamp : null, timestamp, tableNo);
+      return tableView(statements.tableByNo.get(tableNo));
+    },
     hasTables: () => statements.tableCount.get().count > 0,
     listTables: () => statements.listTables.all().map(tableView),
     getTable: (table) => tableView(statements.tableByNo.get(String(table ?? "").trim().toUpperCase())),

@@ -57,7 +57,11 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
         dispatch({ type: "toast", message: t(state.language, "orderQueued") });
       } else {
         dispatch({ type: "order-created", order: { ...baseOrder, status: "sync-failed" } });
-        dispatch({ type: "toast", message: t(state.language, "orderRejected") });
+        // A locked table is the one refusal the guest can do something about:
+        // their cart is fine, the bill is being settled. Telling them to check
+        // their dishes would send them looking for a problem that is not there.
+        const locked = error instanceof ApiError && error.status === 409;
+        dispatch({ type: "toast", message: t(state.language, locked ? "orderTableLocked" : "orderRejected") });
       }
     } finally {
       setSubmitting(false);

@@ -1,8 +1,8 @@
 import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
-import type { AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
+import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
-export type AdminTab = "catalog" | "board" | "printers" | "system";
+export type AdminTab = "catalog" | "board" | "tables" | "printers" | "system";
 export type ProductFilter = "all" | "food" | "drink" | "sushi";
 
 export interface AdminState {
@@ -17,7 +17,7 @@ export interface AdminState {
   failedJobs: ApiPrintJob[];
   bill: ApiBill | null;
   tables: RestaurantTable[];
-  openTables: string[];
+  tableOverview: TableOverview[];
   boardBusy: boolean;
   printers: PrinterProfile[];
   discoveredPrinters: DiscoveredPrinter[];

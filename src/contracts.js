@@ -106,6 +106,10 @@ export const PrinterBody = Type.Object({
   capabilities: Type.Optional(Type.Record(Type.String({ maxLength: 80 }), Type.Unknown()))
 });
 
+export const TableLockBody = Type.Object({
+  locked: Type.Boolean()
+});
+
 export const TableBody = Type.Object({
   table: TableNo,
   label: Type.Optional(Type.String({ maxLength: 64 })),

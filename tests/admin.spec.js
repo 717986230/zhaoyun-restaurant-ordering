@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
     id: "request-1", table: "12", type: "water", status: requestStatus, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   }] }) }));
   await page.route("**/api/admin/print-jobs*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jobs: [] }) }));
-  await page.route("**/api/admin/tables/open", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [] }) }));
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [] }) }));
   await page.goto("/admin.html");
 });
 
@@ -101,12 +101,15 @@ test("a waiter tablet only gets the board, never the catalog", async ({ page }) 
   await page.route("**/api/orders*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ orders: [] }) }));
   await page.route("**/api/service-requests*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ requests: [] }) }));
   await page.route("**/api/admin/print-jobs*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jobs: [] }) }));
-  await page.route("**/api/admin/tables/open", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [] }) }));
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [] }) }));
   await page.goto("/admin.html");
 
   await expect(page.getByText("服务员")).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单看板");
+  // A waiter runs the floor, so the board and the room are theirs; the menu,
+  // the printers and the table tokens are not.
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单看板桌位");
   await expect(page.getByRole("button", { name: "商品与媒体" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "打印机" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "连接设置" })).toHaveCount(0);
   await expect(page.locator("#boardPanel")).toBeVisible();
 });
@@ -125,6 +128,7 @@ test("a kitchen screen sees orders without billing or service calls", async ({ p
   await expect(page.getByRole("button", { name: /更新为：制作中/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "取消订单" })).toHaveCount(0);
   await expect(page.getByText("结账")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "桌位" })).toHaveCount(0);
 });
 
 test("a table card carries the entry link a guest phone will scan", async ({ page }) => {
@@ -150,4 +154,77 @@ test("a table card carries the entry link a guest phone will scan", async ({ pag
   await expect(cards.first().locator("svg")).toBeVisible();
   const modules = await cards.first().locator("svg rect, svg path").count();
   expect(modules, "an empty svg would render as a blank card on every table").toBeGreaterThan(0);
+});
+
+test("the table page shows what is on each table, and locking stops it ordering", async ({ page }) => {
+  const overview = [
+    {
+      table: "07", label: "窗边", enabled: true, locked: false, lockedAt: null, registered: true,
+      state: "seated", total: 27.4, since: new Date().toISOString(),
+      orders: [{
+        id: "order-1", clientRequestId: "c1", no: "260902-001", table: "07", status: "preparing",
+        note: "少盐", total: 27.4, createdAt: new Date().toISOString(),
+        items: [{ id: "photo-r1", name: "蔬菜拉面", qty: 2, modifiers: [{ name: "加面" }] }]
+      }]
+    },
+    { table: "08", label: "", enabled: true, locked: false, lockedAt: null, registered: true, state: "free", total: 0, since: null, orders: [] },
+    { table: "09", label: "", enabled: true, locked: true, lockedAt: new Date().toISOString(), registered: true, state: "locked", total: 9.9, since: new Date().toISOString(), orders: [] }
+  ];
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: overview }) }));
+  let lockedWith = null;
+  await page.route("**/api/admin/tables/07/lock", (route) => {
+    lockedWith = route.request().postDataJSON();
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ table: { table: "07", label: "窗边", token: "t", enabled: true, locked: true, lockedAt: new Date().toISOString() } }) });
+  });
+  await page.goto("/admin.html");
+  await page.getByRole("button", { name: "桌位" }).click();
+
+  const seven = page.locator(".table-tile", { hasText: "桌 07" });
+  // What a manager asked for: the state, and what has actually been ordered.
+  await expect(seven.locator(".status").first()).toHaveText("用餐中");
+  await expect(seven).toContainText("蔬菜拉面");
+  await expect(seven).toContainText("加面");
+  await expect(seven).toContainText("EUR 27.40");
+  await expect(page.locator(".table-tile", { hasText: "桌 08" }).locator(".status").first()).toHaveText("空闲");
+  await expect(page.locator(".table-tile", { hasText: "桌 09" }).locator(".status").first()).toHaveText("已锁定");
+  // A table already locked offers the way back, not a second lock.
+  await expect(page.locator(".table-tile", { hasText: "桌 09" }).getByRole("button", { name: "解除锁定" })).toBeVisible();
+
+  await seven.getByRole("button", { name: "锁定桌号" }).click();
+  await expect.poll(() => lockedWith).toEqual({ locked: true });
+});
+
+test("settling a table releases it, and the guest is told why the table refused", async ({ page }) => {
+  const table = {
+    table: "07", label: "", enabled: true, locked: true, lockedAt: new Date().toISOString(), registered: true,
+    state: "locked", total: 12.5, since: new Date().toISOString(),
+    orders: [{
+      id: "order-1", clientRequestId: "c1", no: "260902-001", table: "07", status: "ready", note: "",
+      total: 12.5, createdAt: new Date().toISOString(), items: [{ id: "photo-r1", name: "蔬菜拉面", qty: 1 }]
+    }]
+  };
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [table] }) }));
+  await page.route("**/api/admin/tables/07/bill", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bill: {
+    table: "07", orderNos: ["260902-001"], orderIds: ["order-1"],
+    items: [{ orderNo: "260902-001", name: "蔬菜拉面", qty: 1, unitPrice: 12.5, lineTotal: 12.5, vatPercent: 10 }],
+    vatBreakdown: [{ percent: 10, gross: 12.5, net: 11.36, vat: 1.14 }],
+    total: 12.5, issuedAt: new Date().toISOString(), fiscalReceipt: false
+  } }) }));
+  let settled = false;
+  await page.route("**/api/admin/tables/07/bill/settle", (route) => {
+    settled = true;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bill: { table: "07", orderNos: [], orderIds: [], items: [], vatBreakdown: [], total: 12.5, issuedAt: new Date().toISOString(), fiscalReceipt: false, printJobId: "job-1" } }) });
+  });
+  await page.goto("/admin.html");
+  await page.getByRole("button", { name: "桌位" }).click();
+  await page.locator(".table-tile", { hasText: "桌 07" }).getByRole("button", { name: "结账" }).click();
+
+  const bill = page.getByRole("dialog", { name: "账单" });
+  await expect(bill).toContainText("EUR 12.50");
+  await expect(bill).toContainText("结账后这桌会自动解除锁定");
+  await bill.getByRole("button", { name: "打印账单并结账" }).click();
+  await expect.poll(() => settled).toBe(true);
+  await expect(page.getByRole("status")).toContainText("桌位已释放");
 });

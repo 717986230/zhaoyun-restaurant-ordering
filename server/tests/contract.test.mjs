@@ -38,7 +38,10 @@ test("Node server satisfies the API contract", async (context) => {
     const response = await app.inject({
       method,
       url,
-      ...(options.admin || options.role ? { headers: { "x-admin-token": TOKENS[options.role || "manager"] } } : {}),
+      headers: {
+        ...(options.admin || options.role ? { "x-admin-token": TOKENS[options.role || "manager"] } : {}),
+        ...(options.tableToken ? { "x-table-token": options.tableToken } : {})
+      },
       ...(options.body ? { payload: options.body } : {})
     });
     let json = {};

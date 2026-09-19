@@ -5,7 +5,7 @@ import { PRINT_JOB_STATUSES } from "../src/contracts.js";
 // below are server-local.
 export {
   CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody,
-  ServiceRequestBody, ServiceStatusBody, TableBody
+  ServiceRequestBody, ServiceStatusBody, TableBody, TableLockBody
 } from "../src/contracts.js";
 
 const IdParams = Type.Object({ id: Type.String({ minLength: 1, maxLength: 128 }) });

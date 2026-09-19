@@ -64,8 +64,48 @@ export function normalizeTableNo(value) {
 
 export function tableView(row) {
   return row
-    ? { table: row.table_no, label: row.label, token: row.token, enabled: Boolean(row.enabled), createdAt: row.created_at, updatedAt: row.updated_at }
+    ? {
+        table: row.table_no,
+        label: row.label,
+        token: row.token,
+        enabled: Boolean(row.enabled),
+        locked: Boolean(row.locked_at),
+        lockedAt: row.locked_at ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
     : null;
+}
+
+export const TABLE_STATES = new Set(["free", "seated", "locked"]);
+
+/**
+ * One table as the floor sees it: is anyone sitting there, what have they
+ * ordered, and may they order more.
+ *
+ * `locked` is service state, not configuration — `enabled` is what takes a
+ * table out of the room altogether. A locked table refuses new orders, which
+ * is what makes it useful while a bill is being settled, and settling the bill
+ * releases it. Both backends aggregate their own rows; this decides what the
+ * result means, so the two cannot disagree about when a table is free.
+ */
+export function tableOverviewView(row, orders = [], fallbackTable = "") {
+  const open = orders.filter((order) => order.status !== "cancelled");
+  const view = tableView(row) ?? { table: String(fallbackTable), label: "", enabled: true, locked: false, lockedAt: null };
+  return {
+    table: view.table,
+    label: view.label,
+    enabled: view.enabled,
+    locked: view.locked,
+    lockedAt: view.lockedAt,
+    // A table nobody has registered can still have orders on it, and it is
+    // seated rather than invisible: the guest scanned something.
+    registered: Boolean(row),
+    state: view.locked ? "locked" : open.length ? "seated" : "free",
+    orders: open,
+    total: Math.round(open.reduce((sum, order) => sum + Math.round(order.total * 100), 0)) / 100,
+    since: open.length ? open.map((order) => order.createdAt).sort()[0] : null
+  };
 }
 
 export function auditView(row) {
