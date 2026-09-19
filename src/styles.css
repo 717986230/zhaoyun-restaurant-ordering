@@ -1,12 +1,63 @@
 :root {
-  --bg: #090807;
-  --panel: #211d1b;
-  --panel-2: #28221f;
-  --line: #625850;
-  --ink: #f1ebe3;
-  --muted: #aaa097;
-  --gold: #b99a70;
-  --accent: #d6b47f;
+  /* 墨玉 — the whole palette, and the only place a colour is written down.
+     Everything below this block references a token, and `tests/styles.spec.js`
+     fails on a raw colour outside it, so re-skinning the app is editing these
+     lines and nothing else.
+
+     Two decisions are baked in. The neutrals have no brown in them: what reads
+     as a cheap Chinese restaurant is the warm cast and the gold, not the
+     darkness. And there is exactly one accent, a celadon green, spent on the
+     single thing a screen wants you to do — Wiener Moderne restraint and 留白
+     happen to want the same thing. */
+
+  /* Surfaces, from the room to the raised card. */
+  --bg-deep: #08090a;
+  --bg: #0f1113;
+  --bg-2: #131518;
+  --panel: #181b1e;
+  --panel-2: #1e2226;
+  --panel-3: #262b30;
+  --panel-glass: rgba(15, 17, 19, 0.93);
+  --field: #131619;
+  --field-glass: rgba(19, 22, 25, 0.68);
+  --fade-1: rgba(10, 11, 12, 0.96);
+  --fade-2: rgba(10, 11, 12, 0.86);
+  --room-glow: rgba(143, 176, 163, 0.07);
+
+  /* Hairlines and washes. A border is a change in light, not a gold rule. */
+  --line-soft: rgba(233, 238, 240, 0.08);
+  --line: rgba(233, 238, 240, 0.15);
+  --line-strong: rgba(233, 238, 240, 0.28);
+  --wash: rgba(233, 238, 240, 0.04);
+  --wash-2: rgba(233, 238, 240, 0.07);
+
+  /* Ink. --faint is still 4.5:1 on --panel: the smallest type has to be read
+     by someone holding the tablet at arm's length. */
+  --ink: #edf0f1;
+  --ink-2: #ccd2d4;
+  --muted: #9aa2a6;
+  --faint: #8d9497;
+  --porcelain: #e9edee;
+  --porcelain-2: #d6dcdd;
+
+  /* The one accent. */
+  --accent: #8fb0a3;
+  --accent-strong: #a9c7ba;
+  --accent-ink: #0c100f;
+  --accent-line: rgba(143, 176, 163, 0.45);
+  --accent-wash: rgba(143, 176, 163, 0.14);
+
+  /* The one warm colour left in the app, and it only ever means "look here". */
+  --danger: #c2705c;
+  --danger-ink: #efc7ba;
+
+  --shadow-1: 0 16px 30px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 20px 44px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 30px 70px rgba(0, 0, 0, 0.72);
+  --inset-art: inset 0 0 35px rgba(0, 0, 0, 0.72);
+  --scrim: rgba(0, 0, 0, 0.32);
+  --art-sheen: rgba(255, 255, 255, 0.14);
+  --art-shade: rgba(0, 0, 0, 0.72);
 
   /* One easing and one duration scale for the whole app. The JS animations in
      CatalogScreen use the same numbers so the overlay, the card and the flip
@@ -18,9 +69,10 @@
   --dur-slow: 0.35s;
 
   color: var(--ink);
-  background: #050505;
+  background: var(--bg-deep);
   font-family: Inter, system-ui, -apple-system, "Noto Sans SC", sans-serif;
 }
+
 
 * {
   box-sizing: border-box;
@@ -35,7 +87,7 @@ body,
   min-width: 320px;
   height: 100%;
   overflow: hidden;
-  background: #050505;
+  background: var(--bg);
 }
 
 button,
@@ -54,8 +106,8 @@ button {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 70% 0, rgba(119, 90, 58, 0.28), transparent 34%),
-    linear-gradient(145deg, #161310, #080706 62%);
+    radial-gradient(circle at 70% 0, var(--room-glow), transparent 34%),
+    linear-gradient(145deg, var(--bg-2), var(--bg-deep) 62%);
 }
 
 .screen {
@@ -102,7 +154,7 @@ html.plt-android .screen.active {
 .service small {
   font: 10px Georgia, serif;
   letter-spacing: 0.18em;
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .brand h1 {
@@ -140,7 +192,7 @@ html.plt-android .screen.active {
 .home-btn.home-lead {
   min-height: 132px;
   border-color: var(--accent);
-  background: linear-gradient(140deg, rgba(214, 180, 127, 0.22), rgba(36, 29, 25, 0.98) 72%);
+  background: linear-gradient(140deg, var(--accent-wash), var(--panel-2) 72%);
 }
 
 .home-btn.home-lead b {
@@ -166,20 +218,20 @@ html.plt-android .screen.active {
 
 .home-btn {
   min-height: 92px;
-  border: 1px solid rgba(185, 154, 112, 0.52);
+  border: 1px solid var(--line-strong);
   border-radius: 7px;
-  background: linear-gradient(140deg, rgba(47, 39, 35, 0.98), rgba(24, 20, 18, 0.98));
+  background: linear-gradient(140deg, var(--panel-3), var(--panel));
   color: var(--ink);
   display: grid;
   align-content: center;
   text-align: left;
   padding: 18px;
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.34);
+  box-shadow: var(--shadow-1);
 }
 
 .home-btn span {
   font: 13px Georgia, serif;
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .home-btn b {
@@ -197,7 +249,7 @@ html.plt-android .screen.active {
 }
 
 .staff-link {
-  border-color: rgba(122, 150, 126, 0.72);
+  border-color: var(--accent-line);
 }
 
 .crash {
@@ -233,7 +285,7 @@ html.plt-android .screen.active {
 
 .crash code {
   margin-top: 18px;
-  color: #7d6a58;
+  color: var(--faint);
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -245,7 +297,7 @@ html.plt-android .screen.active {
 }
 
 .allergen {
-  border: 1px solid rgba(185, 154, 112, 0.42);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 2px 9px;
   font-size: 11px;
@@ -257,7 +309,7 @@ html.plt-android .screen.active {
 .staff-scope {
   margin: 0 0 14px;
   padding: 10px 12px;
-  border: 1px solid rgba(185, 154, 112, 0.32);
+  border: 1px solid var(--line-soft);
   border-radius: 6px;
   color: var(--muted);
   font-size: 12px;
@@ -273,21 +325,21 @@ html.plt-android .screen.active {
 }
 
 .table-button {
-  border: 1px solid rgba(185, 154, 112, 0.4);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #1e1a18;
+  background: var(--field);
   color: var(--muted);
   padding: 8px 16px;
   letter-spacing: 0.08em;
 }
 
 .table-button.unset {
-  border-color: #b4543f;
-  color: #e8b7a6;
+  border-color: var(--danger);
+  color: var(--danger-ink);
 }
 
 .table-setup small {
-  color: #b4543f;
+  color: var(--danger);
   font-size: 11px;
   letter-spacing: 0.06em;
 }
@@ -300,17 +352,17 @@ html.plt-android .screen.active {
 }
 
 .langs button {
-  border: 1px solid rgba(185, 154, 112, 0.4);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #1e1a18;
+  background: var(--field);
   color: var(--muted);
   padding: 8px 12px;
 }
 
 .langs button.active {
-  border-color: var(--gold);
+  border-color: var(--accent);
   color: var(--ink);
-  background: rgba(185, 154, 112, 0.18);
+  background: var(--accent-wash);
 }
 
 .menu,
@@ -327,7 +379,7 @@ html.plt-android .screen.active {
   padding: 0 16px;
   position: relative;
   z-index: 20;
-  background: linear-gradient(#0a0908f5, #0a0908dc, transparent);
+  background: linear-gradient(var(--fade-1), var(--fade-2), transparent);
 }
 
 .topbar {
@@ -336,8 +388,8 @@ html.plt-android .screen.active {
 
 .panel-head {
   height: 82px;
-  border-bottom: 1px solid #403934;
-  background: #11100e;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
 }
 
 .title,
@@ -392,7 +444,7 @@ html.plt-android .screen.active {
   padding: 13px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #292522;
+  background: var(--panel-2);
   color: var(--ink);
   outline: none;
 }
@@ -401,7 +453,7 @@ html.plt-android .screen.active {
 .secondary {
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: #211d1b;
+  background: var(--panel);
   color: var(--ink);
   padding: 12px 14px;
 }
@@ -423,9 +475,9 @@ html.plt-android .screen.active {
 
 .chip {
   flex: 0 0 auto;
-  border: 1px solid #504740;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #1e1a18;
+  background: var(--field);
   color: var(--muted);
   padding: 7px 13px;
   font-size: 10px;
@@ -433,9 +485,9 @@ html.plt-android .screen.active {
 }
 
 .chip.on {
-  background: var(--gold);
-  border-color: var(--gold);
-  color: #171310;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .stack {
@@ -474,10 +526,10 @@ html.plt-android .screen.active {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border: 1px solid rgba(109, 98, 90, 0.72);
+  border: 1px solid var(--line);
   border-radius: 7px;
-  background: linear-gradient(165deg, #292320, #1c1816);
-  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.48);
+  background: linear-gradient(165deg, var(--panel-2), var(--panel));
+  box-shadow: var(--shadow-2);
   backface-visibility: hidden;
 }
 
@@ -488,8 +540,8 @@ html.plt-android .screen.active {
   flex-direction: column;
   gap: 16px;
   background:
-    linear-gradient(150deg, rgba(185, 154, 112, 0.16), transparent 42%),
-    #1f1a17;
+    linear-gradient(150deg, var(--accent-wash), transparent 42%),
+    var(--panel-2);
 }
 
 .summary {
@@ -503,7 +555,7 @@ html.plt-android .screen.active {
 
 .number {
   font: 14px Georgia, serif;
-  color: #c6bbb2;
+  color: var(--ink-2);
 }
 
 .summary h3,
@@ -537,7 +589,7 @@ html.plt-android .screen.active {
 .cat {
   font: 10px Georgia, serif;
   letter-spacing: 0.13em;
-  color: #c5b9b0;
+  color: var(--ink-2);
 }
 
 .detail {
@@ -566,14 +618,14 @@ html.plt-android .screen.active {
   border-radius: 3px;
   overflow: hidden;
   background: var(--art);
-  box-shadow: inset 0 0 35px #000b;
+  box-shadow: var(--inset-art);
 }
 
 .art::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 24% 22%, rgba(255, 255, 255, 0.14), transparent 23%), linear-gradient(120deg, transparent, rgba(0, 0, 0, 0.72));
+  background: radial-gradient(circle at 24% 22%, var(--art-sheen), transparent 23%), linear-gradient(120deg, transparent, var(--art-shade));
 }
 
 .lines::after,
@@ -586,34 +638,34 @@ html.plt-android .screen.active {
 }
 
 .lines::after {
-  background: repeating-linear-gradient(90deg, #eee 0 4px, transparent 4px 9px);
+  background: repeating-linear-gradient(90deg, var(--porcelain) 0 4px, transparent 4px 9px);
 }
 
 .dots::after {
-  background: radial-gradient(circle, #eee 0 2.6px, transparent 3px);
+  background: radial-gradient(circle, var(--porcelain) 0 2.6px, transparent 3px);
   background-size: 12px 12px;
 }
 
 .ring::after {
   border-radius: 50%;
-  background: repeating-radial-gradient(circle, #ddd 0 2px, transparent 2px 7px);
+  background: repeating-radial-gradient(circle, var(--porcelain-2) 0 2px, transparent 2px 7px);
 }
 
 .feature h4 {
   margin: 4px 0 10px;
   font: 19px/1.28 Georgia, serif;
-  color: #d1c7bf;
+  color: var(--ink-2);
 }
 
 .feature p,
 .card-back p {
-  color: #a89d95;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.65;
 }
 
 .meta {
-  border-top: 1px solid #4a413d;
+  border-top: 1px solid var(--line);
   margin-top: 18px;
   padding-top: 13px;
   display: flex;
@@ -624,7 +676,7 @@ html.plt-android .screen.active {
 }
 
 .meta span {
-  border: 1px solid rgba(185, 154, 112, 0.28);
+  border: 1px solid var(--line-soft);
   border-radius: 999px;
   padding: 5px 9px;
 }
@@ -672,10 +724,10 @@ html.plt-android .screen.active {
 
 .primary {
   width: 100%;
-  border: 1px solid var(--gold);
+  border: 1px solid var(--accent);
   border-radius: 7px;
-  background: var(--gold);
-  color: #171310;
+  background: var(--accent);
+  color: var(--accent-ink);
   padding: 14px;
   font-weight: 800;
 }
@@ -691,7 +743,7 @@ html.plt-android .screen.active {
 
 .flip-back {
   align-self: flex-start;
-  border: 1px solid rgba(185, 154, 112, 0.45);
+  border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: var(--ink);
@@ -706,7 +758,7 @@ html.plt-android .screen.active {
 }
 
 .card-back div {
-  border: 1px solid rgba(185, 154, 112, 0.22);
+  border: 1px solid var(--line-soft);
   border-radius: 7px;
   padding: 12px;
 }
@@ -729,16 +781,16 @@ html.plt-android .screen.active {
   transform: translateX(-50%);
   width: min(calc(100vw - 36px), 720px);
   min-height: 58px;
-  border: 1px solid rgba(185, 154, 112, 0.7);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: #171412ed;
+  background: var(--panel-glass);
   color: var(--ink);
   display: grid;
   grid-template-columns: 1fr 32px auto;
   gap: 10px;
   align-items: center;
   padding: 0 16px;
-  box-shadow: 0 18px 36px #000c;
+  box-shadow: var(--shadow-1);
   backdrop-filter: blur(14px);
 }
 
@@ -752,8 +804,8 @@ html.plt-android .screen.active {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--gold);
-  color: #171310;
+  background: var(--accent);
+  color: var(--accent-ink);
   display: grid;
   place-items: center;
   font-size: 12px;
@@ -761,7 +813,7 @@ html.plt-android .screen.active {
 
 .cartbar em {
   font: normal 15px Georgia, serif;
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .content {
@@ -774,8 +826,8 @@ html.plt-android .screen.active {
 .row,
 .order,
 .note-label {
-  border: 1px solid #4d4540;
-  background: #211d1b;
+  border: 1px solid var(--line);
+  background: var(--panel);
   border-radius: 7px;
   padding: 15px;
   margin-bottom: 10px;
@@ -799,7 +851,7 @@ html.plt-android .screen.active {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: #171412;
+  background: var(--panel);
   color: var(--ink);
   padding: 12px;
 }
@@ -831,9 +883,9 @@ html.plt-android .screen.active {
 
 .service {
   min-height: 120px;
-  border: 1px solid #514843;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  background: #211d1b;
+  background: var(--panel);
   color: var(--ink);
   display: grid;
   place-items: center;
@@ -845,7 +897,7 @@ html.plt-android .screen.active {
   width: 30px;
   height: 30px;
   fill: none;
-  stroke: var(--gold);
+  stroke: var(--accent);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -867,7 +919,7 @@ html.plt-android .screen.active {
 }
 
 .order-head span {
-  border: 1px solid rgba(185, 154, 112, 0.38);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--accent);
   padding: 6px 10px;
@@ -875,7 +927,7 @@ html.plt-android .screen.active {
 }
 
 .note {
-  color: #cfc5bd;
+  color: var(--ink-2);
 }
 
 .section-title {
@@ -899,8 +951,8 @@ html.plt-android .screen.active {
   left: 50%;
   bottom: 96px;
   transform: translate(-50%, 16px);
-  background: #3d3835;
-  color: #fff;
+  background: var(--panel-3);
+  color: var(--ink);
   padding: 11px 17px;
   border-radius: 999px;
   opacity: 0;
@@ -994,9 +1046,9 @@ html.plt-android .screen.active {
 
 .dish-card {
   overflow: hidden;
-  border: 1px solid rgba(109, 98, 90, 0.72);
-  background: linear-gradient(165deg, #292320, #1c1816);
-  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.48);
+  border: 1px solid var(--line);
+  background: linear-gradient(165deg, var(--panel-2), var(--panel));
+  box-shadow: var(--shadow-2);
   transform-style: flat;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
@@ -1021,7 +1073,7 @@ html.plt-android .menu.detail-open .stack {
   position: fixed;
   z-index: 60;
   inset: 0;
-  background: rgba(5, 5, 5, 0.2);
+  background: var(--scrim);
 }
 
 .dish-overlay.open {
@@ -1038,10 +1090,10 @@ html.plt-android .menu.detail-open .stack {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  border: 1px solid rgba(143, 126, 111, 0.85);
+  border: 1px solid var(--line-strong);
   border-radius: 7px;
-  background: linear-gradient(165deg, #302824, #171412);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.76);
+  background: linear-gradient(165deg, var(--panel-3), var(--panel));
+  box-shadow: var(--shadow-3);
   transform-origin: top left;
 }
 
@@ -1051,7 +1103,7 @@ html.plt-android .menu.detail-open .stack {
   grid-template-columns: 1fr auto;
   align-content: center;
   padding: 16px 54px 12px 18px;
-  border-bottom: 1px solid rgba(109, 98, 90, 0.55);
+  border-bottom: 1px solid var(--line);
 }
 
 .detail-heading .number,
@@ -1079,9 +1131,9 @@ html.plt-android .menu.detail-open .stack {
   right: 12px;
   width: 38px;
   height: 38px;
-  border: 1px solid rgba(185, 154, 112, 0.38);
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: rgba(20, 17, 15, 0.68);
+  background: var(--field-glass);
   color: var(--ink);
   font-size: 25px;
 }
@@ -1108,7 +1160,7 @@ html.plt-android .menu.detail-open .stack {
 
 .modifier-group legend {
   margin-bottom: 8px;
-  color: var(--gold);
+  color: var(--accent);
   font-size: 11px;
   letter-spacing: .04em;
 }
@@ -1125,30 +1177,30 @@ html.plt-android .menu.detail-open .stack {
   gap: 6px;
   min-height: 34px;
   padding: 7px 10px;
-  border: 1px solid rgba(185, 154, 112, .35);
+  border: 1px solid var(--line);
   border-radius: 5px;
   color: var(--muted);
   font-size: 11px;
 }
 
 .modifier-option.selected {
-  border-color: var(--gold);
-  background: rgba(185, 154, 112, .16);
+  border-color: var(--accent);
+  background: var(--accent-wash);
   color: var(--ink);
 }
 
 .modifier-option input {
-  accent-color: var(--gold);
+  accent-color: var(--accent);
 }
 
 .modifier-option b {
-  color: var(--gold);
+  color: var(--accent);
   font-weight: 600;
 }
 
 .modifier-summary {
   display: block;
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .dish-media {
@@ -1156,18 +1208,18 @@ html.plt-android .menu.detail-open .stack {
   height: 160px;
   object-fit: cover;
   border-radius: 3px;
-  background: #101010;
+  background: var(--bg-2);
 }
 
 .ingredients {
   margin-top: 16px;
   padding: 14px;
-  border-left: 2px solid var(--gold);
-  background: rgba(255, 255, 255, 0.035);
+  border-left: 2px solid var(--accent);
+  background: var(--wash);
 }
 
 .ingredients small {
-  color: var(--gold);
+  color: var(--accent);
   font-size: 9px;
   letter-spacing: 0.12em;
 }
@@ -1187,12 +1239,12 @@ html.plt-android .menu.detail-open .stack {
 
 .detail-buy {
   padding: 0 18px 16px;
-  border-top: 1px solid rgba(109, 98, 90, 0.42);
-  background: #171412;
+  border-top: 1px solid var(--line-soft);
+  background: var(--panel);
 }
 
 .offline-note {
-  color: #d4a865;
+  color: var(--accent-strong);
   font-size: 12px;
 }
 
@@ -1249,10 +1301,10 @@ html.plt-android .menu.detail-open .stack {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  border: 1px solid rgba(143, 126, 111, 0.85);
+  border: 1px solid var(--line-strong);
   border-radius: 7px;
-  background: linear-gradient(165deg, #302824, #171412);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.76);
+  background: linear-gradient(165deg, var(--panel-3), var(--panel));
+  box-shadow: var(--shadow-3);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
@@ -1382,7 +1434,7 @@ html.plt-android .menu.detail-open .stack {
   grid-template-rows: auto auto 1fr;
   gap: 18px;
   padding: 24px;
-  background: linear-gradient(150deg, rgba(185, 154, 112, 0.16), transparent 42%), #1f1a17;
+  background: linear-gradient(150deg, var(--accent-wash), transparent 42%), var(--panel-2);
 }
 
 .detail-back h3 {
@@ -1404,12 +1456,12 @@ html.plt-android .menu.detail-open .stack {
 
 .detail-back dl div {
   padding: 14px;
-  border: 1px solid rgba(185, 154, 112, 0.25);
+  border: 1px solid var(--line-soft);
   border-radius: 7px;
 }
 
 .detail-back dt {
-  color: var(--gold);
+  color: var(--accent);
   font-size: 11px;
 }
 
@@ -1432,7 +1484,7 @@ html.plt-android .menu.detail-open .stack {
 .local-board-note {
   margin: 0 0 14px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--wash-2);
   padding: 10px 12px;
   font-size: 13px;
   line-height: 1.4;

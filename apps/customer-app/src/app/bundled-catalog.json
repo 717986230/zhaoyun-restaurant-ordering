@@ -24,7 +24,7 @@
       "ingredients": "Ramen, Gemüse, Ei"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -156,7 +156,7 @@
       "ingredients": "Ramen, Huhn, Gemüse, Ei"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -288,7 +288,7 @@
       "ingredients": "Ramen, Rind, Gemüse, Ei"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -421,7 +421,7 @@
       "ingredients": "Ramen, Garnelen, Gemüse, Ei"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -554,7 +554,7 @@
       "ingredients": "Rind, Gemüse, Szechuan-Chili, Koriander"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -628,7 +628,7 @@
       "ingredients": "Huhn, Gemüse, Koriander"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -703,7 +703,7 @@
       "ingredients": "Garnelen, Gemüse, Koriander"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -777,7 +777,7 @@
       "ingredients": "Tofu, Gemüse, Szechuan-Chili"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -851,7 +851,7 @@
       "ingredients": "Tofu, Huhn, Gemüse, Szechuan-Chili"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -924,7 +924,7 @@
       "ingredients": "Salat, Tofu, Mango, Karotten, Gurken, Soße"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -997,7 +997,7 @@
       "ingredients": "Hühnerfilet, Karotten, Gurken, Soße"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -1070,7 +1070,7 @@
       "ingredients": "Koreanisches Rindfleisch, Karotten, Gurken"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -1143,7 +1143,7 @@
       "ingredients": "Ente, Karotten, Gurken, Soße"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -1217,7 +1217,7 @@
       "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Udon, Reiskuchen, Gyoza"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -1349,7 +1349,7 @@
       "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Rindfleisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -1482,7 +1482,7 @@
       "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Meeresfrüchte"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -1615,7 +1615,7 @@
       "ingredients": "Saison-Gemüse, Tofu, Glasnudel, Reiskuchen, Lammfleisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -1746,7 +1746,7 @@
       "ingredients": "Lachs, Reis"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -1780,7 +1780,7 @@
       "ingredients": "Lachs, Reis"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -1814,7 +1814,7 @@
       "ingredients": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -1848,7 +1848,7 @@
       "ingredients": "Lachs, Thunfisch, Hamachi, Garnelen, Aal, Avocado"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -1881,7 +1881,7 @@
       "ingredients": "Lachs, Thunfisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -1914,7 +1914,7 @@
       "ingredients": "Lachs, Thunfisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -1947,7 +1947,7 @@
       "ingredients": "Thunfisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -1980,7 +1980,7 @@
       "ingredients": "Thunfisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2011,7 +2011,7 @@
       "ingredients": "Gurke, Reis, Nori"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2044,7 +2044,7 @@
       "ingredients": "Lachs, Reis, Nori"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2077,7 +2077,7 @@
       "ingredients": "Avocado, Reis, Nori"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2110,7 +2110,7 @@
       "ingredients": "Avocado, Mango, Reis, Sesam"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2144,7 +2144,7 @@
       "ingredients": "Avocado, Garnelen, Reis, Sesam"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2178,7 +2178,7 @@
       "ingredients": "Avocado, Lachs, Reis, Sesam"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2211,7 +2211,7 @@
       "ingredients": "Lachs"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2244,7 +2244,7 @@
       "ingredients": "Lachs"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2277,7 +2277,7 @@
       "ingredients": "Lachs, Thunfisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2310,7 +2310,7 @@
       "ingredients": "Lachs, Thunfisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2344,7 +2344,7 @@
       "ingredients": "Lachs, Thunfisch, Hamachi"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2378,7 +2378,7 @@
       "ingredients": "Lachs, Thunfisch, Hamachi"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2413,7 +2413,7 @@
       "ingredients": "Lachs, Thunfisch, Hamachi, Avocado, Kresse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2449,7 +2449,7 @@
       "ingredients": "Lachstempura, Salat, Crispy Panko, Mayo, Teriyaki"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2483,7 +2483,7 @@
       "ingredients": "Lachs, Cream Cheese, Avocado, Masago"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2517,7 +2517,7 @@
       "ingredients": "Thunfisch, Avocado, Masago, Spicy Mayo"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2552,7 +2552,7 @@
       "ingredients": "Garnelen, Avocado, flambierter Aal, Sushi-Soße"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2586,7 +2586,7 @@
       "ingredients": "Knusperente, Gurken, Jungzwiebel, Teriyaki"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2620,7 +2620,7 @@
       "ingredients": "Avocado, Mango, flambierter Lachs"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2654,7 +2654,7 @@
       "ingredients": "Süßkartoffeltempura, Mango, Gurke, Basilikum"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2689,7 +2689,7 @@
       "ingredients": "Erdnuss, Avocado, Kresse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#b56b3d,#171210 75%)",
+      "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -2725,7 +2725,7 @@
       "ingredients": "Hühnerstreifen, Gemüse, Sesam"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -2795,7 +2795,7 @@
       "ingredients": "Hühnerfleisch, Kokosmilch, Gemüse, Basilikum"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -2867,7 +2867,7 @@
       "ingredients": "Ananas, Mango, Hühnerfleisch, Gemüse, Kokosmilch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -2942,7 +2942,7 @@
       "ingredients": "Hühnerfilet, Panko, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3014,7 +3014,7 @@
       "ingredients": "Rind, Gemüse, frischer Chili"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3087,7 +3087,7 @@
       "ingredients": "Rindfleisch, Zwiebel, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3160,7 +3160,7 @@
       "ingredients": "Ente, Gemüse, trockener Chili"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3235,7 +3235,7 @@
       "ingredients": "Lachs, Gemüse, Teriyaki-Soße"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3307,7 +3307,7 @@
       "ingredients": "Garnelen, Gemüse, Thai-Kräuter"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3379,7 +3379,7 @@
       "ingredients": "Tofu, Pak Choi, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3453,7 +3453,7 @@
       "ingredients": "Eierreis, Gemüse, Entenfleisch, gelbes Curry"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3527,7 +3527,7 @@
       "ingredients": "Reiskuchen, Gemüse, koreanisch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3602,7 +3602,7 @@
       "ingredients": "Reiskuchen, Gemüse, Garnelen"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3676,7 +3676,7 @@
       "ingredients": "Teigtaschen, Gemüse, Glasnudel"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3750,7 +3750,7 @@
       "ingredients": "Teigtaschen, Hühnerfleisch, Bärlauch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3822,7 +3822,7 @@
       "ingredients": "Sojabohnen, Meersalz"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3896,7 +3896,7 @@
       "ingredients": "Gurke, Mango, Avocado, Reisnudeln, Basilikum"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -3971,7 +3971,7 @@
       "ingredients": "Gurke, Mango, Avocado, Garnelen, Basilikum"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4045,7 +4045,7 @@
       "ingredients": "Gemüse, Teig"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4119,7 +4119,7 @@
       "ingredients": "Teigtaschen, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4193,7 +4193,7 @@
       "ingredients": "Teigtaschen, Hühnerfleisch, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4267,7 +4267,7 @@
       "ingredients": "Teigtaschen, Rindfleisch, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4343,7 +4343,7 @@
       "ingredients": "Oktopus-Bällchen, Mayo-Soße"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4416,7 +4416,7 @@
       "ingredients": "Koreanischer scharfer Salat"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4489,7 +4489,7 @@
       "ingredients": "Salat, Avocado"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4562,7 +4562,7 @@
       "ingredients": "Lachs-Tatar, Mango, Avocado, Salat"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4635,7 +4635,7 @@
       "ingredients": "Gebackene Garnelen"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4710,7 +4710,7 @@
       "ingredients": "Hühnerfleisch, Garnelen, Koriander"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4783,7 +4783,7 @@
       "ingredients": "Miso, Tofu, Algen"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4858,7 +4858,7 @@
       "ingredients": "Hühnerfleisch, Garnelen, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -4930,7 +4930,7 @@
       "ingredients": "Garnelen, Gemüse, Koriander"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5002,7 +5002,7 @@
       "ingredients": "Hühnerfleisch, Gemüse, Kokosmilch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5077,7 +5077,7 @@
       "ingredients": "Gedämpfte Teigtaschen, Garnelen"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5151,7 +5151,7 @@
       "ingredients": "Udon, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5283,7 +5283,7 @@
       "ingredients": "Udon, Hühnerfleisch, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5415,7 +5415,7 @@
       "ingredients": "Udon, Rindfleisch, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5547,7 +5547,7 @@
       "ingredients": "Udon, Entenfleisch, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5680,7 +5680,7 @@
       "ingredients": "Udon, Garnelen, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5808,7 +5808,7 @@
       "ingredients": "Gekochter Reis"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5881,7 +5881,7 @@
       "ingredients": "Ei, Gemüse"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -5954,7 +5954,7 @@
       "ingredients": "Mochi, Eis"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -6028,7 +6028,7 @@
       "ingredients": "Matcha, Mascarpone, Biskuit"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -6101,7 +6101,7 @@
       "ingredients": "Apfel, Teigtaschen"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#7e3d25,#171210 75%)",
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [
@@ -6171,7 +6171,7 @@
       "ingredients": "0.33L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6202,7 +6202,7 @@
       "ingredients": "0.33L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6233,7 +6233,7 @@
       "ingredients": "0.50L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6264,7 +6264,7 @@
       "ingredients": "0.50L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6295,7 +6295,7 @@
       "ingredients": "0.33L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6326,7 +6326,7 @@
       "ingredients": "0.33L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6357,7 +6357,7 @@
       "ingredients": "0.25L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6390,7 +6390,7 @@
       "ingredients": "0.33L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6423,7 +6423,7 @@
       "ingredients": "0.50L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6456,7 +6456,7 @@
       "ingredients": "Flasche"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6489,7 +6489,7 @@
       "ingredients": "Flasche"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6522,7 +6522,7 @@
       "ingredients": "0.125L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6555,7 +6555,7 @@
       "ingredients": "0.125L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6588,7 +6588,7 @@
       "ingredients": "0.25L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6621,7 +6621,7 @@
       "ingredients": "Aperol"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6654,7 +6654,7 @@
       "ingredients": "Prosecco"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6687,7 +6687,7 @@
       "ingredients": "Holunder, Minze, Limette"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6718,7 +6718,7 @@
       "ingredients": "0.10L"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6751,7 +6751,7 @@
       "ingredients": "Kaffee"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6784,7 +6784,7 @@
       "ingredients": "Kaffee, Milch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6817,7 +6817,7 @@
       "ingredients": "Kaffee, Milch"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],
@@ -6848,7 +6848,7 @@
       "ingredients": "Tee"
     },
     "appearance": {
-      "art": "linear-gradient(135deg,#8b622f,#171210 75%)",
+      "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
     "modifiers": [],

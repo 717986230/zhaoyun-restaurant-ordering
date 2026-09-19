@@ -126,7 +126,7 @@ export function normalizeProduct(input, current = {}) {
     portion: String(details.people ?? current.portion ?? "").trim(),
     level: String(details.level ?? current.level ?? "").trim(),
     ingredients: String(details.ingredients ?? current.ingredients ?? "").trim(),
-    art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#384c3f,#151817 75%)"),
+    art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#2d3a35,#121416 78%)"),
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
     modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
