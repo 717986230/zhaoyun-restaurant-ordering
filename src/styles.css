@@ -397,6 +397,12 @@ html.plt-android .screen.active {
   text-align: center;
 }
 
+/* The admin unlock lives on this title now — seven taps, native builds only —
+   so it needs to look reachable the way the old brand button did. */
+.topbar .title {
+  cursor: pointer;
+}
+
 .title strong {
   display: block;
   font: italic clamp(34px, 7vw, 48px) / 1 Georgia, serif;
@@ -417,6 +423,16 @@ html.plt-android .screen.active {
   background: transparent;
   color: var(--ink);
   font-size: 34px;
+}
+
+/* The language picker collapsed into one button — it shows the language a tap
+   switches to, so the 34px glyph size above would make "English" overflow a
+   48px track; this is text, not an icon. */
+.icon-btn.lang-toggle {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
 }
 
 .back {
@@ -1185,6 +1201,30 @@ html.plt-android .menu.detail-open .stack {
   color: var(--ink);
   font-size: 13px;
   font-weight: 600;
+}
+
+/* Options and add-ons, read rather than picked. There is nothing to order
+   into, so this is the same data the (dormant) cart's modifier picker used —
+   read as a sentence instead of a form: "口味要求: 加面 +2,50 · 不要香菜". */
+.dish-options-group {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.dish-options-group b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.dish-options-group span {
+  margin-left: 8px;
+}
+
+.dish-options-group span:not(:last-child)::after {
+  content: " · ";
+  color: var(--faint);
 }
 
 .modifier-group legend {

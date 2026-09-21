@@ -36,21 +36,22 @@ test.beforeEach(async ({ page }) => {
     }
   ];
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products }) }));
-  await page.route("**/api/orders", async (route) => {
-    const command = route.request().postDataJSON();
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
-      id: "order-1", clientRequestId: command.clientRequestId, no: "260801-001", table: command.table,
-      status: "new", note: command.note, total: 34.5, items: command.items, createdAt: new Date().toISOString()
-    } }) });
-  });
-  await page.route("**/api/service-requests", (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ request: { id: "service-1" } }) }));
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 });
 
+test("opening the app goes straight to the menu, with nothing to click through first", async ({ page }) => {
+  // An NFC tap or a scanned table card used to land on a home screen with
+  // four things to choose between. The app takes no orders any more, so
+  // there is exactly one guest screen, and it is this one.
+  await expect(page.locator("#menu.active")).toBeVisible();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  await expect(page.locator("#home")).toHaveCount(0);
+  await expect(page.locator(".cartbar")).toHaveCount(0);
+});
+
 test("image and video products use the same 3D flip interaction", async ({ page }) => {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
   for (const name of ["黑椒牛柳", "火炙三文鱼寿司"]) {
     await page.locator(".dish-card", { hasText: name }).click();
     await expect(page.locator(".detail-front")).toBeVisible();
@@ -58,6 +59,9 @@ test("image and video products use the same 3D flip interaction", async ({ page 
     await expect(page.locator(".detail-flip-inner")).toHaveClass(/flipped/);
     await expect(page.getByRole("region", { name: "菜品详细信息" })).toBeVisible();
     if (name === "黑椒牛柳") {
+      // Modifiers are read, not picked: there is no cart to attach them to,
+      // so the admin's "加面 / 不要香菜 / 加辣椒" configuration shows up as a
+      // sentence a guest can ask the waiter about.
       await expect(page.getByText("加面")).toBeVisible();
       await expect(page.getByText("不要香菜")).toBeVisible();
       await expect(page.getByText("加辣椒")).toBeVisible();
@@ -67,176 +71,46 @@ test("image and video products use the same 3D flip interaction", async ({ page 
   }
 });
 
-test("language switcher changes home and menu copy", async ({ page }) => {
-  await expect(page.getByRole("button", { name: /开始点餐/ })).toBeVisible();
-  await page.getByRole("button", { name: "Deutsch" }).click();
-  await expect(page.getByRole("button", { name: "Bestellen" })).toBeVisible();
-  await page.getByRole("button", { name: "Bestellen" }).click();
+test("the language button cycles the menu through Chinese, German and English", async ({ page }) => {
+  // Three languages, one button: it always shows the language a tap switches
+  // to, so "中文" means tapping it goes to Chinese from wherever it is now.
+  await expect(page.locator(".dish-card", { hasText: "黑椒牛柳" })).toBeVisible();
+  const toggle = page.getByRole("button", { name: "中文" });
+  await expect(toggle).toBeVisible();
+
+  await toggle.click();
+  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
   await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
-  await expect(page.locator(".menu .langs")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "English" })).toHaveCount(0);
-  // The back control's accessible name follows the language too — it read 返回
-  // to a German screen-reader user before the labels were translated.
-  await page.getByRole("button", { name: "Zurück" }).click();
-  await page.getByRole("button", { name: "English" }).click();
-  await page.getByRole("button", { name: /Start order/ }).click();
+
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.getByRole("button", { name: "English" })).toBeVisible();
   await expect(page.locator(".dish-card", { hasText: "Black Pepper Beef Fillet" })).toBeVisible();
+
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("button", { name: "中文" })).toBeVisible();
+  await expect(page.locator(".dish-card", { hasText: "黑椒牛柳" })).toBeVisible();
 });
 
-test("dish opens with shared-element detail, adds to cart, and submits an order", async ({ page }) => {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  const beef = page.locator(".dish-card", { hasText: "黑椒牛柳" });
-  await expect(beef).toBeVisible();
-  await beef.click();
-  await expect(page.locator(".dish-overlay")).toHaveClass(/open/);
-  // The ingredients are still on the card, but as the parts the back face
-  // breaks them into rather than one comma-separated line.
-  await expect(page.locator(".dish-part").filter({ hasText: "Rinderfilet" })).toHaveCount(1);
-  await expect(page.locator(".dish-part").filter({ hasText: "Pfeffer" })).toHaveCount(1);
-  await expect(page.locator(".menu")).toHaveClass(/detail-open/);
-  await page.locator(".dish-detail-card .add").click();
-  await expect(page.locator("#cartCount")).toHaveText("1");
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await expect(page.locator(".dish-overlay")).not.toBeAttached();
-  await page.locator(".cartbar").click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
-  await page.locator(".screen.active .back").click();
-  await page.locator(".screen.active .back").click();
-  await page.getByRole("button", { name: /订单状态/ }).click();
-  await expect(page.locator("#ordersContent")).toContainText("订单");
-  await expect(page.locator("#ordersContent")).toContainText("新订单");
+test("the chosen language survives a reload", async ({ page }) => {
+  await page.getByRole("button", { name: "中文" }).click();
+  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
+  await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
 });
 
-test("dish options are selected before adding and remain attached to cart order", async ({ page }) => {
-  let submitted;
-  await page.unroute("**/api/orders");
-  await page.route("**/api/orders", async (route) => {
-    submitted = route.request().postDataJSON();
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
-      id: "customized-order", clientRequestId: submitted.clientRequestId, no: "260806-001", table: submitted.table,
-      status: "new", note: submitted.note, total: 37.5, items: [], createdAt: new Date().toISOString()
-    } }) });
-  });
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
-  await expect(page.getByText("加入购物车前选择口味与加料")).toBeVisible();
-  await page.getByText("加面", { exact: true }).click();
-  await page.getByText("不要香菜", { exact: true }).click();
-  await page.getByText("加辣椒", { exact: true }).click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await page.locator(".cartbar").click();
-  await expect(page.locator(".modifier-summary")).toContainText("加面");
-  await expect(page.locator(".modifier-summary")).toContainText("不要香菜");
-  await expect(page.locator(".modifier-summary")).toContainText("加辣椒");
-  await page.getByRole("button", { name: /确认下单/ }).click();
-  await expect.poll(() => submitted?.items?.[0]?.modifiers?.map((modifier) => modifier.id)).toEqual(["extra-noodles", "no-cilantro", "extra-chili"]);
-});
+test("German menu copy replaces the Chinese chrome, all the way into a dish", async ({ page }) => {
+  await page.getByRole("button", { name: "中文" }).click();
+  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
 
-test("offline order is persisted and automatically retried", async ({ page }) => {
-  await page.unroute("**/api/orders");
-  let attempts = 0;
-  await page.route("**/api/orders", async (route) => {
-    attempts += 1;
-    if (attempts < 2) {
-      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "offline" }) });
-      return;
-    }
-    const command = route.request().postDataJSON();
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
-      id: "retried-order", clientRequestId: command.clientRequestId, no: "260805-001", table: command.table,
-      status: "new", note: command.note, total: 34.5, items: command.items, createdAt: new Date().toISOString()
-    } }) });
-  });
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await page.locator(".cartbar").click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
-  await expect.poll(() => attempts).toBeGreaterThanOrEqual(2);
-  await page.locator(".screen.active .back").click();
-  await page.locator(".screen.active .back").click();
-  await page.getByRole("button", { name: /订单状态/ }).click();
-  await expect(page.locator("#ordersContent")).toContainText("新订单");
-});
+  await expect(page.getByRole("button", { name: "Gericht suchen" })).toBeVisible();
 
-test("service request appears in staff board and can be completed", async ({ page }) => {
-  await page.getByRole("button", { name: /呼叫服务员/ }).click();
-  await page.getByRole("button", { name: /加水/ }).click();
-  await expect(page.locator("#serviceStatus")).toContainText("加水请求已发送");
-  await page.getByRole("button", { name: "‹" }).click();
-  await page.getByRole("button", { name: /员工看板/ }).click();
-  await expect(page.locator("#staffContent")).toContainText("加水");
-  await page.getByRole("button", { name: "已处理" }).click();
-  await expect(page.locator(".request.done")).toContainText("加水");
-});
+  await page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" }).click();
+  await expect(page.locator(".dish-options-group").first()).toContainText("Extra Nudeln");
+  await expect(page.getByRole("button", { name: "Details schließen" })).toBeVisible();
 
-test("staff can advance order status", async ({ page }) => {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  const beef = page.locator(".dish-card", { hasText: "黑椒牛柳" });
-  await beef.click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await page.locator(".cartbar").click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
-  await page.locator(".screen.active .back").click();
-  await page.locator(".screen.active .back").click();
-  await page.getByRole("button", { name: /员工看板/ }).click();
-  await page.getByRole("button", { name: /更新为：制作中/ }).click();
-  await expect(page.locator("#staffContent")).toContainText("制作中");
-});
-
-test("table number is provisioned per device and reaches the order command", async ({ page }) => {
-  let submitted;
-  await page.unroute("**/api/orders");
-  await page.route("**/api/orders", async (route) => {
-    submitted = route.request().postDataJSON();
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
-      id: "table-order", clientRequestId: submitted.clientRequestId, no: "260902-007", table: submitted.table,
-      status: "new", note: submitted.note, total: 34.5, items: submitted.items, createdAt: new Date().toISOString()
-    } }) });
-  });
-  let serviceCommand;
-  await page.unroute("**/api/service-requests");
-  await page.route("**/api/service-requests", async (route) => {
-    serviceCommand = route.request().postDataJSON();
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ request: { id: "service-2" } }) });
-  });
-
-  await page.goto("/?table=17");
-  await expect(page.locator(".brand")).toContainText("17");
-
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  await expect(page.locator(".topbar .title")).toContainText("TISCH 17");
-  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await page.locator(".cartbar").click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
-  await expect.poll(() => submitted?.table).toBe("17");
-
-  // The provisioned number survives a reload without the query parameter.
-  await page.goto("/");
-  await expect(page.locator(".brand")).toContainText("17");
-  await page.getByRole("button", { name: /呼叫服务员/ }).click();
-  await page.getByRole("button", { name: /加水/ }).click();
-  await expect.poll(() => serviceCommand?.table).toBe("17");
-});
-
-test("adding the same dish twice accumulates one cart line", async ({ page }) => {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  const beef = page.locator(".dish-card", { hasText: "黑椒牛柳" });
-  await beef.click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await beef.click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await expect(page.locator("#cartCount")).toHaveText("2");
-  await page.locator(".cartbar").click();
-  await expect(page.locator(".row")).toHaveCount(1);
-  await expect(page.locator(".row small").first()).toContainText("× 2");
+  await page.locator(".detail-heading").click({ delay: 50 });
+  await expect(page.getByText("Allergene")).toBeVisible();
 });
 
 test("a tablet that has never reached the server shows the menu the app ships with", async ({ page }) => {
@@ -251,7 +125,6 @@ test("a tablet that has never reached the server shows the menu the app ships wi
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await page.getByRole("button", { name: /开始点餐/ }).click();
 
   await expect(page.locator(".dish-card").first()).toBeVisible();
   expect(await page.locator(".dish-card").count()).toBeGreaterThan(100);
@@ -267,7 +140,6 @@ test("a tablet that has never reached the server shows the menu the app ships wi
 const flippedTransform = "matrix3d(-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1)";
 
 async function flipDetailCard(page) {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
   await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
   await expect(page.locator(".detail-front")).toBeVisible();
   await page.locator(".detail-heading").click();
@@ -287,113 +159,10 @@ test("detail flip is animated when the device does not ask for reduced motion", 
   await expect(page.locator(".detail-flip-inner")).toHaveCSS("transform", flippedTransform, { timeout: 2000 });
 });
 
-// The app is sold as trilingual for an Austrian restaurant, so a German guest
-// must not meet Chinese anywhere on the path from ordering to order status.
-test("German carries all the way through ordering, status and service", async ({ page }) => {
-  const chinese = /[\u4e00-\u9fa5]/;
-  const readable = (locator) => locator.innerText();
-
-  await page.getByRole("button", { name: "Deutsch" }).click();
-  await page.getByRole("button", { name: /Bestellen/ }).click();
-  await page.locator(".dish-card", { hasText: "Rinderfilet" }).click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "Vorderseite" }).or(page.locator(".detail-close")).first().click();
-  await page.locator(".cartbar").click();
-
-  // Cart: note placeholder and the clear-cart control.
-  await expect(page.locator("#orderNote")).toHaveAttribute("placeholder", /wenig Salz/);
-  await expect(page.locator("#clearCart")).toHaveText("Warenkorb leeren");
-
-  await page.getByRole("button", { name: /Bestellung bestätigen/ }).click();
-  await page.locator(".screen.active .back").click();
-  await page.locator(".screen.active .back").click();
-
-  // Order status: this is the label that used to read 新订单 in German.
-  await page.getByRole("button", { name: /Bestellstatus/ }).click();
-  await expect(page.locator(".order-head span")).toHaveText("Neu");
-  const orders = await readable(page.locator("#ordersContent"));
-  expect(orders, `Chinese leaked into the German order list:\n${orders}`).not.toMatch(chinese);
-
-  // Service calls: the labels only had Chinese and German before.
-  await page.locator(".screen.active .back").click();
-  await page.getByRole("button", { name: /Service rufen/ }).click();
-  await expect(page.locator("#serviceStatus")).toHaveText("Bitte gewünschten Service wählen");
-  await page.getByRole("button", { name: /Wasser/ }).click();
-  await expect(page.locator("#serviceStatus")).toContainText("Anfrage gesendet");
-  const service = await readable(page.locator("#serviceGrid"));
-  expect(service, `Chinese leaked into the German service grid:\n${service}`).not.toMatch(chinese);
-});
-
-test("English service labels are English, not Chinese with a German subtitle", async ({ page }) => {
-  await page.getByRole("button", { name: "English" }).click();
-  await page.getByRole("button", { name: /Call service/ }).click();
-  const names = await page.locator("#serviceGrid b").allInnerTexts();
-  expect(names).toEqual(["Water", "Cutlery", "Napkins", "To go", "Clear plates", "Pay"]);
-});
-
-test("layout keeps main controls visible", async ({ page }) => {
-  await expect(page.getByRole("button", { name: /开始点餐/ })).toBeInViewport();
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  await expect(page.locator(".cartbar")).toBeInViewport();
+test("layout keeps the menu's main controls visible", async ({ page }) => {
   await expect(page.locator(".topbar")).toBeInViewport();
-});
-
-test("the language is chosen once on the home screen, not again inside every panel", async ({ page }) => {
-  // The switcher used to be repeated in the cart and order-status headers,
-  // where it both asked a question already answered and overlapped the title:
-  // its three pills were centred in a 56px grid track, so on a 412px screen
-  // 中文 sat across the heading and English ended 77px off the right edge.
-  await page.getByRole("button", { name: "Deutsch" }).click();
-
-  for (const open of [
-    async () => page.getByRole("button", { name: /Bestellstatus/ }).click(),
-    async () => { await page.getByRole("button", { name: /Bestellen/ }).click(); await page.locator(".cartbar").click(); }
-  ]) {
-    await open();
-    const head = page.locator(".screen.active .panel-head");
-    await expect(head).toBeVisible();
-    await expect(head.locator(".langs")).toHaveCount(0);
-
-    // The heading keeps the whole width between the two 56px edge tracks.
-    const layout = await head.evaluate((node) => {
-      const box = node.getBoundingClientRect();
-      const heading = node.querySelector("h2");
-      return { clipped: heading.scrollWidth > heading.clientWidth, width: box.width };
-    });
-    expect(layout.clipped).toBe(false);
-    expect(layout.width).toBe(page.viewportSize().width);
-
-    await page.locator(".screen.active .back").click();
-    if (await page.locator("#menu.active").count()) await page.locator(".screen.active .back").click();
-  }
-
-  // And it is still there where it belongs.
-  await expect(page.locator("#home .langs button")).toHaveCount(3);
-});
-
-test("the kiosk table number travels with the order", async ({ page }) => {
-  let submitted;
-  await page.unroute("**/api/orders");
-  await page.route("**/api/orders", async (route) => {
-    submitted = route.request().postDataJSON();
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ order: {
-      id: "table-21-order", clientRequestId: submitted.clientRequestId, no: "260812-001", table: submitted.table,
-      status: "new", note: submitted.note, total: 34.5, items: submitted.items, createdAt: new Date().toISOString()
-    } }) });
-  });
-  await page.goto("/?table=21");
-  await expect(page.locator(".brand p")).toContainText("21");
-  await expect(page.locator(".table-setup small")).toHaveCount(0);
-  await page.getByRole("button", { name: /开始点餐/ }).click();
-  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
-  await page.locator(".dish-detail-card .add").click();
-  await page.getByRole("button", { name: "关闭详情" }).click();
-  await page.locator(".cartbar").click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
-  await expect.poll(() => submitted?.table).toBe("21");
-
-  await page.goto("/");
-  await expect(page.locator(".brand p")).toContainText("21");
+  await expect(page.locator("#chips")).toBeInViewport();
+  await expect(page.locator(".dish-card").first()).toBeInViewport();
 });
 
 test("the platform class is set, and it is what turns the expensive blur off", async ({ page }) => {
@@ -403,7 +172,6 @@ test("the platform class is set, and it is what turns the expensive blur off", a
   // dish tap, on exactly the hardware least able to afford it.
   await expect(page.locator("html")).toHaveClass(/\bplt-/);
 
-  await page.getByRole("button", { name: /开始点餐/ }).click();
   await page.locator(".dish-card").first().click();
   const stack = page.locator("#stack");
   await expect(page.locator(".menu.detail-open")).toBeVisible();
@@ -418,7 +186,6 @@ test("the platform class is set, and it is what turns the expensive blur off", a
 });
 
 test("the list carries a price, so nothing has to be opened to find one", async ({ page }) => {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
   const row = page.locator(".dish-card", { hasText: "蔬菜拉面" });
   await expect(row.locator(".row-price")).toHaveText("EUR 12.50");
   // The picture slot is in the row whether or not a photo exists yet, so the
@@ -427,7 +194,6 @@ test("the list carries a price, so nothing has to be opened to find one", async 
 });
 
 test("the back of the card takes the dish apart and pins the allergens to its parts", async ({ page }) => {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
   await page.locator(".dish-card", { hasText: "蔬菜拉面" }).click();
   await page.locator(".detail-heading").click({ delay: 50 });
   await expect(page.locator(".detail-flip-inner")).toHaveClass(/flipped/);
@@ -448,7 +214,6 @@ test("the back of the card takes the dish apart and pins the allergens to its pa
 });
 
 test("a part never carries an allergen the dish does not declare", async ({ page }) => {
-  await page.getByRole("button", { name: /开始点餐/ }).click();
   await page.locator(".dish-card", { hasText: "火炙三文鱼寿司" }).click();
   await page.locator(".detail-heading").click({ delay: 50 });
   // Salmon carries D and the dish declares D; rice carries nothing. Nothing

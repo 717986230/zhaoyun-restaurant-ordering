@@ -50,8 +50,12 @@ type Action =
 
 const storageKey = "zy_customer_state_v4";
 const maxStoredOrders = 50;
+// The menu is the whole guest app now; "home" and the screens it used to lead
+// to (cart, orders, service, staff) stay in the Screen union and the reducer
+// below so ordering can be switched back on without a reducer rewrite, but
+// nothing navigates away from "menu" any more.
 const initialState: CustomerState = {
-  screen: "home",
+  screen: "menu",
   table: tableNo(),
   category: "ALLE",
   query: "",
@@ -77,7 +81,7 @@ function hydrate(): CustomerState {
     return {
       ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {},
       orders: (stored.orders || []).slice(0, maxStoredOrders),
-      table: tableNo(), screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: ""
+      table: tableNo(), screen: "menu", activeProductId: null, productFlipped: false, detailModifiers: [], toast: ""
     };
   } catch {
     return initialState;

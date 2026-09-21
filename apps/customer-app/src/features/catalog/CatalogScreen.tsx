@@ -1,14 +1,21 @@
 import { useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { deconstruct, formatEuro, summarizeCart } from "@zhaoyun/domain";
-import type { DishPart, ModifierGroup, ModifierOption, Product, SelectedModifier } from "@zhaoyun/domain";
+import { deconstruct, formatEuro } from "@zhaoyun/domain";
+import type { DishPart, Product } from "@zhaoyun/domain";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { tableNo } from "../../app/table";
 import { productName, t } from "../../app/i18n";
 
-interface Props { state: CustomerState; dispatch: CustomerDispatch; products: Product[]; offlineMenu?: boolean }
+interface Props {
+  state: CustomerState;
+  dispatch: CustomerDispatch;
+  products: Product[];
+  offlineMenu?: boolean;
+  /** No-op outside a Capacitor build; wired to a 7-tap unlock on the title. */
+  onAdminTap: () => Promise<void>;
+}
 
 /**
  * Shared with the `--ease-out` / `--dur-*` tokens in styles.css. The CSS
@@ -18,15 +25,12 @@ interface Props { state: CustomerState; dispatch: CustomerDispatch; products: Pr
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 const DURATION = { backdrop: 0.2, card: 0.26, flip: 0.42 };
 
+/** The three languages, cycled by tapping the one currently shown. */
+const LANGUAGE_NAMES = { zh: "中文", de: "Deutsch", en: "English" } as const;
+const NEXT_LANGUAGE = { zh: "de", de: "en", en: "zh" } as const;
+
 function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
   return names[language] || names.de || names.en;
-}
-
-function toggleModifier(group: ModifierGroup, option: ModifierOption, selected: SelectedModifier[], language: CustomerState["language"]): SelectedModifier[] {
-  const current = selected.filter((item) => group.options.some((candidate) => candidate.id === item.id));
-  const exists = current.some((item) => item.id === option.id);
-  const next = group.selection === "single" ? (exists ? [] : [{ id: option.id, name: localized(option.names, language), priceCents: option.priceCents }]) : exists ? current.filter((item) => item.id !== option.id) : [...current, { id: option.id, name: localized(option.names, language), priceCents: option.priceCents }];
-  return [...selected.filter((item) => !group.options.some((candidate) => candidate.id === item.id)), ...next];
 }
 
 /**
@@ -87,6 +91,29 @@ function Deconstruction({ product, language, reduceMotion }: { product: Product;
   </div>;
 }
 
+/**
+ * What a guest could ask for, shown rather than offered.
+ *
+ * These were once a form: pick a radio, tick a box, see the total change. On
+ * a menu nobody orders from, an interactive control that does nothing is
+ * worse than no control, so this reads the same data — the modifier groups
+ * an admin already configured for the (dormant) ordering flow — as plain
+ * text. "加面 +2,50" tells a guest what they can ask the waiter for without
+ * pretending a tap here does anything.
+ */
+function DishOptions({ product, language }: { product: Product; language: CustomerState["language"] }) {
+  if (!product.modifiers?.length) return null;
+  return <div className="dish-options">
+    <p className="modifier-heading">{t(language, "customize")}</p>
+    {product.modifiers.map((group) => <p className="dish-options-group" key={group.id}>
+      <b>{localized(group.names, language)}</b>
+      {group.options.map((option) => <span key={option.id}>
+        {localized(option.names, language)}{option.priceCents > 0 ? ` +${formatEuro(option.priceCents)}` : ""}
+      </span>)}
+    </p>)}
+  </div>;
+}
+
 function ProductDetail({ product, state, dispatch }: { product: Product; state: CustomerState; dispatch: CustomerDispatch }) {
   const reduceMotion = useReducedMotion();
   const seconds = (value: number) => (reduceMotion ? 0 : value);
@@ -110,30 +137,11 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
               <ProductMedia product={product} />
               <div><h4>{product.names.en}</h4><p>{product.description}</p></div>
             </div>
-            {product.modifiers?.length ? <p className="modifier-heading">{t(state.language, "customize")}</p> : null}
-            {product.modifiers?.map((group) => <fieldset className="modifier-group" key={group.id} onClick={(event) => event.stopPropagation()}>
-              <legend>{localized(group.names, state.language)}</legend>
-              <div className="modifier-options">{group.options.map((option) => {
-                const checked = state.detailModifiers.some((modifier) => modifier.id === option.id);
-                return <label className={`modifier-option ${checked ? "selected" : ""}`} key={option.id}>
-                  <input type={group.selection === "single" ? "radio" : "checkbox"} name={`modifier-${product.id}-${group.id}`} checked={checked} onChange={() => dispatch({ type: "detail-modifiers", modifiers: toggleModifier(group, option, state.detailModifiers, state.language) })} />
-                  <span>{localized(option.names, state.language)}</span>{option.priceCents > 0 && <b>+{formatEuro(option.priceCents)}</b>}
-                </label>;
-              })}</div>
-            </fieldset>)}
+            <DishOptions product={product} language={state.language} />
             <div className="meta"><span>{product.details.time}</span><span>{product.details.people}</span><span>{product.details.level}</span></div>
           </div>
           <div className="detail-buy">
-            <div className="buyline"><strong>{formatEuro(product.priceCents)}</strong><div className="qty">
-              <button onClick={(event) => { event.stopPropagation(); dispatch({ type: "detail-quantity", quantity: state.detailQuantity - 1 }); }}>−</button>
-              <span data-qty-for={product.id}>{state.detailQuantity}</span>
-              <button onClick={(event) => { event.stopPropagation(); dispatch({ type: "detail-quantity", quantity: state.detailQuantity + 1 }); }}>＋</button>
-            </div></div>
-            <button className="primary add" onClick={(event) => {
-              event.stopPropagation();
-              dispatch({ type: "add-to-cart", productId: product.id, quantity: state.detailQuantity, modifiers: state.detailModifiers });
-              dispatch({ type: "toast", message: t(state.language, "add") });
-            }}>{t(state.language, "add")}</button>
+            <div className="buyline"><strong>{formatEuro(product.priceCents)}</strong></div>
           </div>
         </section>
         <section className="detail-face detail-back" aria-label={t(state.language, "detailRegion")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
@@ -158,7 +166,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
   </motion.div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, offlineMenu = false }: Props) {
+export function CatalogScreen({ state, dispatch, products, offlineMenu = false, onAdminTap }: Props) {
   const query = state.query.trim().toLowerCase();
   const visible = products.filter((product) => {
     const categoryMatch = state.category === "ALLE" || product.category === state.category;
@@ -166,14 +174,20 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false }
     return categoryMatch && (!query || text.includes(query));
   });
   const categories = ["ALLE", ...new Set(products.map((product) => product.category))];
-  const lines = Object.values(state.cart);
-  const summary = summarizeCart(lines, products);
   const activeProduct = products.find((product) => product.id === state.activeProductId);
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
-      <button className="icon-btn back" aria-label={t(state.language, "goBack")} onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button>
-      <div className="title"><strong>La Carte</strong><small>TISCH {tableNo()}</small></div>
+      {/* The whole language picker, as one button: it shows the language a tap
+          switches to next, so three languages fit the same 56px icon track a
+          back arrow used to sit in — there is nowhere left to go back to. */}
+      <button className="icon-btn lang-toggle" onClick={() => dispatch({ type: "language", language: NEXT_LANGUAGE[state.language] })}>{LANGUAGE_NAMES[state.language]}</button>
+      {/* Admin access lives here now, exactly as it did on the home screen this
+          replaced: seven taps within four seconds, and only inside the native
+          shell — `useKiosk` is a no-op everywhere else. */}
+      <div className="title" role="button" tabIndex={0} onClick={() => void onAdminTap()} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") void onAdminTap(); }}>
+        <strong>La Carte</strong><small>TISCH {tableNo()}</small>
+      </div>
       <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
     </header>
     <div id="searchBox" className={`search-box ${state.searchOpen ? "open" : ""}`}>
@@ -192,6 +206,5 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false }
       </div>
     </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}</div>
     <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} state={state} dispatch={dispatch} />}</AnimatePresence>
-    <button className="cartbar" onClick={() => dispatch({ type: "navigate", screen: "cart" })}><span>{t(state.language, "cart")}</span><b id="cartCount">{summary.count}</b><em id="cartTotal">{formatEuro(summary.totalCents)}</em></button>
   </section>;
 }
