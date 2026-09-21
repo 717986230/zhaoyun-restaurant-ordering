@@ -98,6 +98,12 @@ export interface ApiServiceRequest {
   updatedAt: string;
 }
 
+export type MenuThemeId = "jade" | "teal" | "terracotta";
+
+export interface ApiSettings {
+  menuTheme: MenuThemeId;
+}
+
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";
 
 export interface ApiPrintJob {

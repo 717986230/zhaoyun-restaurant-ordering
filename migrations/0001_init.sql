@@ -113,6 +113,11 @@ CREATE TABLE print_jobs (
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE restaurant_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      menu_theme TEXT NOT NULL DEFAULT 'jade',
+      updated_at TEXT NOT NULL
+    );
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
 CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);

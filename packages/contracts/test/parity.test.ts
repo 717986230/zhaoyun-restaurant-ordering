@@ -1,11 +1,12 @@
 import { Value } from "@sinclair/typebox/value";
 import { describe, expect, it } from "vitest";
 import {
-  CreateOrderBody, ORDER_STATUSES, OrderStatusBody, PRINT_STATIONS, ProductBody,
-  SERVICE_STATUSES, ServiceRequestBody, ServiceStatusBody, TableBody
+  CreateOrderBody, MENU_THEMES, ORDER_STATUSES, OrderStatusBody, PRINT_STATIONS, ProductBody,
+  SERVICE_STATUSES, ServiceRequestBody, ServiceStatusBody, SettingsBody, TableBody
 } from "../../../src/contracts.js";
 import type { CreateOrderCommand, CreateServiceRequestCommand, OrderStatus, ServiceStatus } from "../src/index";
 import type { AdminProductInput } from "../../api-client/src/index";
+import { MENU_THEME_IDS } from "../../domain/src/themes";
 
 /**
  * The runtime schemas and these TypeScript types describe the same requests.
@@ -74,5 +75,11 @@ describe("Wire contract parity", () => {
     expect(Value.Check(ProductBody, { ...input, allergens: ["Z"] })).toBe(false);
     expect(Value.Check(ProductBody, { ...input, vatPercent: 7 })).toBe(false);
     expect([...PRINT_STATIONS]).toEqual(["kitchen", "bar", "sushi", "front"]);
+  });
+
+  it("keeps the vetted menu styles identical between the server schema and the domain presets", () => {
+    expect([...MENU_THEMES]).toEqual([...MENU_THEME_IDS]);
+    for (const menuTheme of MENU_THEME_IDS) expect(Value.Check(SettingsBody, { menuTheme })).toBe(true);
+    expect(Value.Check(SettingsBody, { menuTheme: "gold" })).toBe(false);
   });
 });

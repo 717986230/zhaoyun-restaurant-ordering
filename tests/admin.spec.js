@@ -5,13 +5,19 @@ import { expect, test } from "@playwright/test";
 // would make a passing PATCH look like a board that never updates.
 let orderStatus;
 let requestStatus;
+let menuTheme;
 
 test.beforeEach(async ({ page }) => {
   orderStatus = "new";
   requestStatus = "open";
+  menuTheme = "jade";
   await page.addInitScript(() => sessionStorage.setItem("zy_admin_token", "test-admin"));
   await page.route("**/api/health", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
   await page.route("**/api/admin/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ role: "manager" }) }));
+  await page.route("**/api/admin/settings", async (route) => {
+    if (route.request().method() === "PUT") menuTheme = route.request().postDataJSON().menuTheme;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ menuTheme }) });
+  });
   await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [{
     id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
     names: { zh: "黑椒牛柳", de: "Rinderfilet", en: "Beef Fillet" }, description: "",
@@ -87,6 +93,17 @@ test("admin workspace loads catalog and printer modules", async ({ page }) => {
   await expect(page.locator(".printer-list")).toContainText("厨房打印机");
   await page.getByRole("button", { name: /搜索周围打印机/ }).click();
   await expect(page.getByRole("status")).toContainText("Android App");
+});
+
+test("a manager picks a menu style, and the choice is saved", async ({ page }) => {
+  await page.getByRole("button", { name: "连接设置" }).click();
+  const picker = page.locator(".theme-picker");
+  await expect(picker).toBeVisible();
+  await expect(picker.locator(".theme-swatch.selected")).toContainText("墨玉");
+
+  await picker.locator(".theme-swatch", { hasText: "赤陶" }).click();
+  await expect.poll(() => menuTheme).toBe("terracotta");
+  await expect(picker.locator(".theme-swatch.selected")).toContainText("赤陶");
 });
 
 test("a combo is built by packaging existing dishes into a new entry", async ({ page }) => {

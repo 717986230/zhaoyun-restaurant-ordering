@@ -17,6 +17,11 @@ export const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "c
 export const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 export const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
 export const PRINTER_TRANSPORTS = new Set(["lan", "bluetooth", "usb"]);
+// The colour hexes themselves live in packages/domain/src/themes.ts, next to
+// the guest app that renders them; the backend only ever needs to know which
+// ids are valid to store.
+export const MENU_THEME_IDS = new Set(["jade", "teal", "terracotta"]);
+export const DEFAULT_MENU_THEME = "jade";
 
 /**
  * Who may do what.
@@ -281,6 +286,16 @@ export function serviceRequestView(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+export function normalizeMenuTheme(value, fallback = DEFAULT_MENU_THEME) {
+  const theme = String(value ?? fallback);
+  if (!MENU_THEME_IDS.has(theme)) throw new Error("Unsupported menu theme");
+  return theme;
+}
+
+export function settingsView(row) {
+  return { menuTheme: row ? row.menu_theme : DEFAULT_MENU_THEME };
 }
 
 export function printerView(row) {

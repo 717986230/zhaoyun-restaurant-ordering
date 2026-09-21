@@ -10,9 +10,9 @@
  */
 import {
   assertOrderTransition, assertRequestTransition, auditView, billView, bool, boundedLimit, mapProduct,
-  normalizePrinter, normalizeProduct, normalizeTableNo, now, orderProductIds, orderView, parseJson,
-  planOrder, planPrintFailure, printerView, printJobView, serviceRequestView, tableOverviewView,
-  tableView, uuid
+  normalizeMenuTheme, normalizePrinter, normalizeProduct, normalizeTableNo, now, orderProductIds, orderView,
+  parseJson, planOrder, planPrintFailure, printerView, printJobView, serviceRequestView, settingsView,
+  tableOverviewView, tableView, uuid
 } from "../shared/rules.mjs";
 
 const PRODUCT_COLUMNS = [
@@ -234,6 +234,20 @@ export function createStore(db) {
     return printerView(await first("SELECT * FROM printer_profiles WHERE id = ?", printer.id));
   }
 
+  async function getSettings() {
+    return settingsView(await first("SELECT * FROM restaurant_settings WHERE id = 1"));
+  }
+
+  async function saveSettings(input) {
+    const menuTheme = normalizeMenuTheme(input.menuTheme);
+    await run(
+      `INSERT INTO restaurant_settings (id, menu_theme, updated_at) VALUES (1, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET menu_theme = excluded.menu_theme, updated_at = excluded.updated_at`,
+      menuTheme, now()
+    );
+    return getSettings();
+  }
+
   return {
     listProducts,
     getProduct,
@@ -253,6 +267,8 @@ export function createStore(db) {
     listPrinters: async () => (await all("SELECT * FROM printer_profiles ORDER BY role, name")).map(printerView),
     savePrinter,
     deletePrinter: async (id) => (await run("DELETE FROM printer_profiles WHERE id = ?", String(id))) > 0,
+    getSettings,
+    saveSettings,
     listPrintJobs: async (status = "queued", limit = 100) =>
       (await all("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?", String(status), boundedLimit(limit)))
         .map(printJobView),

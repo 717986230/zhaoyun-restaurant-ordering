@@ -151,6 +151,30 @@ export function contractChecks(call, assert) {
       assert.ok(listed.json.printers.some((printer) => printer.id === created.json.printer.id));
     }],
 
+    ["the menu style is jade until a manager picks another, and the catalogue carries it", async () => {
+      const before = await call("GET", "/api/catalog");
+      assert.equal(before.json.theme, "jade", "a fresh restaurant ships the default menu style");
+
+      const denied = await call("PUT", "/api/admin/settings", { body: { menuTheme: "teal" } });
+      assert.equal(denied.status, 401, "changing the menu style requires a token");
+
+      const badTheme = await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "gold" } });
+      assert.equal(badTheme.status, 400, "only the vetted presets may be picked");
+
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "teal" } });
+      assert.equal(saved.status, 200);
+      assert.equal(saved.json.menuTheme, "teal");
+
+      const after = await call("GET", "/api/catalog");
+      assert.equal(after.json.theme, "teal", "the guest menu reads the style a manager just picked");
+
+      const read = await call("GET", "/api/admin/settings", { admin: true });
+      assert.equal(read.json.menuTheme, "teal");
+
+      // Leave the fixture as every other test expects it.
+      await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "jade" } });
+    }],
+
     ["a product with a space in its category saves", async () => {
       const saved = await call("POST", "/api/admin/products", {
         admin: true,

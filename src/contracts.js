@@ -51,6 +51,9 @@ export const SERVICE_STATUSES = ["open", "acknowledged", "completed", "cancelled
 export const PRINT_STATIONS = ["kitchen", "bar", "sushi", "front"];
 export const PRINT_JOB_STATUSES = ["queued", "claimed", "printing", "printed", "retry-wait", "failed"];
 export const VAT_PERCENTS = [10, 13, 20];
+// The colour hexes for each id live in packages/domain/src/themes.ts, next to
+// the guest app that renders them; the wire contract only needs the ids.
+export const MENU_THEMES = ["jade", "teal", "terracotta"];
 
 const literals = (values) => Type.Union(values.map((value) => Type.Literal(value)));
 
@@ -102,6 +105,10 @@ export const ProductBody = Type.Object({
   // A combo: the existing dishes it packages, so it is otherwise a normal
   // product with its own name, price and photo, not a distinct product kind.
   bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 }))
+});
+
+export const SettingsBody = Type.Object({
+  menuTheme: literals(MENU_THEMES)
 });
 
 export const PrinterBody = Type.Object({

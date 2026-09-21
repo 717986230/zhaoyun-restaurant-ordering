@@ -1,15 +1,19 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable } from "@zhaoyun/api-client";
+import type { MenuThemeId } from "@zhaoyun/contracts";
+import { MENU_THEMES } from "@zhaoyun/domain";
 import { TableCards } from "./TableCards";
 
 interface Props {
   storage: AdminStorage;
   tables: RestaurantTable[];
   auditEntries: AuditEntry[];
+  menuTheme: MenuThemeId | null;
   onSave: (storage: AdminStorage) => Promise<void>;
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<void>;
   onDeleteTable: (table: string) => Promise<void>;
+  onSaveMenuTheme: (menuTheme: MenuThemeId) => Promise<void>;
 }
 
 const ROLE_LABELS: Record<string, string> = { manager: "经理", staff: "服务员", kitchen: "厨房" };
@@ -49,6 +53,16 @@ export function SettingsPanel(props: Props) {
       <label><span>管理员令牌</span><input name="token" required type="password" defaultValue={props.storage.token} autoComplete="current-password" /></label>
       <button className="primary-action" type="submit">测试并保存连接</button>
     </form>
+
+    <h1>菜单样式</h1>
+    <p>只改变一处强调色，菜单其余部分（背景、文字、对比度）保持不变，选完立即在顾客菜单上生效。</p>
+    <div className="theme-picker">{Object.values(MENU_THEMES).map((theme) => <button
+      key={theme.id}
+      type="button"
+      className={`theme-swatch ${props.menuTheme === theme.id ? "selected" : ""}`}
+      style={{ "--swatch": theme.accent } as React.CSSProperties}
+      onClick={() => void props.onSaveMenuTheme(theme.id)}
+    ><i /><span>{theme.nameZh}</span></button>)}</div>
 
     <h1>桌台</h1>
     <p>登记桌台后，服务端只接受已登记的桌号，并要求设备带上该桌的令牌。没有登记任何桌台时保持开放模式。</p>

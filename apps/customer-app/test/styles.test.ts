@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { MENU_THEMES } from "@zhaoyun/domain";
 
 /**
  * The palette, as assertions.
@@ -82,8 +83,10 @@ describe.each(Object.entries(sheets))("%s stylesheet", (_name, css) => {
   it("references only tokens it defines", () => {
     const defined = tokens(css);
     const referenced = new Set([...body(css).matchAll(/var\((--[a-z0-9-]+)/g)].map((match) => match[1]));
-    // `--art` is the one exception: each product sets it inline from its own row.
-    const missing = [...referenced].filter((token) => token !== "--art" && !defined.has(token));
+    // `--art` and `--swatch` are the exceptions: each product, and each menu
+    // style swatch, sets its own colour inline rather than through a token.
+    const inlineExceptions = new Set(["--art", "--swatch"]);
+    const missing = [...referenced].filter((token) => !inlineExceptions.has(token) && !defined.has(token));
     expect(missing).toEqual([]);
   });
 });
@@ -134,5 +137,23 @@ describe("the guest palette", () => {
       .map(([token, value]) => ({ token, ...hsl(value) }))
       .filter(({ hue, saturation }) => saturation > 0.15 && !(hue >= 130 && hue <= 180) && !(hue >= 5 && hue <= 25));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("menu styles", () => {
+  // A 菜单样式 pick only ever swaps the accent group at runtime — every other
+  // token stays what src/styles.css declares — so a preset only has to clear
+  // the same floor the shipped accent does: readable against --panel, its
+  // own label readable on it, and no gold hue sneaking in as a "style".
+  const panel = tokens(sheets.guest).get("--panel")!;
+
+  it.each(Object.values(MENU_THEMES))("$id ($nameZh) clears the accent contrast floor", (theme) => {
+    expect(contrast(theme.accent, panel)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(theme.accentInk, theme.accent)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(Object.values(MENU_THEMES))("$id ($nameZh) stays out of gold", (theme) => {
+    const { hue, saturation } = hsl(theme.accent);
+    expect(saturation > 0.15 && !(hue >= 130 && hue <= 180) && !(hue >= 5 && hue <= 25)).toBe(false);
   });
 });

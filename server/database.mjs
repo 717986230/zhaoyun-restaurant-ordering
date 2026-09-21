@@ -5,13 +5,16 @@ import { DatabaseSync } from "node:sqlite";
 import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
-import { auditView, billView, normalizeBundleItems, normalizeTableNo, tableOverviewView, tableView } from "../shared/rules.mjs";
+import {
+  auditView, billView, normalizeBundleItems, normalizeMenuTheme, normalizeTableNo,
+  settingsView, tableOverviewView, tableView
+} from "../shared/rules.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 const VAT_PERCENTS = new Set([10, 13, 20]);
 // Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
@@ -263,6 +266,12 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS restaurant_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      menu_theme TEXT NOT NULL DEFAULT 'jade',
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
@@ -354,6 +363,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
     releaseTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?"),
     openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
+    getSettings: db.prepare("SELECT * FROM restaurant_settings WHERE id = 1"),
+    upsertSettings: db.prepare(`
+      INSERT INTO restaurant_settings (id, menu_theme, updated_at) VALUES (1, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET menu_theme = excluded.menu_theme, updated_at = excluded.updated_at
+    `),
     listPrinters: db.prepare("SELECT * FROM printer_profiles ORDER BY role, name"),
     printerById: db.prepare("SELECT * FROM printer_profiles WHERE id = ?"),
     insertPrinter: db.prepare("INSERT INTO printer_profiles (id, name, transport, address, port, role, enabled, capabilities_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
@@ -639,6 +653,16 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     };
   }
 
+  function getSettings() {
+    return settingsView(statements.getSettings.get());
+  }
+
+  function saveSettings(input) {
+    const menuTheme = normalizeMenuTheme(input.menuTheme);
+    statements.upsertSettings.run(menuTheme, now());
+    return getSettings();
+  }
+
   function savePrinter(input, id) {
     const current = id ? statements.printerById.get(String(id)) : null;
     if (id && !current) return null;
@@ -766,6 +790,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     listPrinters: () => statements.listPrinters.all().map(printerView),
     savePrinter,
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
+    getSettings,
+    saveSettings,
     listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map(printJobView),
     claimPrintJob: (role, workerId, leaseMs = 30_000) => {
       const timestamp = now();

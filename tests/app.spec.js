@@ -1,51 +1,52 @@
 import { expect, test } from "@playwright/test";
 
+const products = [
+  {
+    id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
+    names: { zh: "黑椒牛柳", de: "Rinderfilet mit schwarzem Pfeffer", en: "Black Pepper Beef Fillet" },
+    description: "Zartes Rinderfilet mit schwarzem Pfeffer.", price: 34.5,
+    allergens: ["F", "O"], details: { time: "35 min", people: "2 Personen", level: "Mittel", ingredients: "Rinderfilet, Pfeffer" },
+    appearance: { art: "linear-gradient(135deg,#7e1e18,#190f0e 76%)", pattern: "ring" }, media: [],
+    modifiers: [{ id: "custom", names: { zh: "口味要求", de: "Sonderwünsche", en: "Preferences" }, selection: "multi", options: [
+      { id: "extra-noodles", names: { zh: "加面", de: "Extra Nudeln", en: "Extra noodles" }, priceCents: 250 },
+      { id: "no-cilantro", names: { zh: "不要香菜", de: "Ohne Koriander", en: "No cilantro" }, priceCents: 0 },
+      { id: "extra-chili", names: { zh: "加辣椒", de: "Extra Chili", en: "Extra chili" }, priceCents: 50 }
+    ] }]
+  },
+  {
+    id: "video-1", sku: "SUSHI-01", kind: "sushi", category: "SUSHI",
+    names: { zh: "火炙三文鱼寿司", de: "Flambierter Lachs", en: "Torched Salmon Sushi" },
+    description: "Flambierter Lachs.", price: 12.8,
+    // Sesame is in the ingredients and deliberately not in the declaration:
+    // the glossary knows sesame carries N, and the test below is that it
+    // still does not put N on the dish. Only the kitchen declares.
+    allergens: ["D"], details: { time: "10 min", people: "1 Person", level: "Mild", ingredients: "Lachs, Reis, Sesam" },
+    appearance: { art: "#37231d", pattern: "lines" }, media: [{ type: "video", url: "/media/demo.mp4" }]
+  },
+  {
+    // Every term here is in the ingredient glossary, which is what makes the
+    // breakdown assertions below about the feature rather than about a
+    // fixture nobody translated.
+    id: "ramen-1", sku: "R1", kind: "food", category: "RAMEN",
+    names: { zh: "蔬菜拉面", de: "Ramen mit Gemüse", en: "Ramen with Vegetables" },
+    description: "Ramen, Gemüse, Ei.", price: 12.5,
+    allergens: ["A", "C", "F"], details: { time: "20 min", people: "1 Person", level: "Mild", ingredients: "Ramen, Gemüse, Ei" },
+    appearance: { art: "#1d2320", pattern: "dots" }, media: []
+  },
+  {
+    // A 套餐: its own entry, its own price and photo, that also names the
+    // existing dishes it packages — not a new product kind.
+    id: "combo-1", sku: "SET-1", kind: "food", category: "SET",
+    names: { zh: "双人套餐", de: "Menü für zwei", en: "Set for Two" },
+    description: "Rinderfilet und Ramen zusammen.", price: 42,
+    allergens: [], details: { time: "35 min", people: "2 Personen", level: "Mild", ingredients: "" },
+    appearance: { art: "#2a2318", pattern: "ring" }, media: [],
+    bundleItems: [{ productId: "80", quantity: 1 }, { productId: "ramen-1", quantity: 2 }]
+  }
+];
+
 test.beforeEach(async ({ page }) => {
-  const products = [
-    {
-      id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
-      names: { zh: "黑椒牛柳", de: "Rinderfilet mit schwarzem Pfeffer", en: "Black Pepper Beef Fillet" },
-      description: "Zartes Rinderfilet mit schwarzem Pfeffer.", price: 34.5,
-      allergens: ["F", "O"], details: { time: "35 min", people: "2 Personen", level: "Mittel", ingredients: "Rinderfilet, Pfeffer" },
-      appearance: { art: "linear-gradient(135deg,#7e1e18,#190f0e 76%)", pattern: "ring" }, media: [],
-      modifiers: [{ id: "custom", names: { zh: "口味要求", de: "Sonderwünsche", en: "Preferences" }, selection: "multi", options: [
-        { id: "extra-noodles", names: { zh: "加面", de: "Extra Nudeln", en: "Extra noodles" }, priceCents: 250 },
-        { id: "no-cilantro", names: { zh: "不要香菜", de: "Ohne Koriander", en: "No cilantro" }, priceCents: 0 },
-        { id: "extra-chili", names: { zh: "加辣椒", de: "Extra Chili", en: "Extra chili" }, priceCents: 50 }
-      ] }]
-    },
-    {
-      id: "video-1", sku: "SUSHI-01", kind: "sushi", category: "SUSHI",
-      names: { zh: "火炙三文鱼寿司", de: "Flambierter Lachs", en: "Torched Salmon Sushi" },
-      description: "Flambierter Lachs.", price: 12.8,
-      // Sesame is in the ingredients and deliberately not in the declaration:
-      // the glossary knows sesame carries N, and the test below is that it
-      // still does not put N on the dish. Only the kitchen declares.
-      allergens: ["D"], details: { time: "10 min", people: "1 Person", level: "Mild", ingredients: "Lachs, Reis, Sesam" },
-      appearance: { art: "#37231d", pattern: "lines" }, media: [{ type: "video", url: "/media/demo.mp4" }]
-    },
-    {
-      // Every term here is in the ingredient glossary, which is what makes the
-      // breakdown assertions below about the feature rather than about a
-      // fixture nobody translated.
-      id: "ramen-1", sku: "R1", kind: "food", category: "RAMEN",
-      names: { zh: "蔬菜拉面", de: "Ramen mit Gemüse", en: "Ramen with Vegetables" },
-      description: "Ramen, Gemüse, Ei.", price: 12.5,
-      allergens: ["A", "C", "F"], details: { time: "20 min", people: "1 Person", level: "Mild", ingredients: "Ramen, Gemüse, Ei" },
-      appearance: { art: "#1d2320", pattern: "dots" }, media: []
-    },
-    {
-      // A 套餐: its own entry, its own price and photo, that also names the
-      // existing dishes it packages — not a new product kind.
-      id: "combo-1", sku: "SET-1", kind: "food", category: "SET",
-      names: { zh: "双人套餐", de: "Menü für zwei", en: "Set for Two" },
-      description: "Rinderfilet und Ramen zusammen.", price: 42,
-      allergens: [], details: { time: "35 min", people: "2 Personen", level: "Mild", ingredients: "" },
-      appearance: { art: "#2a2318", pattern: "ring" }, media: [],
-      bundleItems: [{ productId: "80", quantity: 1 }, { productId: "ramen-1", quantity: 2 }]
-    }
-  ];
-  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products }) }));
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "jade" }) }));
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
@@ -121,6 +122,21 @@ test("German menu copy replaces the Chinese chrome, all the way into a dish", as
 
   await page.locator(".detail-heading").click({ delay: 50 });
   await expect(page.getByText("Allergene")).toBeVisible();
+});
+
+test("the menu style the server picked changes only the accent, at load", async ({ page }) => {
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "terracotta" }) }));
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
+  expect(accent).toBe("#c98868");
+  // The rest of the palette — background, ink — is untouched by a style pick.
+  const bg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bg").trim());
+  expect(bg).toBe("#0f1113");
 });
 
 test("a tablet that has never reached the server shows the menu the app ships with", async ({ page }) => {

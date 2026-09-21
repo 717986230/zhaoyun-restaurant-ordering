@@ -4,6 +4,7 @@ import type { RealtimeEnvelope } from "@zhaoyun/contracts";
 import { restaurantApi } from "./api";
 import { useCatalog } from "./useCatalog";
 import { useCustomerState } from "./model";
+import { useMenuTheme } from "./useMenuTheme";
 import { CatalogScreen } from "../features/catalog/CatalogScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
 
@@ -22,15 +23,16 @@ import { useKiosk } from "../features/kiosk/useKiosk";
  */
 export function App() {
   const { state, dispatch } = useCustomerState();
-  const { data: products, usingBundledMenu } = useCatalog();
+  const { data: catalog, usingBundledMenu } = useCatalog();
   const queryClient = useQueryClient();
   const handleAdminTap = useKiosk();
+  useMenuTheme(catalog.theme);
 
   useEffect(() => restaurantApi.connect((message: RealtimeEnvelope) => {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });
   }), [queryClient]);
 
   return <main className="app-shell">
-    <CatalogScreen state={state} dispatch={dispatch} products={products} offlineMenu={usingBundledMenu} onAdminTap={handleAdminTap} />
+    <CatalogScreen state={state} dispatch={dispatch} products={catalog.products} offlineMenu={usingBundledMenu} onAdminTap={handleAdminTap} />
   </main>;
 }

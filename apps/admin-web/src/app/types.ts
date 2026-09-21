@@ -1,4 +1,4 @@
-import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
+import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest, MenuThemeId } from "@zhaoyun/contracts";
 import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
@@ -24,5 +24,6 @@ export interface AdminState {
   editingProduct: Product | null;
   editingPrinter: PrinterProfile | null;
   productFilter: ProductFilter;
+  menuTheme: MenuThemeId | null;
   toast: { message: string; kind: "success" | "warning" | "error" } | null;
 }

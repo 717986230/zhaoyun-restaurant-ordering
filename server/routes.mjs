@@ -5,7 +5,7 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
   CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody, TableBody, TableLockBody, TableParams
+  ProductBody, ServiceRequestBody, ServiceStatusBody, SettingsBody, TableBody, TableLockBody, TableParams
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
@@ -174,7 +174,15 @@ export function registerRoutes(app, { database, realtime, config }) {
     realtime.connect(socket, TABLE_PATTERN.test(table) ? table : null);
   });
 
-  app.get("/api/catalog", async () => ({ products: database.listProducts(true) }));
+  app.get("/api/catalog", async () => ({ products: database.listProducts(true), theme: database.getSettings().menuTheme }));
+  app.get("/api/admin/settings", { preHandler: requireAdmin }, async () => database.getSettings());
+  app.put("/api/admin/settings", { preHandler: requireAdmin, schema: { body: SettingsBody } }, async (request, reply) => {
+    try {
+      return database.saveSettings(request.body || {});
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
   app.get("/api/admin/products", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async () => ({ products: database.listProducts(false) }));
   app.get("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const product = database.getProduct(request.params.id);

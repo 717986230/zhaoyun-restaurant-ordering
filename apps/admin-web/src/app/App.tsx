@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminApi } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
-import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, MenuThemeId } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
@@ -33,7 +33,7 @@ const initialState: AdminState = {
   tab: "catalog", role: null, auditEntries: [],
   connected: false, connectionText: "未连接", products: [], printers: [],
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
-  discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", toast: null
+  discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", menuTheme: null, toast: null
 };
 
 const BOARD_REFRESH_MS = 5000;
@@ -74,9 +74,9 @@ export function App() {
       const { role } = await adminApi.session();
       roleRef.current = role;
       const manager = role === "manager";
-      const [catalog, printerList] = manager
-        ? await Promise.all([adminApi.products(), adminApi.printers()])
-        : [{ products: [] }, { printers: [] }];
+      const [catalog, printerList, settings] = manager
+        ? await Promise.all([adminApi.products(), adminApi.printers(), adminApi.settings()])
+        : [{ products: [] }, { printers: [] }, null];
       setState((current) => ({
         ...current,
         role,
@@ -84,6 +84,7 @@ export function App() {
         connectionText: `服务器在线 · ${ROLE_LABELS[role]}`,
         products: catalog.products.map(mapProduct),
         printers: printerList.printers,
+        menuTheme: settings?.menuTheme ?? current.menuTheme,
         tab: TABS_BY_ROLE[role].includes(current.tab) ? current.tab : TABS_BY_ROLE[role][0] ?? "board"
       }));
     } catch (error) {
@@ -208,6 +209,14 @@ export function App() {
     catch (error) { notify(error instanceof Error ? error.message : "测试打印失败", "error"); }
   }
 
+  async function saveMenuTheme(menuTheme: MenuThemeId) {
+    try {
+      const settings = await adminApi.updateSettings(menuTheme);
+      setState((current) => ({ ...current, menuTheme: settings.menuTheme }));
+      notify("菜单样式已更新");
+    } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
+  }
+
   async function saveConnection(nextStorage: AdminStorage) {
     adminApi.configure(nextStorage);
     await connect();
@@ -266,7 +275,7 @@ export function App() {
         onSettleBill={settleBill}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
-      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} />}
+      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} menuTheme={state.menuTheme} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} onSaveMenuTheme={saveMenuTheme} />}
     </main>
   </div><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;
 }

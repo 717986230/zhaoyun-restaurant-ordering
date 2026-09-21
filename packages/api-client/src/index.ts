@@ -1,6 +1,6 @@
 import type {
-  ApiBill, ApiCatalogProduct, ApiOrder, ApiPrintJob, ApiServiceRequest, CreateOrderCommand,
-  CreateServiceRequestCommand, PrintJobStatus, RealtimeEnvelope, VatPercent
+  ApiBill, ApiCatalogProduct, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
+  CreateServiceRequestCommand, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
 
@@ -157,6 +157,8 @@ export class AdminApi {
   createPrinter(profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request("/api/admin/printers", { method: "POST", body: JSON.stringify(profile) }); }
   updatePrinter(id: string, profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(profile) }); }
   retryPrintJob(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }
+  settings(): Promise<ApiSettings> { return this.#request("/api/admin/settings"); }
+  updateSettings(menuTheme: MenuThemeId): Promise<ApiSettings> { return this.#request("/api/admin/settings", { method: "PUT", body: JSON.stringify({ menuTheme }) }); }
 
   connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
     const base = this.storage.baseUrl.replace(/^http/, "ws");
@@ -214,7 +216,7 @@ export class RestaurantApi {
     return `${this.#baseUrl()}${path}`;
   }
 
-  catalog(): Promise<{ products: ApiCatalogProduct[] }> {
+  catalog(): Promise<{ products: ApiCatalogProduct[]; theme?: MenuThemeId }> {
     return this.#request("/api/catalog");
   }
 

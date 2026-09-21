@@ -18,7 +18,7 @@ import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
   CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
-  TableBody, TableLockBody
+  SettingsBody, TableBody, TableLockBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
@@ -212,7 +212,8 @@ async function handle(request, env) {
 
   // /api/catalog
   if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
-    return json({ products: await store.listProducts(true) });
+    const { menuTheme } = await store.getSettings();
+    return json({ products: await store.listProducts(true), theme: menuTheme });
   }
 
   // /api/orders and /api/orders/:id/status
@@ -451,6 +452,20 @@ async function handle(request, env) {
 
     if (path[2] === "printer-for-role" && path.length === 4 && method === "GET") {
       return json({ printer: await store.printerForRole(path[3]) });
+    }
+
+    // /api/admin/settings
+    if (path.length === 3 && path[2] === "settings" && method === "GET") {
+      return json(await store.getSettings());
+    }
+    if (path.length === 3 && path[2] === "settings" && method === "PUT") {
+      try {
+        const { value, invalid } = await body(request, SettingsBody);
+        if (invalid) return invalid;
+        return json(await store.saveSettings(value));
+      } catch (error) {
+        return fail(error.message);
+      }
     }
   }
 

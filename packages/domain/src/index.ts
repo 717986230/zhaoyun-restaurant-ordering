@@ -155,3 +155,5 @@ export { services } from "./seed.js";
 export type { ServiceId } from "./seed.js";
 export { deconstruct, ingredients, ingredientTerms } from "./ingredients.js";
 export type { Deconstruction, DishPart, IngredientEntry } from "./ingredients.js";
+export { DEFAULT_MENU_THEME, MENU_THEME_IDS, MENU_THEMES } from "./themes.js";
+export type { MenuTheme, MenuThemeId } from "./themes.js";

@@ -1150,6 +1150,41 @@ h2 {
   }
 }
 
+/* Menu style. Each swatch's own colour comes in inline as --swatch, since it
+   is the one thing per preset that isn't a fixed admin-console token. */
+.theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 16px;
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.theme-swatch i {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--swatch);
+  flex-shrink: 0;
+}
+
+.theme-swatch.selected {
+  border-color: var(--swatch);
+  box-shadow: 0 0 0 1px var(--swatch);
+}
+
 /* Table cards. The sheet is laid out for A4 and the print rules drop everything
    else, so "print" from the dialog gives a page of cards and nothing else. */
 .table-cards-launch {
