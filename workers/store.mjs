@@ -18,7 +18,7 @@ import {
 const PRODUCT_COLUMNS = [
   "id", "sku", "kind", "category", "name_zh", "name_de", "name_en", "description", "price_cents",
   "allergens_json", "prep_time", "portion", "level", "ingredients", "art", "pattern", "available",
-  "published", "sort_order", "print_station", "modifiers_json", "created_at", "updated_at"
+  "published", "sort_order", "print_station", "modifiers_json", "bundle_items_json", "created_at", "updated_at"
 ];
 
 export function createStore(db) {
@@ -81,12 +81,13 @@ export function createStore(db) {
         `UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
            name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
            portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
-           published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, updated_at = ? WHERE id = ?`,
+           published = ?, sort_order = ?, print_station = ?, modifiers_json = ?,
+           bundle_items_json = ?, updated_at = ? WHERE id = ?`,
         product.sku, product.kind, product.category, product.nameZh, product.nameDe,
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
         product.pattern, product.available, product.published, product.sortOrder,
-        product.printStation, product.modifiersJson, timestamp, product.id
+        product.printStation, product.modifiersJson, product.bundleItemsJson, timestamp, product.id
       );
     } else {
       await run(
@@ -95,7 +96,7 @@ export function createStore(db) {
         product.nameDe, product.nameEn, product.description, product.priceCents,
         product.allergensJson, product.prepTime, product.portion, product.level,
         product.ingredients, product.art, product.pattern, product.available,
-        product.published, product.sortOrder, product.printStation, product.modifiersJson, timestamp, timestamp
+        product.published, product.sortOrder, product.printStation, product.modifiersJson, product.bundleItemsJson, timestamp, timestamp
       );
     }
     return getProduct(product.id);

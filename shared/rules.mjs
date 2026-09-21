@@ -162,6 +162,15 @@ export function boundedLimit(limit, fallback = 100, max = 500) {
   return Math.min(Number(limit) || fallback, max);
 }
 
+/** Clamps a combo's bundled quantities the same way on both backends; what a
+ *  dish id actually refers to is checked where the product rows are at hand. */
+export function normalizeBundleItems(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && String(item.productId ?? "").trim())
+    .map((item) => ({ productId: String(item.productId).trim(), quantity: Math.max(1, Math.min(99, Number(item.quantity) || 1)) }));
+}
+
 export function mapProduct(row, media = []) {
   return {
     id: row.id,
@@ -183,6 +192,7 @@ export function mapProduct(row, media = []) {
       pattern: row.pattern
     },
     modifiers: parseJson(row.modifiers_json, []),
+    bundleItems: parseJson(row.bundle_items_json, []),
     available: Boolean(row.available),
     published: Boolean(row.published),
     sortOrder: row.sort_order,
@@ -226,6 +236,7 @@ export function normalizeProduct(input, current = {}) {
     art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#2d3a35,#121416 78%)"),
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
     modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
+    bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
     sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),

@@ -2,7 +2,7 @@ import type {
   ApiBill, ApiCatalogProduct, ApiOrder, ApiPrintJob, ApiServiceRequest, CreateOrderCommand,
   CreateServiceRequestCommand, PrintJobStatus, RealtimeEnvelope, VatPercent
 } from "@zhaoyun/contracts";
-import type { ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
+import type { BundleItem, ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
 
 export interface RestaurantApiOptions {
   baseUrl: () => string;
@@ -27,6 +27,7 @@ export interface AdminProductInput {
   available: boolean;
   published: boolean;
   modifiers?: ModifierGroup[];
+  bundleItems?: BundleItem[];
 }
 
 export type StaffRole = "manager" | "staff" | "kitchen";

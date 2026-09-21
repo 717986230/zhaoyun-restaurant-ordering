@@ -30,6 +30,12 @@ export interface SelectedModifier {
   priceCents: number;
 }
 
+/** One dish a 套餐 (combo) bundles in, and how many of it come with the set. */
+export interface BundleItem {
+  productId: string;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -44,6 +50,9 @@ export interface Product {
   appearance: { art: string; pattern: string };
   media: ProductMedia[];
   modifiers?: ModifierGroup[];
+  /** Present on a combo: the existing dishes it packages, by id. A combo is
+   *  otherwise an ordinary product — its own name, price and photo. */
+  bundleItems?: BundleItem[];
   available: boolean;
   published: boolean;
   printStation: PrintStation;

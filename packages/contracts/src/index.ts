@@ -41,6 +41,7 @@ export interface ApiCatalogProduct {
     selection: "single" | "multi";
     options: Array<{ id: string; names: { zh: string; de: string; en: string }; priceCents: number }>;
   }>;
+  bundleItems?: Array<{ productId: string; quantity: number }>;
   media?: Array<{ id?: string; type: "image" | "video"; url: string; posterUrl?: string | null; sortOrder?: number }>;
   available?: boolean;
   published?: boolean;

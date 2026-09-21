@@ -114,7 +114,29 @@ function DishOptions({ product, language }: { product: Product; language: Custom
   </div>;
 }
 
-function ProductDetail({ product, state, dispatch }: { product: Product; state: CustomerState; dispatch: CustomerDispatch }) {
+/**
+ * A 套餐 (combo) is an ordinary product — its own name, price and photo — that
+ * also names the existing dishes it bundles. `bundleItems` only carries ids
+ * and quantities, so rendering it needs the full product list to look the
+ * names up; a dish removed from the catalogue after a combo was built is
+ * silently skipped rather than shown as a blank line.
+ */
+function BundleContents({ product, products, language }: { product: Product; products: Product[]; language: CustomerState["language"] }) {
+  if (!product.bundleItems?.length) return null;
+  const byId = new Map(products.map((item) => [item.id, item]));
+  return <div className="bundle-items">
+    <p className="modifier-heading">{t(language, "bundleIncludes")}</p>
+    <ul className="bundle-items-list">
+      {product.bundleItems.map((item) => {
+        const dish = byId.get(item.productId);
+        if (!dish) return null;
+        return <li key={item.productId}>{item.quantity > 1 ? `${item.quantity}× ` : ""}{productName(dish, language)}</li>;
+      })}
+    </ul>
+  </div>;
+}
+
+function ProductDetail({ product, products, state, dispatch }: { product: Product; products: Product[]; state: CustomerState; dispatch: CustomerDispatch }) {
   const reduceMotion = useReducedMotion();
   const seconds = (value: number) => (reduceMotion ? 0 : value);
 
@@ -138,6 +160,7 @@ function ProductDetail({ product, state, dispatch }: { product: Product; state: 
               <div><h4>{product.names.en}</h4><p>{product.description}</p></div>
             </div>
             <DishOptions product={product} language={state.language} />
+            <BundleContents product={product} products={products} language={state.language} />
             <div className="meta"><span>{product.details.time}</span><span>{product.details.people}</span><span>{product.details.level}</span></div>
           </div>
           <div className="detail-buy">
@@ -205,6 +228,6 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false, 
         <span className="row-price">{formatEuro(product.priceCents)}</span>
       </div>
     </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}</div>
-    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} state={state} dispatch={dispatch} />}</AnimatePresence>
+    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} products={products} state={state} dispatch={dispatch} />}</AnimatePresence>
   </section>;
 }

@@ -41,6 +41,11 @@ const ModifierGroup = Type.Object({
   options: Type.Array(ModifierOption, { maxItems: 32 })
 });
 
+const BundleItem = Type.Object({
+  productId: ProductId,
+  quantity: Type.Integer({ minimum: 1, maximum: 99 })
+});
+
 export const ORDER_STATUSES = ["new", "preparing", "ready", "completed", "cancelled"];
 export const SERVICE_STATUSES = ["open", "acknowledged", "completed", "cancelled"];
 export const PRINT_STATIONS = ["kitchen", "bar", "sushi", "front"];
@@ -93,7 +98,10 @@ export const ProductBody = Type.Object({
     art: Type.String({ maxLength: 400 }),
     pattern: Type.String({ maxLength: 32 })
   })),
-  modifiers: Type.Optional(Type.Array(ModifierGroup, { maxItems: 16 }))
+  modifiers: Type.Optional(Type.Array(ModifierGroup, { maxItems: 16 })),
+  // A combo: the existing dishes it packages, so it is otherwise a normal
+  // product with its own name, price and photo, not a distinct product kind.
+  bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 }))
 });
 
 export const PrinterBody = Type.Object({

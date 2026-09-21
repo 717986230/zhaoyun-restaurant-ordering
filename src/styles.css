@@ -1227,6 +1227,26 @@ html.plt-android .menu.detail-open .stack {
   color: var(--faint);
 }
 
+/* A combo's card, not a form either: the dishes it packages, listed the way
+   the receipt would show them. */
+.bundle-items-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.bundle-items-list li {
+  color: var(--ink);
+}
+
+.bundle-items-list li::before {
+  content: "· ";
+  color: var(--faint);
+}
+
 .modifier-group legend {
   margin-bottom: 8px;
   color: var(--accent);

@@ -33,6 +33,16 @@ test.beforeEach(async ({ page }) => {
       description: "Ramen, Gemüse, Ei.", price: 12.5,
       allergens: ["A", "C", "F"], details: { time: "20 min", people: "1 Person", level: "Mild", ingredients: "Ramen, Gemüse, Ei" },
       appearance: { art: "#1d2320", pattern: "dots" }, media: []
+    },
+    {
+      // A 套餐: its own entry, its own price and photo, that also names the
+      // existing dishes it packages — not a new product kind.
+      id: "combo-1", sku: "SET-1", kind: "food", category: "SET",
+      names: { zh: "双人套餐", de: "Menü für zwei", en: "Set for Two" },
+      description: "Rinderfilet und Ramen zusammen.", price: 42,
+      allergens: [], details: { time: "35 min", people: "2 Personen", level: "Mild", ingredients: "" },
+      appearance: { art: "#2a2318", pattern: "ring" }, media: [],
+      bundleItems: [{ productId: "80", quantity: 1 }, { productId: "ramen-1", quantity: 2 }]
     }
   ];
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products }) }));
@@ -220,4 +230,14 @@ test("a part never carries an allergen the dish does not declare", async ({ page
   // else may appear, whatever the glossary knows about the terms.
   const letters = await page.locator(".dish-part .allergen").allInnerTexts();
   expect(letters).toEqual(["D"]);
+});
+
+test("a combo names the dishes it packages, not just its own price", async ({ page }) => {
+  await page.locator(".dish-card", { hasText: "双人套餐" }).click();
+  const bundle = page.locator(".bundle-items");
+  await expect(bundle).toBeVisible();
+  await expect(bundle).toContainText("黑椒牛柳");
+  // Quantities above one are shown; the singular dish is not prefixed with "1×".
+  await expect(bundle).toContainText("2× 蔬菜拉面");
+  await expect(bundle.getByText("黑椒牛柳", { exact: true })).toBeVisible();
 });

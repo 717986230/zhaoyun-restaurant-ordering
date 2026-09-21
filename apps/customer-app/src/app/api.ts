@@ -28,6 +28,7 @@ export function mapApiProduct(product: ApiCatalogProduct): Product {
     details: product.details,
     appearance: product.appearance,
     modifiers: product.modifiers ?? [],
+    bundleItems: product.bundleItems ?? [],
     media: (product.media ?? []).map((media) => ({ ...media })),
     available: product.available ?? true,
     published: product.published ?? true,

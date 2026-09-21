@@ -5,13 +5,13 @@ import { DatabaseSync } from "node:sqlite";
 import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
-import { auditView, billView, normalizeTableNo, tableOverviewView, tableView } from "../shared/rules.mjs";
+import { auditView, billView, normalizeBundleItems, normalizeTableNo, tableOverviewView, tableView } from "../shared/rules.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 const VAT_PERCENTS = new Set([10, 13, 20]);
 // Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
@@ -76,6 +76,7 @@ function mapProduct(row, media = []) {
       pattern: row.pattern
     },
     modifiers: parseJson(row.modifiers_json, []),
+    bundleItems: parseJson(row.bundle_items_json, []),
     available: Boolean(row.available),
     published: Boolean(row.published),
     sortOrder: row.sort_order,
@@ -122,6 +123,7 @@ function normalizeProduct(input, current = {}) {
     art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#2d3a35,#121416 78%)"),
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
     modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
+    bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
     sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
@@ -163,6 +165,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       print_station TEXT NOT NULL DEFAULT 'kitchen',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10,
+      bundle_items_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -274,7 +277,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE products ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
     "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
     "ALTER TABLE orders ADD COLUMN billed_at TEXT",
-    "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT"
+    "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
+    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'"
   ]) {
     try {
       db.exec(statement);
@@ -301,14 +305,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       INSERT INTO products (
         id, sku, kind, category, name_zh, name_de, name_en, description, price_cents,
         allergens_json, prep_time, portion, level, ingredients, art, pattern, available,
-        published, sort_order, print_station, modifiers_json, vat_percent, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        published, sort_order, print_station, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     updateProduct: db.prepare(`
       UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
         name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
         portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
-        published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, vat_percent = ?, updated_at = ? WHERE id = ?
+        published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, vat_percent = ?,
+        bundle_items_json = ?, updated_at = ? WHERE id = ?
     `),
     deleteProduct: db.prepare("DELETE FROM products WHERE id = ?"),
     insertMedia: db.prepare("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"),
@@ -380,7 +385,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
         product.pattern, product.available, product.published, product.sortOrder,
-        product.printStation, product.modifiersJson, product.vatPercent, timestamp, product.id
+        product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, product.id
       );
     } else {
       statements.insertProduct.run(
@@ -389,7 +394,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         product.allergensJson, product.prepTime, product.portion, product.level,
         product.ingredients, product.art, product.pattern, product.available,
         product.published, product.sortOrder, product.printStation, product.modifiersJson,
-        product.vatPercent, timestamp, timestamp
+        product.vatPercent, product.bundleItemsJson, timestamp, timestamp
       );
     }
     return getProduct(product.id);

@@ -24,6 +24,7 @@ CREATE TABLE products (
       print_station TEXT NOT NULL DEFAULT 'kitchen',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10,
+      bundle_items_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
