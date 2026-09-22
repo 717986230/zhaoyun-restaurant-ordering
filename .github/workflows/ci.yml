@@ -100,18 +100,30 @@ jobs:
 
       - run: npm ci
 
+      # Turning Pages on is the one part of this nobody can automate: creating
+      # the site needs admin rights the workflow token is never given, and
+      # `configure-pages`' own `enablement` input therefore fails with
+      # "Resource not accessible by integration", which says nothing about
+      # what to do. Say it here instead, before that happens.
+      - name: Check that Pages is switched on
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages")
+          if [ "$status" = "404" ]; then
+            echo "::error::GitHub Pages is off for this repository. Switch it on once, by hand: Settings → Pages → Build and deployment → Source → GitHub Actions. No workflow can do this step."
+            exit 1
+          fi
+          echo "Pages is on (HTTP $status)."
+
       # `base_path` is `/<repo>` for a project site and empty for a custom
       # domain, so asking Pages where it will serve from beats hard-coding a
       # path that breaks the day a domain is added.
-      #
-      # `enablement` turns Pages on if it is off, using the `pages: write`
-      # permission above — without it this step is where a repository that has
-      # never had Pages fails, and the fix is a settings page rather than
-      # anything in here. It is a no-op once Pages exists.
       - uses: actions/configure-pages@v5
         id: pages
-        with:
-          enablement: true
 
       # Without API_BASE_URL the published menu still renders — it falls back
       # to the catalogue bundled at build time and says so on screen — but the
