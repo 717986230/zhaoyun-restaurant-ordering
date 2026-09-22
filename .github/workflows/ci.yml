@@ -154,7 +154,11 @@ jobs:
     name: Publish the menu to GitHub Pages
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: checks
+    # Deliberately not `needs: checks`. Publishing a menu is not a release of
+    # anything the tests guard — and it still cannot publish something that
+    # does not compile, because `npm run build` typechecks first. Gating it on
+    # the full suite only meant waiting four minutes to look at a page. The
+    # suite still runs, alongside this rather than in front of it.
     # One site, one live version, so normally only a commit on main publishes
     # — a pull request build would otherwise overwrite the menu guests are
     # reading. The second clause is temporary: the menu-only guest app, the
