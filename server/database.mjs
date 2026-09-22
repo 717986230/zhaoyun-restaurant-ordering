@@ -6,15 +6,22 @@ import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
-  auditView, billView, normalizeBundleItems, normalizeMenuTheme, normalizeTableNo,
-  settingsView, tableOverviewView, tableView
+  adminGateView, assertPassword, auditView, billView, DEFAULT_MENU_THEME, hashPassword,
+  hashSessionToken, newSessionToken, normalizeBundleItems, normalizeMenuTheme,
+  normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
+  tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
+
+// 16 zero bytes. A salt for nobody: signing in against a console that has no
+// password yet still spends the same 210k iterations as one that does, so the
+// response time does not say which it was.
+const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 const VAT_PERCENTS = new Set([10, 13, 20]);
 // Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
@@ -266,13 +273,29 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    -- One restaurant, one row, and the console's password lives on it: there
+    -- is nothing to name or list, so a table of accounts would be a table of
+    -- one. The hash is stored, never the password.
     CREATE TABLE IF NOT EXISTS restaurant_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       menu_theme TEXT NOT NULL DEFAULT 'jade',
+      admin_password_hash TEXT,
+      admin_password_salt TEXT,
+      admin_password_iterations INTEGER,
+      admin_password_set_at TEXT,
       updated_at TEXT NOT NULL
     );
 
+    -- Only the SHA-256 of a session token is kept, so the table is useless to
+    -- anyone who reads it: it cannot be replayed as a credential.
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      token_hash TEXT PRIMARY KEY,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
@@ -287,7 +310,13 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
     "ALTER TABLE orders ADD COLUMN billed_at TEXT",
     "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
-    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'"
+    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'",
+    // A database from before the console had a password gate has the settings
+    // row already; these four columns are how it gets one without a rebuild.
+    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_hash TEXT",
+    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_salt TEXT",
+    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_iterations INTEGER",
+    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_set_at TEXT"
   ]) {
     try {
       db.exec(statement);
@@ -363,6 +392,21 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
     releaseTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?"),
     openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
+    setAdminPassword: db.prepare(`
+      INSERT INTO restaurant_settings (id, menu_theme, admin_password_hash, admin_password_salt, admin_password_iterations, admin_password_set_at, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        admin_password_hash = excluded.admin_password_hash,
+        admin_password_salt = excluded.admin_password_salt,
+        admin_password_iterations = excluded.admin_password_iterations,
+        admin_password_set_at = excluded.admin_password_set_at,
+        updated_at = excluded.updated_at
+    `),
+    insertSession: db.prepare("INSERT INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)"),
+    sessionByHash: db.prepare("SELECT * FROM admin_sessions WHERE token_hash = ?"),
+    deleteSession: db.prepare("DELETE FROM admin_sessions WHERE token_hash = ?"),
+    deleteAllSessions: db.prepare("DELETE FROM admin_sessions"),
+    deleteExpiredSessions: db.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?"),
     getSettings: db.prepare("SELECT * FROM restaurant_settings WHERE id = 1"),
     upsertSettings: db.prepare(`
       INSERT INTO restaurant_settings (id, menu_theme, updated_at) VALUES (1, ?, ?)
@@ -653,6 +697,84 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     };
   }
 
+  function adminGate() {
+    return adminGateView(statements.getSettings.get());
+  }
+
+  /**
+   * Sets the console's password: once with no current password, because the
+   * first person through the door has none to give, and thereafter only for
+   * someone who can produce the one in force.
+   *
+   * Returns null rather than throwing on a wrong current password, so the
+   * caller answers it the way it answers a wrong sign-in — one refusal, no
+   * detail — and its rate limiter counts it.
+   */
+  async function resetAdminGatePassword(password) {
+    const row = statements.getSettings.get();
+    const stored = await hashPassword(assertPassword(password));
+    const timestamp = now();
+    statements.setAdminPassword.run(
+      row?.menu_theme ?? DEFAULT_MENU_THEME,
+      stored.hash, stored.salt, stored.iterations, timestamp, timestamp
+    );
+    // Changing the password ends every session opened with the old one; that
+    // is most of the reason anyone changes it.
+    statements.deleteAllSessions.run();
+    return adminGateView(statements.getSettings.get());
+  }
+
+  async function setAdminGatePassword(password, currentPassword) {
+    const row = statements.getSettings.get();
+    if (row?.admin_password_hash) {
+      const correct = await verifyPassword(String(currentPassword ?? ""), {
+        hash: row.admin_password_hash, salt: row.admin_password_salt, iterations: row.admin_password_iterations
+      });
+      if (!correct) return null;
+    }
+    return resetAdminGatePassword(password);
+  }
+
+  /** Exchanges the password for a session token, or nothing at all. */
+  async function signIn(password) {
+    const row = statements.getSettings.get();
+    const stored = row?.admin_password_hash
+      ? { hash: row.admin_password_hash, salt: row.admin_password_salt, iterations: row.admin_password_iterations }
+      // Verify against a throwaway hash anyway, so an unconfigured gate does
+      // not answer faster than a wrong password and say so by timing.
+      : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(password ?? ""), stored);
+    if (!row?.admin_password_hash || !correct) return null;
+
+    const token = newSessionToken();
+    const timestamp = now();
+    statements.deleteExpiredSessions.run(timestamp);
+    statements.insertSession.run(
+      await hashSessionToken(token),
+      new Date(Date.now() + SESSION_TTL_MS).toISOString(), timestamp
+    );
+    return { token, expiresInMs: SESSION_TTL_MS };
+  }
+
+  /** The role behind a session token, or null — expired and revoked look the
+   *  same to a caller, which is what they should. Past the gate there is only
+   *  one role, and it is manager: this is the owner's own console. */
+  async function roleForSession(token) {
+    if (!token) return null;
+    const row = statements.sessionByHash.get(await hashSessionToken(token));
+    if (!row) return null;
+    if (row.expires_at <= now()) {
+      statements.deleteSession.run(row.token_hash);
+      return null;
+    }
+    return { role: "manager" };
+  }
+
+  async function signOut(token) {
+    if (!token) return false;
+    return statements.deleteSession.run(await hashSessionToken(token)).changes > 0;
+  }
+
   function getSettings() {
     return settingsView(statements.getSettings.get());
   }
@@ -792,6 +914,12 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
     getSettings,
     saveSettings,
+    adminGate,
+    setAdminGatePassword,
+    resetAdminGatePassword,
+    signIn,
+    signOut,
+    roleForSession,
     listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map(printJobView),
     claimPrintJob: (role, workerId, leaseMs = 30_000) => {
       const timestamp = now();

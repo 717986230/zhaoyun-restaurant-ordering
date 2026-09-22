@@ -1280,3 +1280,40 @@ h2 {
 
   .table-card { border-color: var(--paper-line-print); }
 }
+
+/* The password gate. It is the whole page before anyone is through it, so it
+   centres rather than sitting in the console's grid. */
+.gate-shell {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.gate-pane {
+  width: 100%;
+  max-width: 380px;
+}
+
+.gate-form {
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-card);
+  padding: clamp(22px, 5vw, 32px);
+  box-shadow: 0 10px 30px -18px var(--a-shadow-1);
+}
+
+.gate-form .form-title {
+  display: block;
+}
+
+.gate-note {
+  margin: 0;
+  color: var(--a-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.gate-note.error {
+  color: var(--a-danger);
+  font-weight: 650;
+}

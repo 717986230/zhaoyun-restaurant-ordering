@@ -39,6 +39,9 @@ test("Node server satisfies the API contract", async (context) => {
       method,
       url,
       headers: {
+        // `token` is a session token the suite signed in for; `admin`/`role`
+        // are the configured shared tokens. Both travel in the same header.
+        ...(options.token ? { "x-admin-token": options.token } : {}),
         ...(options.admin || options.role ? { "x-admin-token": TOKENS[options.role || "manager"] } : {}),
         ...(options.tableToken ? { "x-table-token": options.tableToken } : {})
       },

@@ -18,7 +18,7 @@ import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
   CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
-  SettingsBody, TableBody, TableLockBody
+  SetPasswordBody, SettingsBody, SignInBody, TableBody, TableLockBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
@@ -117,28 +117,11 @@ async function refuseUnknownTable(request, store, order) {
 }
 
 /**
- * Authenticate, then check rank.
- *
- * Three shared tokens, one per role, exactly as the Node server has: the
- * manager token is `ADMIN_TOKEN`, and `STAFF_TOKEN` / `KITCHEN_TOKEN` are
- * optional secrets a deployment may add. Leave them unset and there is one
- * role, not three aliases of it.
- *
- * This deployment had no roles at all until now — one token opened everything,
- * so a waiter tablet pointed at it could edit the menu, its prices and its
- * allergen declarations. `shared/contract-suite.mjs` asks both backends about
- * it now, which is what stops the two drifting apart again.
- *
- * Returns `{ role }` when the request may proceed and `{ denied }` when it may
- * not, so a caller cannot forget to check.
+ * One budget per client address, shared by the guards and the sign-in route,
+ * so guessing the password and guessing a token are counted together. Returns
+ * `{ denied }` once the budget is spent.
  */
-async function requireRole(request, env, store, minimumRole) {
-  const expected = env.ADMIN_TOKEN;
-  if (!expected || String(expected).length < 32) {
-    // Refuse rather than fall back to a default: a deployed backend with a weak
-    // admin token is worse than one that plainly is not configured yet.
-    return { denied: fail("ADMIN_TOKEN is not configured on this deployment", 503) };
-  }
+function authThrottle(request) {
   const moment = Date.now();
   const key = clientKey(request);
   const current = authFailures.get(key);
@@ -148,19 +131,63 @@ async function requireRole(request, env, store, minimumRole) {
     const retryAfter = Math.max(1, Math.ceil((active.resetAt - moment) / 1000));
     return { denied: json({ error: "Too many authentication attempts", retryAfter }, 429, { "retry-after": String(retryAfter) }) };
   }
+  return {
+    fail() {
+      const failures = (active?.failures ?? 0) + 1;
+      if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(moment);
+      authFailures.set(key, { failures, resetAt: moment + AUTH_WINDOW_MS });
+    },
+    pass() {
+      authFailures.delete(key);
+    }
+  };
+}
+
+/** The manager token, or nothing when this deployment has none worth trusting.
+ *  Refusing a short one rather than falling back to a default: a deployed
+ *  backend with a weak admin token is worse than one that plainly has none. */
+function adminToken(env) {
+  const expected = env.ADMIN_TOKEN;
+  return expected && String(expected).length >= 32 ? expected : null;
+}
+
+/**
+ * Authenticate, then check rank.
+ *
+ * The header carries one of two things: a session token the console got by
+ * typing the console's password, or one of the shared tokens — `ADMIN_TOKEN`
+ * for manager, and the optional `STAFF_TOKEN` / `KITCHEN_TOKEN`. The session
+ * is asked first because it is what everyone uses; the tokens stay for the
+ * tablets configured with one, and for getting back in when the password has
+ * been forgotten.
+ *
+ * Roles only come from tokens. Past the password gate there is one role and it
+ * is manager: it is the owner's own console.
+ *
+ * Returns `{ role }` when the request may proceed and `{ denied }` when it may
+ * not, so a caller cannot forget to check.
+ */
+async function requireRole(request, env, store, minimumRole) {
+  const expected = adminToken(env);
+  const throttle = authThrottle(request);
+  if (throttle.denied) return throttle;
   const provided = request.headers.get("x-admin-token");
-  const role = resolveStaffRole((token) => tokenMatches(provided, token), {
+  const session = await store.roleForSession(provided);
+  const role = session?.role ?? resolveStaffRole((token) => tokenMatches(provided, token), {
     manager: expected,
     staff: env.STAFF_TOKEN,
     kitchen: env.KITCHEN_TOKEN
   });
   if (!role) {
-    const failures = (active?.failures ?? 0) + 1;
-    if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(moment);
-    authFailures.set(key, { failures, resetAt: moment + AUTH_WINDOW_MS });
+    // Nothing configured that could ever grant one: say so, rather than
+    // counting a failure against a caller who had no way to succeed.
+    if (!expected && !(await store.adminGate()).configured) {
+      return { denied: fail("Set a password on the admin console, or configure ADMIN_TOKEN", 503) };
+    }
+    throttle.fail();
     return { denied: json({ error: "Admin authentication required" }, 401) };
   }
-  authFailures.delete(key);
+  throttle.pass();
   if (!roleAllows(role, minimumRole)) {
     // A valid token used beyond its role is worth recording, not just refusing.
     const url = new URL(request.url);
@@ -282,6 +309,67 @@ async function handle(request, env) {
   }
 
   if (path[0] === "api" && path[1] === "admin") {
+    /**
+     * The door of the admin console, ahead of every guarded route because it
+     * is how a caller gets something to present to them.
+     *
+     * The GET is deliberately open: it answers one bit — has a password been
+     * set — which the console needs before it can draw anything, and which
+     * anyone who tried to sign in would learn regardless.
+     */
+    if (path.length === 3 && path[2] === "gate" && method === "GET") {
+      return json(await store.adminGate());
+    }
+    if (path.length === 4 && path[2] === "gate" && path[3] === "sign-in" && method === "POST") {
+      const throttle = authThrottle(request);
+      if (throttle.denied) return throttle.denied;
+      const { value, invalid } = await body(request, SignInBody);
+      if (invalid) return invalid;
+      const session = await store.signIn(value.password);
+      if (!session) {
+        throttle.fail();
+        return fail("Wrong password", 401);
+      }
+      throttle.pass();
+      return json(session);
+    }
+    /**
+     * Sets the password: once for whoever opens the console first, because
+     * there is nothing yet to prove, and thereafter only for someone who can
+     * produce the one in force.
+     *
+     * The recovery path is ADMIN_TOKEN, and it is the token that is accepted
+     * here rather than a live session on purpose: a stolen session must not be
+     * able to change the password and lock the owner out of their own menu.
+     */
+    if (path.length === 4 && path[2] === "gate" && path[3] === "password" && method === "POST") {
+      const throttle = authThrottle(request);
+      if (throttle.denied) return throttle.denied;
+      const { value, invalid } = await body(request, SetPasswordBody);
+      if (invalid) return invalid;
+      const expected = adminToken(env);
+      const recovering = Boolean(expected) && tokenMatches(request.headers.get("x-admin-token"), expected);
+      try {
+        const updated = recovering
+          ? await store.resetAdminGatePassword(value.password)
+          : await store.setAdminGatePassword(value.password, value.currentPassword);
+        if (!updated) {
+          throttle.fail();
+          return fail("Wrong password", 401);
+        }
+        throttle.pass();
+        return json(updated);
+      } catch (error) {
+        return fail(error.message);
+      }
+    }
+    if (path.length === 4 && path[2] === "gate" && path[3] === "sign-out" && method === "POST") {
+      const { denied } = await gate("kitchen");
+      if (denied) return denied;
+      await store.signOut(request.headers.get("x-admin-token"));
+      return new Response(null, { status: 204, headers: SECURITY_HEADERS });
+    }
+
     // The three routes a waiter tablet and the kitchen screen legitimately
     // reach. They are guarded at their own rank, before the manager gate that
     // covers everything below them — which is what keeps the catalogue, and so

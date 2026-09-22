@@ -5,6 +5,7 @@ import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, MenuThemeId } from
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
+import { GatePanel } from "../features/gate/GatePanel";
 import { BoardPanel } from "../features/board/BoardPanel";
 import { TablesPanel } from "../features/tables/TablesPanel";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
@@ -30,7 +31,9 @@ function mapProduct(product: ApiCatalogProduct): Product {
 }
 
 const initialState: AdminState = {
-  tab: "catalog", role: null, auditEntries: [],
+  tab: "catalog", role: null,
+  gate: { checking: true, configured: false, busy: false, error: null, reachable: true },
+  auditEntries: [],
   connected: false, connectionText: "未连接", products: [], printers: [],
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", menuTheme: null, toast: null
@@ -68,7 +71,9 @@ export function App() {
     window.setTimeout(() => setState((current) => ({ ...current, toast: null })), 2400);
   }, []);
 
-  const connect = useCallback(async () => {
+  /** True when the console is through and loaded; false when whatever is in
+   *  the header did not open the door. */
+  const connect = useCallback(async (): Promise<boolean> => {
     try {
       await adminApi.health();
       const { role } = await adminApi.session();
@@ -87,9 +92,11 @@ export function App() {
         menuTheme: settings?.menuTheme ?? current.menuTheme,
         tab: TABS_BY_ROLE[role].includes(current.tab) ? current.tab : TABS_BY_ROLE[role][0] ?? "board"
       }));
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "连接失败";
-      setState((current) => ({ ...current, connected: false, connectionText: message, ...(!adminApi.storage.token ? { tab: "system" as const } : {}) }));
+      setState((current) => ({ ...current, role: null, connected: false, connectionText: message }));
+      return false;
     }
   }, []);
 
@@ -108,7 +115,73 @@ export function App() {
     }
   }, [notify]);
 
-  useEffect(() => { void connect(); }, [connect]);
+  /**
+   * Ask the door before drawing anything.
+   *
+   * A token already in the header gets first go — that is a session from
+   * earlier in this browser tab, or an ADMIN_TOKEN somebody configured on the
+   * connection tab, and either way there is nothing to ask. Only when it does
+   * not open the door does the gate appear.
+   *
+   * If the gate itself is unreachable the console falls back to the connection
+   * tab, because then the problem is the address, not the password.
+   */
+  useEffect(() => {
+    void (async () => {
+      if (adminApi.storage.token && await connect()) {
+        setState((current) => ({ ...current, gate: { ...current.gate, checking: false, configured: true } }));
+        return;
+      }
+      try {
+        const { configured } = await adminApi.gate();
+        setState((current) => ({ ...current, gate: { checking: false, configured, busy: false, error: null, reachable: true } }));
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          tab: "system",
+          connectionText: error instanceof Error ? error.message : "连接失败",
+          gate: { ...current.gate, checking: false, reachable: false }
+        }));
+      }
+    })();
+  }, [connect]);
+
+  /** Both doors end the same way: keep the token, then load the console. */
+  const enterWith = useCallback(async (open: () => Promise<{ token: string }>) => {
+    setState((current) => ({ ...current, gate: { ...current.gate, busy: true, error: null } }));
+    try {
+      const { token } = await open();
+      adminApi.remember(token);
+      const entered = await connect();
+      setState((current) => ({
+        ...current,
+        gate: { ...current.gate, checking: false, configured: true, busy: false, error: entered ? null : current.connectionText }
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        gate: { ...current.gate, busy: false, error: error instanceof Error ? error.message : "登录失败" }
+      }));
+    }
+  }, [connect]);
+
+  const signIn = useCallback((password: string) => enterWith(() => adminApi.signIn(password)), [enterWith]);
+
+  // Setting the first password does not sign anyone in by itself, so the
+  // console immediately spends it on a session rather than asking for it twice.
+  const setFirstPassword = useCallback((password: string) => enterWith(async () => {
+    await adminApi.setPassword(password);
+    return adminApi.signIn(password);
+  }), [enterWith]);
+
+  const signOut = useCallback(async () => {
+    try { await adminApi.signOut(); } catch { /* Leaving is not something to fail at. */ }
+    adminApi.forget();
+    setState((current) => ({
+      ...initialState,
+      gate: { checking: false, configured: current.gate.configured, busy: false, error: null, reachable: true }
+    }));
+  }, []);
 
   const loadTables = useCallback(async () => {
     if (!adminApi.storage.token) return;
@@ -217,6 +290,17 @@ export function App() {
     } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
   }
 
+  /** Changing the password ends every session opened with the old one — this
+   *  one included, so the console signs itself back in with the new one. */
+  async function changePassword(password: string, currentPassword: string) {
+    try {
+      await adminApi.setPassword(password, currentPassword);
+      const { token } = await adminApi.signIn(password);
+      adminApi.remember(token);
+      notify("管理密码已修改，其他设备需要重新登录");
+    } catch (error) { notify(error instanceof Error ? error.message : "修改密码失败", "error"); }
+  }
+
   async function saveConnection(nextStorage: AdminStorage) {
     adminApi.configure(nextStorage);
     await connect();
@@ -247,11 +331,26 @@ export function App() {
 
   function setTab(tab: AdminTab) { setState((current) => ({ ...current, tab })); }
 
+  // The gate stands in front of everything, and nothing behind it is rendered
+  // — not even the tab strip, which is what a hidden tab would be.
+  if (state.gate.checking) {
+    return <div className="admin-shell gate-shell"><p className="gate-note">正在连接…</p></div>;
+  }
+  if (!state.role && state.gate.reachable) {
+    return <div className="admin-shell gate-shell"><GatePanel
+      configured={state.gate.configured}
+      busy={state.gate.busy}
+      error={state.gate.error}
+      onSignIn={signIn}
+      onSetPassword={setFirstPassword}
+    /></div>;
+  }
+
   return <><div className="admin-shell">
-    <header className="admin-head"><div><strong>赵云餐厅管理台</strong><small>ZHAO YUN OPERATIONS</small></div><div className="admin-head-actions"><div className="connection"><i className={state.connected ? "online" : ""} /><span>{state.connectionText}</span></div><button onClick={() => void returnToApp()}>返回点餐</button></div></header>
+    <header className="admin-head"><div><strong>赵云餐厅管理台</strong><small>ZHAO YUN OPERATIONS</small></div><div className="admin-head-actions"><div className="connection"><i className={state.connected ? "online" : ""} /><span>{state.connectionText}</span></div><button onClick={() => void returnToApp()}>返回点餐</button><button onClick={() => void signOut()}>退出</button></div></header>
     <nav className="admin-tabs" aria-label="管理模块">{(state.role ? TABS_BY_ROLE[state.role] : (["system"] as AdminTab[])).map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} onClick={() => setTab(tab)}>{TAB_LABELS[tab]}</button>)}</nav>
     <main>
-      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onRefresh={connect} />}
+      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel
         orders={state.orders}
         requests={state.requests}
@@ -275,7 +374,7 @@ export function App() {
         onSettleBill={settleBill}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
-      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} menuTheme={state.menuTheme} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} onSaveMenuTheme={saveMenuTheme} />}
+      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} menuTheme={state.menuTheme} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} onSaveMenuTheme={saveMenuTheme} onChangePassword={changePassword} />}
     </main>
   </div><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;
 }

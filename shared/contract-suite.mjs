@@ -229,6 +229,67 @@ export function contractChecks(call, assert) {
       );
     }],
 
+    ["the console's password gate is set once and then signs in", async () => {
+      const before = await call("GET", "/api/admin/gate");
+      assert.equal(before.status, 200, "the gate says whether a password exists, without one");
+      assert.equal(before.json.configured, false, "a fresh deployment has no password yet");
+      // One bit, and only that bit: the hash must never leave the database.
+      assert.deepEqual(Object.keys(before.json), ["configured"]);
+
+      const tooShort = await call("POST", "/api/admin/gate/password", { body: { password: "short" } });
+      assert.equal(tooShort.status, 400, "the password floor is refused at the edge");
+
+      const set = await call("POST", "/api/admin/gate/password", { body: { password: "kueche-passwort-2026" } });
+      assert.equal(set.status, 200);
+      assert.equal(set.json.configured, true);
+      assert.equal((await call("GET", "/api/admin/gate")).json.configured, true);
+
+      const wrong = await call("POST", "/api/admin/gate/sign-in", { body: { password: "kueche-passwort-2025" } });
+      assert.equal(wrong.status, 401, "a wrong password is refused");
+
+      const signedIn = await call("POST", "/api/admin/gate/sign-in", { body: { password: "kueche-passwort-2026" } });
+      assert.equal(signedIn.status, 200);
+      assert.ok(signedIn.json.token, "signing in hands back a session token");
+      assert.equal(signedIn.json.password, undefined, "and nothing else about the password");
+      const session = signedIn.json.token;
+
+      // The session is presented in the same header every other route reads,
+      // which is the whole reason no other route had to change.
+      const asManager = await call("GET", "/api/admin/products", { token: session });
+      assert.equal(asManager.status, 200, "past the gate the console is manager");
+      assert.equal((await call("GET", "/api/admin/session", { token: session })).json.role, "manager");
+
+      // Once set, changing it takes the one in force — otherwise anyone who
+      // reached the console could take it over.
+      const unproven = await call("POST", "/api/admin/gate/password", { body: { password: "ein-neues-passwort" } });
+      assert.equal(unproven.status, 401, "a second set needs the current password");
+
+      const changed = await call("POST", "/api/admin/gate/password", {
+        body: { password: "ein-neues-passwort", currentPassword: "kueche-passwort-2026" }
+      });
+      assert.equal(changed.status, 200);
+      assert.equal(
+        (await call("GET", "/api/admin/products", { token: session })).status, 401,
+        "changing the password ends the sessions opened with the old one"
+      );
+      assert.equal((await call("POST", "/api/admin/gate/sign-in", { body: { password: "kueche-passwort-2026" } })).status, 401);
+
+      // ADMIN_TOKEN is the way back in when the password is forgotten, and it
+      // is the token rather than a live session that may do this: a stolen
+      // session must not be able to lock the owner out of their own menu.
+      const recovered = await call("POST", "/api/admin/gate/password", { admin: true, body: { password: "wieder-hereingekommen" } });
+      assert.equal(recovered.status, 200, "ADMIN_TOKEN resets the password without knowing it");
+      const back = await call("POST", "/api/admin/gate/sign-in", { body: { password: "wieder-hereingekommen" } });
+      assert.equal(back.status, 200);
+
+      const out = await call("POST", "/api/admin/gate/sign-out", { token: back.json.token });
+      assert.equal(out.status, 204);
+      assert.equal(
+        (await call("GET", "/api/admin/products", { token: back.json.token })).status, 401,
+        "a signed-out token is dead"
+      );
+    }],
+
     ["a table round-trips with the token its card prints", async () => {
       const created = await call("POST", "/api/admin/tables", { admin: true, body: { table: "c7", label: "Fenster" } });
       assert.equal(created.status, 201);
