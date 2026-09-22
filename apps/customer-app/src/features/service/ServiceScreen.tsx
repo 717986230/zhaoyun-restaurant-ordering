@@ -1,6 +1,8 @@
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { restaurantApi } from "../../app/api";
+import { tableNo } from "../../app/table";
 import { services } from "@zhaoyun/domain";
+import { format, serviceName, t } from "../../app/i18n";
 
 const iconPaths: Record<string, string> = {
   water: "M12 3s6 6.4 6 10.4A6 6 0 1 1 6 13.4C6 9.4 12 3 12 3Z",
@@ -12,20 +14,24 @@ const iconPaths: Record<string, string> = {
 };
 
 export function ServiceScreen({ state, dispatch }: { state: CustomerState; dispatch: CustomerDispatch }) {
-  async function requestService(service: (typeof services)[number]) {
-    const [serviceType, label, de] = service;
+  async function requestService(serviceType: (typeof services)[number]["id"]) {
     const localId = crypto.randomUUID();
+    const table = tableNo();
     let id: string = localId;
     let pendingSync = false;
     try {
-      const result = await restaurantApi.createServiceRequest({ table: "08", type: serviceType });
+      const result = await restaurantApi.createServiceRequest({ table: table, type: serviceType });
       id = result.request.id;
     } catch {
       pendingSync = true;
     }
-    dispatch({ type: "service-created", request: { id, table: "08", serviceType, label, status: "open", createdAt: new Date().toISOString(), ...(pendingSync ? { pendingSync: true } : {}) }, message: `${label}请求已发送，服务员马上过来` });
-    dispatch({ type: "toast", message: pendingSync ? "服务请求等待同步" : "服务请求已发送" });
+    dispatch({ type: "service-created", request: { id, table: table, serviceType, status: "open", createdAt: new Date().toISOString(), ...(pendingSync ? { pendingSync: true } : {}) } });
+    dispatch({ type: "toast", message: t(state.language, pendingSync ? "serviceQueued" : "serviceSent") });
   }
 
-  return <section id="service" className="screen panel active"><header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button><div><h2>呼叫服务员</h2><small>SERVICE RUFEN</small></div></header><div className="content"><div id="serviceGrid" className="service-grid">{services.map((service) => <button className="service" key={service[0]} onClick={() => requestService(service)}><svg aria-hidden="true" viewBox="0 0 24 24"><path d={iconPaths[service[0]]} /></svg><b>{service[1]}</b><small>{service[2]}</small></button>)}</div><p id="serviceStatus" className="status">{state.serviceMessage}</p></div></section>;
+  const status = state.lastServiceType
+    ? format(t(state.language, "serviceOnTheWay"), { name: serviceName(state.lastServiceType, state.language) })
+    : t(state.language, "servicePrompt");
+
+  return <section id="service" className="screen panel active"><header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "home" })}>‹</button><div><h2>{t(state.language, "service")}</h2><small>SERVICE RUFEN</small></div></header><div className="content"><div id="serviceGrid" className="service-grid">{services.map((service) => <button className="service" key={service.id} onClick={() => requestService(service.id)}><svg aria-hidden="true" viewBox="0 0 24 24"><path d={iconPaths[service.id]} /></svg><b>{serviceName(service.id, state.language)}</b><small>{service.names.de}</small></button>)}</div><p id="serviceStatus" className="status">{status}</p></div></section>;
 }

@@ -1,11 +1,13 @@
 import { useEffect, useReducer } from "react";
 import type { CreateOrderCommand } from "@zhaoyun/contracts";
 import type { CartLine, Order, OrderStatus, SelectedModifier, ServiceRequest } from "@zhaoyun/domain";
+import { tableNo } from "./table";
 
 export type Screen = "home" | "menu" | "cart" | "orders" | "service" | "staff";
 
 export interface CustomerState {
   screen: Screen;
+  table: string;
   category: string;
   query: string;
   searchOpen: boolean;
@@ -18,7 +20,8 @@ export interface CustomerState {
   pendingOrders: Record<string, { command: CreateOrderCommand; attempts: number; nextAttemptAt: number }>;
   requests: ServiceRequest[];
   language: "zh" | "de" | "en";
-  serviceMessage: string;
+  /** Last service the guest called, resolved to a name at render time. */
+  lastServiceType: string | null;
   toast: string;
 }
 
@@ -27,7 +30,7 @@ type Action =
   | { type: "category"; category: string }
   | { type: "query"; query: string }
   | { type: "toggle-search" }
-  | { type: "open-product"; productId: string; quantity: number }
+  | { type: "open-product"; productId: string }
   | { type: "close-product" }
   | { type: "toggle-product-flip" }
   | { type: "detail-quantity"; quantity: number }
@@ -40,14 +43,20 @@ type Action =
   | { type: "order-retry-scheduled"; clientRequestId: string }
   | { type: "order-status"; orderId: string; clientRequestId?: string; status: OrderStatus; totalCents?: number }
   | { type: "advance-order"; orderId: string; status: OrderStatus }
-  | { type: "service-created"; request: ServiceRequest; message: string }
+  | { type: "service-created"; request: ServiceRequest }
   | { type: "service-done"; requestId: string }
   | { type: "language"; language: CustomerState["language"] }
   | { type: "toast"; message: string };
 
 const storageKey = "zy_customer_state_v4";
+const maxStoredOrders = 50;
+// The menu is the whole guest app now; "home" and the screens it used to lead
+// to (cart, orders, service, staff) stay in the Screen union and the reducer
+// below so ordering can be switched back on without a reducer rewrite, but
+// nothing navigates away from "menu" any more.
 const initialState: CustomerState = {
-  screen: "home",
+  screen: "menu",
+  table: tableNo(),
   category: "ALLE",
   query: "",
   searchOpen: false,
@@ -60,7 +69,7 @@ const initialState: CustomerState = {
   pendingOrders: {},
   requests: [],
   language: "zh",
-  serviceMessage: "请选择需要的服务",
+  lastServiceType: null,
   toast: ""
 };
 
@@ -69,7 +78,11 @@ function hydrate(): CustomerState {
     const stored = JSON.parse(localStorage.getItem(storageKey) || "null") as Partial<CustomerState> | null;
     if (!stored) return initialState;
     const cart = Object.fromEntries(Object.entries(stored.cart || {}).map(([key, value]) => [key, typeof value === "number" ? { productId: key, quantity: value, modifiers: [] } : value]));
-    return { ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {}, screen: "home", activeProductId: null, productFlipped: false, detailModifiers: [], toast: "" };
+    return {
+      ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {},
+      orders: (stored.orders || []).slice(0, maxStoredOrders),
+      table: tableNo(), screen: "menu", activeProductId: null, productFlipped: false, detailModifiers: [], toast: ""
+    };
   } catch {
     return initialState;
   }
@@ -81,7 +94,7 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     case "category": return { ...state, category: action.category };
     case "query": return { ...state, query: action.query };
     case "toggle-search": return { ...state, searchOpen: !state.searchOpen };
-    case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: action.quantity, detailModifiers: [] };
+    case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: 1, detailModifiers: [] };
     case "close-product": return { ...state, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "toggle-product-flip": return { ...state, productFlipped: !state.productFlipped };
     case "detail-quantity": return { ...state, detailQuantity: Math.max(1, Math.min(99, action.quantity)) };
@@ -89,14 +102,15 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     case "add-to-cart": {
       const modifierKey = action.modifiers.map((modifier) => modifier.id).sort().join(",");
       const key = `${action.productId}::${modifierKey}`;
-      return { ...state, cart: { ...state.cart, [key]: { productId: action.productId, quantity: action.quantity, modifiers: action.modifiers } } };
+      const quantity = Math.min(99, (state.cart[key]?.quantity ?? 0) + action.quantity);
+      return { ...state, cart: { ...state.cart, [key]: { productId: action.productId, quantity, modifiers: action.modifiers } } };
     }
     case "clear-cart": return { ...state, cart: {} };
-    case "order-created": return { ...state, cart: {}, orders: [action.order, ...state.orders] };
+    case "order-created": return { ...state, cart: {}, orders: [action.order, ...state.orders].slice(0, maxStoredOrders) };
     case "order-queued": return {
       ...state,
       cart: {},
-      orders: [action.order, ...state.orders],
+      orders: [action.order, ...state.orders].slice(0, maxStoredOrders),
       pendingOrders: { ...state.pendingOrders, [action.command.clientRequestId]: { command: action.command, attempts: 0, nextAttemptAt: 0 } }
     };
     case "order-synced": {
@@ -117,7 +131,7 @@ function reducer(state: CustomerState, action: Action): CustomerState {
         : order)
     };
     case "advance-order": return { ...state, orders: state.orders.map((order) => order.id === action.orderId ? { ...order, status: action.status } : order) };
-    case "service-created": return { ...state, requests: [action.request, ...state.requests], serviceMessage: action.message };
+    case "service-created": return { ...state, requests: [action.request, ...state.requests], lastServiceType: action.request.serviceType };
     case "service-done": return { ...state, requests: state.requests.map((request) => request.id === action.requestId ? { ...request, status: "completed" } : request) };
     case "language": return { ...state, language: action.language };
     case "toast": return { ...state, toast: action.message };

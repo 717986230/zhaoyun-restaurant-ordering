@@ -4,9 +4,9 @@ import { ApiError } from "@zhaoyun/api-client";
 import { formatEuro, summarizeCart } from "@zhaoyun/domain";
 import type { Order, Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
+import { tableNo } from "../../app/table";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { productName, t } from "../../app/i18n";
-import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 export function CartScreen({ state, dispatch, products }: { state: CustomerState; dispatch: CustomerDispatch; products: Product[] }) {
   const [note, setNote] = useState("");
@@ -21,11 +21,12 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
     if (!entries.length || submitting) return;
     setSubmitting(true);
     const clientRequestId = crypto.randomUUID();
+    const table = tableNo();
     const baseOrder: Order = {
       id: clientRequestId,
       clientRequestId,
       no: String(Date.now()).slice(-6),
-      table: "08",
+      table,
       status: "pending-sync",
       note,
         items: entries.map(({ product, quantity, modifiers }) => ({ productId: product.id, quantity, name: productName(product, state.language), modifiers })),
@@ -34,7 +35,7 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
     };
     const command: CreateOrderCommand = {
         clientRequestId,
-        table: "08",
+        table,
         note,
         items: entries.map(({ product, quantity, modifiers }) => ({ id: product.id, qty: quantity, modifiers: modifiers.map((modifier) => ({ id: modifier.id })) }))
     };
@@ -48,15 +49,19 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
         totalCents: Math.round(order.total * 100),
         createdAt: order.createdAt
       } });
-      dispatch({ type: "toast", message: "订单已提交" });
+      dispatch({ type: "toast", message: t(state.language, "orderPlaced") });
     } catch (error) {
       const retryable = !(error instanceof ApiError) || error.status >= 500;
       if (retryable) {
         dispatch({ type: "order-queued", order: { ...baseOrder, status: "sync-failed" }, command });
-        dispatch({ type: "toast", message: "服务器离线，订单已保存并等待自动重试" });
+        dispatch({ type: "toast", message: t(state.language, "orderQueued") });
       } else {
         dispatch({ type: "order-created", order: { ...baseOrder, status: "sync-failed" } });
-        dispatch({ type: "toast", message: "订单未被接受，请检查菜品或购物车" });
+        // A locked table is the one refusal the guest can do something about:
+        // their cart is fine, the bill is being settled. Telling them to check
+        // their dishes would send them looking for a problem that is not there.
+        const locked = error instanceof ApiError && error.status === 409;
+        dispatch({ type: "toast", message: t(state.language, locked ? "orderTableLocked" : "orderRejected") });
       }
     } finally {
       setSubmitting(false);
@@ -64,13 +69,13 @@ export function CartScreen({ state, dispatch, products }: { state: CustomerState
   }
 
   return <section id="cart" className="screen panel active">
-    <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>{t(state.language, "cart")}</h2><small>WARENKORB</small></div><LanguageSwitcher language={state.language} dispatch={dispatch} /></header>
+    <header className="panel-head"><button className="icon-btn back" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>‹</button><div><h2>{t(state.language, "cart")}</h2><small>WARENKORB</small></div></header>
     <div id="cartContent" className="content">{entries.length ? <>
       {entries.map(({ product, quantity, modifiers }) => <div className="row" key={`${product.id}-${modifiers.map((modifier) => modifier.id).join(",")}`}><div><h3>{productName(product, state.language)}</h3><small>{product.names.de} × {quantity}</small>{modifiers.length > 0 && <small className="modifier-summary">{modifiers.map((modifier) => modifier.name).join(" · ")}</small>}</div><strong>{formatEuro((product.priceCents + modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0)) * quantity)}</strong></div>)}
-      <label className="note-label">{t(state.language, "note")}<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder={state.language === "zh" ? "例如：少盐、不要香菜" : state.language === "de" ? "z. B. wenig Salz" : "e.g. less salt"} /></label>
+      <label className="note-label">{t(state.language, "note")}<input id="orderNote" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t(state.language, "notePlaceholder")} /></label>
       <div className="total"><span>{t(state.language, "total")}</span><b>{formatEuro(summary.totalCents)}</b></div>
       <button id="submitOrder" className="primary" disabled={submitting} onClick={submitOrder}>{submitting ? "…" : t(state.language, "submit")}</button>
-      <button id="clearCart" className="secondary" onClick={() => dispatch({ type: "clear-cart" })}>{state.language === "zh" ? "清空购物车" : state.language === "de" ? "Warenkorb leeren" : "Clear cart"}</button>
+      <button id="clearCart" className="secondary" onClick={() => dispatch({ type: "clear-cart" })}>{t(state.language, "clearCart")}</button>
     </> : <div className="empty">{t(state.language, "emptyCart")}<button className="secondary" onClick={() => dispatch({ type: "navigate", screen: "menu" })}>{t(state.language, "backMenu")}</button></div>}</div>
   </section>;
 }

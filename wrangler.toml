@@ -1,0 +1,29 @@
+name = "zhaoyun-ordering"
+account_id = "567821d20c9f5cb759b0b218d0ba0c39"
+main = "workers/index.mjs"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# The menu is also published as a static site on GitHub Pages, which is a
+# different origin from the Worker, so the browser asks permission before it
+# may read the catalogue. An origin is not a credential — this list is public
+# by nature, and an entry here grants nothing an admin token does not already
+# gate. Add a custom Pages domain as a second comma-separated entry.
+[vars]
+CORS_ORIGIN = "https://717986230.github.io"
+
+# The built web app also ships with the Worker, so that deployment serves both
+# and the tablets have no separate API address to configure.
+[assets]
+directory = "dist/web"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# The account and database ids identify resources; neither grants access to
+# them, so both belong in the repository. The credential is CLOUDFLARE_API_TOKEN,
+# which lives only in a repository secret.
+[[d1_databases]]
+binding = "DB"
+database_name = "zhaoyun-ordering"
+database_id = "8c8d9548-60c3-451d-939d-b5461a89c7ed"
+migrations_dir = "migrations"

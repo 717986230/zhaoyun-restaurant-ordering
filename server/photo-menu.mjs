@@ -1,7 +1,16 @@
+/**
+ * The stand-in for a dish photo, until there are dish photos.
+ *
+ * It is the largest patch of colour on the detail screen, so it belongs to the
+ * app's palette rather than having one of its own: three neutral grounds that
+ * differ by kind and nothing else. The warm oranges that used to be here were
+ * the one thing still making the screen look like a takeaway menu after the
+ * rest of the app stopped.
+ */
 const art = {
-  food: "linear-gradient(135deg,#7e3d25,#171210 75%)",
-  sushi: "linear-gradient(135deg,#b56b3d,#171210 75%)",
-  drink: "linear-gradient(135deg,#8b622f,#171210 75%)"
+  food: "linear-gradient(135deg,#2d3a35,#121416 78%)",
+  sushi: "linear-gradient(135deg,#33403f,#121416 78%)",
+  drink: "linear-gradient(135deg,#2f3742,#121416 78%)"
 };
 
 const labels = {

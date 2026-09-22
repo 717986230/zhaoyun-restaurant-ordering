@@ -1,15 +1,25 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { dishes } from "../src/data.js";
+import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
+// The table and audit shapes the two backends must agree on, byte for byte.
+import {
+  auditView, billView, normalizeBundleItems, normalizeMenuTheme, normalizeTableNo,
+  settingsView, tableOverviewView, tableView
+} from "../shared/rules.mjs";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 8;
+const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
+const VAT_PERCENTS = new Set([10, 13, 20]);
+// Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
+// The operator can override per product; confirm the rates with a tax advisor.
+const DEFAULT_VAT_PERCENT = { food: 10, sushi: 10, drink: 20 };
 const ORDER_TRANSITIONS = new Map([
   ["new", new Set(["preparing", "cancelled"])],
   ["preparing", new Set(["ready", "cancelled"])],
@@ -56,6 +66,7 @@ function mapProduct(row, media = []) {
     names: { zh: row.name_zh, de: row.name_de, en: row.name_en },
     description: row.description,
     price: row.price_cents / 100,
+    vatPercent: row.vat_percent,
     allergens: parseJson(row.allergens_json, []),
     details: {
       time: row.prep_time,
@@ -68,6 +79,7 @@ function mapProduct(row, media = []) {
       pattern: row.pattern
     },
     modifiers: parseJson(row.modifiers_json, []),
+    bundleItems: parseJson(row.bundle_items_json, []),
     available: Boolean(row.available),
     published: Boolean(row.published),
     sortOrder: row.sort_order,
@@ -92,25 +104,29 @@ function normalizeProduct(input, current = {}) {
   const printStation = input.printStation || current.print_station || (kind === "drink" ? "bar" : kind === "sushi" ? "sushi" : "kitchen");
   if (!PRODUCT_KINDS.has(kind)) throw new Error("Unsupported product kind");
   if (!PRINT_STATIONS.has(printStation)) throw new Error("Unsupported print station");
+  const vatPercent = Number(input.vatPercent ?? current.vat_percent ?? DEFAULT_VAT_PERCENT[kind]);
+  if (!VAT_PERCENTS.has(vatPercent)) throw new Error("Unsupported VAT percentage");
 
   return {
     id: String(input.id || current.id || randomUUID()),
     sku: String(input.sku || current.sku || "").trim(),
     kind,
-    category: String(input.category || current.category || "OTHER").trim().toUpperCase(),
+    category: String(input.category || current.category || "OTHER").trim().replace(/\s+/g, " ").toUpperCase(),
     nameZh: String(names.zh ?? input.nameZh ?? current.name_zh ?? "").trim(),
     nameDe: String(names.de ?? input.nameDe ?? current.name_de ?? "").trim(),
     nameEn: String(names.en ?? input.nameEn ?? current.name_en ?? "").trim(),
     description: String(input.description ?? current.description ?? "").trim(),
     priceCents: input.price === undefined ? current.price_cents ?? 0 : priceToCents(input.price),
-    allergensJson: JSON.stringify(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, [])),
+    vatPercent,
+    allergensJson: JSON.stringify(normalizeAllergens(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, []))),
     prepTime: String(details.time ?? current.prep_time ?? "").trim(),
     portion: String(details.people ?? current.portion ?? "").trim(),
     level: String(details.level ?? current.level ?? "").trim(),
     ingredients: String(details.ingredients ?? current.ingredients ?? "").trim(),
-    art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#384c3f,#151817 75%)"),
+    art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#2d3a35,#121416 78%)"),
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
     modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
+    bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
     sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
@@ -118,12 +134,16 @@ function normalizeProduct(input, current = {}) {
   };
 }
 
-export function createDatabase(databasePath) {
+export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS } = {}) {
   mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = new DatabaseSync(databasePath);
+  // The API server and every print agent open the same file from separate processes.
+  // Without a busy timeout the second writer fails immediately with SQLITE_BUSY.
   db.exec(`
     PRAGMA foreign_keys = ON;
     PRAGMA journal_mode = WAL;
+    PRAGMA busy_timeout = ${Number(busyTimeoutMs) || 0};
+    PRAGMA synchronous = NORMAL;
 
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
@@ -147,6 +167,8 @@ export function createDatabase(databasePath) {
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
+      vat_percent INTEGER NOT NULL DEFAULT 10,
+      bundle_items_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -169,6 +191,7 @@ export function createDatabase(databasePath) {
       status TEXT NOT NULL DEFAULT 'new',
       note TEXT NOT NULL DEFAULT '',
       total_cents INTEGER NOT NULL,
+      billed_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -181,7 +204,8 @@ export function createDatabase(databasePath) {
       quantity INTEGER NOT NULL CHECK (quantity > 0),
       unit_price_cents INTEGER NOT NULL,
       print_station TEXT NOT NULL,
-      modifiers_json TEXT NOT NULL DEFAULT '[]'
+      modifiers_json TEXT NOT NULL DEFAULT '[]',
+      vat_percent INTEGER NOT NULL DEFAULT 10
     );
 
     CREATE TABLE IF NOT EXISTS service_requests (
@@ -189,6 +213,27 @@ export function createDatabase(databasePath) {
       table_no TEXT NOT NULL,
       type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      at TEXT NOT NULL,
+      role TEXT NOT NULL,
+      ip TEXT NOT NULL DEFAULT '',
+      method TEXT NOT NULL,
+      route TEXT NOT NULL,
+      status INTEGER NOT NULL,
+      detail_json TEXT NOT NULL DEFAULT '{}'
+    );
+
+    CREATE TABLE IF NOT EXISTS restaurant_tables (
+      table_no TEXT PRIMARY KEY,
+      label TEXT NOT NULL DEFAULT '',
+      token TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      locked_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -221,18 +266,38 @@ export function createDatabase(databasePath) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS restaurant_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      menu_theme TEXT NOT NULL DEFAULT 'jade',
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
   `);
   for (const statement of [
     "ALTER TABLE products ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE order_items ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE print_jobs ADD COLUMN claimed_by TEXT",
     "ALTER TABLE print_jobs ADD COLUMN lease_until TEXT",
-    "ALTER TABLE print_jobs ADD COLUMN next_attempt_at TEXT"
+    "ALTER TABLE print_jobs ADD COLUMN next_attempt_at TEXT",
+    "ALTER TABLE products ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
+    "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
+    "ALTER TABLE orders ADD COLUMN billed_at TEXT",
+    "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
+    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'"
   ]) {
-    try { db.exec(statement); } catch (error) { if (!String(error.message).includes("duplicate column name")) throw error; }
+    try {
+      db.exec(statement);
+      // Existing catalogs predate the VAT column: drinks are billed at the standard rate.
+      if (statement.startsWith("ALTER TABLE products ADD COLUMN vat_percent")) {
+        db.exec(`UPDATE products SET vat_percent = ${DEFAULT_VAT_PERCENT.drink} WHERE kind = 'drink'`);
+      }
+    } catch (error) {
+      if (!String(error.message).includes("duplicate column name")) throw error;
+    }
   }
   const currentSchemaVersion = Number(db.prepare("PRAGMA user_version").get().user_version || 0);
   if (currentSchemaVersion > SCHEMA_VERSION) throw new Error(`Unsupported database schema version: ${currentSchemaVersion}`);
@@ -249,14 +314,15 @@ export function createDatabase(databasePath) {
       INSERT INTO products (
         id, sku, kind, category, name_zh, name_de, name_en, description, price_cents,
         allergens_json, prep_time, portion, level, ingredients, art, pattern, available,
-        published, sort_order, print_station, modifiers_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        published, sort_order, print_station, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     updateProduct: db.prepare(`
       UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
         name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
         portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
-        published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, updated_at = ? WHERE id = ?
+        published = ?, sort_order = ?, print_station = ?, modifiers_json = ?, vat_percent = ?,
+        bundle_items_json = ?, updated_at = ? WHERE id = ?
     `),
     deleteProduct: db.prepare("DELETE FROM products WHERE id = ?"),
     insertMedia: db.prepare("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"),
@@ -264,9 +330,12 @@ export function createDatabase(databasePath) {
     orderByClientId: db.prepare("SELECT * FROM orders WHERE client_request_id = ?"),
     orderById: db.prepare("SELECT * FROM orders WHERE id = ?"),
     orderItems: db.prepare("SELECT * FROM order_items WHERE order_id = ?"),
-    listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?"),
+    listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC, rowid DESC LIMIT ?"),
+    openBillOrders: db.prepare("SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at"),
+    openBillTables: db.prepare("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"),
+    markOrdersBilled: db.prepare("UPDATE orders SET billed_at = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'"),
     insertOrder: db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)"),
-    insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+    insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
     updateOrderStatus: db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"),
     insertPrintJob: db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)"),
     listPrintJobs: db.prepare("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?"),
@@ -276,10 +345,29 @@ export function createDatabase(databasePath) {
     printJobById: db.prepare("SELECT * FROM print_jobs WHERE id = ?"),
     failPrintJob: db.prepare("UPDATE print_jobs SET status = ?, attempts = attempts + 1, error = ?, claimed_by = NULL, lease_until = NULL, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = 'claimed' AND claimed_by = ?"),
     retryPrintJob: db.prepare("UPDATE print_jobs SET status = 'queued', attempts = 0, error = NULL, claimed_by = NULL, lease_until = NULL, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = 'failed'"),
-    listRequests: db.prepare("SELECT * FROM service_requests ORDER BY created_at DESC LIMIT ?"),
+    listRequests: db.prepare("SELECT * FROM service_requests ORDER BY created_at DESC, rowid DESC LIMIT ?"),
     requestById: db.prepare("SELECT * FROM service_requests WHERE id = ?"),
     insertRequest: db.prepare("INSERT INTO service_requests (id, table_no, type, status, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?)"),
     updateRequest: db.prepare("UPDATE service_requests SET status = ?, updated_at = ? WHERE id = ?"),
+    insertAudit: db.prepare("INSERT INTO audit_log (id, at, role, ip, method, route, status, detail_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+    listAudit: db.prepare("SELECT * FROM audit_log ORDER BY at DESC, rowid DESC LIMIT ?"),
+    tableCount: db.prepare("SELECT COUNT(*) AS count FROM restaurant_tables"),
+    listTables: db.prepare("SELECT * FROM restaurant_tables ORDER BY table_no"),
+    tableByNo: db.prepare("SELECT * FROM restaurant_tables WHERE table_no = ?"),
+    upsertTable: db.prepare(`
+      INSERT INTO restaurant_tables (table_no, label, token, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(table_no) DO UPDATE SET label = excluded.label, token = excluded.token, enabled = excluded.enabled, updated_at = excluded.updated_at
+    `),
+    deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
+    setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
+    releaseTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?"),
+    openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
+    getSettings: db.prepare("SELECT * FROM restaurant_settings WHERE id = 1"),
+    upsertSettings: db.prepare(`
+      INSERT INTO restaurant_settings (id, menu_theme, updated_at) VALUES (1, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET menu_theme = excluded.menu_theme, updated_at = excluded.updated_at
+    `),
     listPrinters: db.prepare("SELECT * FROM printer_profiles ORDER BY role, name"),
     printerById: db.prepare("SELECT * FROM printer_profiles WHERE id = ?"),
     insertPrinter: db.prepare("INSERT INTO printer_profiles (id, name, transport, address, port, role, enabled, capabilities_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
@@ -311,7 +399,7 @@ export function createDatabase(databasePath) {
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
         product.pattern, product.available, product.published, product.sortOrder,
-        product.printStation, product.modifiersJson, timestamp, product.id
+        product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, product.id
       );
     } else {
       statements.insertProduct.run(
@@ -319,7 +407,8 @@ export function createDatabase(databasePath) {
         product.nameDe, product.nameEn, product.description, product.priceCents,
         product.allergensJson, product.prepTime, product.portion, product.level,
         product.ingredients, product.art, product.pattern, product.available,
-        product.published, product.sortOrder, product.printStation, product.modifiersJson, timestamp, timestamp
+        product.published, product.sortOrder, product.printStation, product.modifiersJson,
+        product.vatPercent, product.bundleItemsJson, timestamp, timestamp
       );
     }
     return getProduct(product.id);
@@ -354,8 +443,39 @@ export function createDatabase(databasePath) {
         qty: item.quantity,
         unitPrice: item.unit_price_cents / 100,
         printStation: item.print_station,
+        vatPercent: item.vat_percent,
         modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
       })),
+      billedAt: row.billed_at ?? null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  function serviceRequestView(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      table: row.table_no,
+      type: row.type,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  function printJobView(row) {
+    return {
+      id: row.id,
+      orderId: row.order_id,
+      printerRole: row.printer_role,
+      status: row.status,
+      attempts: row.attempts,
+      error: row.error,
+      claimedBy: row.claimed_by,
+      leaseUntil: row.lease_until,
+      nextAttemptAt: row.next_attempt_at,
+      payload: parseJson(row.payload_json, {}),
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -398,6 +518,17 @@ export function createDatabase(databasePath) {
     const timestamp = now();
     const orderNo = `${timestamp.slice(2, 10).replaceAll("-", "")}-${id.slice(0, 5).toUpperCase()}`;
 
+    const tableNo = String(input.table ?? "").trim();
+    if (!tableNo) throw new Error("Order requires a table number");
+    // A locked table is one whose bill is being settled. Refusing here is the
+    // whole point of the lock: an order that lands mid-settle is either missing
+    // from the bill the guest just paid or reopens a table that was released.
+    const tableRow = statements.tableByNo.get(tableNo.toUpperCase());
+    if (tableRow?.locked_at) {
+      const error = new Error("This table is locked; please ask a waiter");
+      error.code = "TABLE_LOCKED";
+      throw error;
+    }
     db.exec("BEGIN IMMEDIATE");
     try {
       const committed = statements.orderByClientId.get(requestId);
@@ -405,17 +536,17 @@ export function createDatabase(databasePath) {
         db.exec("COMMIT");
         return orderView(committed);
       }
-      statements.insertOrder.run(id, orderNo, requestId, String(input.table || "08"), String(input.note || "").trim(), totalCents, timestamp, timestamp);
+      statements.insertOrder.run(id, orderNo, requestId, tableNo, String(input.note || "").trim(), totalCents, timestamp, timestamp);
       const jobs = new Map();
       for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {
         const productName = product.name_zh || product.name_de || product.name_en;
-        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers));
+        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers), product.vat_percent);
         const stationItems = jobs.get(product.print_station) || [];
         stationItems.push({ sku: product.sku, name: productName, names: { zh: product.name_zh, de: product.name_de, en: product.name_en }, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names, price: modifier.priceCents / 100 })) });
         jobs.set(product.print_station, stationItems);
       }
       for (const [station, items] of jobs) {
-        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table: String(input.table || "08"), note: String(input.note || ""), items }), timestamp, timestamp);
+        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table: tableNo, note: String(input.note || ""), items }), timestamp, timestamp);
       }
       db.exec("COMMIT");
     } catch (error) {
@@ -423,6 +554,49 @@ export function createDatabase(databasePath) {
       throw error;
     }
     return orderView(statements.orderById.get(id));
+  }
+
+  /**
+   * The VAT split itself lives in `shared/rules.mjs`, so the Worker computes a
+   * bill the same way rather than a second, guessed way. All that is left here
+   * is reading the rows, which is the one thing the two cannot share.
+   */
+  function billForTable(tableNo) {
+    const orders = statements.openBillOrders.all(String(tableNo));
+    const itemsByOrderId = new Map(orders.map((order) => [order.id, statements.orderItems.all(order.id)]));
+    const productsById = new Map();
+    for (const rows of itemsByOrderId.values()) {
+      for (const row of rows) {
+        if (productsById.has(row.product_id)) continue;
+        const product = statements.productById.get(row.product_id);
+        if (product) productsById.set(row.product_id, product);
+      }
+    }
+    return billView(tableNo, orders, itemsByOrderId, productsById);
+  }
+
+  function settleTableBill(tableNo) {
+    const table = String(tableNo);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const bill = billForTable(table);
+      if (!bill.orderIds.length) {
+        db.exec("COMMIT");
+        return null;
+      }
+      const timestamp = now();
+      statements.markOrdersBilled.run(timestamp, timestamp, table);
+      // Paying is what frees the table, so the lock a waiter set before
+      // printing the bill does not have to be cleared by hand afterwards.
+      statements.releaseTableLock.run(timestamp, table);
+      const jobId = randomUUID();
+      statements.insertPrintJob.run(jobId, bill.orderIds[0], "front", JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp);
+      db.exec("COMMIT");
+      return { ...bill, issuedAt: timestamp, printJobId: jobId };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   function updateOrder(id, status) {
@@ -439,8 +613,8 @@ export function createDatabase(databasePath) {
   function createServiceRequest(input) {
     const id = randomUUID();
     const timestamp = now();
-    statements.insertRequest.run(id, String(input.table || "08"), String(input.type || "").trim(), timestamp, timestamp);
-    return statements.requestById.get(id);
+    statements.insertRequest.run(id, String(input.table), String(input.type || "").trim(), timestamp, timestamp);
+    return serviceRequestView(statements.requestById.get(id));
   }
 
   function updateServiceRequest(id, status) {
@@ -451,7 +625,42 @@ export function createDatabase(databasePath) {
       throw new Error(`Invalid service request transition: ${current.status} -> ${status}`);
     }
     statements.updateRequest.run(status, now(), String(id));
-    return statements.requestById.get(String(id));
+    return serviceRequestView(statements.requestById.get(String(id)));
+  }
+
+  function saveTable(input) {
+    const table = normalizeTableNo(input.table);
+    const current = statements.tableByNo.get(table);
+    const timestamp = now();
+    const token = input.rotateToken || !current ? randomBytes(12).toString("base64url") : current.token;
+    statements.upsertTable.run(table, String(input.label ?? current?.label ?? "").trim(), token, bool(input.enabled, current ? Boolean(current.enabled) : true), current?.created_at ?? timestamp, timestamp);
+    return tableView(statements.tableByNo.get(table));
+  }
+
+  function printerView(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      transport: row.transport,
+      address: row.address,
+      port: row.port,
+      role: row.role,
+      enabled: Boolean(row.enabled),
+      capabilities: parseJson(row.capabilities_json, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  function getSettings() {
+    return settingsView(statements.getSettings.get());
+  }
+
+  function saveSettings(input) {
+    const menuTheme = normalizeMenuTheme(input.menuTheme);
+    statements.upsertSettings.run(menuTheme, now());
+    return getSettings();
   }
 
   function savePrinter(input, id) {
@@ -477,7 +686,10 @@ export function createDatabase(databasePath) {
     } else {
       statements.insertPrinter.run(printer.id, printer.name, printer.transport, printer.address, printer.port, printer.role, printer.enabled, printer.capabilities, timestamp, timestamp);
     }
-    return statements.printerById.get(printer.id);
+    // The DTO, like the list route. Returning the row here made POST answer
+    // `enabled: 1` and `capabilities_json` where GET answers `enabled: true`
+    // and `capabilities` — one resource with two shapes depending on the verb.
+    return printerView(statements.printerById.get(printer.id));
   }
 
   function seed() {
@@ -494,10 +706,9 @@ export function createDatabase(databasePath) {
       }
       return;
     }
-    const catalog = photoMenuDishes.length ? photoMenuDishes : dishes;
     db.exec("BEGIN");
     try {
-      catalog.forEach((dish, index) => saveProduct({
+      photoMenuDishes.forEach((dish, index) => saveProduct({
         id: String(dish.id),
         sku: dish.sku || `FOOD-${dish.id}`,
         kind: dish.kind || "food",
@@ -532,13 +743,56 @@ export function createDatabase(databasePath) {
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),
     createOrder,
     updateOrder,
-    listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)),
+    billForTable,
+    settleTableBill,
+    openBillTables: () => statements.openBillTables.all().map((row) => row.table_no),
+    listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
     createServiceRequest,
     updateServiceRequest,
-    listPrinters: () => statements.listPrinters.all().map((row) => ({ ...row, enabled: Boolean(row.enabled), capabilities: parseJson(row.capabilities_json, {}) })),
+    recordAudit: (entry) => {
+      statements.insertAudit.run(randomUUID(), now(), String(entry.role), String(entry.ip ?? ""), String(entry.method), String(entry.route), Number(entry.status), JSON.stringify(entry.detail ?? {}));
+    },
+    listAudit: (limit = 100) => statements.listAudit.all(Math.min(Number(limit) || 100, 500)).map(auditView),
+    /**
+     * Every table the floor has to look at, whether or not it is registered.
+     *
+     * An unregistered table with orders on it is real — someone scanned a card
+     * that was deleted, or typed a number — so it appears as seated rather
+     * than not appearing at all.
+     */
+    tablesOverview: () => {
+      const byTable = new Map();
+      for (const row of statements.openOrdersForTables.all()) {
+        const list = byTable.get(row.table_no) ?? [];
+        list.push(orderView(row, statements.orderItems.all(row.id)));
+        byTable.set(row.table_no, list);
+      }
+      const rows = statements.listTables.all();
+      const known = new Set(rows.map((row) => row.table_no));
+      const overview = rows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? []));
+      for (const [tableNo, orders] of byTable) {
+        if (!known.has(tableNo)) overview.push(tableOverviewView(null, orders, tableNo));
+      }
+      return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+    },
+    setTableLock: (table, locked) => {
+      const tableNo = normalizeTableNo(table);
+      if (!statements.tableByNo.get(tableNo)) return null;
+      const timestamp = now();
+      statements.setTableLock.run(locked ? timestamp : null, timestamp, tableNo);
+      return tableView(statements.tableByNo.get(tableNo));
+    },
+    hasTables: () => statements.tableCount.get().count > 0,
+    listTables: () => statements.listTables.all().map(tableView),
+    getTable: (table) => tableView(statements.tableByNo.get(String(table ?? "").trim().toUpperCase())),
+    saveTable,
+    deleteTable: (table) => statements.deleteTable.run(String(table ?? "").trim().toUpperCase()).changes > 0,
+    listPrinters: () => statements.listPrinters.all().map(printerView),
     savePrinter,
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
-    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) })),
+    getSettings,
+    saveSettings,
+    listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map(printJobView),
     claimPrintJob: (role, workerId, leaseMs = 30_000) => {
       const timestamp = now();
       const leaseUntil = new Date(Date.now() + leaseMs).toISOString();

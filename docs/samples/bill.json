@@ -1,0 +1,81 @@
+{
+  "table": "12",
+  "orderNos": [
+    "260918-00001",
+    "260918-00002"
+  ],
+  "orderIds": [
+    "00000000-0000-0000-0000-000000000001",
+    "00000000-0000-0000-0000-000000000002"
+  ],
+  "items": [
+    {
+      "orderNo": "260918-00001",
+      "name": "可乐 / 无糖可乐",
+      "names": {
+        "zh": "可乐 / 无糖可乐",
+        "de": "Cola / Cola Zero",
+        "en": "Cola / Cola Zero"
+      },
+      "qty": 2,
+      "unitPrice": 3.8,
+      "lineTotal": 7.6,
+      "vatPercent": 20,
+      "modifiers": []
+    },
+    {
+      "orderNo": "260918-00001",
+      "name": "蔬菜拉面",
+      "names": {
+        "zh": "蔬菜拉面",
+        "de": "Ramen mit Gemüse",
+        "en": "Ramen with Vegetables"
+      },
+      "qty": 2,
+      "unitPrice": 15,
+      "lineTotal": 30,
+      "vatPercent": 10,
+      "modifiers": [
+        {
+          "name": "加面",
+          "names": {
+            "zh": "加面",
+            "de": "Extra Nudeln",
+            "en": "Extra noodles"
+          }
+        }
+      ]
+    },
+    {
+      "orderNo": "260918-00002",
+      "name": "三文鱼握寿司 6个",
+      "names": {
+        "zh": "三文鱼握寿司 6个",
+        "de": "Sake Set 6 Stück",
+        "en": "Salmon Nigiri Set 6 pcs"
+      },
+      "qty": 1,
+      "unitPrice": 9.9,
+      "lineTotal": 9.9,
+      "vatPercent": 10,
+      "modifiers": []
+    }
+  ],
+  "vatBreakdown": [
+    {
+      "percent": 10,
+      "gross": 39.9,
+      "net": 36.27,
+      "vat": 3.63
+    },
+    {
+      "percent": 20,
+      "gross": 7.6,
+      "net": 6.33,
+      "vat": 1.27
+    }
+  ],
+  "total": 47.5,
+  "issuedAt": "2026-09-18T21:09:47.729Z",
+  "fiscalReceipt": false
+}

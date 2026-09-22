@@ -1,4 +1,5 @@
 export type ProductKind = "food" | "drink" | "sushi";
+export type VatPercent = 10 | 13 | 20;
 export type PrintStation = "kitchen" | "bar" | "sushi" | "front";
 export type OrderStatus = "pending-sync" | "sync-failed" | "new" | "preparing" | "ready" | "completed" | "cancelled";
 
@@ -29,6 +30,12 @@ export interface SelectedModifier {
   priceCents: number;
 }
 
+/** One dish a 套餐 (combo) bundles in, and how many of it come with the set. */
+export interface BundleItem {
+  productId: string;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -37,11 +44,15 @@ export interface Product {
   names: { zh: string; de: string; en: string };
   description: string;
   priceCents: number;
+  vatPercent: VatPercent;
   allergens: string[];
   details: { time: string; people: string; level: string; ingredients: string };
   appearance: { art: string; pattern: string };
   media: ProductMedia[];
   modifiers?: ModifierGroup[];
+  /** Present on a combo: the existing dishes it packages, by id. A combo is
+   *  otherwise an ordinary product — its own name, price and photo. */
+  bundleItems?: BundleItem[];
   available: boolean;
   published: boolean;
   printStation: PrintStation;
@@ -72,8 +83,8 @@ export interface Order {
 export interface ServiceRequest {
   id: string;
   table: string;
+  /** Resolved to a display name at render time; never stored localized. */
   serviceType: string;
-  label: string;
   status: "open" | "acknowledged" | "completed" | "cancelled";
   createdAt: string;
   pendingSync?: boolean;
@@ -140,4 +151,9 @@ export function formatEuro(cents: number): string {
   return `EUR ${(cents / 100).toFixed(2)}`;
 }
 
-export { dishes as seedDishes, orderStatuses as legacyOrderStatusLabels, services } from "./seed.js";
+export { services } from "./seed.js";
+export type { ServiceId } from "./seed.js";
+export { deconstruct, ingredients, ingredientTerms } from "./ingredients.js";
+export type { Deconstruction, DishPart, IngredientEntry } from "./ingredients.js";
+export { DEFAULT_MENU_THEME, MENU_THEME_IDS, MENU_THEMES } from "./themes.js";
+export type { MenuTheme, MenuThemeId } from "./themes.js";

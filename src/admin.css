@@ -1,6 +1,71 @@
 :root {
-  color: #202623;
-  background: #eef1ef;
+  /* The staff console is light on purpose: it is used under restaurant lights,
+     often on someone's own phone, and it must not be mistaken for the guest
+     app. Its greens are the same celadon family as the guest app's accent,
+     darkened until they hold on white. Every colour in this file is declared
+     here — `apps/customer-app/test/styles.test.ts` fails on a raw colour
+     anywhere else. */
+
+  /* Surfaces */
+  --a-bg: #eef1ef;
+  --a-shell: #f5f7f6;
+  --a-card: #ffffff;
+  --a-sunken: #f7f9f8;
+  --a-rail: #edf2ef;
+  --a-stripe: #eaf0ec;
+  --a-tint: #dfe6e2;
+
+  /* The dark chrome: header, board headings, toasts */
+  --a-head: #17221d;
+  --a-head-2: #344b40;
+  --a-head-ink: #ffffff;
+  --a-head-ink-2: #d8dfdb;
+  --a-head-muted: #a9b7af;
+  --a-head-line: #73837a;
+
+  /* Lines */
+  --a-line: #d7ddda;
+  --a-line-2: #c8d0cc;
+  --a-line-soft: #e6eae8;
+  --a-line-dash: #95a39b;
+
+  /* Ink */
+  --a-ink: #202623;
+  --a-ink-2: #34433b;
+  --a-muted: #5f6963;
+  --a-faint: #69736d;
+
+  /* Accent */
+  --a-accent: #275f46;
+  --a-accent-ink: #315e48;
+  --a-accent-2: #4e6659;
+  --a-accent-line: #66806f;
+  --a-accent-wash: #dfe7e2;
+  --a-on-accent: #ffffff;
+  --a-focus-ring: rgba(39, 95, 70, 0.14);
+
+  /* States */
+  --a-idle: #89918d;
+  --a-ok: #38a36b;
+  --a-ok-ring: rgba(56, 163, 107, 0.15);
+  --a-danger: #8d3232;
+  --a-danger-solid: #9f3434;
+  --a-danger-line: #bb6c6c;
+  --a-danger-wash: #f4dede;
+  --a-danger-wash-soft: #fdf7f7;
+  --a-warn-solid: #865f25;
+  --a-shadow-1: rgba(20, 39, 29, 0.14);
+
+  /* The printed table card is paper, and paper is warm. */
+  --paper: #f6f3ef;
+  --paper-ink: #141110;
+  --paper-muted: #6b625b;
+  --paper-faint: #9a8e82;
+  --paper-line: #ded5cb;
+  --paper-line-print: #c9c0b6;
+
+  color: var(--a-ink);
+  background: var(--a-bg);
   font-family: Inter, system-ui, -apple-system, "Noto Sans SC", sans-serif;
 }
 
@@ -27,7 +92,7 @@ button {
 
 .admin-shell {
   min-height: 100vh;
-  background: #f5f7f6;
+  background: var(--a-shell);
 }
 
 .admin-head {
@@ -36,8 +101,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #fff;
-  background: #17221d;
+  color: var(--a-head-ink);
+  background: var(--a-head);
 }
 
 .admin-head strong {
@@ -48,7 +113,7 @@ button {
 .admin-head small {
   display: block;
   margin-top: 4px;
-  color: #a9b7af;
+  color: var(--a-head-muted);
   font-size: 9px;
   letter-spacing: .16em;
 }
@@ -57,7 +122,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #d8dfdb;
+  color: var(--a-head-ink-2);
   font-size: 12px;
 }
 
@@ -68,10 +133,10 @@ button {
 }
 
 .admin-head-actions > button {
-  border: 1px solid #73837a;
+  border: 1px solid var(--a-head-line);
   border-radius: 4px;
   background: transparent;
-  color: #fff;
+  color: var(--a-head-ink);
   padding: 7px 10px;
   font-size: 12px;
 }
@@ -82,14 +147,14 @@ button {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #89918d;
+  background: var(--a-idle);
 }
 
 .connection i.online,
 .product-row > i.live,
 .printer-row > i.live {
-  background: #38a36b;
-  box-shadow: 0 0 0 3px rgba(56, 163, 107, .15);
+  background: var(--a-ok);
+  box-shadow: 0 0 0 3px var(--a-ok-ring);
 }
 
 .admin-tabs {
@@ -98,15 +163,15 @@ button {
   gap: 26px;
   align-items: end;
   padding: 0 clamp(18px, 4vw, 48px);
-  border-bottom: 1px solid #cfd6d2;
-  background: #fff;
+  border-bottom: 1px solid var(--a-line);
+  background: var(--a-card);
 }
 
 .admin-tabs button,
 .filter-tabs button {
   border: 0;
   background: transparent;
-  color: #68716c;
+  color: var(--a-muted);
 }
 
 .admin-tabs button {
@@ -116,8 +181,8 @@ button {
 }
 
 .admin-tabs button.active {
-  color: #17221d;
-  border-color: #b88b47;
+  color: var(--a-head);
+  border-color: var(--a-accent);
   font-weight: 700;
 }
 
@@ -137,8 +202,8 @@ button {
 
 .editor-pane {
   padding: 28px clamp(22px, 4vw, 48px);
-  border-right: 1px solid #d7ddda;
-  background: #fff;
+  border-right: 1px solid var(--a-line);
+  background: var(--a-card);
 }
 
 .list-pane {
@@ -176,7 +241,7 @@ h2 {
 .printer-toolbar p,
 .system-pane > p {
   margin-bottom: 0;
-  color: #758079;
+  color: var(--a-muted);
   font-size: 13px;
 }
 
@@ -191,7 +256,7 @@ h2 {
 }
 
 .editor-form label > span {
-  color: #59635d;
+  color: var(--a-muted);
   font-size: 12px;
   font-weight: 650;
 }
@@ -201,10 +266,10 @@ h2 {
 .editor-form select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #c8d0cc;
+  border: 1px solid var(--a-line-2);
   border-radius: 5px;
-  background: #fff;
-  color: #202623;
+  background: var(--a-card);
+  color: var(--a-ink);
   padding: 10px 11px;
   outline: none;
 }
@@ -212,8 +277,8 @@ h2 {
 .editor-form input:focus,
 .editor-form textarea:focus,
 .editor-form select:focus {
-  border-color: #6b8a79;
-  box-shadow: 0 0 0 3px rgba(79, 121, 98, .11);
+  border-color: var(--a-accent-line);
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
 }
 
 .field-grid {
@@ -231,7 +296,7 @@ h2 {
   grid-template-columns: repeat(3, 1fr);
   padding: 3px;
   border-radius: 6px;
-  background: #e9eeeb;
+  background: var(--a-rail);
 }
 
 .segmented label {
@@ -249,14 +314,14 @@ h2 {
   padding: 9px;
   border-radius: 4px;
   text-align: center;
-  color: #5f6963;
+  color: var(--a-muted);
   font-size: 13px;
 }
 
 .segmented input:checked + span {
-  color: #17221d;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(20, 39, 29, .14);
+  color: var(--a-head);
+  background: var(--a-card);
+  box-shadow: 0 1px 4px var(--a-shadow-1);
   font-weight: 700;
 }
 
@@ -264,9 +329,9 @@ h2 {
   min-height: 84px;
   place-items: center;
   align-content: center;
-  border: 1px dashed #95a39b;
+  border: 1px dashed var(--a-line-dash);
   border-radius: 5px;
-  background: #f7f9f8;
+  background: var(--a-sunken);
   text-align: center;
 }
 
@@ -278,12 +343,12 @@ h2 {
 }
 
 .upload-zone b {
-  color: #315e48;
+  color: var(--a-accent-ink);
   font-size: 13px;
 }
 
 .upload-zone small {
-  color: #818b85;
+  color: var(--a-faint);
   font-size: 11px;
 }
 
@@ -309,8 +374,8 @@ h2 {
 .discover-action {
   border: 0;
   border-radius: 5px;
-  background: #275f46;
-  color: white;
+  background: var(--a-accent);
+  color: var(--a-on-accent);
   padding: 12px 18px;
   font-weight: 700;
 }
@@ -318,10 +383,10 @@ h2 {
 .icon-action {
   width: 38px;
   height: 38px;
-  border: 1px solid #c8d0cc;
+  border: 1px solid var(--a-line-2);
   border-radius: 5px;
-  background: #fff;
-  color: #34433b;
+  background: var(--a-card);
+  color: var(--a-ink-2);
   font-size: 22px;
 }
 
@@ -338,13 +403,13 @@ h2 {
 }
 
 .filter-tabs button.active {
-  color: #fff;
-  background: #344b40;
+  color: var(--a-head-ink);
+  background: var(--a-head-2);
 }
 
 .product-list,
 .printer-list {
-  border-top: 1px solid #d4dad7;
+  border-top: 1px solid var(--a-line);
 }
 
 .product-row,
@@ -354,9 +419,9 @@ h2 {
   align-items: center;
   gap: 13px;
   border: 0;
-  border-bottom: 1px solid #d4dad7;
+  border-bottom: 1px solid var(--a-line);
   background: transparent;
-  color: #222a26;
+  color: var(--a-ink);
   text-align: left;
 }
 
@@ -368,7 +433,7 @@ h2 {
 .product-row:hover,
 .product-row.selected,
 .printer-row:hover {
-  background: #edf2ef;
+  background: var(--a-rail);
 }
 
 .product-thumb {
@@ -378,7 +443,7 @@ h2 {
   display: grid;
   place-items: center;
   border-radius: 4px;
-  background: #dfe6e2;
+  background: var(--a-tint);
 }
 
 .product-thumb img {
@@ -388,7 +453,7 @@ h2 {
 }
 
 .media-mark {
-  color: #4e6659;
+  color: var(--a-accent-2);
   font: 18px Georgia, serif;
 }
 
@@ -405,13 +470,13 @@ h2 {
 .product-copy small,
 .printer-row small {
   margin-top: 4px;
-  color: #78827c;
+  color: var(--a-faint);
   font-size: 11px;
 }
 
 .product-kind,
 .printer-row em {
-  color: #69736d;
+  color: var(--a-muted);
   font-size: 12px;
   font-style: normal;
 }
@@ -423,17 +488,17 @@ h2 {
 
 .danger-action {
   margin-top: 18px;
-  border: 1px solid #bb6c6c;
+  border: 1px solid var(--a-danger-line);
   border-radius: 5px;
   background: transparent;
-  color: #a63e3e;
+  color: var(--a-danger);
   padding: 9px 12px;
 }
 
 .printer-toolbar {
   padding: 28px clamp(20px, 4vw, 48px) 22px;
-  border-bottom: 1px solid #d5dcda;
-  background: #fff;
+  border-bottom: 1px solid var(--a-line);
+  background: var(--a-card);
 }
 
 .printer-layout {
@@ -445,8 +510,8 @@ h2 {
 
 .discovered {
   padding: 22px clamp(20px, 4vw, 48px);
-  border-bottom: 1px solid #d5dcda;
-  background: #eaf0ec;
+  border-bottom: 1px solid var(--a-line);
+  background: var(--a-stripe);
 }
 
 .discovered h2 {
@@ -466,9 +531,9 @@ h2 {
   gap: 10px;
   align-items: center;
   padding: 10px;
-  border: 1px solid #c8d2cc;
+  border: 1px solid var(--a-line-2);
   border-radius: 5px;
-  background: #fff;
+  background: var(--a-card);
 }
 
 .discovered-row b,
@@ -478,16 +543,16 @@ h2 {
 
 .discovered-row small {
   margin-top: 3px;
-  color: #758079;
+  color: var(--a-muted);
   font-size: 11px;
 }
 
 .discovered-row button,
 .test-printer {
-  border: 1px solid #66806f;
+  border: 1px solid var(--a-accent-line);
   border-radius: 4px;
   background: transparent;
-  color: #315e48;
+  color: var(--a-accent-ink);
   padding: 7px 10px;
 }
 
@@ -506,8 +571,8 @@ h2 {
   display: grid;
   place-items: center;
   border-radius: 4px;
-  background: #dfe7e2;
-  color: #365343;
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
 }
 
 .compact-form,
@@ -521,8 +586,495 @@ h2 {
 
 .admin-empty {
   padding: 56px 20px;
-  color: #7c8781;
+  color: var(--a-faint);
   text-align: center;
+}
+
+#boardPanel > .list-head {
+  padding: 20px clamp(16px, 3vw, 30px) 0;
+}
+
+.ghost-action {
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  padding: 11px 16px;
+  white-space: nowrap;
+}
+
+/* Nothing in this console showed a disabled button as disabled, so a control
+   that was busy or unavailable looked exactly like one that would work. */
+.admin-shell button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px clamp(16px, 3vw, 30px) 30px;
+}
+
+.board-column h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--a-ink-2);
+}
+
+.board-column h2 em {
+  font-style: normal;
+  color: var(--a-faint);
+}
+
+.board-column h2:not(:first-child) {
+  margin-top: 22px;
+}
+
+.board-list {
+  display: grid;
+  gap: 10px;
+}
+
+.board-list .admin-empty {
+  border: 1px dashed var(--a-line);
+  border-radius: 6px;
+  padding: 22px 12px;
+}
+
+.board-card {
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 12px 14px;
+}
+
+.board-card.failed {
+  border-color: var(--a-danger-line);
+}
+
+.board-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.board-card-head b {
+  font-size: 16px;
+}
+
+.board-card-head .status {
+  border-radius: 999px;
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.board-card-head .status.failed {
+  background: var(--a-danger-wash);
+  color: var(--a-danger);
+}
+
+.board-card small {
+  display: block;
+  margin-top: 4px;
+  color: var(--a-faint);
+  font-size: 12px;
+}
+
+.board-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.board-card ul em {
+  color: var(--a-faint);
+  font-style: normal;
+  font-size: 12px;
+}
+
+/* The room, one tile per table. Two columns on a phone is unreadable for a
+   tile that carries an order list, so the tiles set a minimum and the grid
+   decides how many fit. */
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.table-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--a-line);
+  border-left: 3px solid var(--a-line-2);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 12px 14px;
+}
+
+/* State is carried by the left edge as well as the pill: a glance across the
+   room should not need the labels to be read. */
+.table-tile.seated {
+  border-left-color: var(--a-accent);
+}
+
+.table-tile.locked {
+  border-left-color: var(--a-warn-solid);
+  background: var(--a-sunken);
+}
+
+.table-tile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.table-tile-head b {
+  font-size: 17px;
+}
+
+.table-tile-head .status {
+  border-radius: 999px;
+  background: var(--a-rail);
+  color: var(--a-muted);
+  padding: 3px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.table-tile-head .status.seated {
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.table-tile-head .status.locked {
+  background: var(--a-danger-wash);
+  color: var(--a-danger);
+}
+
+.table-tile-meta {
+  color: var(--a-faint);
+  font-size: 12px;
+}
+
+.table-tile-orders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.table-tile-orders > li {
+  border-top: 1px solid var(--a-line-soft);
+  padding-top: 8px;
+}
+
+.table-tile-order-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--a-faint);
+}
+
+.table-tile-order-head .status {
+  border-radius: 999px;
+  background: var(--a-rail);
+  color: var(--a-muted);
+  padding: 2px 8px;
+}
+
+.table-tile-orders ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.table-tile-orders ul em {
+  color: var(--a-faint);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.table-tile-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--a-line);
+  padding-top: 8px;
+  font-size: 13px;
+  color: var(--a-muted);
+}
+
+.table-tile-total b {
+  font-size: 16px;
+  color: var(--a-ink);
+}
+
+.table-tile-empty {
+  margin: 0;
+  color: var(--a-faint);
+  font-size: 13px;
+}
+
+.table-tile .board-actions {
+  margin-top: auto;
+}
+
+.table-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bill-sheet {
+  margin-top: 10px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 14px;
+}
+
+.bill-items {
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.bill-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.bill-total {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--a-line);
+  padding-top: 10px;
+  font-size: 16px;
+}
+
+.bill-vat {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.bill-vat th,
+.bill-vat td {
+  border-bottom: 1px solid var(--a-line-soft);
+  padding: 5px 4px;
+  text-align: right;
+}
+
+.bill-vat th:first-child,
+.bill-vat td:first-child {
+  text-align: left;
+}
+
+.bill-disclaimer {
+  margin: 12px 0;
+  color: var(--a-muted);
+  font-size: 12px;
+}
+
+.admin-crash {
+  max-width: 640px;
+  margin: 12vh auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.admin-crash p {
+  color: var(--a-muted);
+}
+
+.admin-crash pre {
+  margin-top: 20px;
+  padding: 12px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  color: var(--a-danger);
+  font-size: 12px;
+  text-align: left;
+  overflow-x: auto;
+}
+
+.audit-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.audit-row {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid var(--a-line-soft);
+  border-radius: 5px;
+  background: var(--a-card);
+}
+
+.audit-row.denied {
+  border-color: var(--a-danger-line);
+  background: var(--a-danger-wash-soft);
+}
+
+.audit-role {
+  color: var(--a-accent-2);
+  font-size: 12px;
+}
+
+.audit-what b {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.audit-what small {
+  display: block;
+  margin-top: 3px;
+  color: var(--a-faint);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.table-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.table-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 10px 12px;
+}
+
+.table-row code {
+  display: block;
+  margin-top: 4px;
+  color: var(--a-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.table-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.allergen-picker {
+  border: 1px solid var(--a-line);
+  border-radius: 5px;
+  padding: 10px 12px 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px 14px;
+}
+
+.allergen-picker legend {
+  color: var(--a-ink-2);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.allergen-picker label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.allergen-picker input {
+  width: 16px;
+  height: 16px;
+}
+
+.bundle-picker {
+  border: 1px solid var(--a-line);
+  border-radius: 5px;
+  padding: 10px 12px 12px;
+}
+
+.bundle-picker legend {
+  color: var(--a-ink-2);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.bundle-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px 14px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.bundle-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.bundle-picker-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.bundle-picker-row input[type="number"] {
+  width: 56px;
+  margin-left: auto;
+}
+
+.bundle-picker-empty {
+  margin: 0;
+  color: var(--a-ink-2);
+  font-size: 13px;
+}
+
+.board-note {
+  margin: 8px 0 0;
+  color: var(--a-danger);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.board-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.board-actions button {
+  margin: 0;
 }
 
 .admin-toast {
@@ -534,8 +1086,8 @@ h2 {
   transform: translate(-50%, 12px);
   opacity: 0;
   border-radius: 5px;
-  background: #202a25;
-  color: #fff;
+  background: var(--a-head);
+  color: var(--a-head-ink);
   padding: 11px 16px;
   pointer-events: none;
   transition: .2s ease;
@@ -547,22 +1099,23 @@ h2 {
 }
 
 .admin-toast[data-tone="error"] {
-  background: #9f3434;
+  background: var(--a-danger-solid);
 }
 
 .admin-toast[data-tone="warning"] {
-  background: #865f25;
+  background: var(--a-warn-solid);
 }
 
 @media (max-width: 800px) {
   .catalog-layout,
-  .printer-layout {
+  .printer-layout,
+  .board-layout {
     grid-template-columns: 1fr;
   }
 
   .editor-pane {
     border-right: 0;
-    border-bottom: 1px solid #d7ddda;
+    border-bottom: 1px solid var(--a-line);
   }
 
   .admin-tabs {
@@ -595,4 +1148,135 @@ h2 {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+/* Menu style. Each swatch's own colour comes in inline as --swatch, since it
+   is the one thing per preset that isn't a fixed admin-console token. */
+.theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 16px;
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.theme-swatch i {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--swatch);
+  flex-shrink: 0;
+}
+
+.theme-swatch.selected {
+  border-color: var(--swatch);
+  box-shadow: 0 0 0 1px var(--swatch);
+}
+
+/* Table cards. The sheet is laid out for A4 and the print rules drop everything
+   else, so "print" from the dialog gives a page of cards and nothing else. */
+.table-cards-launch {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 16px;
+  justify-items: start;
+}
+
+.table-cards-launch small {
+  color: var(--a-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.table-cards {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: auto;
+  padding: 18px;
+  background: var(--paper);
+  color: var(--paper-ink);
+}
+
+.table-cards-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.table-cards-bar b { display: block; font-size: 18px; }
+.table-cards-bar small { color: var(--paper-muted); font-size: 12px; }
+.table-cards-actions { display: flex; gap: 8px; }
+
+.table-cards-warning {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--a-danger-wash);
+  color: var(--a-danger);
+  font-size: 13px;
+}
+
+.table-cards-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.table-card {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 16px 14px 18px;
+  border: 1px solid var(--paper-line);
+  border-radius: 10px;
+  background: var(--a-card);
+  break-inside: avoid;
+}
+
+.table-card-brand { text-align: center; }
+.table-card-brand small { display: block; font: 9px Georgia, serif; letter-spacing: 0.22em; color: var(--paper-faint); }
+.table-card-brand b { font: 26px/1.1 Georgia, "Noto Serif SC", serif; font-weight: 400; }
+
+.table-card-qr { width: 100%; max-width: 168px; }
+.table-card-qr svg { display: block; width: 100%; height: auto; }
+
+.table-card-foot { text-align: center; }
+.table-card-foot b { display: block; font-size: 17px; }
+.table-card-foot small { display: block; color: var(--paper-muted); font-size: 11px; }
+.table-card-hint { margin-top: 3px; letter-spacing: 0.04em; }
+
+@media print {
+  body > *:not(.table-cards) { display: none !important; }
+
+  .table-cards {
+    position: static;
+    padding: 0;
+    background: var(--a-card);
+    overflow: visible;
+  }
+
+  .table-cards-bar { display: none; }
+
+  .table-cards-sheet {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8mm;
+  }
+
+  .table-card { border-color: var(--paper-line-print); }
 }
