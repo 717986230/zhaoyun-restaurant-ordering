@@ -150,6 +150,52 @@ jobs:
             --title "Debug APK (${COMMIT:0:7})" \
             --notes "Debug-signed build of ${COMMIT:0:7}. Replaced on every build of this branch."
 
+  pages:
+    name: Publish the menu to GitHub Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: checks
+    # One site, one live version: only a commit on main publishes. A pull
+    # request build would otherwise overwrite the menu guests are reading.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # `base_path` is `/<repo>` for a project site and empty for a custom
+      # domain, so asking Pages where it will serve from beats hard-coding a
+      # path that breaks the day a domain is added.
+      - uses: actions/configure-pages@v5
+        id: pages
+
+      # Without API_BASE_URL the published menu still renders — it falls back
+      # to the catalogue bundled at build time and says so on screen — but the
+      # admin console has nothing to connect to, and prices stop tracking D1.
+      - name: Build the site
+        run: npm run build
+        env:
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          VITE_API_BASE: ${{ vars.API_BASE_URL }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/web
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
+
   deploy:
     name: Deploy Worker and D1
     runs-on: ubuntu-latest

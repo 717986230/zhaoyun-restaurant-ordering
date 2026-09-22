@@ -4,8 +4,16 @@ main = "workers/index.mjs"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
-# The built web app ships with the Worker, so one deployment serves both and the
-# tablets have no separate API address to configure.
+# The menu is also published as a static site on GitHub Pages, which is a
+# different origin from the Worker, so the browser asks permission before it
+# may read the catalogue. An origin is not a credential — this list is public
+# by nature, and an entry here grants nothing an admin token does not already
+# gate. Add a custom Pages domain as a second comma-separated entry.
+[vars]
+CORS_ORIGIN = "https://717986230.github.io"
+
+# The built web app also ships with the Worker, so that deployment serves both
+# and the tablets have no separate API address to configure.
 [assets]
 directory = "dist/web"
 binding = "ASSETS"
