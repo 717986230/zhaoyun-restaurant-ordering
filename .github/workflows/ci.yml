@@ -6,8 +6,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# A push to a pull request branch would otherwise run this twice, and the
-# Android job is the expensive half.
+# A push to a pull request branch would otherwise run this twice.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -65,91 +64,6 @@ jobs:
             test-results/
           retention-days: 7
 
-  android:
-    name: Android debug APK
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    # The APK is the artefact the restaurant actually installs, so it is built
-    # from the same commit the checks above ran on.
-    needs: checks
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      # Puts the SDK on PATH and accepts the licences the Gradle plugin checks
-      # for. `packages` is set because the action still defaults to installing
-      # `tools`, which Google removed from the repository — sdkmanager exits 1
-      # on "Failed to find package 'tools'" and takes the job with it.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-
-      - run: npm ci
-
-      # A tablet's `location.origin` inside the Capacitor shell is localhost, so
-      # without this the installed APK can only reach a backend after someone
-      # types its address into the admin console. Set the repository variable
-      # API_BASE_URL to the deployment and the APK ships pointing at it; leave
-      # it unset and nothing changes. A device configured by hand still wins.
-      - name: Build web assets
-        run: npm run build
-        env:
-          VITE_API_BASE: ${{ vars.API_BASE_URL }}
-
-      - name: Sync Capacitor Android project
-        run: npm run cap:sync
-
-      - name: Assemble debug APK
-        run: |
-          chmod +x android/gradlew
-          cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
-
-      # On a pull_request event GITHUB_SHA is the merge commit, which exists in
-      # no branch — name the APK after the commit a person can actually check out.
-      - name: Name the APK after the commit
-        env:
-          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          mkdir -p dist/apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk \
-             "dist/apk/zhaoyun-ordering-${COMMIT:0:7}-debug.apk"
-          sha256sum dist/apk/*.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: zhaoyun-ordering-debug-apk
-          path: dist/apk/*.apk
-          retention-days: 30
-
-      # Also attach it to a rolling prerelease. An Actions artifact is a zip
-      # behind a login and is served from storage some networks cannot reach; a
-      # release asset is the apk itself, on a stable link, and replaces the
-      # previous one so the tag always means "the latest build of this branch".
-      - name: Publish the APK as a rolling prerelease
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          tag="apk-$(echo "$GITHUB_REF_NAME" | tr '/' '-')"
-          gh release delete "$tag" --cleanup-tag --yes || true
-          gh release create "$tag" dist/apk/*.apk \
-            --prerelease \
-            --target "$COMMIT" \
-            --title "Debug APK (${COMMIT:0:7})" \
-            --notes "Debug-signed build of ${COMMIT:0:7}. Replaced on every build of this branch."
-
   pages:
     name: Publish the menu to GitHub Pages
     runs-on: ubuntu-latest
@@ -159,6 +73,7 @@ jobs:
     # does not compile, because `npm run build` typechecks first. Gating it on
     # the full suite only meant waiting four minutes to look at a page. The
     # suite still runs, alongside this rather than in front of it.
+    #
     # One site, one live version, so normally only a commit on main publishes
     # — a pull request build would otherwise overwrite the menu guests are
     # reading. The second clause is temporary: the menu-only guest app, the
@@ -188,8 +103,15 @@ jobs:
       # `base_path` is `/<repo>` for a project site and empty for a custom
       # domain, so asking Pages where it will serve from beats hard-coding a
       # path that breaks the day a domain is added.
+      #
+      # `enablement` turns Pages on if it is off, using the `pages: write`
+      # permission above — without it this step is where a repository that has
+      # never had Pages fails, and the fix is a settings page rather than
+      # anything in here. It is a no-op once Pages exists.
       - uses: actions/configure-pages@v5
         id: pages
+        with:
+          enablement: true
 
       # Without API_BASE_URL the published menu still renders — it falls back
       # to the catalogue bundled at build time and says so on screen — but the
@@ -211,7 +133,7 @@ jobs:
     name: Deploy Worker and D1
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [checks, android]
+    needs: checks
     # Only a push that lands on main deploys. A pull_request run, however
     # green, never touches the real database or the live Worker.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
