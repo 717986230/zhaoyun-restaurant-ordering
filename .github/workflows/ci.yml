@@ -74,16 +74,11 @@ jobs:
     # the full suite only meant waiting four minutes to look at a page. The
     # suite still runs, alongside this rather than in front of it.
     #
-    # One site, one live version, so normally only a commit on main publishes
-    # — a pull request build would otherwise overwrite the menu guests are
-    # reading. The second clause is temporary: the menu-only guest app, the
-    # combos and the menu styles all live on this branch, so main has nothing
-    # worth publishing until it lands. What gets published is the merge
-    # commit, which is what main will hold anyway. Delete that clause once it
-    # is merged.
-    if: >-
-      (github.ref == 'refs/heads/main' && github.event_name == 'push')
-      || github.head_ref == 'claude/project-review-tm9nvr'
+    # One site, one live version: only a commit on main publishes. A pull
+    # request build would otherwise overwrite the menu guests are reading —
+    # and the `github-pages` environment refuses a branch that is not the
+    # default one anyway, before a single step of this job can run.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       pages: write
       id-token: write
