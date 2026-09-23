@@ -330,6 +330,33 @@ async function drag(page, fromY, toY) {
   }, [fromY, toY]);
 }
 
+test("a photo that failed from the cached menu still shows once the server names a new one", async ({ page }) => {
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  await page.route("**/media/old.jpg", (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route("**/media/new.png", (route) => route.fulfill({ status: 200, contentType: "image/png", body: png }));
+  const withPhoto = (url) => products.map((product) => (product.id === "80" ? { ...product, media: [{ type: "image", url, credit: "Jane Doe · CC BY 4.0 · Wikimedia Commons" }] } : product));
+  // Yesterday's menu, kept on the device, pointing at a photo since replaced.
+  await page.evaluate((catalog) => localStorage.setItem("zy_catalog_cache_v3", JSON.stringify(catalog)), {
+    products: withPhoto("/media/old.jpg").map((product) => ({ ...product, priceCents: Math.round(product.price * 100) })), theme: "jade", languages: ["zh", "en", "de"]
+  });
+  await page.unroute("**/api/catalog");
+  let answer;
+  const served = new Promise((resolve) => { answer = resolve; });
+  await page.route("**/api/catalog", async (route) => {
+    await served;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: withPhoto("/media/new.png"), theme: "jade", languages: ["zh", "en", "de"] }) });
+  });
+  await page.reload();
+  const row = page.locator(".dish-card", { hasText: "黑椒牛柳" });
+  // The old one fails first and the row falls back to its artwork …
+  await expect(row.locator(".art")).toBeVisible();
+  answer();
+  // … and the new one is not held to that failure.
+  await expect(row.locator("img.dish-media.loaded")).toHaveAttribute("src", /\/media\/new\.png$/);
+  await row.click();
+  await expect(page.locator(".photo-credit")).toContainText("Jane Doe · CC BY 4.0");
+});
+
 test.describe("the menu turns its pages", () => {
   const onChip = (page) => page.locator(".chip.on");
 

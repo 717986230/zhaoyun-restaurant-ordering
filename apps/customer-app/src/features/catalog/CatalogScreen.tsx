@@ -49,13 +49,17 @@ function localized(names: { zh: string; de: string; en: string }, language: Cust
  */
 function ProductMedia({ product, size = "feature" }: { product: Product; size?: "feature" | "thumb" }) {
   const media = product.media[0];
-  const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+  // Remembered per URL, not per row: the menu first draws from the copy the
+  // app ships with and then from the server, and a photo that is replaced
+  // gets a new URL — neither may inherit the old one's failure.
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const art = <div className={`art ${size === "thumb" ? "art-thumb " : ""}${product.appearance.pattern}`} style={{ "--art": product.appearance.art } as React.CSSProperties} />;
-  if (!media || state === "failed") return art;
-  const source = restaurantApi.mediaUrl(media.url);
-  const className = `${size === "thumb" ? "dish-media dish-media-thumb" : "dish-media"} ${state === "loaded" ? "loaded" : ""}`;
+  const source = media ? restaurantApi.mediaUrl(media.url) : null;
+  if (!media || !source || failed === source) return art;
+  const className = `${size === "thumb" ? "dish-media dish-media-thumb" : "dish-media"} ${loaded === source ? "loaded" : ""}`;
   if (media.type === "video") {
-    return <video className={`${className} loaded`} src={source} poster={media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined} playsInline muted loop autoPlay preload="metadata" onError={() => setState("failed")} />;
+    return <video className={`${className} loaded`} src={source} poster={media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined} playsInline muted loop autoPlay preload="metadata" onError={() => setFailed(source)} />;
   }
   return <img
     className={className}
@@ -65,8 +69,8 @@ function ProductMedia({ product, size = "feature" }: { product: Product; size?: 
     height={size === "thumb" ? 48 : 360}
     loading="lazy"
     decoding="async"
-    onLoad={() => setState("loaded")}
-    onError={() => setState("failed")}
+    onLoad={() => setLoaded(source)}
+    onError={() => setFailed(source)}
   />;
 }
 
