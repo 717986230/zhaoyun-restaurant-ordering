@@ -1,18 +1,23 @@
 import { useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { deconstruct, formatEuro } from "@zhaoyun/domain";
-import type { DishPart, Product } from "@zhaoyun/domain";
+import { deconstruct, formatEuro, LANGUAGE_INFO } from "@zhaoyun/domain";
+import type { DishPart, MenuLanguage, Product } from "@zhaoyun/domain";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { tableNo } from "../../app/table";
 import { productName, t } from "../../app/i18n";
+import type { ColorScheme } from "../../app/useColorScheme";
 
 interface Props {
   state: CustomerState;
   dispatch: CustomerDispatch;
   products: Product[];
   offlineMenu?: boolean;
+  /** The languages the restaurant switched on, in flag order. */
+  languages: MenuLanguage[];
+  scheme: ColorScheme;
+  onToggleScheme: () => void;
   /** Counts taps on the title; the seventh within four seconds opens the admin console. */
   onAdminTap: () => Promise<void>;
 }
@@ -24,10 +29,6 @@ interface Props {
  */
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 const DURATION = { backdrop: 0.2, card: 0.26, flip: 0.42 };
-
-/** The three languages, cycled by tapping the one currently shown. */
-const LANGUAGE_NAMES = { zh: "中文", de: "Deutsch", en: "English" } as const;
-const NEXT_LANGUAGE = { zh: "de", de: "en", en: "zh" } as const;
 
 function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
   return names[language] || names.de || names.en;
@@ -189,7 +190,7 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
   </motion.div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, offlineMenu = false, onAdminTap }: Props) {
+export function CatalogScreen({ state, dispatch, products, offlineMenu = false, languages, scheme, onToggleScheme, onAdminTap }: Props) {
   const query = state.query.trim().toLowerCase();
   const visible = products.filter((product) => {
     const categoryMatch = state.category === "ALLE" || product.category === state.category;
@@ -201,17 +202,29 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false, 
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
-      {/* The whole language picker, as one button: it shows the language a tap
-          switches to next, so three languages fit the same 56px icon track a
-          back arrow used to sit in — there is nowhere left to go back to. */}
-      <button className="icon-btn lang-toggle" onClick={() => dispatch({ type: "language", language: NEXT_LANGUAGE[state.language] })}>{LANGUAGE_NAMES[state.language]}</button>
+      <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
       {/* The hidden way into the admin console: seven taps within four
           seconds. On the web it opens admin.html, which asks for the password;
           in the Android kiosk shell it asks for the kiosk PIN first. */}
       <div className="title" role="button" tabIndex={0} onClick={() => void onAdminTap()} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") void onAdminTap(); }}>
         <strong>La Carte</strong><small>TISCH {tableNo()}</small>
       </div>
-      <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
+      <div className="topbar-end">
+        {/* A flag per language the restaurant switched on, and none when there
+            is only one: there would be nothing to switch to. */}
+        {languages.length > 1 && <div className="flags" role="group" aria-label={t(state.language, "language")}>{languages.map((language) => <button
+          key={language}
+          className={`flag ${state.language === language ? "on" : ""}`}
+          aria-label={LANGUAGE_INFO[language].name}
+          aria-pressed={state.language === language}
+          onClick={() => dispatch({ type: "language", language })}
+        ><img src={LANGUAGE_INFO[language].flag} alt="" /></button>)}</div>}
+        <button
+          className="icon-btn scheme-toggle"
+          aria-label={t(state.language, scheme === "dark" ? "lightMode" : "darkMode")}
+          onClick={onToggleScheme}
+        >{scheme === "dark" ? "☀" : "☾"}</button>
+      </div>
     </header>
     <div id="searchBox" className={`search-box ${state.searchOpen ? "open" : ""}`}>
       <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={`${t(state.language, "search")} / SKU`} autoFocus={state.searchOpen} />

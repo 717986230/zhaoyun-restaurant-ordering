@@ -22,10 +22,17 @@ function inTempDatabase(run) {
   }
 }
 
-const gateMigration = readFileSync(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "migrations", "0003_admin_password_gate.sql"),
-  "utf8"
-);
+const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "migrations");
+
+/**
+ * The hand-written migrations after 0001/0002, each with the objects it
+ * exists to create. `drop` rebuilds the database that migration was written
+ * for: one deployed before those objects were added to 0001.
+ */
+const incremental = [
+  { file: "0003_admin_password_gate.sql", drop: "DROP INDEX idx_admin_sessions_expiry; DROP TABLE admin_sessions; DROP TABLE admin_gate;" },
+  { file: "0004_app_settings.sql", drop: "DROP TABLE app_settings;" }
+].map((migration) => ({ ...migration, sql: readFileSync(path.join(migrationsDir, migration.file), "utf8") }));
 
 test("the committed migrations match the schema and seed the server creates", () => {
   const generated = generate();
@@ -82,11 +89,12 @@ test("applying the migrations reproduces the server's database", () => {
 
 /**
  * Wrangler applies each migration file once per database and never again, so
- * the two databases 0003 meets in practice are these: one created from today's
- * 0001, which already has the gate tables, and one deployed before the gate
- * existed, which does not. Both must end up where the Node server does.
+ * every hand-written migration meets two kinds of database in practice: one
+ * created from today's 0001, which already has what it adds, and one deployed
+ * before that existed, which does not. Both must end up where the Node server
+ * does — the first untouched, the second brought up to date.
  */
-test("0003 is a no-op on a fresh database and brings a deployed one up to date", () => {
+test("the incremental migrations are no-ops on a fresh database and bring a deployed one up to date", () => {
   const sql = committed();
   const expected = inTempDatabase((file) => {
     createDatabase(file).close();
@@ -100,23 +108,24 @@ test("0003 is a no-op on a fresh database and brings a deployed one up to date",
     const db = new DatabaseSync(file);
     db.exec(sql.schema);
     db.exec(sql.catalog);
-    db.exec(gateMigration);
+    for (const migration of incremental) db.exec(migration.sql);
     const result = schemaOf(db);
     db.close();
     return result;
   });
-  assert.deepEqual(fresh, expected, "0003 must not change a database created from today's 0001");
+  assert.deepEqual(fresh, expected, "an incremental migration must not change a database created from today's 0001");
 
-  const deployed = inTempDatabase((file) => {
-    const db = new DatabaseSync(file);
-    db.exec(sql.schema);
-    db.exec(sql.catalog);
-    // The shape of a D1 database that applied 0001 before the gate was added.
-    db.exec("DROP INDEX idx_admin_sessions_expiry; DROP TABLE admin_sessions; DROP TABLE admin_gate;");
-    db.exec(gateMigration);
-    const result = schemaOf(db);
-    db.close();
-    return result;
-  });
-  assert.deepEqual(deployed, expected, "0003 must give an already-deployed database the gate tables");
+  for (const migration of incremental) {
+    const deployed = inTempDatabase((file) => {
+      const db = new DatabaseSync(file);
+      db.exec(sql.schema);
+      db.exec(sql.catalog);
+      db.exec(migration.drop);
+      db.exec(migration.sql);
+      const result = schemaOf(db);
+      db.close();
+      return result;
+    });
+    assert.deepEqual(deployed, expected, `${migration.file} must give an already-deployed database what it adds`);
+  }
 });

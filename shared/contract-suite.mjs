@@ -175,6 +175,33 @@ export function contractChecks(call, assert) {
       await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "jade" } });
     }],
 
+    ["the menu offers English and German until a manager picks otherwise", async () => {
+      const before = await call("GET", "/api/catalog");
+      assert.deepEqual(before.json.languages, ["en", "de"], "a fresh restaurant offers English and German");
+
+      const denied = await call("PUT", "/api/admin/settings", { body: { menuLanguages: ["zh"] } });
+      assert.equal(denied.status, 401, "changing the menu's languages requires a token");
+
+      for (const menuLanguages of [[], ["fr"], ["en", "en"]]) {
+        const refused = await call("PUT", "/api/admin/settings", { admin: true, body: { menuLanguages } });
+        assert.equal(refused.status, 400, `${JSON.stringify(menuLanguages)} is not a set of menu languages`);
+      }
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: {} })).status, 400, "an empty save is a mistake");
+
+      // Picked in any order, stored and served in flag order.
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { menuLanguages: ["de", "zh", "en"] } });
+      assert.equal(saved.status, 200);
+      assert.deepEqual(saved.json.menuLanguages, ["zh", "en", "de"]);
+      assert.equal(saved.json.menuTheme, "jade", "saving the languages alone leaves the menu style as it was");
+      assert.deepEqual((await call("GET", "/api/catalog")).json.languages, ["zh", "en", "de"]);
+
+      // And the other way round: a style change leaves the languages alone.
+      await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "teal" } });
+      assert.deepEqual((await call("GET", "/api/admin/settings", { admin: true })).json.menuLanguages, ["zh", "en", "de"]);
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "jade", menuLanguages: ["en", "de"] } });
+    }],
+
     ["a product with a space in its category saves", async () => {
       const saved = await call("POST", "/api/admin/products", {
         admin: true,

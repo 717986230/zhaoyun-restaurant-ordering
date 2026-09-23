@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ApiCatalogProduct, MenuThemeId } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_THEME } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
 import { mapApiProduct, restaurantApi } from "./api";
 import bundled from "./bundled-catalog.json";
 
@@ -10,6 +10,8 @@ const cacheKey = "zy_catalog_cache_v3";
 interface Catalog {
   products: Product[];
   theme: MenuThemeId;
+  /** Absent in a catalogue cached before the setting existed. */
+  languages?: MenuLanguage[];
 }
 
 /**
@@ -29,9 +31,9 @@ function cachedCatalog(): Catalog {
     const cached = JSON.parse(localStorage.getItem(cacheKey) || "null") as Catalog | null;
     return cached && Array.isArray(cached.products) && cached.products.length
       ? cached
-      : { products: bundledCatalog, theme: DEFAULT_MENU_THEME };
+      : { products: bundledCatalog, theme: DEFAULT_MENU_THEME, languages: DEFAULT_MENU_LANGUAGES };
   } catch {
-    return { products: bundledCatalog, theme: DEFAULT_MENU_THEME };
+    return { products: bundledCatalog, theme: DEFAULT_MENU_THEME, languages: DEFAULT_MENU_LANGUAGES };
   }
 }
 
@@ -39,8 +41,12 @@ export function useCatalog() {
   const query = useQuery({
     queryKey: ["catalog"],
     queryFn: async (): Promise<Catalog> => {
-      const { products, theme } = await restaurantApi.catalog();
-      const catalog = { products: products.map(mapApiProduct), theme: theme ?? DEFAULT_MENU_THEME };
+      const { products, theme, languages } = await restaurantApi.catalog();
+      const catalog = {
+        products: products.map(mapApiProduct),
+        theme: theme ?? DEFAULT_MENU_THEME,
+        languages: languages?.length ? languages : DEFAULT_MENU_LANGUAGES
+      };
       localStorage.setItem(cacheKey, JSON.stringify(catalog));
       return catalog;
     },

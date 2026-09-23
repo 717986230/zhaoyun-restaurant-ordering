@@ -1,8 +1,8 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable } from "@zhaoyun/api-client";
-import type { MenuThemeId } from "@zhaoyun/contracts";
-import { MENU_THEMES } from "@zhaoyun/domain";
+import type { MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
+import { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES } from "@zhaoyun/domain";
 import { TableCards } from "./TableCards";
 
 interface Props {
@@ -14,6 +14,8 @@ interface Props {
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<void>;
   onDeleteTable: (table: string) => Promise<void>;
   onSaveMenuTheme: (menuTheme: MenuThemeId) => Promise<void>;
+  menuLanguages: MenuLanguage[] | null;
+  onSaveMenuLanguages: (menuLanguages: MenuLanguage[]) => Promise<void>;
   onChangePassword: (password: string, currentPassword: string) => Promise<void>;
 }
 
@@ -91,6 +93,25 @@ export function SettingsPanel(props: Props) {
       style={{ "--swatch": theme.accent } as React.CSSProperties}
       onClick={() => void props.onSaveMenuTheme(theme.id)}
     ><i /><span>{theme.nameZh}</span></button>)}</div>
+
+    <h1>菜单语言</h1>
+    <p>客人菜单右上角会出现这几种语言的国旗，点一下就切换。至少留一种。</p>
+    <div className="language-picker" role="group" aria-label="菜单语言">{MENU_LANGUAGES.map((language) => {
+      const offered = props.menuLanguages ?? DEFAULT_MENU_LANGUAGES;
+      const on = offered.includes(language);
+      // The last one cannot be switched off: a menu has to be in something.
+      const last = on && offered.length === 1;
+      const next = on ? offered.filter((item) => item !== language) : [...offered, language];
+      return <button
+        key={language}
+        type="button"
+        className={`language-toggle ${on ? "selected" : ""}`}
+        aria-pressed={on}
+        disabled={last}
+        title={last ? "至少保留一种语言" : undefined}
+        onClick={() => void props.onSaveMenuLanguages(next)}
+      ><img src={LANGUAGE_INFO[language].flag} alt="" /><span>{LANGUAGE_INFO[language].name}</span></button>;
+    })}</div>
 
     <h1>桌台</h1>
     <p>登记桌台后，服务端只接受已登记的桌号，并要求设备带上该桌的令牌。没有登记任何桌台时保持开放模式。</p>

@@ -1,12 +1,13 @@
 import { Value } from "@sinclair/typebox/value";
 import { describe, expect, it } from "vitest";
 import {
-  CreateOrderBody, MENU_THEMES, ORDER_STATUSES, OrderStatusBody, PRINT_STATIONS, ProductBody,
+  CreateOrderBody, MENU_LANGUAGES, MENU_THEMES, ORDER_STATUSES, OrderStatusBody, PRINT_STATIONS, ProductBody,
   SERVICE_STATUSES, ServiceRequestBody, ServiceStatusBody, SettingsBody, TableBody
 } from "../../../src/contracts.js";
 import type { CreateOrderCommand, CreateServiceRequestCommand, OrderStatus, ServiceStatus } from "../src/index";
 import type { AdminProductInput } from "../../api-client/src/index";
 import { MENU_THEME_IDS } from "../../domain/src/themes";
+import { MENU_LANGUAGES as RULE_MENU_LANGUAGES } from "../../../shared/rules.mjs";
 
 /**
  * The runtime schemas and these TypeScript types describe the same requests.
@@ -81,5 +82,17 @@ describe("Wire contract parity", () => {
     expect([...MENU_THEMES]).toEqual([...MENU_THEME_IDS]);
     for (const menuTheme of MENU_THEME_IDS) expect(Value.Check(SettingsBody, { menuTheme })).toBe(true);
     expect(Value.Check(SettingsBody, { menuTheme: "gold" })).toBe(false);
+  });
+
+  it("keeps the menu languages identical between the wire schema and the shared rules", () => {
+    expect([...MENU_LANGUAGES]).toEqual([...RULE_MENU_LANGUAGES]);
+    expect(Value.Check(SettingsBody, { menuLanguages: ["en", "de"] })).toBe(true);
+    expect(Value.Check(SettingsBody, { menuLanguages: ["zh"] })).toBe(true);
+    // No languages, an unknown one, or the same one twice: not a menu.
+    expect(Value.Check(SettingsBody, { menuLanguages: [] })).toBe(false);
+    expect(Value.Check(SettingsBody, { menuLanguages: ["fr"] })).toBe(false);
+    expect(Value.Check(SettingsBody, { menuLanguages: ["en", "en"] })).toBe(false);
+    // Either setting may be saved alone, but a save has to carry one of them.
+    expect(Value.Check(SettingsBody, {})).toBe(false);
   });
 });

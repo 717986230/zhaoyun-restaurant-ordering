@@ -20,6 +20,9 @@ export interface CustomerState {
   pendingOrders: Record<string, { command: CreateOrderCommand; attempts: number; nextAttemptAt: number }>;
   requests: ServiceRequest[];
   language: "zh" | "de" | "en";
+  /** Whether `language` is the guest's own pick. Until it is, the menu follows
+   *  the phone's language among the ones the restaurant offers. */
+  languageChosen: boolean;
   /** Last service the guest called, resolved to a name at render time. */
   lastServiceType: string | null;
   toast: string;
@@ -68,7 +71,8 @@ const initialState: CustomerState = {
   orders: [],
   pendingOrders: {},
   requests: [],
-  language: "zh",
+  language: "de",
+  languageChosen: false,
   lastServiceType: null,
   toast: ""
 };
@@ -133,7 +137,7 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     case "advance-order": return { ...state, orders: state.orders.map((order) => order.id === action.orderId ? { ...order, status: action.status } : order) };
     case "service-created": return { ...state, requests: [action.request, ...state.requests], lastServiceType: action.request.serviceType };
     case "service-done": return { ...state, requests: state.requests.map((request) => request.id === action.requestId ? { ...request, status: "completed" } : request) };
-    case "language": return { ...state, language: action.language };
+    case "language": return { ...state, language: action.language, languageChosen: true };
     case "toast": return { ...state, toast: action.message };
   }
 }

@@ -239,8 +239,8 @@ async function handle(request, env) {
 
   // /api/catalog
   if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
-    const { menuTheme } = await store.getSettings();
-    return json({ products: await store.listProducts(true), theme: menuTheme });
+    const { menuTheme, menuLanguages } = await store.getSettings();
+    return json({ products: await store.listProducts(true), theme: menuTheme, languages: menuLanguages });
   }
 
   // /api/orders and /api/orders/:id/status

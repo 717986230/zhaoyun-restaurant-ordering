@@ -6,17 +6,24 @@ import { expect, test } from "@playwright/test";
 let orderStatus;
 let requestStatus;
 let menuTheme;
+let menuLanguages;
 
 test.beforeEach(async ({ page }) => {
   orderStatus = "new";
   requestStatus = "open";
   menuTheme = "jade";
+  menuLanguages = ["en", "de"];
   await page.addInitScript(() => sessionStorage.setItem("zy_admin_token", "test-admin"));
   await page.route("**/api/health", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
   await page.route("**/api/admin/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ role: "manager" }) }));
   await page.route("**/api/admin/settings", async (route) => {
-    if (route.request().method() === "PUT") menuTheme = route.request().postDataJSON().menuTheme;
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ menuTheme }) });
+    if (route.request().method() === "PUT") {
+      const body = route.request().postDataJSON();
+      // As both backends do: either setting may come alone, stored in flag order.
+      if (body.menuTheme) menuTheme = body.menuTheme;
+      if (body.menuLanguages) menuLanguages = ["zh", "en", "de"].filter((language) => body.menuLanguages.includes(language));
+    }
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ menuTheme, menuLanguages }) });
   });
   await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [{
     id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
@@ -104,6 +111,29 @@ test("a manager picks a menu style, and the choice is saved", async ({ page }) =
   await picker.locator(".theme-swatch", { hasText: "赤陶" }).click();
   await expect.poll(() => menuTheme).toBe("terracotta");
   await expect(picker.locator(".theme-swatch.selected")).toContainText("赤陶");
+});
+
+test("a manager chooses the menu's languages, and cannot switch off the last one", async ({ page }) => {
+  await page.getByRole("button", { name: "连接设置" }).click();
+  const languages = page.getByRole("group", { name: "菜单语言" });
+  const toggle = (name) => languages.getByRole("button", { name });
+  // English and German are on out of the box; Chinese is one tap away.
+  await expect(toggle("English")).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle("Deutsch")).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle("中文")).toHaveAttribute("aria-pressed", "false");
+
+  await toggle("中文").click();
+  await expect.poll(() => menuLanguages).toEqual(["zh", "en", "de"]);
+  await expect(toggle("中文")).toHaveAttribute("aria-pressed", "true");
+
+  await toggle("English").click();
+  await expect.poll(() => menuLanguages).toEqual(["zh", "de"]);
+  await toggle("中文").click();
+  await expect.poll(() => menuLanguages).toEqual(["de"]);
+  // A menu has to be in some language.
+  await expect(toggle("Deutsch")).toBeDisabled();
+  // The style was never part of these saves.
+  expect(menuTheme).toBe("jade");
 });
 
 test("a combo is built by packaging existing dishes into a new entry", async ({ page }) => {

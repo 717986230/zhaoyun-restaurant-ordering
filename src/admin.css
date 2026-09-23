@@ -1317,3 +1317,47 @@ h2 {
   color: var(--a-danger);
   font-weight: 650;
 }
+
+/* 菜单语言: the same pill as a menu style swatch, with the flag the guest
+   will see in place of the colour dot. */
+.language-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 16px;
+}
+
+.language-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.language-toggle img {
+  width: 24px;
+  height: 16px;
+  border-radius: 2px;
+  object-fit: cover;
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.language-toggle.selected {
+  border-color: var(--a-accent);
+  box-shadow: 0 0 0 1px var(--a-accent);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  font-weight: 650;
+}
+
+.language-toggle.selected img {
+  opacity: 1;
+  filter: none;
+}

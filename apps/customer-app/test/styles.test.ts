@@ -157,3 +157,44 @@ describe("menu styles", () => {
     expect(saturation > 0.15 && !(hue >= 130 && hue <= 180) && !(hue >= 5 && hue <= 25)).toBe(false);
   });
 });
+
+describe("the light menu", () => {
+  // The same floors as the dark menu, read off the --light-* tokens that
+  // `:root[data-theme="light"]` switches to. A guest by a window reads the
+  // allergen letters in daylight, which is no excuse for grey on white.
+  const guest = tokens(sheets.guest);
+  const light = (name: string) => guest.get(`--light-${name}`)!;
+  const pairs: Array<[string, string, string, number]> = [
+    ["body text", light("ink"), light("panel"), 7],
+    ["secondary text", light("ink-2"), light("panel"), 7],
+    ["muted labels", light("muted"), light("panel"), 4.5],
+    ["smallest type on a raised surface", light("faint"), light("panel-3"), 4.5],
+    ["muted labels on a raised surface", light("muted"), light("panel-3"), 4.5],
+    ["warning text", light("danger"), light("bg"), 4.5],
+    ["warning text on a card", light("danger-ink"), light("panel"), 4.5]
+  ];
+
+  it.each(pairs)("%s clears %s on %s at %d:1", (_what, foreground, background, floor) => {
+    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(floor);
+  });
+
+  it("switches only to tokens it defines, and only tokens the dark menu has", () => {
+    const start = sheets.guest.indexOf(':root[data-theme="light"] {');
+    expect(start).toBeGreaterThan(0);
+    const block = sheets.guest.slice(start, sheets.guest.indexOf("\n}\n", start));
+    const switched = [...block.matchAll(/^\s+(--[a-z0-9-]+):\s*var\((--light-[a-z0-9-]+)\);/gm)];
+    expect(switched.length).toBeGreaterThan(20);
+    for (const [, token, source] of switched) {
+      expect(guest.has(token), `${token} is not a dark-menu token`).toBe(true);
+      expect(source).toBe(`--light-${token.slice(2)}`);
+      expect(guest.has(source), `${source} is not defined`).toBe(true);
+    }
+  });
+
+  it.each(Object.values(MENU_THEMES))("$id ($nameZh) has a light accent that clears the same floor", (theme) => {
+    expect(contrast(theme.light.accent, light("panel"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(theme.light.accentInk, theme.light.accent)).toBeGreaterThanOrEqual(4.5);
+    const { hue, saturation } = hsl(theme.light.accent);
+    expect(saturation > 0.15 && !(hue >= 130 && hue <= 180) && !(hue >= 5 && hue <= 25)).toBe(false);
+  });
+});

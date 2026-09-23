@@ -37,7 +37,8 @@ const copy = {
     staffAdvanceTo: "更新为", staffHandled: "已处理", staffPending: "待同步",
     setTable: "设置桌号", tablePrompt: "请输入本设备所在的桌号（1-8 位字母或数字）", tableInvalid: "桌号无效，请使用 1-8 位字母或数字",
     tableUnset: "本设备还没有分配桌号，订单会记到默认桌号",
-    breakdown: "拆解", parts: "组成", alsoContains: "另含（未标注到具体食材）", portionOf: "规格"
+    breakdown: "拆解", parts: "组成", alsoContains: "另含（未标注到具体食材）", portionOf: "规格",
+    language: "语言", lightMode: "切换到浅色", darkMode: "切换到深色"
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
@@ -71,7 +72,8 @@ const copy = {
     staffAdvanceTo: "Ändern auf", staffHandled: "Erledigt", staffPending: "Wird übertragen",
     setTable: "Tisch einstellen", tablePrompt: "Tischnummer dieses Geräts eingeben (1-8 Zeichen)", tableInvalid: "Ungültige Tischnummer: 1-8 Buchstaben oder Ziffern",
     tableUnset: "Diesem Gerät ist noch kein Tisch zugewiesen",
-    breakdown: "Aufgeschlüsselt", parts: "Bestandteile", alsoContains: "Außerdem enthalten (keiner Zutat zugeordnet)", portionOf: "Menge"
+    breakdown: "Aufgeschlüsselt", parts: "Bestandteile", alsoContains: "Außerdem enthalten (keiner Zutat zugeordnet)", portionOf: "Menge",
+    language: "Sprache", lightMode: "Helles Design", darkMode: "Dunkles Design"
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
@@ -105,7 +107,8 @@ const copy = {
     staffAdvanceTo: "Change to", staffHandled: "Done", staffPending: "sending",
     setTable: "Set table", tablePrompt: "Enter the table number of this device (1-8 characters)", tableInvalid: "Invalid table number: use 1-8 letters or digits",
     tableUnset: "This device has no table assigned yet",
-    breakdown: "Taken apart", parts: "Components", alsoContains: "Also contains (not tied to one ingredient)", portionOf: "Serving"
+    breakdown: "Taken apart", parts: "Components", alsoContains: "Also contains (not tied to one ingredient)", portionOf: "Serving",
+    language: "Language", lightMode: "Switch to light", darkMode: "Switch to dark"
   }
 } as const;
 

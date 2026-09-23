@@ -45,8 +45,13 @@ const products = [
   }
 ];
 
+// Most of this file reads the menu in Chinese, so it is a Chinese phone at a
+// restaurant that has switched all three languages on. What happens by default
+// — English and German only, following the phone — is its own group below.
+test.use({ locale: "zh-CN" });
+
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "jade" }) }));
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "jade", languages: ["zh", "en", "de"] }) }));
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
@@ -109,37 +114,38 @@ test("image and video products use the same 3D flip interaction", async ({ page 
   }
 });
 
-test("the language button cycles the menu through Chinese, German and English", async ({ page }) => {
-  // Three languages, one button: it always shows the language a tap switches
-  // to, so "中文" means tapping it goes to Chinese from wherever it is now.
+test("the flags in the top right switch the menu between the languages the restaurant offers", async ({ page }) => {
+  // Located by class, not by its label: the label is in the menu's language,
+  // which is the thing this test changes.
+  const flags = page.locator(".topbar-end .flags");
+  await expect(flags).toHaveAttribute("aria-label", "语言");
+  await expect(flags.getByRole("button")).toHaveCount(3);
+  // A Chinese phone, and Chinese is on: that is where it starts.
+  await expect(flags.getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".dish-card", { hasText: "黑椒牛柳" })).toBeVisible();
-  const toggle = page.getByRole("button", { name: "中文" });
-  await expect(toggle).toBeVisible();
 
-  await toggle.click();
-  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
+  await flags.getByRole("button", { name: "Deutsch" }).click();
   await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
+  await expect(flags.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
 
-  await page.getByRole("button", { name: "Deutsch" }).click();
-  await expect(page.getByRole("button", { name: "English" })).toBeVisible();
+  await flags.getByRole("button", { name: "English" }).click();
   await expect(page.locator(".dish-card", { hasText: "Black Pepper Beef Fillet" })).toBeVisible();
 
-  await page.getByRole("button", { name: "English" }).click();
-  await expect(page.getByRole("button", { name: "中文" })).toBeVisible();
+  await flags.getByRole("button", { name: "中文" }).click();
   await expect(page.locator(".dish-card", { hasText: "黑椒牛柳" })).toBeVisible();
 });
 
 test("the chosen language survives a reload", async ({ page }) => {
-  await page.getByRole("button", { name: "中文" }).click();
-  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
 });
 
 test("German menu copy replaces the Chinese chrome, all the way into a dish", async ({ page }) => {
-  await page.getByRole("button", { name: "中文" }).click();
-  await expect(page.getByRole("button", { name: "Deutsch" })).toBeVisible();
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
 
   await expect(page.getByRole("button", { name: "Gericht suchen" })).toBeVisible();
 
@@ -149,6 +155,51 @@ test("German menu copy replaces the Chinese chrome, all the way into a dish", as
 
   await page.locator(".detail-heading").click({ delay: 50 });
   await expect(page.getByText("Allergene")).toBeVisible();
+});
+
+test.describe("on a 360px phone, the width of most Android phones", () => {
+  test.use({ viewport: { width: 360, height: 740 } });
+
+  test("every row shows its picture, number, name and price side by side", async ({ page }) => {
+    // The narrow-screen rule used to declare two columns for a four-part row,
+    // so the name wrapped under the picture and was hidden behind it.
+    const row = page.locator(".dish-card", { hasText: "黑椒牛柳" }).locator(".summary");
+    await expect(row).toBeVisible();
+    const box = async (selector) => row.locator(selector).first().boundingBox();
+    const [picture, number, name, price] = [await box(".art, .dish-media"), await box(".number"), await box("h3"), await box(".row-price")];
+    expect(picture.x + picture.width).toBeLessThanOrEqual(number.x);
+    expect(number.x + number.width).toBeLessThanOrEqual(name.x);
+    expect(name.x + name.width).toBeLessThanOrEqual(price.x);
+    // One line each, level with each other.
+    expect(Math.abs(name.y - number.y)).toBeLessThan(24);
+  });
+
+  test("the title stays on one line beside three flags", async ({ page }) => {
+    const title = await page.locator(".topbar .title strong").boundingBox();
+    const flags = await page.locator(".topbar-end").boundingBox();
+    expect(title.height).toBeLessThan(40);
+    expect(title.x + title.width).toBeLessThanOrEqual(flags.x);
+  });
+});
+
+test("the sun and moon switch the menu between dark and light, and it stays switched", async ({ page }) => {
+  const root = (name) => page.evaluate((token) => getComputedStyle(document.documentElement).getPropertyValue(token).trim(), name);
+  // Dark is the menu as designed, so that is where a guest starts.
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  expect(await root("--bg")).toBe("#0f1113");
+  expect(await root("--accent")).toBe("#8fb0a3");
+
+  await page.getByRole("button", { name: "切换到浅色" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await root("--bg")).toBe("#f3f5f6");
+  // The accent darkens with it: the dark menu's pale celadon is unreadable on white.
+  expect(await root("--accent")).toBe("#2f6b56");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByRole("button", { name: "切换到深色" }).click();
+  expect(await root("--bg")).toBe("#0f1113");
+  expect(await root("--accent")).toBe("#8fb0a3");
 });
 
 test("the menu style the server picked changes only the accent, at load", async ({ page }) => {
@@ -182,7 +233,10 @@ test("a tablet that has never reached the server shows the menu the app ships wi
   await expect(page.locator(".dish-card").first()).toBeVisible();
   expect(await page.locator(".dish-card").count()).toBeGreaterThan(100);
   await expect(page.locator(".dish-card .number").first()).toHaveText("R1");
-  await expect(page.locator(".local-board-note")).toContainText("离线菜单");
+  // Having never reached the server, it has not heard that this restaurant
+  // switched Chinese on either, so it offers the default two — and a Chinese
+  // phone falls back to German, the language of the house.
+  await expect(page.locator(".local-board-note")).toContainText("Offline-Speisekarte");
 });
 
 // The CSS prefers-reduced-motion block cannot reach motion/react's JS-driven
@@ -283,4 +337,68 @@ test("a combo names the dishes it packages, not just its own price", async ({ pa
   // Quantities above one are shown; the singular dish is not prefixed with "1×".
   await expect(bundle).toContainText("2× 蔬菜拉面");
   await expect(bundle.getByText("黑椒牛柳", { exact: true })).toBeVisible();
+});
+
+test.describe("a restaurant that has not switched Chinese on", () => {
+  // The default: the catalogue says nothing about languages, which is what a
+  // restaurant that never opened 菜单语言 serves.
+  const catalogWithout = (extra = {}) => async ({ page }) => {
+    await page.unroute("**/api/catalog");
+    await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "jade", ...extra }) }));
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+  };
+
+  test.describe("on an Austrian phone", () => {
+    test.use({ locale: "de-AT" });
+    test.beforeEach(catalogWithout());
+
+    test("offers English and German only, and starts in German", async ({ page }) => {
+      const flags = page.locator(".topbar-end").getByRole("group");
+      await expect(flags.getByRole("button")).toHaveCount(2);
+      await expect(flags.getByRole("button", { name: "中文" })).toHaveCount(0);
+      await expect(flags.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    });
+
+    test("a guest who once picked Chinese reads German now that it is off", async ({ page }) => {
+      await page.evaluate(() => localStorage.setItem("zy_customer_state_v4", JSON.stringify({ language: "zh", languageChosen: true })));
+      await page.reload();
+      await expect(page.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator(".dish-card", { hasText: "黑椒牛柳" })).toHaveCount(0);
+    });
+  });
+
+  test.describe("on an English phone", () => {
+    test.use({ locale: "en-GB" });
+    test.beforeEach(catalogWithout());
+
+    test("starts in English", async ({ page }) => {
+      await expect(page.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator(".dish-card", { hasText: "Black Pepper Beef Fillet" })).toBeVisible();
+    });
+  });
+
+  test.describe("on a French phone", () => {
+    test.use({ locale: "fr-FR" });
+    test.beforeEach(catalogWithout());
+
+    test("falls back to German, the language of the house", async ({ page }) => {
+      await expect(page.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
+    });
+  });
+
+  test.describe("with one language only", () => {
+    test.use({ locale: "en-GB" });
+    test.beforeEach(catalogWithout({ languages: ["de"] }));
+
+    test("shows no flags, since there is nothing to switch to", async ({ page }) => {
+      await expect(page.locator(".dish-card", { hasText: "Rinderfilet mit schwarzem Pfeffer" })).toBeVisible();
+      await expect(page.locator(".flags")).toHaveCount(0);
+      // The light/dark switch is still there on its own.
+      await expect(page.getByRole("button", { name: "Helles Design" })).toBeVisible();
+    });
+  });
 });

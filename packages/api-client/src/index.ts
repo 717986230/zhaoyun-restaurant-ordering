@@ -1,6 +1,6 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
-  CreateServiceRequestCommand, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
+  CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
 
@@ -182,7 +182,8 @@ export class AdminApi {
   updatePrinter(id: string, profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(profile) }); }
   retryPrintJob(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }
   settings(): Promise<ApiSettings> { return this.#request("/api/admin/settings"); }
-  updateSettings(menuTheme: MenuThemeId): Promise<ApiSettings> { return this.#request("/api/admin/settings", { method: "PUT", body: JSON.stringify({ menuTheme }) }); }
+  /** Either setting may be saved alone; the one left out keeps its value. */
+  updateSettings(settings: Partial<ApiSettings>): Promise<ApiSettings> { return this.#request("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) }); }
 
   connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
     const base = this.storage.baseUrl.replace(/^http/, "ws");
@@ -240,7 +241,7 @@ export class RestaurantApi {
     return `${this.#baseUrl()}${path}`;
   }
 
-  catalog(): Promise<{ products: ApiCatalogProduct[]; theme?: MenuThemeId }> {
+  catalog(): Promise<{ products: ApiCatalogProduct[]; theme?: MenuThemeId; languages?: MenuLanguage[] }> {
     return this.#request("/api/catalog");
   }
 
