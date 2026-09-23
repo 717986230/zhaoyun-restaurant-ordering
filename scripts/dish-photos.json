@@ -49,7 +49,7 @@
     "query": "beef hot pot"
   },
   "photo-h3": {
-    "query": "seafood hotpot shrimp clams"
+    "query": "seafood steamboat"
   },
   "photo-h4": {
     "query": "instant-boiled mutton"
@@ -85,7 +85,7 @@
     "query": "kappa maki"
   },
   "photo-m2": {
-    "query": "salmon maki"
+    "file": "File:Salmon maki Solaire Resort North1.jpg"
   },
   "photo-m3": {
     "query": "avocado maki"
@@ -290,7 +290,7 @@
     "query": "glass of sparkling water"
   },
   "photo-dr-aloe": {
-    "query": "aloe vera juice"
+    "file": "File:Grapefruit and aloe jelly drink.jpg"
   },
   "photo-dr-apple": {
     "file": "File:Russet apple juice.JPG"
@@ -302,7 +302,7 @@
     "query": "red bull energy drink can"
   },
   "photo-beer-wiesel-fass": {
-    "query": "draft beer glass"
+    "query": "glass of beer with foam"
   },
   "photo-beer-wiesel-stamm": {
     "query": "Märzen beer"
@@ -311,7 +311,7 @@
     "query": "non-alcoholic beer glass"
   },
   "photo-beer-japan": {
-    "query": "Asahi Super Dry"
+    "file": "File:Orion Premium Draft Beer, 633 mL bottle as sold in Canada.jpg"
   },
   "photo-wine-white": {
     "file": "File:Glass of White Wine shot with a bottle of white wine - Evan Swigart.jpg"
@@ -320,7 +320,7 @@
     "query": "glass of red wine"
   },
   "photo-wine-spritzer": {
-    "file": "File:Heuriger Zum Renner Wiener Spritzer.jpg"
+    "file": "File:Fröccs.jpg"
   },
   "photo-aperol": {
     "query": "aperol spritz"
@@ -333,7 +333,7 @@
     "query": "hugo cocktail"
   },
   "photo-sake": {
-    "query": "sake ochoko"
+    "query": "tokkuri"
   },
   "photo-coffee-espresso": {
     "file": "File:Cup of espresso 02.jpg"
