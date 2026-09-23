@@ -91,12 +91,18 @@ function describe(page, trusted = false) {
   };
 }
 
+/**
+ * 480×360 and at most MAX_BYTES: hex-encoded, one photo is one SQL statement
+ * in the D1 migration, and D1 refuses a statement over 100 KB.
+ */
 async function shrink(buffer) {
-  for (let quality = 78; quality >= 44; quality -= 6) {
-    const out = await sharp(buffer).rotate().resize(480, 360, { fit: "cover", position: "attention" }).jpeg({ quality, mozjpeg: true }).toBuffer();
-    if (out.length <= MAX_BYTES || quality <= 50) return out;
+  for (const width of [480, 400]) {
+    for (let quality = 78; quality >= 36; quality -= 6) {
+      const out = await sharp(buffer).rotate().resize(width, (width * 3) / 4, { fit: "cover", position: "attention" }).jpeg({ quality, mozjpeg: true }).toBuffer();
+      if (out.length <= MAX_BYTES) return out;
+    }
   }
-  throw new Error("unreachable");
+  throw new Error(`cannot get the photo under ${MAX_BYTES} bytes`);
 }
 
 async function main() {

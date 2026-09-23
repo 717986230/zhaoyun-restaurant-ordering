@@ -77,6 +77,10 @@ test("the photo migrations give D1 the dishes' photos, byte for byte", () => {
     return result;
   });
 
+  // D1 refuses any single statement over 100 KB, and one photo is one statement.
+  for (const part of sql.photos) {
+    for (const statement of part.sql.split("\n")) assert.ok(statement.length < 100_000, `${part.name} has a ${statement.length}-byte statement`);
+  }
   assert.equal(migrated.files.length, photos.length);
   for (const photo of photos) {
     const row = migrated.files.find((file) => file.id === photo.fileId);
