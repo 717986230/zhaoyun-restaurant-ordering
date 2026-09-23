@@ -234,6 +234,15 @@ button {
 }
 
 /* The sections, on one line that scrolls sideways rather than wrapping. */
+/* The header, the tabs and a connection warning, pinned to the top of the
+   window on every screen; the page scrolls under them. */
+.admin-top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 6px 18px var(--a-shadow-1);
+}
+
 .admin-tabs {
   display: flex;
   gap: 4px;
@@ -2238,5 +2247,55 @@ h2 {
 
   .editor-form .bundle-options {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Back to the top of whatever long thing was scrolled (app/BackToTop.tsx):
+   at the right end of the pinned tab bar, so it never covers a row. It keeps
+   its place while hidden, so the tabs do not shift when it appears. */
+.admin-tabs .back-to-top {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--a-line-2);
+  border-bottom-width: 1px;
+  border-radius: 50%;
+  background: var(--a-card);
+  color: var(--a-ink);
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+
+.admin-tabs .back-to-top.on {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+}
+
+.admin-tabs .back-to-top:hover {
+  border-color: var(--a-accent);
+  color: var(--a-accent);
+}
+
+.admin-tabs .back-to-top svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-tabs .back-to-top {
+    transition: none;
   }
 }
