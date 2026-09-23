@@ -479,6 +479,37 @@ test("no admin screen is wider than the window, at any common width", async ({ p
   }
 });
 
+test("on a computer the dishes page fits the window, and the long list scrolls inside its own box", async ({ page }) => {
+  const dish = (index) => ({
+    id: `dish-${index}`, sku: `D${index}`, kind: "food", category: "MAIN",
+    names: { zh: `菜品 ${index}`, de: `Gericht ${index}`, en: `Dish ${index}` }, description: "",
+    price: 10 + index, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" },
+    available: true, published: true, printStation: "kitchen", media: [], modifiers: []
+  });
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: Array.from({ length: 120 }, (_, index) => dish(index + 1)) }) }));
+  for (const [width, height] of [[1024, 700], [1440, 900], [1920, 1080]]) {
+    await page.setViewportSize({ width, height });
+    await page.reload();
+    await expect(page.locator(".product-row")).toHaveCount(120);
+    const measured = await page.evaluate(() => {
+      const list = document.querySelector(".product-list");
+      const frame = document.querySelector(".catalog-layout").getBoundingClientRect();
+      return {
+        page: document.scrollingElement.scrollHeight,
+        listScrolls: list.scrollHeight > list.clientHeight + 100,
+        frameBottom: frame.bottom
+      };
+    });
+    expect(measured.page, `the page at ${width}×${height} is no taller than the window`).toBeLessThanOrEqual(height + 1);
+    expect(measured.frameBottom).toBeLessThanOrEqual(height);
+    expect(measured.listScrolls, `the list at ${width}px scrolls inside its box`).toBe(true);
+    // The last dish is reached by scrolling the list, and opens like any other.
+    await page.locator(".product-row").last().click();
+    await expect(page.locator("#productForm input").first()).toBeVisible();
+  }
+});
+
 test("the menu's QR code downloads as a PNG that a phone can scan", async ({ page }) => {
   await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
   await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [

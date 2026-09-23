@@ -1713,8 +1713,13 @@ h2 {
   vertical-align: middle;
 }
 
+/* Up to forty dishes: a box of its own, not a card forty rows long. */
 .featured-list {
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
+  align-content: start;
   gap: 6px;
   margin: 4px 0 0;
   padding: 0;
@@ -1875,13 +1880,43 @@ h2 {
   background: linear-gradient(90deg, var(--a-head-ink-2), var(--a-head-2));
 }
 
-/* On a wide screen the dishes page is a framed sheet of a readable width,
-   not a form and a list pulled to the two edges of a 27-inch monitor. */
-@media (min-width: 1200px) {
+/* On a computer or a tablet the dishes page is one framed sheet that fits the
+   window: the form and the list each scroll inside it, so 118 dishes never
+   turn the page into a ten-thousand-pixel strip. The shell becomes a column
+   exactly the window's height and the sheet takes what the header leaves —
+   no header height is written down anywhere. A window too short for that
+   (a landscape phone-sized tablet) keeps the ordinary scrolling page. */
+@media (min-width: 801px) and (min-height: 560px) {
+  .admin-shell:has(.catalog-layout) {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .admin-shell:has(.catalog-layout) > main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-panel.active:has(> .catalog-layout) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: clamp(12px, 2vw, 24px) clamp(12px, 3vw, 40px);
+  }
+
   .catalog-layout {
+    flex: 1;
+    width: 100%;
     max-width: 1480px;
-    min-height: calc(100vh - 170px);
-    margin: 24px auto 40px;
+    min-height: 0;
+    margin: 0 auto;
     overflow: hidden;
     border: 1px solid var(--a-line);
     border-radius: 16px;
@@ -1889,8 +1924,33 @@ h2 {
     box-shadow: 0 18px 50px var(--a-shadow-1);
   }
 
-  .admin-panel.active:has(> .catalog-layout) {
-    padding: 0 clamp(20px, 3vw, 40px);
+  .editor-pane {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .list-pane {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* The list is its own framed box; its head and filters stay put above it. */
+  .list-pane .product-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--a-line);
+    border-radius: 12px;
+    background: var(--a-card);
+  }
+
+  .list-pane .product-row:last-child {
+    border-bottom: 0;
   }
 }
 
@@ -2061,17 +2121,6 @@ h2 {
   font-size: 10px;
 }
 
-/* The editor stays in view on a wide screen while the list scrolls past it. */
-@media (min-width: 801px) {
-  .editor-pane {
-    position: sticky;
-    top: 0;
-    align-self: start;
-    max-height: 100vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
 
 /* A phone: the list head wraps rather than pushing "new dish" off screen,
    the filters scroll sideways, and a dish name may take two lines. */
