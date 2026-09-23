@@ -1691,22 +1691,16 @@
     ]
   },
   "photo-wine-spritzer": {
-    "query": "Weinschorle",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Jamaica Spritz.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Jamaica_Spritz.jpg",
-    "author": "Sarah Stierch",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 17179,
-    "alternatives": [
-      "File:Limoncello spritzer (6104943642).jpg",
-      "File:Heuriger Zum Renner Wiener Spritzer Thymian.jpg",
-      "File:Heuriger Zum Renner Wiener Spritzer.jpg",
-      "File:Fröccs.jpg",
-      "File:Hosta Spritzer 1zz.jpg"
-    ]
+    "pinned": "File:Heuriger Zum Renner Wiener Spritzer.jpg",
+    "file": "File:Heuriger Zum Renner Wiener Spritzer.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Heuriger_Zum_Renner_Wiener_Spritzer.jpg",
+    "author": "Geolina163",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 28497,
+    "alternatives": []
   },
   "photo-aperol": {
     "query": "aperol spritz",
