@@ -85,7 +85,7 @@
     "query": "kappa maki"
   },
   "photo-m2": {
-    "file": "File:Salmon maki Solaire Resort North1.jpg"
+    "query": "hosomaki salmon"
   },
   "photo-m3": {
     "query": "avocado maki"
@@ -320,7 +320,7 @@
     "query": "glass of red wine"
   },
   "photo-wine-spritzer": {
-    "file": "File:Fröccs.jpg"
+    "query": "Weinschorle"
   },
   "photo-aperol": {
     "query": "aperol spritz"
