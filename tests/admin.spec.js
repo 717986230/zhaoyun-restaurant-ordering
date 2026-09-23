@@ -126,10 +126,20 @@ test("a manager chooses the menu's languages, and cannot switch off the last one
   await expect.poll(() => menuLanguages).toEqual(["zh", "en", "de"]);
   await expect(toggle("中文")).toHaveAttribute("aria-pressed", "true");
 
+  // Two taps in a row while the first save is still on its way — on a slow
+  // phone the server answers after the second tap, which is how this failed
+  // in CI. Each tap must be worked out from what the one before left on
+  // screen, not from the list the page had before it.
+  await page.route("**/api/admin/settings", async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return route.fallback();
+  });
   await toggle("English").click();
-  await expect.poll(() => menuLanguages).toEqual(["zh", "de"]);
   await toggle("中文").click();
   await expect.poll(() => menuLanguages).toEqual(["de"]);
+  await expect(toggle("English")).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle("中文")).toHaveAttribute("aria-pressed", "false");
   // A menu has to be in some language.
   await expect(toggle("Deutsch")).toBeDisabled();
   // The style was never part of these saves.

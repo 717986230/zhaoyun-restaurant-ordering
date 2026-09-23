@@ -25,7 +25,7 @@ import { useKiosk } from "../features/kiosk/useKiosk";
  */
 export function App() {
   const { state, dispatch } = useCustomerState();
-  const { data: catalog, usingBundledMenu } = useCatalog();
+  const { data: catalog } = useCatalog();
   const queryClient = useQueryClient();
   const handleAdminTap = useKiosk();
   const [scheme, toggleScheme] = useColorScheme();
@@ -47,7 +47,6 @@ export function App() {
       state={{ ...state, language }}
       dispatch={dispatch}
       products={catalog.products}
-      offlineMenu={usingBundledMenu}
       languages={languages}
       scheme={scheme}
       onToggleScheme={toggleScheme}
