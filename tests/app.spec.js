@@ -160,18 +160,63 @@ test("German menu copy replaces the Chinese chrome, all the way into a dish", as
 test.describe("on a 360px phone, the width of most Android phones", () => {
   test.use({ viewport: { width: 360, height: 740 } });
 
-  test("every row shows its picture, number, name and price side by side", async ({ page }) => {
-    // The narrow-screen rule used to declare two columns for a four-part row,
-    // so the name wrapped under the picture and was hidden behind it.
-    const row = page.locator(".dish-card", { hasText: "黑椒牛柳" }).locator(".summary");
+  /** Two boxes that share no pixel. */
+  const apart = (a, b) => a.x + a.width <= b.x + 0.5 || b.x + b.width <= a.x + 0.5 || a.y + a.height <= b.y + 0.5 || b.y + b.height <= a.y + 0.5;
+
+  async function rowParts(page, name) {
+    const row = page.locator(".dish-card", { hasText: name }).locator(".summary");
     await expect(row).toBeVisible();
     const box = async (selector) => row.locator(selector).first().boundingBox();
-    const [picture, number, name, price] = [await box(".art, .dish-media"), await box(".number"), await box("h3"), await box(".row-price")];
+    return { picture: await box(".art, .dish-media"), number: await box(".number"), name: await box("h3"), price: await box(".row-price") };
+  }
+
+  test("every row shows its picture, then its number over its name, then its price", async ({ page }) => {
+    // The narrow-screen rule once declared two columns for a four-part row,
+    // so the name wrapped under the picture and was hidden behind it.
+    const { picture, number, name, price } = await rowParts(page, "黑椒牛柳");
     expect(picture.x + picture.width).toBeLessThanOrEqual(number.x);
-    expect(number.x + number.width).toBeLessThanOrEqual(name.x);
+    expect(picture.x + picture.width).toBeLessThanOrEqual(name.x);
+    expect(number.y + number.height).toBeLessThanOrEqual(name.y + 1);
     expect(name.x + name.width).toBeLessThanOrEqual(price.x);
-    // One line each, level with each other.
-    expect(Math.abs(name.y - number.y)).toBeLessThan(24);
+  });
+
+  test("a long drink code and a long German name overlap nothing", async ({ page }) => {
+    // The codes of the drinks — BEER-NONALC, WINE-WHITE, APEROL-PROSECCO —
+    // used to sit in a column sized for R1 and ran through the name.
+    const drink = {
+      id: "wine-white", sku: "APEROL-PROSECCO", kind: "drink", category: "WINE",
+      names: { zh: "白葡萄酒", de: "Weißwein Grüner Veltliner 1/8 aus der Wachau", en: "White Wine Grüner Veltliner 1/8" },
+      description: "", price: 4.5, allergens: [], details: { time: "", people: "", level: "", ingredients: "" },
+      appearance: { art: "#333", pattern: "dots" }, media: []
+    };
+    await page.unroute("**/api/catalog");
+    await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [...products, drink], theme: "jade", languages: ["zh", "en", "de"] }) }));
+    await page.reload();
+    await page.getByRole("button", { name: "Deutsch" }).click();
+    const parts = await rowParts(page, "APEROL-PROSECCO");
+    const names = Object.keys(parts);
+    for (const [index, one] of names.entries()) {
+      for (const other of names.slice(index + 1)) expect(apart(parts[one], parts[other]), `${one} overlaps ${other}`).toBe(true);
+    }
+  });
+
+  test("a long restaurant title shrinks to fit between the search button and the flags", async ({ page }) => {
+    await page.unroute("**/api/catalog");
+    await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      products, theme: "jade", languages: ["zh", "en", "de"], menu: { title: "Chiri Kitchen Mariahilf", restaurantName: "Chiri", defaultScheme: "dark", showTableNumber: true }
+    }) }));
+    await page.reload();
+    const title = page.locator(".topbar .title strong");
+    await expect(title).toHaveText("Chiri Kitchen Mariahilf");
+    await expect.poll(() => title.evaluate((node) => node.scrollWidth <= node.parentElement.clientWidth)).toBe(true);
+    const [search, text, flags, bar] = [await page.locator("#searchBtn").boundingBox(), await title.boundingBox(), await page.locator(".topbar-end").boundingBox(), await page.locator(".topbar").boundingBox()];
+    expect(search.x + search.width).toBeLessThanOrEqual(text.x + 0.5);
+    expect(text.x + text.width).toBeLessThanOrEqual(flags.x + 0.5);
+    // At most two lines, inside the header.
+    expect(text.y).toBeGreaterThanOrEqual(bar.y);
+    expect(text.y + text.height).toBeLessThanOrEqual(bar.y + bar.height);
+    // Still a title, not a footnote.
+    expect(Number.parseFloat(await title.evaluate((node) => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(16);
   });
 
   test("the title stays on one line beside three flags", async ({ page }) => {

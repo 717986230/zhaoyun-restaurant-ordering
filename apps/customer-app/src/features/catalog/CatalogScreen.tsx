@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, LANGUAGE_INFO } from "@zhaoyun/domain";
 import type { DishPart, MenuLanguage, Product } from "@zhaoyun/domain";
@@ -32,9 +32,9 @@ interface Props {
  * every duration goes through `useReducedMotion` below instead.
  */
 const EASE = [0.2, 0.8, 0.2, 1] as const;
-const DURATION = { backdrop: 0.2, card: 0.3, page: 0.34 };
+const DURATION = { backdrop: 0.2, card: 0.32, page: 0.46 };
 /** The card turns like a card: quick off the mark, settling without a wobble. */
-const FLIP_SPRING = { type: "spring", stiffness: 210, damping: 26, mass: 0.9 } as const;
+const FLIP_SPRING = { type: "spring", stiffness: 150, damping: 22, mass: 1 } as const;
 
 function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
   return names[language] || names.de || names.en;
@@ -74,10 +74,52 @@ function ProductMedia({ product, size = "feature" }: { product: Product; size?: 
   />;
 }
 
-/** Whose photo it is, when it is not the restaurant's own. */
-function PhotoCredit({ product }: { product: Product }) {
-  const credit = product.media[0]?.credit;
-  return credit ? <small className="photo-credit">📷 {credit}</small> : null;
+/**
+ * The restaurant's title, as large as the header allows and never larger.
+ *
+ * The owner names it, so it can be "La Carte" or "Chiri Kitchen" or longer;
+ * a fixed size either wastes the header or runs into the search button and
+ * the flags. This measures the space between them and shrinks the type until
+ * the name fits, again whenever the screen turns or the name changes.
+ */
+function FitTitle({ text }: { text: string }) {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const title = ref.current;
+    const room = title?.parentElement;
+    if (!title || !room) return;
+    const fit = () => {
+      title.style.fontSize = "";
+      title.dataset.wrap = "false";
+      const available = room.clientWidth;
+      const needed = title.scrollWidth;
+      if (!available || needed <= available) return;
+      const natural = Number.parseFloat(getComputedStyle(title).fontSize);
+      const oneLine = Math.floor(natural * (available / needed) * 0.97);
+      if (oneLine >= 18) {
+        title.style.fontSize = `${oneLine}px`;
+        return;
+      }
+      // Too long for one line at a size anyone can read: two lines instead.
+      title.dataset.wrap = "true";
+      title.style.fontSize = `${Math.max(15, Math.min(Math.floor(natural * 0.62), Math.floor(natural * ((2 * available) / needed) * 0.85)))}px`;
+    };
+    fit();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+    observer?.observe(room);
+    void document.fonts?.ready.then(fit);
+    return () => observer?.disconnect();
+  }, [text]);
+  return <strong ref={ref}>{text}</strong>;
+}
+
+/** Line icons for the light/dark switch; the ☀ ☾ glyphs look different on every phone. */
+function SunIcon() {
+  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></svg>;
+}
+
+function MoonIcon() {
+  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2z" /></svg>;
 }
 
 /**
@@ -190,18 +232,17 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
           it is turning reverses it from where it is instead of jumping. */}
       <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}
         initial={false}
-        animate={{ rotateY: state.productFlipped ? 180 : 0, scale: reduceMotion ? 1 : [1, 0.94, 1] }}
-        transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP_SPRING, scale: { duration: 0.5, times: [0, 0.45, 1], ease: EASE } }}>
+        animate={{ rotateY: state.productFlipped ? 180 : 0, scale: reduceMotion ? 1 : [1, 0.86, 1] }}
+        transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP_SPRING, scale: { duration: 0.62, times: [0, 0.45, 1], ease: EASE } }}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
             <span className="number">{product.sku}</span><span className="cat">{product.category}</span>
             <h3>{productName(product, state.language)}</h3>{secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}
           </div>
           <div className="detail-scroll">
-            <div className="feature">
-              <figure className="feature-media"><ProductMedia product={product} /><PhotoCredit product={product} /></figure>
-              <div><p>{product.description}</p></div>
-            </div>
+            {/* The photo takes the whole width. The description is on the
+                back with the rest of the facts, and so is the photo credit. */}
+            <figure className="feature-media"><ProductMedia product={product} /></figure>
             <DishOptions product={product} language={state.language} />
             <BundleContents product={product} products={products} language={state.language} />
             <div className="meta"><span>{product.details.time}</span><span>{product.details.people}</span><span>{product.details.level}</span></div>
@@ -224,6 +265,7 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
                 : "—"}</dd></div>
               <div><dt>{t(state.language, "time")}</dt><dd>{product.details.time}</dd></div>
               <div><dt>{t(state.language, "portion")}</dt><dd>{product.details.people} · {product.details.level}</dd></div>
+              {product.media[0]?.credit && <div className="photo-credit-row"><dt>{t(state.language, "photo")}</dt><dd className="photo-credit">{product.media[0].credit}</dd></div>}
             </dl>
           </div>
         </section>
@@ -282,9 +324,11 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
     chip?.scrollIntoView?.({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
   }, [state.category, reduceMotion]);
 
+  // The new page swings in like a leaf of a book hinged at its top edge,
+  // from below for the next page and from above for the previous one.
   const enter = reduceMotion || turn.current.direction === 0
     ? { opacity: 0 }
-    : { opacity: 0, y: 44 * turn.current.direction, rotateX: -7 * turn.current.direction };
+    : { opacity: 0, y: 70 * turn.current.direction, rotateX: -24 * turn.current.direction, scale: 0.94 };
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
@@ -293,7 +337,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
           seconds. On the web it opens admin.html, which asks for the password;
           in the Android kiosk shell it asks for the kiosk PIN first. */}
       <div className="title" role="button" tabIndex={0} onClick={() => void onAdminTap()} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") void onAdminTap(); }}>
-        <strong>{title}</strong>{showTableNumber && table && <small>{t(state.language, "tableLabel").replace("{table}", table)}</small>}
+        <FitTitle text={title} />{showTableNumber && table && <small>{t(state.language, "tableLabel").replace("{table}", table)}</small>}
       </div>
       <div className="topbar-end">
         {/* A flag per language the restaurant switched on, and none when there
@@ -309,7 +353,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
           className="icon-btn scheme-toggle"
           aria-label={t(state.language, scheme === "dark" ? "lightMode" : "darkMode")}
           onClick={onToggleScheme}
-        >{scheme === "dark" ? "☀" : "☾"}</button>
+        >{scheme === "dark" ? <SunIcon /> : <MoonIcon />}</button>
       </div>
     </header>
     <div id="searchBox" className={`search-box ${state.searchOpen ? "open" : ""}`}>
@@ -320,15 +364,21 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
     <div id="stack" ref={stackRef} className="stack">
       <div ref={sheetRef} className="page-sheet">
         {prevPage && <p className="page-hint page-hint-prev" aria-hidden="true"><i /><span className="page-hint-idle">↑ {t(state.language, "prevPage")} · {pageName(prevPage)}</span><span className="page-hint-armed">{t(state.language, "releaseToTurn")} · {pageName(prevPage)}</span></p>}
-        <motion.div key={`${state.category}|${query}`} className="stack-page"
+        <motion.div key={`${state.category}|${query}`} className={`stack-page ${turn.current.direction ? "turned" : ""}`}
           initial={enter}
-          animate={{ opacity: 1, y: 0, rotateX: 0 }}
+          animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
-          {visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
+          {visible.length ? visible.map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
             <div className="summary">
               <ProductMedia product={product} size="thumb" />
-              <span className="number">{product.sku}</span>
-              <div><h3>{productName(product, state.language)}</h3>{secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}</div>
+              {/* The code sits on its own small line above the name: drink
+                  codes like BEER-NONALC are far wider than R1, and in a
+                  column of their own they ran into the name. */}
+              <div className="row-text">
+                <span className="number">{product.sku}</span>
+                <h3>{productName(product, state.language)}</h3>
+                {secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}
+              </div>
               {/* A menu without prices sends a guest into every dish to find one. */}
               <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
             </div>
@@ -336,7 +386,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
           {nextPage && <button type="button" className="page-next" onClick={() => turnTo(nextPage)}>
             <i className="page-next-progress" aria-hidden="true" />
             <span className="page-next-label"><b>{t(state.language, "nextPage")} · {pageName(nextPage)}</b><small className="page-hint-idle">{t(state.language, "pullForNext")}</small><small className="page-hint-armed">{t(state.language, "releaseToTurn")}</small></span>
-            <span className="page-next-arrow" aria-hidden="true">↓</span>
+            <span className="page-next-arrow" aria-hidden="true">→</span>
           </button>}
           {paging && !nextPage && visible.length > 0 && <p className="page-end">{t(state.language, "endOfMenu")}</p>}
         </motion.div>
