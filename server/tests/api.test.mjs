@@ -26,7 +26,7 @@ test("catalog, orders, service requests and print routing work together", async 
   const catalog = await app.inject({ method: "GET", url: "/api/catalog" });
   assert.equal(catalog.statusCode, 200);
   const catalogProducts = catalog.json().products;
-  assert.equal(catalogProducts.length, 111);
+  assert.equal(catalogProducts.length, 118, "111 dishes and 7 set menus");
   assert.ok(catalogProducts.some((product) => product.sku === "R1" && product.category === "RAMEN"));
   assert.ok(catalogProducts.some((product) => product.sku === "N1-6" && product.kind === "sushi" && product.printStation === "sushi"));
   assert.ok(catalogProducts.some((product) => product.sku === "BEER-WIESEL-FASS" && product.kind === "drink" && product.printStation === "bar"));

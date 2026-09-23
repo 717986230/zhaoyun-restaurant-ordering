@@ -2,7 +2,34 @@ import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
 } from "@zhaoyun/contracts";
-import type { BundleItem, ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
+import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
+
+/**
+ * A product as the server sends it, as the apps work with it. One function
+ * for both apps: the admin console kept a copy that dropped `bundleItems`,
+ * so a set opened for editing looked empty and saving it emptied it.
+ */
+export function toProduct(product: ApiCatalogProduct): Product {
+  return {
+    id: String(product.id),
+    sku: product.sku,
+    kind: product.kind,
+    category: product.category,
+    names: product.names,
+    description: product.description,
+    priceCents: Math.round(product.price * 100),
+    vatPercent: product.vatPercent ?? (product.kind === "drink" ? 20 : 10),
+    allergens: product.allergens,
+    details: product.details,
+    appearance: product.appearance,
+    modifiers: product.modifiers ?? [],
+    bundleItems: product.bundleItems ?? [],
+    media: (product.media ?? []).map((media) => ({ ...media })),
+    available: product.available ?? true,
+    published: product.published ?? true,
+    printStation: product.printStation ?? (product.kind === "drink" ? "bar" : product.kind === "sushi" ? "sushi" : "kitchen")
+  };
+}
 
 export interface RestaurantApiOptions {
   baseUrl: () => string;

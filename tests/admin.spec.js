@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
+
+const require = createRequire(import.meta.url);
 
 // The board refetches after every mutation, so the stubbed list has to answer
 // with the status the stubbed PATCH just accepted. A fixture frozen at "new"
@@ -186,6 +190,10 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
 
   await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-list")).toContainText("黑椒牛柳");
+  // "套餐" lists the dishes that package others — none yet.
+  await page.locator(".filter-tabs").getByRole("button", { name: "套餐" }).click();
+  await expect(page.locator(".product-row")).toHaveCount(0);
+  await page.locator(".filter-tabs").getByRole("button", { name: "全部" }).click();
   // On a phone the list and the form take turns; the button opens a blank one.
   await page.getByRole("button", { name: "＋ 新增菜品" }).click();
 
@@ -193,17 +201,23 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
   await page.locator('input[name="nameZh"]').fill("双人套餐");
   await page.locator('input[name="price"]').fill("39.90");
 
-  // Same environment quirk the catalog-load test above works around on
-  // `.product-row`: this Chromium build reports elements on a long form as
-  // momentarily obstructed by a sibling field, though nothing actually
-  // overlaps them — `force` on every field below and on the submit matches
-  // that established workaround rather than chasing it per element.
+  // Dishes go in by search and a tap; each one then shows with its quantity.
   const picker = page.locator(".bundle-picker");
-  await expect(picker).toContainText("黑椒牛柳");
-  await expect(picker).toContainText("红酒");
-  await picker.locator(".bundle-picker-row", { hasText: "黑椒牛柳" }).locator('input[type="checkbox"]').check({ force: true });
-  await picker.locator(".bundle-picker-row", { hasText: "红酒" }).locator('input[type="checkbox"]').check({ force: true });
-  await picker.locator(".bundle-picker-row", { hasText: "红酒" }).locator('input[type="number"]').fill("2", { force: true });
+  await expect(picker.locator(".bundle-chosen")).toHaveCount(0);
+  await picker.locator(".bundle-search").fill("黑椒");
+  await expect(picker.locator(".bundle-option")).toHaveCount(1);
+  await picker.locator(".bundle-option", { hasText: "黑椒牛柳" }).click();
+  await picker.locator(".bundle-search").fill("");
+  await picker.locator(".bundle-option", { hasText: "红酒" }).click();
+  const chosen = picker.locator(".bundle-chosen li");
+  await expect(chosen).toHaveCount(2);
+  await expect(picker.locator(".bundle-option")).toHaveCount(0);
+  await chosen.filter({ hasText: "红酒" }).locator('input[type="number"]').fill("2");
+  // Taken out and put back: still one line per dish.
+  await chosen.filter({ hasText: "红酒" }).getByRole("button", { name: "从套餐移除" }).click();
+  await expect(chosen).toHaveCount(1);
+  await picker.locator(".bundle-option", { hasText: "红酒" }).click();
+  await chosen.filter({ hasText: "红酒" }).locator('input[type="number"]').fill("2");
 
   await page.getByRole("button", { name: "创建菜品" }).click({ force: true });
   await expect.poll(() => posted?.bundleItems).toEqual([
@@ -445,4 +459,96 @@ test("a dish goes onto the promotions page from its editor, and the page is swit
   await expect.poll(() => appSettings.featuredTitle).toBe("主厨套餐");
   await card.getByRole("button", { name: "移除" }).click();
   await expect.poll(() => appSettings.featuredProductIds).toEqual([]);
+});
+
+test("no admin screen is wider than the window, at any common width", async ({ page }) => {
+  // Hidden radios once took the page's full width, so the console scrolled
+  // sideways into empty space on every screen with the dish editor open.
+  // Measured against the width set here, not window.innerWidth: a phone-sized
+  // browser widens its layout to fit oversized content, which hides the bug.
+  let width = 0;
+  const fits = () => page.evaluate((limit) => document.scrollingElement.scrollWidth <= limit + 1, width);
+  for (width of [360, 768, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+    expect(await fits(), `dishes at ${width}px`).toBe(true);
+    await page.locator(".product-row").first().click({ force: true });
+    expect(await fits(), `dish editor at ${width}px`).toBe(true);
+    await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+    expect(await fits(), `settings at ${width}px`).toBe(true);
+  }
+});
+
+test("the menu's QR code downloads as a PNG that a phone can scan", async ({ page }) => {
+  await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
+  await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
+    { table: "12", label: "窗边", token: "tok-12-secret", enabled: true }
+  ] }) }));
+  await page.goto("/admin.html");
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+
+  /** The downloaded file, decoded in the page by a real QR reader. */
+  const scan = async (trigger) => {
+    const [download] = await Promise.all([page.waitForEvent("download"), trigger()]);
+    const bytes = readFileSync(await download.path());
+    expect(bytes.subarray(1, 4).toString()).toBe("PNG");
+    const text = await page.evaluate(async (base64) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${base64}`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      return window.jsQR(pixels.data, pixels.width, pixels.height)?.data ?? null;
+    }, bytes.toString("base64"));
+    return { name: download.suggestedFilename(), text };
+  };
+  await page.addScriptTag({ path: require.resolve("jsqr/dist/jsQR.js") });
+
+  // The code has to carry exactly the link the console shows for that table.
+  const row = page.locator(".table-row", { hasText: "桌 12" });
+  const shown = await row.locator("code").textContent();
+  expect(shown).toContain("?table=12&k=tok-12-secret");
+
+  const menu = await scan(() => page.getByRole("button", { name: /下载菜单二维码/ }).click());
+  expect(menu.name).toBe("menu-qr.png");
+  expect(menu.text).toBe(shown.split("?")[0]);
+
+  const table = await scan(() => row.getByRole("button", { name: /二维码/ }).click());
+  expect(table.name).toBe("table-12-qr.png");
+  expect(table.text).toBe(shown);
+});
+
+test("a set opened for editing shows its dishes, and saving it keeps them", async ({ page }) => {
+  // The console once mapped products without their contents: a set opened
+  // empty, and pressing save wiped what it held.
+  const beef = {
+    id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
+    names: { zh: "黑椒牛柳", de: "Rinderfilet", en: "Beef Fillet" }, description: "",
+    price: 34.5, allergens: ["F"], details: { ingredients: "", time: "", people: "", level: "" },
+    appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: []
+  };
+  const set = { ...beef, id: "set-1", sku: "SET-1", category: "SET", names: { zh: "双人套餐", de: "Menü für zwei", en: "Set for Two" }, price: 39, bundleItems: [{ productId: "80", quantity: 2 }] };
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [beef, set] }) }));
+  let saved;
+  await page.route("**/api/admin/products/set-1", (route) => {
+    saved = route.request().postDataJSON();
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: set }) });
+  });
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+  // A set's thumbnail is its dishes, and "套餐" lists it.
+  await page.locator(".filter-tabs").getByRole("button", { name: "套餐" }).click();
+  await expect(page.locator(".product-row")).toHaveCount(1);
+  await page.locator(".product-row", { hasText: "双人套餐" }).click({ force: true });
+  const chosen = page.locator(".bundle-chosen li");
+  await expect(chosen).toHaveCount(1);
+  await expect(chosen).toContainText("黑椒牛柳");
+  await expect(chosen.locator('input[type="number"]')).toHaveValue("2");
+  await page.getByRole("button", { name: "保存修改" }).click({ force: true });
+  await expect.poll(() => saved?.bundleItems).toEqual([{ productId: "80", quantity: 2 }]);
 });

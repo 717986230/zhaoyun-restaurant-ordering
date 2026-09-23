@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, LANGUAGE_INFO } from "@zhaoyun/domain";
-import type { DishPart, MenuLanguage, Product } from "@zhaoyun/domain";
+import type { DishPart, FeaturedTemplateId, MenuLanguage, Product } from "@zhaoyun/domain";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
@@ -25,11 +25,18 @@ interface Props {
   /** Counts taps on the title; the seventh within four seconds opens the admin console. */
   onAdminTap: () => Promise<void>;
   /** The promotions page, when the owner switched it on and chose dishes. */
-  featured: { title: string; products: Product[] } | null;
+  featured: { title: string; products: Product[]; template: FeaturedTemplateId } | null;
 }
 
 /** The promotions page's place among the categories; no real category is called this. */
 export const FEATURED_PAGE = "__featured__";
+/** The set menus' page: every dish that packages others, whatever its category. */
+export const SETS_PAGE = "__sets__";
+
+/** A set menu is a dish made of other dishes; nothing else marks one. */
+export function isSet(product: Product): boolean {
+  return Boolean(product.bundleItems?.length);
+}
 
 /**
  * Shared with the `--ease-out` / `--dur-*` tokens in styles.css. The CSS
@@ -118,6 +125,54 @@ function FitTitle({ text }: { text: string }) {
   return <strong ref={ref}>{text}</strong>;
 }
 
+/** Time, portion and spice level — only those the kitchen filled in. */
+function facts(product: Product): string[] {
+  return [product.details.time, product.details.people, product.details.level].filter((fact): fact is string => Boolean(fact && fact.trim()));
+}
+
+type ProductIndex = Map<string, Product>;
+
+/** A set's dishes, in the order the owner packed them; a dish since removed is skipped. */
+function setContents(product: Product, byId: ProductIndex): Array<{ dish: Product; quantity: number }> {
+  return (product.bundleItems ?? []).flatMap((item) => {
+    const dish = byId.get(item.productId);
+    return dish ? [{ dish, quantity: item.quantity }] : [];
+  });
+}
+
+/**
+ * A dish's picture — and for a set, the dishes it is made of, side by side.
+ *
+ * A set is its contents: one photo of one plate says less about "2× gyoza,
+ * bulgogi, mapo tofu, 2× mochi" than the four of them together. So wherever
+ * a set is drawn — its row, its detail card, the promotions page — it is the
+ * same grid of up to four of its dishes, and a set of fewer than two known
+ * dishes falls back to its own picture.
+ */
+function DishPicture({ product, byId, size = "feature" }: { product: Product; byId: ProductIndex; size?: "feature" | "thumb" }) {
+  const dishes = setContents(product, byId).map(({ dish }) => dish);
+  if (dishes.length < 2) return <ProductMedia product={product} size={size} />;
+  const shown = dishes.slice(0, 4);
+  return <div className={`set-collage n${shown.length} ${size === "thumb" ? "set-collage-thumb" : ""}`} aria-label={shown.map((dish) => dish.names.de || dish.names.zh).join(", ")}>
+    {shown.map((dish) => <ProductMedia key={dish.id} product={dish} />)}
+    {dishes.length > 4 && <span className="set-collage-more">+{dishes.length - 4}</span>}
+  </div>;
+}
+
+/** What a set holds, one line per dish: its picture, how many, its name. */
+function SetList({ product, byId, language }: { product: Product; byId: ProductIndex; language: CustomerState["language"] }) {
+  const contents = setContents(product, byId);
+  if (!contents.length) return null;
+  return <div className="set-list">
+    <p className="set-list-heading">{t(language, "bundleIncludes")}</p>
+    <ul>{contents.map(({ dish, quantity }) => <li key={dish.id}>
+      <span className="set-list-thumb"><ProductMedia product={dish} size="thumb" /></span>
+      {quantity > 1 && <b className="set-list-qty">{quantity}×</b>}
+      <span className="set-list-name">{productName(dish, language)}</span>
+    </li>)}</ul>
+  </div>;
+}
+
 /** Line icons for the light/dark switch; the ☀ ☾ glyphs look different on every phone. */
 function SunIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></svg>;
@@ -147,6 +202,7 @@ function Deconstruction({ product, language, reduceMotion, showing }: { product:
   const name = (part: DishPart) => (language === "zh" ? part.zh : language === "en" ? part.en : part.de);
   const second = (part: DishPart) => (language === "de" ? part.zh : part.de);
 
+  if (!parts.length && !portions.length && !unattributed.length) return null;
   return <div className="dish-parts-block">
     <p className="parts-heading">{t(language, "parts")}</p>
     <ol className="dish-parts">{parts.map((part, index) => <motion.li className="dish-part" key={`${part.de}-${index}`}
@@ -192,29 +248,7 @@ function DishOptions({ product, language }: { product: Product; language: Custom
   </div>;
 }
 
-/**
- * A 套餐 (combo) is an ordinary product — its own name, price and photo — that
- * also names the existing dishes it bundles. `bundleItems` only carries ids
- * and quantities, so rendering it needs the full product list to look the
- * names up; a dish removed from the catalogue after a combo was built is
- * silently skipped rather than shown as a blank line.
- */
-function BundleContents({ product, products, language }: { product: Product; products: Product[]; language: CustomerState["language"] }) {
-  if (!product.bundleItems?.length) return null;
-  const byId = new Map(products.map((item) => [item.id, item]));
-  return <div className="bundle-items">
-    <p className="modifier-heading">{t(language, "bundleIncludes")}</p>
-    <ul className="bundle-items-list">
-      {product.bundleItems.map((item) => {
-        const dish = byId.get(item.productId);
-        if (!dish) return null;
-        return <li key={item.productId}>{item.quantity > 1 ? `${item.quantity}× ` : ""}{productName(dish, language)}</li>;
-      })}
-    </ul>
-  </div>;
-}
-
-function ProductDetail({ product, products, state, dispatch }: { product: Product; products: Product[]; state: CustomerState; dispatch: CustomerDispatch }) {
+function ProductDetail({ product, byId, state, dispatch }: { product: Product; byId: ProductIndex; state: CustomerState; dispatch: CustomerDispatch }) {
   const reduceMotion = useReducedMotion();
   const seconds = (value: number) => (reduceMotion ? 0 : value);
 
@@ -247,10 +281,10 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
           <div className="detail-scroll">
             {/* The photo takes the whole width. The description is on the
                 back with the rest of the facts, and so is the photo credit. */}
-            <figure className="feature-media"><ProductMedia product={product} /></figure>
+            <figure className="feature-media"><DishPicture product={product} byId={byId} /></figure>
             <DishOptions product={product} language={state.language} />
-            <BundleContents product={product} products={products} language={state.language} />
-            <div className="meta"><span>{product.details.time}</span><span>{product.details.people}</span><span>{product.details.level}</span></div>
+            <SetList product={product} byId={byId} language={state.language} />
+            {facts(product).length > 0 && <div className="meta">{facts(product).map((fact) => <span key={fact}>{fact}</span>)}</div>}
           </div>
           <div className="detail-buy">
             <div className="buyline"><strong>{formatPrice(product.priceCents, state.language)}</strong></div>
@@ -260,7 +294,10 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
           <button className="flip-back" onClick={(event) => { event.stopPropagation(); dispatch({ type: "toggle-product-flip" }); }}>{t(state.language, "back")}</button>
           <div><small>{product.sku} · {t(state.language, "breakdown")}</small><h3>{productName(product, state.language)}</h3><p>{product.description}</p></div>
           <div className="detail-back-scroll" onClick={(event) => event.stopPropagation()}>
-            <Deconstruction product={product} language={state.language} reduceMotion={Boolean(reduceMotion)} showing={state.productFlipped} />
+            {/* A set is taken apart into its dishes; a dish into its ingredients. */}
+            {isSet(product)
+              ? <SetList product={product} byId={byId} language={state.language} />
+              : <Deconstruction product={product} language={state.language} reduceMotion={Boolean(reduceMotion)} showing={state.productFlipped} />}
             <dl>
               {/* The declared list stays whole and stays first among the facts:
                   it is the legal statement, and the breakdown above only
@@ -268,8 +305,8 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
               <div><dt>{t(state.language, "allergens")}</dt><dd>{product.allergens.length
                 ? <span className="allergen-list">{product.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, state.language)}>{code} {allergenLabel(code, state.language)}</b>)}</span>
                 : "—"}</dd></div>
-              <div><dt>{t(state.language, "time")}</dt><dd>{product.details.time}</dd></div>
-              <div><dt>{t(state.language, "portion")}</dt><dd>{product.details.people} · {product.details.level}</dd></div>
+              {product.details.time && <div><dt>{t(state.language, "time")}</dt><dd>{product.details.time}</dd></div>}
+              {(product.details.people || product.details.level) && <div><dt>{t(state.language, "portion")}</dt><dd>{[product.details.people, product.details.level].filter(Boolean).join(" · ")}</dd></div>}
               {product.media[0]?.credit && <div className="photo-credit-row"><dt>{t(state.language, "photo")}</dt><dd className="photo-credit">{product.media[0].credit}</dd></div>}
             </dl>
           </div>
@@ -283,50 +320,47 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
  * The promotions page: set menus and signature dishes, first in the menu and
  * unlike the rest of it.
  *
- * Where a category is a list to scan, this is a small gallery to linger on:
- * one dish to a card, the photo edge to edge with the name set on it, the
- * set's contents spelled out, the price on a rule of its own. Elegance by
- * depth and restraint — a darker room, pearl type, fine lines, space — and
- * not by gold, which the palette rules out on purpose.
+ * One markup for all ten designs the owner can pick from; each design is a
+ * CSS block in styles.css under `.featured-page[data-template="…"]`, so a new
+ * design never touches this component. That is why a few things are written
+ * twice — the name on the photo and in the text, the price in the caption and
+ * in the footer: every design shows the one that suits it and hides the other.
+ * Elegance by depth and restraint — a darker room, pearl type, fine lines —
+ * and not by gold, which the palette rules out on purpose.
  */
-function FeaturedPage({ title, products, allProducts, language, onOpen }: { title: string; products: Product[]; allProducts: Product[]; language: CustomerState["language"]; onOpen: (id: string) => void }) {
-  const byId = useMemo(() => new Map(allProducts.map((product) => [product.id, product])), [allProducts]);
-  const collage = (product: Product) => (product.bundleItems ?? []).flatMap((item) => {
-    const dish = byId.get(item.productId);
-    return dish && dish.media.length ? [dish] : [];
-  });
-  return <div className="featured-page">
+function FeaturedPage({ title, eyebrow, template, products, byId, language, onOpen }: { title: string; eyebrow: string; template: FeaturedTemplateId; products: Product[]; byId: ProductIndex; language: CustomerState["language"]; onOpen: (id: string) => void }) {
+  return <div className="featured-page" data-template={template}>
     <header className="featured-hero">
-      <p className="featured-eyebrow">✦ {t(language, "featuredEyebrow")} ✦</p>
-      <h2>{title || t(language, "featuredDefault")}</h2>
+      <p className="featured-eyebrow">✦ {eyebrow} ✦</p>
+      <h2>{title}</h2>
       <p className="featured-rule" aria-hidden="true"><i /></p>
     </header>
     <div className="featured-grid">{products.map((product, index) => {
+      const number = String(index + 1).padStart(2, "0");
+      const name = productName(product, language);
       const second = secondaryName(product, language);
-      const contents = (product.bundleItems ?? []).flatMap((item) => {
-        const dish = byId.get(item.productId);
-        return dish ? [`${item.quantity > 1 ? `${item.quantity}× ` : ""}${productName(dish, language)}`] : [];
-      });
+      const price = formatPrice(product.priceCents, language);
       return <article key={product.id} className="featured-card" data-id={product.id} style={{ "--row": Math.min(index, 11) } as React.CSSProperties} role="button" tabIndex={0}
         onClick={() => onOpen(product.id)}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(product.id); } }}>
         <div className="featured-photo">
-          {/* A set with no photo of its own is shown as what it is: its dishes, side by side. */}
-          {!product.media.length && collage(product).length > 1
-            ? <div className={`featured-collage n${Math.min(collage(product).length, 4)}`}>{collage(product).slice(0, 4).map((dish) => <ProductMedia key={dish.id} product={dish} />)}</div>
-            : <ProductMedia product={product} />}
+          <DishPicture product={product} byId={byId} />
           <div className="featured-caption">
-            <span className="featured-number">{String(index + 1).padStart(2, "0")}</span>
-            <h3>{productName(product, language)}</h3>
+            <span className="featured-number">{number}</span>
+            <h3>{name}</h3>
+            <span className="featured-caption-price">{price}</span>
           </div>
         </div>
         <div className="featured-body">
+          <span className="featured-number featured-body-number">{number}</span>
+          <h3 className="featured-name">{name}</h3>
           {second && <p className="featured-second">{second}</p>}
           {product.description && <p className="featured-description">{product.description}</p>}
-          {contents.length > 0 && <p className="featured-contents"><span>{t(language, "bundleIncludes")}</span>{contents.join(" · ")}</p>}
+          <SetList product={product} byId={byId} language={language} />
           <div className="featured-foot">
             <span className="featured-view">{t(language, "featuredView")} →</span>
-            <strong className="featured-price">{formatPrice(product.priceCents, language)}</strong>
+            <i className="featured-leader" aria-hidden="true" />
+            <strong className="featured-price">{price}</strong>
           </div>
         </div>
       </article>;
@@ -338,13 +372,20 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
-  const visible = products.filter((product) => {
-    const categoryMatch = state.category === "ALLE" || state.category === FEATURED_PAGE || product.category === state.category;
+  // Set menus have a page of their own and stay out of "all" and the
+  // categories, so a guest looking for a dish does not wade through bundles.
+  const byId = useMemo<ProductIndex>(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const sets = useMemo(() => products.filter(isSet), [products]);
+  const dishes = useMemo(() => products.filter((product) => !isSet(product)), [products]);
+  const onSets = sets.length > 0 && state.category === SETS_PAGE && !query;
+  // A search looks through everything, sets included; a page shows its own.
+  const visible = (query ? products : dishes).filter((product) => {
+    const categoryMatch = query || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE || product.category === state.category;
     const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category].join(" ").toLowerCase();
     return categoryMatch && (!query || text.includes(query));
   });
   // The promotions page, when there is one, is the first page of the menu.
-  const categories = [...(featured ? [FEATURED_PAGE] : []), "ALLE", ...new Set(products.map((product) => product.category))];
+  const categories = [...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))];
   const activeProduct = products.find((product) => product.id === state.activeProductId);
   const table = assignedTableNo();
   const reduceMotion = useReducedMotion();
@@ -356,6 +397,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
   const prevPage = paging && pageIndex > 0 ? categories[pageIndex - 1] : undefined;
   const pageName = (category: string) => (category === FEATURED_PAGE
     ? `✦ ${featured?.title || t(state.language, "featuredDefault")}`
+    : category === SETS_PAGE ? t(state.language, "setsPage")
     : category === "ALLE" ? t(state.language, "allCategories") : category);
 
   // A guest's first look this visit is the promotions page, when there is one.
@@ -371,8 +413,9 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
   }, [Boolean(featured)]);
   // Switched off while a guest was on it: back to everything.
   useEffect(() => {
-    if (!featured && state.category === FEATURED_PAGE) dispatch({ type: "category", category: "ALLE" });
-  }, [featured, state.category, dispatch]);
+    if (!categories.includes(state.category)) dispatch({ type: "category", category: "ALLE" });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories.join("|"), state.category, dispatch]);
 
   const stackRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -411,7 +454,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
     ? { opacity: 0 }
     : { opacity: 0, y: 70 * turn.current.direction, rotateX: -24 * turn.current.direction, scale: 0.94 };
 
-  return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""} ${onFeatured ? "on-featured" : ""}`}>
+  return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""} ${onFeatured || onSets ? "on-featured" : ""} ${state.searchOpen ? "search-open" : ""}`} data-featured-template={onFeatured ? featured?.template : onSets ? "framed" : undefined}>
     <header className="topbar">
       <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
       {/* The hidden way into the admin console: seven taps within four
@@ -441,7 +484,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
       <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={t(state.language, "searchPlaceholder")} autoFocus={state.searchOpen} />
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
-    <nav id="chips" ref={chipsRef} className="chips">{categories.map((category) => <button key={category} className={`chip ${category === FEATURED_PAGE ? "chip-featured" : ""} ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}</nav>
+    <nav id="chips" ref={chipsRef} className="chips">{categories.map((category) => <button key={category} className={`chip ${category === FEATURED_PAGE ? "chip-featured" : ""} ${category === SETS_PAGE ? "chip-sets" : ""} ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}</nav>
     <div id="stack" ref={stackRef} className="stack">
       <div ref={sheetRef} className="page-sheet">
         {prevPage && <p className="page-hint page-hint-prev" aria-hidden="true"><i /><span className="page-hint-idle">↑ {t(state.language, "prevPage")} · {pageName(prevPage)}</span><span className="page-hint-armed">{t(state.language, "releaseToTurn")} · {pageName(prevPage)}</span></p>}
@@ -449,9 +492,11 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
           initial={enter}
           animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
-          {onFeatured && featured ? <FeaturedPage title={featured.title} products={featured.products} allProducts={products} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} /> : visible.length ? visible.map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
+          {onFeatured && featured ? <FeaturedPage title={featured.title || t(state.language, "featuredDefault")} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
+            : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
+            : visible.length ? visible.map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
             <div className="summary">
-              <ProductMedia product={product} size="thumb" />
+              <DishPicture product={product} byId={byId} size="thumb" />
               {/* The code sits on its own small line above the name: drink
                   codes like BEER-NONALC are far wider than R1, and in a
                   column of their own they ran into the name. */}
@@ -473,6 +518,6 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
         </motion.div>
       </div>
     </div>
-    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} products={products} state={state} dispatch={dispatch} />}</AnimatePresence>
+    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} byId={byId} state={state} dispatch={dispatch} />}</AnimatePresence>
   </section>;
 }

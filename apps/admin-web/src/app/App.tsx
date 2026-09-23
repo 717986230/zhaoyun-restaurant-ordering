@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AdminApi } from "@zhaoyun/api-client";
+import { AdminApi, toProduct } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
 import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
@@ -16,22 +16,6 @@ import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 
 const adminApi = new AdminApi();
-
-function mapProduct(product: ApiCatalogProduct): Product {
-  return {
-    id: String(product.id), sku: product.sku, kind: product.kind, category: product.category,
-    names: product.names, description: product.description, priceCents: Math.round(product.price * 100),
-    vatPercent: product.vatPercent ?? (product.kind === "drink" ? 20 : 10),
-    allergens: product.allergens, details: product.details, appearance: product.appearance, modifiers: product.modifiers ?? [],
-    media: (product.media ?? []).map((media) => ({
-      ...(media.id ? { id: media.id } : {}), type: media.type, url: media.url,
-      ...(media.posterUrl !== undefined ? { posterUrl: media.posterUrl } : {}),
-      ...(media.sortOrder !== undefined ? { sortOrder: media.sortOrder } : {})
-    })),
-    available: product.available ?? true, published: product.published ?? true,
-    printStation: product.printStation ?? (product.kind === "drink" ? "bar" : product.kind === "sushi" ? "sushi" : "kitchen")
-  };
-}
 
 const initialState: AdminState = {
   tab: "catalog", role: null,
@@ -107,7 +91,7 @@ export function App() {
           role,
           connected: true,
           connectionError: null,
-          products: catalog.products.map(mapProduct),
+          products: catalog.products.map(toProduct),
           printers: printerList.printers,
           settings: settings ?? current.settings,
           tab: tabs.includes(current.tab) ? current.tab : tabs[0] ?? "board"
@@ -283,7 +267,7 @@ export function App() {
     try {
       const { product } = await adminApi.duplicateProduct(id);
       await connect();
-      setState((current) => ({ ...current, editingProduct: mapProduct(product) }));
+      setState((current) => ({ ...current, editingProduct: toProduct(product) }));
       notify(t("productDuplicated"));
     } catch (error) { failed(error, "saveFailed"); }
   }

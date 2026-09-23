@@ -425,10 +425,16 @@ test.describe("the promotions page", () => {
       const cards = page.locator(".featured-card");
       await expect(cards).toHaveCount(2);
       await expect(cards.nth(0)).toContainText("双人套餐");
-      await expect(cards.nth(0).locator(".featured-number")).toHaveText("01");
+      await expect(cards.nth(0).locator(".featured-caption .featured-number")).toHaveText("01");
       // A set spells out what it holds.
-      await expect(cards.nth(0).locator(".featured-contents")).toContainText("黑椒牛柳");
-      await expect(cards.nth(0).locator(".featured-contents")).toContainText("2× 蔬菜拉面");
+      // One line per dish in the set, each with its own picture.
+      const contents = cards.nth(0).locator(".set-list li");
+      await expect(contents).toHaveCount(2);
+      await expect(contents.nth(0)).toContainText("黑椒牛柳");
+      await expect(contents.nth(1)).toHaveText(/2×\s*蔬菜拉面/);
+      await expect(contents.nth(1).locator(".set-list-thumb")).toBeVisible();
+      // And the set's picture is its dishes, side by side.
+      await expect(cards.nth(0).locator(".featured-photo .set-collage > *")).toHaveCount(2);
       await expect(cards.nth(1)).toContainText("黑椒牛柳");
     });
 
@@ -436,6 +442,9 @@ test.describe("the promotions page", () => {
       await page.locator(".featured-card").nth(1).click();
       await expect(page.locator(".dish-detail-card")).toContainText("黑椒牛柳");
       await page.getByRole("button", { name: "关闭详情" }).click();
+      // The page after the promotions is the set menus, then everything else.
+      await page.locator(".page-next").click();
+      await expect(page.locator(".chip.on")).toHaveText("套餐");
       await page.locator(".page-next").click();
       await expect(page.locator(".chip.on")).toHaveText("全部");
       await expect(page.locator(".menu.on-featured")).toHaveCount(0);
@@ -456,9 +465,10 @@ test.describe("the promotions page", () => {
 
   test("is not there when switched off, or when none of its dishes are on the menu", async ({ page }) => {
     await withFeatured(null)({ page });
-    await expect(page.locator(".chip").first()).toHaveText("全部");
+    await expect(page.locator(".chip-featured")).toHaveCount(0);
+    await expect(page.locator(".chip.on")).toHaveText("全部");
     await withFeatured({ title: "", productIds: ["gone-from-the-menu"] })({ page });
-    await expect(page.locator(".chip").first()).toHaveText("全部");
+    await expect(page.locator(".chip-featured")).toHaveCount(0);
     await expect(page.locator(".featured-page")).toHaveCount(0);
   });
 });
@@ -499,13 +509,16 @@ test.describe("the menu turns its pages", () => {
   });
 
   test("the first page cannot be pulled back past, and the last says it is the end", async ({ page }) => {
+    // The set menus come before everything else; pulling back from "all" reaches them.
     await drag(page, 300, 600);
-    await expect(onChip(page)).toHaveText("全部");
-    await page.getByRole("button", { name: "SET", exact: true }).click();
+    await expect(onChip(page)).toHaveText("套餐");
+    await drag(page, 300, 600);
+    await expect(onChip(page)).toHaveText("套餐");
+    await page.getByRole("button", { name: "RAMEN", exact: true }).click();
     await expect(page.locator(".page-next")).toHaveCount(0);
     await expect(page.locator(".page-end")).toHaveText("菜单到底了");
     await drag(page, 600, 300);
-    await expect(onChip(page)).toHaveText("SET");
+    await expect(onChip(page)).toHaveText("RAMEN");
   });
 
   test("a search is one page, with nothing to turn to", async ({ page }) => {
@@ -528,10 +541,13 @@ test("the header shows no table number the guest was never given, and nothing in
   // show; the placeholder "08" used to appear as if it were real.
   await expect(page.locator(".topbar .title small")).toHaveCount(0);
   await expect(page.getByText(/TISCH/)).toHaveCount(0);
-  // The "all" chip speaks the guest's language.
-  await expect(page.locator(".chip").first()).toHaveText("全部");
+  // The "all" chip speaks the guest's language (the set menus' page comes before it).
+  const allChip = page.locator(".chip:not(.chip-sets):not(.chip-featured)").first();
+  await expect(allChip).toHaveText("全部");
+  await expect(page.locator(".chip-sets")).toHaveText("套餐");
   await page.getByRole("button", { name: "English" }).click();
-  await expect(page.locator(".chip").first()).toHaveText("All");
+  await expect(allChip).toHaveText("All");
+  await expect(page.locator(".chip-sets")).toHaveText("Set menus");
   await page.locator("#searchBtn").click();
   await expect(page.locator("#searchInput")).toHaveAttribute("placeholder", "Search dish or number");
 });
@@ -596,14 +612,35 @@ test("a part never carries an allergen the dish does not declare", async ({ page
   expect(letters).toEqual(["D"]);
 });
 
+test("set menus have a page of their own, apart from the dishes", async ({ page }) => {
+  // "All" is the dishes; a set is not one of them.
+  await expect(page.locator(".chip.on")).toHaveText("全部");
+  await expect(page.locator(".dish-card", { hasText: "双人套餐" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "SET", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "套餐", exact: true }).click();
+  const set = page.locator(".featured-card", { hasText: "双人套餐" });
+  await expect(set).toBeVisible();
+  await expect(page.locator(".featured-page")).toHaveAttribute("data-template", "framed");
+  await expect(set.locator(".set-list li")).toHaveCount(2);
+  await expect(set.locator(".set-collage")).toBeVisible();
+  await expect(page.locator(".featured-card")).toHaveCount(1);
+  // A search still looks through everything.
+  await page.locator("#searchBtn").click();
+  await page.locator("#searchInput").fill("套餐");
+  await expect(page.locator(".dish-card", { hasText: "双人套餐" })).toBeVisible();
+});
+
 test("a combo names the dishes it packages, not just its own price", async ({ page }) => {
-  await page.locator(".dish-card", { hasText: "双人套餐" }).click();
-  const bundle = page.locator(".bundle-items");
+  await page.getByRole("button", { name: "套餐", exact: true }).click();
+  await page.locator(".featured-card", { hasText: "双人套餐" }).click();
+  const bundle = page.locator(".dish-detail-card .detail-front .set-list");
   await expect(bundle).toBeVisible();
-  await expect(bundle).toContainText("黑椒牛柳");
+  await expect(bundle.locator("li")).toHaveCount(2);
   // Quantities above one are shown; the singular dish is not prefixed with "1×".
-  await expect(bundle).toContainText("2× 蔬菜拉面");
-  await expect(bundle.getByText("黑椒牛柳", { exact: true })).toBeVisible();
+  await expect(bundle.locator("li").nth(1)).toHaveText(/2×\s*蔬菜拉面/);
+  await expect(bundle.locator("li").nth(0).locator(".set-list-qty")).toHaveCount(0);
+  // The detail card's picture is the set's dishes.
+  await expect(page.locator(".dish-detail-card .feature-media .set-collage > *")).toHaveCount(2);
 });
 
 test.describe("a restaurant that has not switched Chinese on", () => {

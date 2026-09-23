@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 import { dishPhotos } from "./dish-photos.mjs";
+import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
   adminGateView, assertPassword, auditView, billView, hashPassword,
@@ -947,7 +948,27 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return row ? { contentType: row.content_type, bytes: Buffer.from(row.bytes) } : null;
   }
 
+  /**
+   * The starting set menus, once. The marker, not the products, records that
+   * it happened, so a set the owner deletes is not put back on the next start.
+   */
+  function seedSetMenus() {
+    if (statements.allAppSettings.all().some((row) => row.key === SET_MENU_SEED_KEY)) return;
+    db.exec("BEGIN");
+    try {
+      for (const set of setMenuProducts(listProducts(false))) {
+        if (!statements.productById.get(set.id) && !statements.productBySku.get(set.sku)) saveProduct(set);
+      }
+      statements.setAppSetting.run(SET_MENU_SEED_KEY, "true", now());
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   seed();
+  seedSetMenus();
   seedPhotos();
 
   return {

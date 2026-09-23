@@ -7,6 +7,8 @@ import {
 import type { CreateOrderCommand, CreateServiceRequestCommand, OrderStatus, ServiceStatus } from "../src/index";
 import type { AdminProductInput } from "../../api-client/src/index";
 import { MENU_THEME_IDS } from "../../domain/src/themes";
+import { FEATURED_TEMPLATE_IDS } from "../../domain/src/featured";
+import { FEATURED_TEMPLATES as RULE_FEATURED_TEMPLATES } from "../../../shared/rules.mjs";
 import { MENU_LANGUAGES as RULE_MENU_LANGUAGES } from "../../../shared/rules.mjs";
 
 /**
@@ -82,6 +84,12 @@ describe("Wire contract parity", () => {
     expect([...MENU_THEMES]).toEqual([...MENU_THEME_IDS]);
     for (const menuTheme of MENU_THEME_IDS) expect(Value.Check(SettingsBody, { menuTheme })).toBe(true);
     expect(Value.Check(SettingsBody, { menuTheme: "gold" })).toBe(false);
+  });
+
+  it("keeps the promotions templates identical between the rules, the schema and the admin's list", () => {
+    expect([...FEATURED_TEMPLATE_IDS]).toEqual([...RULE_FEATURED_TEMPLATES]);
+    for (const featuredTemplate of FEATURED_TEMPLATE_IDS) expect(Value.Check(SettingsBody, { featuredTemplate })).toBe(true);
+    expect(Value.Check(SettingsBody, { featuredTemplate: "neon" })).toBe(false);
   });
 
   it("keeps the menu languages identical between the wire schema and the shared rules", () => {

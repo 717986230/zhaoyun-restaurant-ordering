@@ -3,14 +3,8 @@ import type { RestaurantTable } from "@zhaoyun/api-client";
 import QRCode from "qrcode";
 import type { MenuLanguage } from "@zhaoyun/contracts";
 import { useI18n } from "../../app/i18n";
-
-/** What the card says to a guest, in each language the menu offers — the
- *  card is read by guests, not by whoever printed it. */
-const CARD_COPY: Record<MenuLanguage, { table: string; scan: string }> = {
-  zh: { table: "桌", scan: "扫码看菜单" },
-  de: { table: "Tisch", scan: "Speisekarte scannen" },
-  en: { table: "Table", scan: "Scan for the menu" }
-};
+// What the card says to a guest — the same words the downloadable PNG uses.
+import { CARD_COPY, downloadQrCard } from "../qr/qrCard";
 
 /**
  * Printable table cards.
@@ -89,6 +83,7 @@ export function TableCards({ tables, restaurantName, menuLanguages, entryUrl, on
         {table.label && <small>{table.label}</small>}
         <small className="table-card-hint">{menuLanguages.map((language) => CARD_COPY[language].scan).join(" · ")}</small>
       </div>
+      <button type="button" className="ghost-action table-card-download" onClick={() => void downloadQrCard({ url: entryUrl(table), restaurantName, menuLanguages, table: table.table, label: table.label })}>⬇ {t("downloadPng")}</button>
     </article>)}</div>
   </div>;
 }
