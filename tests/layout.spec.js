@@ -130,6 +130,31 @@ test("a page picked from the chips opens at its top, whichever side of it the gu
   }
 });
 
+test("far down a long page, one tap goes back to the top; the header and categories never scroll away", async ({ page }) => {
+  const stack = page.locator("#stack");
+  const toTop = page.getByRole("button", { name: "回到顶部" });
+  const header = async () => Promise.all([page.locator(".topbar").boundingBox(), page.locator("#chips").boundingBox()]);
+  const [topbarBefore, chipsBefore] = await header();
+  // Not at the top of the page: there is nowhere to go back to.
+  await expect(page.locator(".to-top")).not.toHaveClass(/\bon\b/);
+
+  await stack.evaluate((node) => { node.scrollTop = node.scrollHeight / 2; });
+  await expect(toTop).toBeVisible();
+  const [topbarAfter, chipsAfter] = await header();
+  expect(topbarAfter.y).toBe(topbarBefore.y);
+  expect(chipsAfter.y).toBe(chipsBefore.y);
+  // In the corner, inside the screen, clear of the header.
+  const button = await page.locator(".to-top").boundingBox();
+  const viewport = page.viewportSize();
+  expect(button.x + button.width).toBeLessThanOrEqual(viewport.width);
+  expect(button.y + button.height).toBeLessThanOrEqual(viewport.height);
+  expect(button.y).toBeGreaterThan(chipsAfter.y + chipsAfter.height);
+
+  await toTop.click();
+  await expect.poll(() => stack.evaluate((node) => node.scrollTop)).toBe(0);
+  await expect(page.locator(".to-top")).not.toHaveClass(/\bon\b/);
+});
+
 const TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];
 
 /** In one card: every visible piece of text inside the card, and none on another. */

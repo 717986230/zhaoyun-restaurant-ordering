@@ -510,6 +510,50 @@ test("on a computer the dishes page fits the window, and the long list scrolls i
   }
 });
 
+test("the header and tabs stay on screen, and a long page goes back to its top in one tap", async ({ page }) => {
+  const dish = (index) => ({
+    id: `dish-${index}`, sku: `D${index}`, kind: "food", category: "MAIN",
+    names: { zh: `菜品 ${index}`, de: `Gericht ${index}`, en: `Dish ${index}` }, description: "",
+    price: 10 + index, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" },
+    available: true, published: true, printStation: "kitchen", media: [], modifiers: []
+  });
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: Array.from({ length: 120 }, (_, index) => dish(index + 1)) }) }));
+  const toTop = page.getByRole("button", { name: "回到顶部" });
+  const tabs = page.getByRole("navigation", { name: "管理模块" });
+
+  // A phone: the whole page scrolls, under the header and the tabs.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.locator(".product-row")).toHaveCount(120);
+  await expect(page.locator(".back-to-top")).not.toHaveClass(/\bon\b/);
+  await page.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight / 2));
+  await expect(toTop).toBeVisible();
+  expect((await page.locator(".admin-head").boundingBox()).y).toBe(0);
+  await expect(tabs).toBeInViewport();
+  await toTop.click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+  // A computer: the dish list scrolls in its own box, and the button follows it there.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.reload();
+  await expect(page.locator(".product-row")).toHaveCount(120);
+  const list = page.locator(".product-list");
+  await list.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+  await expect(toTop).toBeVisible();
+  await toTop.click();
+  await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBe(0);
+  await expect(page.locator(".back-to-top")).not.toHaveClass(/\bon\b/);
+
+  // Settings is a long page too; the header stays while it scrolls.
+  await tabs.getByRole("button", { name: "设置", exact: true }).click();
+  await page.setViewportSize({ width: 1440, height: 600 });
+  await page.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight));
+  expect((await page.locator(".admin-head").boundingBox()).y).toBe(0);
+  await expect(tabs).toBeInViewport();
+  await expect(toTop).toBeVisible();
+});
+
 test("the menu's QR code downloads as a PNG that a phone can scan", async ({ page }) => {
   await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
   await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [

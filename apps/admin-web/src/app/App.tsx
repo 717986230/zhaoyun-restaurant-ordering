@@ -14,6 +14,7 @@ import { TablesPanel } from "../features/tables/TablesPanel";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
+import { BackToTop } from "./BackToTop";
 import { DEFAULT_TIME_ZONE } from "../../../../src/schedule.js";
 
 const adminApi = new AdminApi();
@@ -443,6 +444,8 @@ export function App() {
   const tabs = state.role ? tabsFor(state.role, state.settings?.showOrdering ?? false) : (["system"] as AdminTab[]);
 
   return <><div className="admin-shell">
+    {/* Who, where and the way out stay on screen however far down a page is. */}
+    <div className="admin-top">
     <header className="admin-head">
       <div className="admin-brand">
         <strong>{restaurantName || t("admin")}</strong>
@@ -455,8 +458,9 @@ export function App() {
         {state.role && <button className="head-action" onClick={() => void signOut()} aria-label={t("signOut")} title={t("signOut")}><SignOutIcon /><em>{t("signOut")}</em></button>}
       </div>
     </header>
-    <nav className="admin-tabs" aria-label={t("modules")}>{tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}</nav>
+    <nav className="admin-tabs" aria-label={t("modules")}>{tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}<BackToTop key={state.tab} label={t("backToTop")} /></nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
+    </div>
     <main>
       {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} timeZone={state.settings?.timeZone ?? DEFAULT_TIME_ZONE} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel

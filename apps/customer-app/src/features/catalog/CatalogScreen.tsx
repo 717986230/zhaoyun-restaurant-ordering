@@ -439,6 +439,21 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     if (category !== state.category) dispatch({ type: "category", category });
   }
 
+  // Back to the top of a long page in one tap, once the guest is more than a
+  // screen and a bit down it. Watched on the list's own scroller — the
+  // header and the category bar never scroll, so they need no help.
+  const [farDown, setFarDown] = useState(false);
+  useEffect(() => {
+    const stack = stackRef.current;
+    if (!stack) return;
+    let frame = 0;
+    const check = () => { frame = 0; setFarDown(stack.scrollTop > stack.clientHeight * 1.2); };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(check); };
+    stack.addEventListener("scroll", onScroll, { passive: true });
+    check();
+    return () => { stack.removeEventListener("scroll", onScroll); cancelAnimationFrame(frame); };
+  }, []);
+
   usePageTurn({
     scroller: stackRef,
     sheet: sheetRef,
@@ -528,6 +543,17 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
         </motion.div>
       </div>
     </div>
+    {/* Outside the list: the list is transformed while a page turns, and a
+        fixed button inside it would move with the page. */}
+    <button
+      type="button"
+      className={`to-top ${farDown && !activeProduct ? "on" : ""}`}
+      aria-label={t(state.language, "backToTop")}
+      title={t(state.language, "backToTop")}
+      aria-hidden={!farDown || Boolean(activeProduct)}
+      tabIndex={farDown && !activeProduct ? 0 : -1}
+      onClick={() => stackRef.current?.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })}
+    ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" /></svg></button>
     <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} byId={byId} state={state} dispatch={dispatch} />}</AnimatePresence>
   </section>;
 }
