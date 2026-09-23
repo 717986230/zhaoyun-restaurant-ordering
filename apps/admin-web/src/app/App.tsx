@@ -17,6 +17,18 @@ import { SettingsPanel } from "../features/settings/SettingsPanel";
 
 const adminApi = new AdminApi();
 
+/**
+ * The header's two icons, drawn rather than typed: "⏻" and friends are not in
+ * every phone's fonts, and a missing glyph is an empty circle nobody can read.
+ */
+function OpenIcon() {
+  return <svg className="head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
+}
+
+function SignOutIcon() {
+  return <svg className="head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" /></svg>;
+}
+
 const initialState: AdminState = {
   tab: "catalog", role: null,
   gate: { checking: true, configured: false, busy: false, error: null, reachable: true },
@@ -438,8 +450,8 @@ export function App() {
       </div>
       <div className="admin-head-actions">
         {languagePicker}
-        <button className="head-action" onClick={() => void openMenu()} aria-label={t("openMenu")} title={t("openMenu")}><span aria-hidden="true">↗</span><em>{t("openMenu")}</em></button>
-        {state.role && <button className="head-action" onClick={() => void signOut()} aria-label={t("signOut")} title={t("signOut")}><span aria-hidden="true">⏻</span><em>{t("signOut")}</em></button>}
+        <button className="head-action" onClick={() => void openMenu()} aria-label={t("openMenu")} title={t("openMenu")}><OpenIcon /><em>{t("openMenu")}</em></button>
+        {state.role && <button className="head-action" onClick={() => void signOut()} aria-label={t("signOut")} title={t("signOut")}><SignOutIcon /><em>{t("signOut")}</em></button>}
       </div>
     </header>
     <nav className="admin-tabs" aria-label={t("modules")}>{tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}</nav>

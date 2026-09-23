@@ -552,3 +552,21 @@ test("a set opened for editing shows its dishes, and saving it keeps them", asyn
   await page.getByRole("button", { name: "保存修改" }).click({ force: true });
   await expect.poll(() => saved?.bundleItems).toEqual([{ productId: "80", quantity: 2 }]);
 });
+
+test("the header fits on the narrowest phone, every button inside the screen and drawn", async ({ page }) => {
+  // The sign-out icon was a font glyph some Android phones do not have — an
+  // empty circle — and the header ran off the right edge of a phone.
+  for (const width of [320, 360, 412]) {
+    await page.setViewportSize({ width, height: 800 });
+    const buttons = page.locator(".admin-head .head-action");
+    await expect(buttons).toHaveCount(2);
+    for (const button of await buttons.all()) {
+      const box = await button.boundingBox();
+      expect(box.x + box.width, `a header button leaves a ${width}px screen`).toBeLessThanOrEqual(width);
+      const icon = await button.locator("svg").boundingBox();
+      expect(icon.width).toBeGreaterThan(10);
+    }
+    const flags = await page.locator(".admin-head .admin-languages").boundingBox();
+    expect(flags.x + flags.width).toBeLessThanOrEqual(width);
+  }
+});

@@ -176,6 +176,17 @@ button {
   font-style: normal;
 }
 
+.head-icon {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* The console's own language, as the guest menu's flag capsule. */
 .admin-languages {
   display: flex;
@@ -1215,11 +1226,36 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  /* Icons only: the words would push the restaurant's name off the line. */
+  /* Icons only, and everything a size smaller: the header is one line on the
+     narrowest phone, the restaurant's name giving way before any button does. */
+  .admin-head {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .admin-head-actions {
+    gap: 6px;
+  }
+
   .head-action {
-    width: 36px;
+    width: 34px;
+    min-height: 34px;
     padding: 0;
     justify-content: center;
+  }
+
+  .admin-languages button {
+    width: 30px;
+    height: 28px;
+  }
+
+  .admin-languages img {
+    width: 19px;
+    height: 13px;
+  }
+
+  .admin-brand strong {
+    font-size: 16px;
   }
 
   .head-action em {
