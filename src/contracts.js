@@ -123,7 +123,10 @@ export const SettingsBody = Type.Object({
   menuTitle: Type.Optional(Type.String({ minLength: 1, maxLength: 24 })),
   menuDefaultScheme: Type.Optional(literals(COLOR_SCHEMES)),
   showTableNumber: Type.Optional(Type.Boolean()),
-  showOrdering: Type.Optional(Type.Boolean())
+  showOrdering: Type.Optional(Type.Boolean()),
+  featuredEnabled: Type.Optional(Type.Boolean()),
+  featuredTitle: Type.Optional(Type.String({ maxLength: 32 })),
+  featuredProductIds: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { maxItems: 40 }))
 }, { minProperties: 1, additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces

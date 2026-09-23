@@ -8,7 +8,7 @@ import { dishPhotos } from "./dish-photos.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
   adminGateView, assertPassword, auditView, billView, hashPassword,
-  hashSessionToken, newSessionToken, normalizeBundleItems, normalizeSettingsInput,
+  duplicateInput, hashSessionToken, newSessionToken, normalizeBundleItems, normalizeSettingsInput,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
   tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
@@ -510,6 +510,24 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return rows.map((row) => mapProduct(row, media.get(row.id)));
   }
 
+  /** A new, unpublished dish with everything the original had, photos included. */
+  function duplicateProduct(id) {
+    const original = getProduct(id);
+    if (!original) return null;
+    db.exec("BEGIN");
+    try {
+      const copy = saveProduct(duplicateInput(original));
+      for (const media of original.media) {
+        statements.insertMedia.run(randomUUID(), copy.id, media.type, media.url, media.posterUrl || null, Number(media.sortOrder || 0), now());
+      }
+      db.exec("COMMIT");
+      return getProduct(copy.id);
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   function addMedia(productId, media) {
     if (!statements.productById.get(String(productId))) return null;
     const id = randomUUID();
@@ -939,6 +957,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     saveProduct,
     deleteProduct: (id) => statements.deleteProduct.run(String(id)).changes > 0,
     addMedia,
+    duplicateProduct,
     getMediaFile,
     deleteMedia: (id) => statements.deleteMedia.run(String(id)).changes > 0,
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),

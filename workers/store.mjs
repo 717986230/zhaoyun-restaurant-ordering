@@ -10,7 +10,7 @@
  */
 import {
   adminGateView, assertOrderTransition, assertPassword, assertRequestTransition, auditView,
-  billView, bool, boundedLimit, hashPassword, hashSessionToken, mapProduct, newSessionToken,
+  billView, bool, boundedLimit, duplicateInput, hashPassword, hashSessionToken, mapProduct, newSessionToken,
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
   printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
@@ -107,6 +107,20 @@ export function createStore(db) {
       );
     }
     return getProduct(product.id);
+  }
+
+  /** A new, unpublished dish with everything the original had, photos included. */
+  async function duplicateProduct(id) {
+    const original = await getProduct(id);
+    if (!original) return null;
+    const copy = await saveProduct(duplicateInput(original));
+    for (const media of original.media) {
+      await run(
+        "INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        uuid(), copy.id, media.type, media.url, media.posterUrl || null, Number(media.sortOrder || 0), now()
+      );
+    }
+    return getProduct(copy.id);
   }
 
   async function addMedia(productId, media) {
@@ -362,6 +376,7 @@ export function createStore(db) {
     saveProduct,
     deleteProduct: async (id) => (await run("DELETE FROM products WHERE id = ?", String(id))) > 0,
     addMedia,
+    duplicateProduct,
     getMediaFile,
     storeMedia,
     listOrders: async (limit = 100) => {

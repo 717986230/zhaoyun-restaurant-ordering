@@ -1643,3 +1643,96 @@ h2 {
   font-size: 17px;
   font-weight: 700;
 }
+
+/* Copy and "promotions page" sit together under the editor's title: the two
+   things done to a dish as a whole rather than to one of its fields. */
+.editor-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feature-toggle {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.feature-toggle.on {
+  border-color: var(--a-accent);
+  background: var(--a-accent);
+  color: var(--a-on-accent);
+}
+
+.feature-mark {
+  margin-right: 6px;
+  color: var(--a-accent);
+  font-style: normal;
+}
+
+.draft-mark {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  color: var(--a-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.featured-list {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.featured-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 10px;
+  background: var(--a-sunken);
+}
+
+.featured-index {
+  color: var(--a-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.featured-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.featured-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.featured-actions button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 8px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  cursor: pointer;
+}
+
+.featured-actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

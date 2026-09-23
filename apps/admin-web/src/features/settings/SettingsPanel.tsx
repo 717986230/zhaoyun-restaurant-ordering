@@ -2,6 +2,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
+import type { Product } from "@zhaoyun/domain";
 import { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES } from "@zhaoyun/domain";
 import { useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
@@ -10,6 +11,8 @@ import { TableCards } from "./TableCards";
 interface Props {
   storage: AdminStorage;
   settings: ApiSettings | null;
+  /** For the promotions card, which lists the chosen dishes by name. */
+  products: Product[];
   tables: RestaurantTable[];
   auditEntries: AuditEntry[];
   onSaveSettings: (change: Partial<ApiSettings>, done: CopyKey) => Promise<void>;
@@ -48,6 +51,33 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
     <input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     <span>{label}</span>
   </label>;
+}
+
+/** The promotions page's dishes, in the order a guest sees them. */
+function FeaturedList({ ids, products, onChange }: { ids: string[]; products: Product[]; onChange: (ids: string[]) => void }) {
+  const { t, language } = useI18n();
+  const byId = new Map(products.map((product) => [product.id, product]));
+  // A dish deleted since it was chosen is simply not listed, and drops out on the next save.
+  const shown = ids.filter((id) => byId.has(id));
+  if (!shown.length) return <p className="settings-hint">{t("featuredEmpty")}</p>;
+  const move = (index: number, by: number) => {
+    const next = [...shown];
+    const [item] = next.splice(index, 1);
+    next.splice(index + by, 0, item!);
+    onChange(next);
+  };
+  return <ol className="featured-list">{shown.map((id, index) => {
+    const product = byId.get(id)!;
+    return <li key={id}>
+      <span className="featured-index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="featured-name">{product.names[language] || product.names.zh || product.names.de}{!product.published && <em className="draft-mark">{t("draft")}</em>}</span>
+      <span className="featured-actions">
+        <button type="button" aria-label={t("moveUp")} disabled={index === 0} onClick={() => move(index, -1)}>↑</button>
+        <button type="button" aria-label={t("moveDown")} disabled={index === shown.length - 1} onClick={() => move(index, 1)}>↓</button>
+        <button type="button" aria-label={t("remove")} onClick={() => onChange(shown.filter((item) => item !== id))}>✕</button>
+      </span>
+    </li>;
+  })}</ol>;
 }
 
 export function SettingsPanel(props: Props) {
@@ -149,6 +179,18 @@ export function SettingsPanel(props: Props) {
             onClick={() => void props.onSaveSettings({ menuLanguages: next }, "languagesSaved")}
           ><img src={LANGUAGE_INFO[option].flag} alt="" /><span>{LANGUAGE_INFO[option].name}</span></button>;
         })}</div>
+      </Section>
+
+      <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")}>
+        <Toggle checked={settings.featuredEnabled} label={t("featuredEnable")} onChange={(featuredEnabled) => void props.onSaveSettings({ featuredEnabled }, "featuredSaved")} />
+        <form key={settings.featuredTitle} className="editor-form" onSubmit={(event) => {
+          event.preventDefault();
+          void props.onSaveSettings({ featuredTitle: String(new FormData(event.currentTarget).get("featuredTitle") || "") }, "featuredSaved");
+        }}>
+          <label><span>{t("featuredTitleLabel")}</span><input name="featuredTitle" maxLength={32} defaultValue={settings.featuredTitle} placeholder={t("featuredTitlePlaceholder")} /></label>
+          <button className="ghost-action" type="submit">{t("save")}</button>
+        </form>
+        <FeaturedList ids={settings.featuredProductIds} products={props.products} onChange={(featuredProductIds) => void props.onSaveSettings({ featuredProductIds }, "featuredSaved")} />
       </Section>
 
       <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")}>

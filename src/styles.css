@@ -47,6 +47,14 @@
   --accent-line: rgba(143, 176, 163, 0.45);
   --accent-wash: rgba(143, 176, 163, 0.14);
 
+  /* The promotions page: a deeper room of its own, lit from above. Elegance
+     here is depth, pearl type and fine rules — not gold. */
+  --velvet: #070809;
+  --velvet-2: #121517;
+  --pearl: #f1f2f2;
+  --pearl-2: #c9cfd1;
+  --veil: rgba(4, 5, 6, 0.78);
+
   /* The one warm colour left in the app, and it only ever means "look here". */
   --danger: #c2705c;
   --danger-ink: #efc7ba;
@@ -79,6 +87,8 @@
      picture on the page, not the page. The accent's light variant is set by
      useMenuTheme, because each 菜单样式 needs its own darker shade. */
   --light-bg-deep: #eef1f2;
+  --light-velvet: #e3e7e8;
+  --light-velvet-2: #f5f6f6;
   --light-bg: #f3f5f6;
   --light-bg-2: #eceff0;
   --light-panel: #ffffff;
@@ -115,6 +125,8 @@
 /* Switched by the sun/moon button in the menu's top bar. Only references here:
    the colours themselves live in the block above. */
 :root[data-theme="light"] {
+  --velvet: var(--light-velvet);
+  --velvet-2: var(--light-velvet-2);
   --bg-deep: var(--light-bg-deep);
   --bg: var(--light-bg);
   --bg-2: var(--light-bg-2);
@@ -2161,4 +2173,259 @@ button:focus-visible,
   font: 600 10px/1.2 system-ui, sans-serif;
   letter-spacing: 0.12em;
   overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   The promotions page. A room of its own inside the menu: the backdrop drops
+   to velvet, the type turns to pearl and serif, and the dishes are shown one
+   to a card, photo first. Nothing here is gold; the richness is depth, space
+   and fine rules.
+   ------------------------------------------------------------------------ */
+/* The whole screen, not just the list's column: on a tablet the list is
+   centred, and a velvet strip down the middle read as a mistake. */
+.menu.on-featured {
+  background:
+    radial-gradient(120% 60% at 50% 0, var(--velvet-2), transparent 70%),
+    var(--velvet);
+}
+
+.chip.chip-featured {
+  border-color: var(--line-strong);
+  font-family: Georgia, "Noto Serif SC", serif;
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.chip.chip-featured.on {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--bg-deep);
+}
+
+.featured-page {
+  padding: 10px 0 8px;
+}
+
+.featured-hero {
+  margin: 8px 0 26px;
+  text-align: center;
+}
+
+.featured-eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+}
+
+.featured-hero h2 {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font: italic 400 clamp(32px, 9vw, 52px) / 1.05 Georgia, "Noto Serif SC", serif;
+  overflow-wrap: anywhere;
+}
+
+/* A hairline broken by a small diamond: the page's one ornament. */
+.featured-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(260px, 70%);
+  margin: 18px auto 0;
+}
+
+.featured-rule::before,
+.featured-rule::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.featured-rule i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--ink-2);
+  transform: rotate(45deg);
+}
+
+.featured-grid {
+  display: grid;
+  gap: 22px;
+}
+
+@media (min-width: 720px) {
+  .featured-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 26px;
+  }
+}
+
+.featured-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+  animation: featured-in 0.7s var(--ease-out) backwards;
+  animation-delay: calc(var(--row) * 90ms + 80ms);
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.featured-card:active {
+  transform: scale(0.985);
+}
+
+.featured-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@keyframes featured-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.97);
+  }
+}
+
+.featured-photo {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--velvet-2);
+}
+
+.featured-photo .dish-media,
+.featured-photo .art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+}
+
+/* The name sits on the photo, over a veil that darkens only its lower edge. */
+.featured-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 64px 20px 16px;
+  background: linear-gradient(180deg, transparent, var(--veil) 62%);
+}
+
+.featured-number {
+  display: block;
+  color: var(--pearl-2);
+  font: 11px/1 Georgia, serif;
+  letter-spacing: 0.32em;
+}
+
+.featured-caption h3 {
+  margin: 8px 0 0;
+  color: var(--pearl);
+  font: 400 clamp(22px, 6.4vw, 30px) / 1.12 Georgia, "Noto Serif SC", serif;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.featured-body {
+  display: grid;
+  gap: 10px;
+  padding: 16px 20px 18px;
+}
+
+.featured-second {
+  margin: 0;
+  color: var(--ink-2);
+  font: italic 15px/1.3 Georgia, "Noto Serif SC", serif;
+}
+
+.featured-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.featured-contents {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.featured-contents span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.featured-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.featured-view {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.featured-price {
+  color: var(--ink);
+  font: 400 24px/1 Georgia, serif;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .featured-card {
+    animation: none;
+  }
+}
+
+.featured-collage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 2px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.featured-collage.n2 {
+  grid-template-rows: 1fr;
+}
+
+.featured-collage.n3 > :first-child {
+  grid-row: span 2;
+}
+
+.featured-collage .dish-media,
+.featured-collage .art {
+  position: static;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  max-height: none;
+  border-radius: 0;
 }

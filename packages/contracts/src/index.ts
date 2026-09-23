@@ -119,6 +119,11 @@ export interface ApiSettings {
   /** Orders, table billing and printers in the admin console; off while the
    *  menu is view-only. */
   showOrdering: boolean;
+  /** The promotions page: on or off, its heading (empty: the menu's own
+   *  wording), and its dishes in the order shown. */
+  featuredEnabled: boolean;
+  featuredTitle: string;
+  featuredProductIds: string[];
 }
 
 /** The part of the settings the guest menu reads, served with the catalogue. */
@@ -127,6 +132,9 @@ export interface ApiMenuSettings {
   restaurantName: string;
   defaultScheme: ColorScheme;
   showTableNumber: boolean;
+  /** The promotions page, when the owner switched it on. An empty title means
+   *  the menu's own wording for it. */
+  featured?: { title: string; productIds: string[] } | null;
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

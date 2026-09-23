@@ -63,6 +63,52 @@ export function contractChecks(call, assert) {
       assert.ok(Buffer.from(served.bytes).equals(png), "the upload comes back byte for byte");
     }],
 
+    ["a dish is copied whole, off the menu until someone has looked at it", async () => {
+      assert.equal((await call("POST", "/api/admin/products/photo-r1/duplicate")).status, 401);
+      assert.equal((await call("POST", "/api/admin/products/no-such-dish/duplicate", { admin: true })).status, 404);
+
+      const original = (await call("GET", "/api/admin/products/photo-r1", { admin: true })).json;
+      const copied = await call("POST", "/api/admin/products/photo-r1/duplicate", { admin: true });
+      assert.equal(copied.status, 201);
+      const copy = copied.json.product;
+      assert.notEqual(copy.id, original.id);
+      assert.notEqual(copy.sku, original.sku, "the copy needs a code of its own");
+      assert.equal(copy.names.zh, `${original.names.zh}（副本）`);
+      assert.equal(copy.names.de, `${original.names.de} (Kopie)`);
+      assert.equal(copy.published, false, "a half-edited twin must not reach a guest");
+      for (const field of ["kind", "category", "description", "price", "vatPercent", "printStation"]) {
+        assert.deepEqual(copy[field], original[field], `${field} is copied`);
+      }
+      assert.deepEqual(copy.allergens, original.allergens);
+      assert.deepEqual(copy.modifiers, original.modifiers);
+      assert.deepEqual(copy.media.map((media) => media.url), original.media.map((media) => media.url), "the photo comes along");
+
+      const catalog = (await call("GET", "/api/catalog")).json.products;
+      assert.ok(!catalog.some((product) => product.id === copy.id), "an unpublished copy stays off the menu");
+      assert.equal((await call("DELETE", `/api/admin/products/${copy.id}`, { admin: true })).status, 204);
+      // Removing the copy leaves the original's photo where it was.
+      const after = (await call("GET", "/api/admin/products/photo-r1", { admin: true })).json;
+      assert.deepEqual(after.media, original.media);
+    }],
+
+    ["the promotions page is off until switched on, and lists what the owner chose", async () => {
+      const refusals = [{ featuredEnabled: "yes" }, { featuredTitle: "x".repeat(33) }, { featuredProductIds: Array.from({ length: 41 }, (_, index) => `dish-${index}`) }, { featuredProductIds: [""] }];
+      for (const body of refusals) {
+        assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body })).status, 400, `${JSON.stringify(body)} must be refused`);
+      }
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { featuredProductIds: ["photo-t4", "photo-r1", "photo-t4"], featuredTitle: "  Chef's   Selection " } });
+      assert.equal(saved.status, 200);
+      assert.deepEqual(saved.json.featuredProductIds, ["photo-t4", "photo-r1"], "in the owner's order, once each");
+      assert.equal(saved.json.featuredTitle, "Chef's Selection");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.featured, null, "chosen but not switched on: nothing for a guest");
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { featuredEnabled: true } });
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.featured, { title: "Chef's Selection", productIds: ["photo-t4", "photo-r1"] });
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { featuredEnabled: false, featuredTitle: "", featuredProductIds: [] } });
+      assert.equal((await call("GET", "/api/catalog")).json.menu.featured, null);
+    }],
+
     ["an order prices its modifiers and routes one job per station", async () => {
       const created = await call("POST", "/api/orders", {
         body: {
@@ -238,7 +284,7 @@ export function contractChecks(call, assert) {
 
     ["the restaurant's name, the menu's title and its look are the owner's to set", async () => {
       const before = await call("GET", "/api/catalog");
-      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true },
+      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, featured: null },
         "a fresh restaurant ships with these");
 
       assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
@@ -254,7 +300,7 @@ export function contractChecks(call, assert) {
       assert.equal(saved.status, 200);
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
       assert.deepEqual((await call("GET", "/api/catalog")).json.menu,
-        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false });
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, featured: null });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
       // A save of one setting leaves the rest where they were.
       assert.equal(saved.json.menuTheme, "jade");

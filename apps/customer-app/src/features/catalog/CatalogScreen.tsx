@@ -24,7 +24,12 @@ interface Props {
   onToggleScheme: () => void;
   /** Counts taps on the title; the seventh within four seconds opens the admin console. */
   onAdminTap: () => Promise<void>;
+  /** The promotions page, when the owner switched it on and chose dishes. */
+  featured: { title: string; products: Product[] } | null;
 }
+
+/** The promotions page's place among the categories; no real category is called this. */
+export const FEATURED_PAGE = "__featured__";
 
 /**
  * Shared with the `--ease-out` / `--dur-*` tokens in styles.css. The CSS
@@ -274,14 +279,72 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
   </motion.div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap }: Props) {
+/**
+ * The promotions page: set menus and signature dishes, first in the menu and
+ * unlike the rest of it.
+ *
+ * Where a category is a list to scan, this is a small gallery to linger on:
+ * one dish to a card, the photo edge to edge with the name set on it, the
+ * set's contents spelled out, the price on a rule of its own. Elegance by
+ * depth and restraint — a darker room, pearl type, fine lines, space — and
+ * not by gold, which the palette rules out on purpose.
+ */
+function FeaturedPage({ title, products, allProducts, language, onOpen }: { title: string; products: Product[]; allProducts: Product[]; language: CustomerState["language"]; onOpen: (id: string) => void }) {
+  const byId = useMemo(() => new Map(allProducts.map((product) => [product.id, product])), [allProducts]);
+  const collage = (product: Product) => (product.bundleItems ?? []).flatMap((item) => {
+    const dish = byId.get(item.productId);
+    return dish && dish.media.length ? [dish] : [];
+  });
+  return <div className="featured-page">
+    <header className="featured-hero">
+      <p className="featured-eyebrow">✦ {t(language, "featuredEyebrow")} ✦</p>
+      <h2>{title || t(language, "featuredDefault")}</h2>
+      <p className="featured-rule" aria-hidden="true"><i /></p>
+    </header>
+    <div className="featured-grid">{products.map((product, index) => {
+      const second = secondaryName(product, language);
+      const contents = (product.bundleItems ?? []).flatMap((item) => {
+        const dish = byId.get(item.productId);
+        return dish ? [`${item.quantity > 1 ? `${item.quantity}× ` : ""}${productName(dish, language)}`] : [];
+      });
+      return <article key={product.id} className="featured-card" data-id={product.id} style={{ "--row": Math.min(index, 11) } as React.CSSProperties} role="button" tabIndex={0}
+        onClick={() => onOpen(product.id)}
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(product.id); } }}>
+        <div className="featured-photo">
+          {/* A set with no photo of its own is shown as what it is: its dishes, side by side. */}
+          {!product.media.length && collage(product).length > 1
+            ? <div className={`featured-collage n${Math.min(collage(product).length, 4)}`}>{collage(product).slice(0, 4).map((dish) => <ProductMedia key={dish.id} product={dish} />)}</div>
+            : <ProductMedia product={product} />}
+          <div className="featured-caption">
+            <span className="featured-number">{String(index + 1).padStart(2, "0")}</span>
+            <h3>{productName(product, language)}</h3>
+          </div>
+        </div>
+        <div className="featured-body">
+          {second && <p className="featured-second">{second}</p>}
+          {product.description && <p className="featured-description">{product.description}</p>}
+          {contents.length > 0 && <p className="featured-contents"><span>{t(language, "bundleIncludes")}</span>{contents.join(" · ")}</p>}
+          <div className="featured-foot">
+            <span className="featured-view">{t(language, "featuredView")} →</span>
+            <strong className="featured-price">{formatPrice(product.priceCents, language)}</strong>
+          </div>
+        </div>
+      </article>;
+    })}</div>
+  </div>;
+}
+
+export function CatalogScreen({ state, dispatch, products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured }: Props) {
   const query = state.query.trim().toLowerCase();
+  // A search looks through the whole menu, whatever page it was typed on.
+  const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
   const visible = products.filter((product) => {
-    const categoryMatch = state.category === "ALLE" || product.category === state.category;
+    const categoryMatch = state.category === "ALLE" || state.category === FEATURED_PAGE || product.category === state.category;
     const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category].join(" ").toLowerCase();
     return categoryMatch && (!query || text.includes(query));
   });
-  const categories = ["ALLE", ...new Set(products.map((product) => product.category))];
+  // The promotions page, when there is one, is the first page of the menu.
+  const categories = [...(featured ? [FEATURED_PAGE] : []), "ALLE", ...new Set(products.map((product) => product.category))];
   const activeProduct = products.find((product) => product.id === state.activeProductId);
   const table = assignedTableNo();
   const reduceMotion = useReducedMotion();
@@ -291,7 +354,25 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
   const paging = !query && categories.length > 1;
   const nextPage = paging ? categories[pageIndex + 1] : undefined;
   const prevPage = paging && pageIndex > 0 ? categories[pageIndex - 1] : undefined;
-  const pageName = (category: string) => (category === "ALLE" ? t(state.language, "allCategories") : category);
+  const pageName = (category: string) => (category === FEATURED_PAGE
+    ? `✦ ${featured?.title || t(state.language, "featuredDefault")}`
+    : category === "ALLE" ? t(state.language, "allCategories") : category);
+
+  // A guest's first look this visit is the promotions page, when there is one.
+  // Once per session: after that the menu stays where they left it.
+  useEffect(() => {
+    if (!featured) return;
+    try {
+      if (sessionStorage.getItem("zy_featured_seen")) return;
+      sessionStorage.setItem("zy_featured_seen", "1");
+    } catch { /* storage refused: show it anyway, once per load */ }
+    if (state.category === "ALLE") dispatch({ type: "category", category: FEATURED_PAGE });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(featured)]);
+  // Switched off while a guest was on it: back to everything.
+  useEffect(() => {
+    if (!featured && state.category === FEATURED_PAGE) dispatch({ type: "category", category: "ALLE" });
+  }, [featured, state.category, dispatch]);
 
   const stackRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -330,7 +411,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
     ? { opacity: 0 }
     : { opacity: 0, y: 70 * turn.current.direction, rotateX: -24 * turn.current.direction, scale: 0.94 };
 
-  return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
+  return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""} ${onFeatured ? "on-featured" : ""}`}>
     <header className="topbar">
       <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
       {/* The hidden way into the admin console: seven taps within four
@@ -360,7 +441,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
       <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={t(state.language, "searchPlaceholder")} autoFocus={state.searchOpen} />
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
-    <nav id="chips" ref={chipsRef} className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}</nav>
+    <nav id="chips" ref={chipsRef} className="chips">{categories.map((category) => <button key={category} className={`chip ${category === FEATURED_PAGE ? "chip-featured" : ""} ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}</nav>
     <div id="stack" ref={stackRef} className="stack">
       <div ref={sheetRef} className="page-sheet">
         {prevPage && <p className="page-hint page-hint-prev" aria-hidden="true"><i /><span className="page-hint-idle">↑ {t(state.language, "prevPage")} · {pageName(prevPage)}</span><span className="page-hint-armed">{t(state.language, "releaseToTurn")} · {pageName(prevPage)}</span></p>}
@@ -368,7 +449,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
           initial={enter}
           animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
-          {visible.length ? visible.map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
+          {onFeatured && featured ? <FeaturedPage title={featured.title} products={featured.products} allProducts={products} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} /> : visible.length ? visible.map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
             <div className="summary">
               <ProductMedia product={product} size="thumb" />
               {/* The code sits on its own small line above the name: drink

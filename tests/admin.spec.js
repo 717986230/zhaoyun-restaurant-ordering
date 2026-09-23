@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
   menuLanguages = ["en", "de"];
   // Orders, tables and printers are behind the ordering module, which a
   // restaurant turns on once guests can order; these tests run with it on.
-  appSettings = { restaurantName: "赵云", menuTitle: "La Carte", menuDefaultScheme: "dark", showTableNumber: true, showOrdering: true };
+  appSettings = { restaurantName: "赵云", menuTitle: "La Carte", menuDefaultScheme: "dark", showTableNumber: true, showOrdering: true, featuredEnabled: false, featuredTitle: "", featuredProductIds: [] };
   await page.addInitScript(() => sessionStorage.setItem("zy_admin_token", "test-admin"));
   await page.route("**/api/health", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
   await page.route("**/api/admin/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ role: "manager" }) }));
@@ -403,4 +403,46 @@ test("orders, tables and printers stay out of the way until ordering is switched
   await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
   await expect(nav).toHaveText("菜品订单桌位打印设置");
+});
+
+test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
+  let duplicated = null;
+  await page.route("**/api/admin/products/80/duplicate", (route) => {
+    duplicated = true;
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ product: {
+      id: "81", sku: "ITEM-81", kind: "food", category: "MAIN",
+      names: { zh: "黑椒牛柳（副本）", de: "Rinderfilet (Kopie)", en: "Beef Fillet (copy)" }, description: "",
+      price: 34.5, allergens: ["F"], details: { ingredients: "Rind", time: "35 min", people: "2", level: "Mittel" },
+      appearance: { art: "#222", pattern: "ring" }, available: true, published: false, printStation: "kitchen", media: [], modifiers: []
+    } }) });
+  });
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+  await page.locator(".product-row").first().click({ force: true });
+  await page.getByRole("button", { name: /复制这个菜品/ }).click();
+  await expect.poll(() => duplicated).toBe(true);
+  // The copy is what is open now, under names that say so and off the menu.
+  await expect(page.locator('input[name="nameZh"]')).toHaveValue("黑椒牛柳（副本）");
+  await expect(page.locator('input[name="published"]')).not.toBeChecked();
+  await expect(page.getByRole("status")).toContainText("已复制");
+});
+
+test("a dish goes onto the promotions page from its editor, and the page is switched on in settings", async ({ page }) => {
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+  await page.locator(".product-row").first().click({ force: true });
+  const toggle = page.getByRole("button", { name: /放到活动页/ });
+  await toggle.click();
+  await expect.poll(() => appSettings.featuredProductIds).toEqual(["80"]);
+  await expect(page.getByRole("button", { name: /在活动页上/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".product-row .feature-mark")).toHaveCount(1);
+
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const card = page.locator("#featured-title").locator("xpath=..");
+  await expect(card.locator(".featured-list li")).toContainText(["黑椒牛柳"]);
+  await card.getByRole("switch", { name: "在菜单上显示活动页" }).click();
+  await expect.poll(() => appSettings.featuredEnabled).toBe(true);
+  await card.locator('input[name="featuredTitle"]').fill("主厨套餐");
+  await card.getByRole("button", { name: "保存", exact: true }).click();
+  await expect.poll(() => appSettings.featuredTitle).toBe("主厨套餐");
+  await card.getByRole("button", { name: "移除" }).click();
+  await expect.poll(() => appSettings.featuredProductIds).toEqual([]);
 });

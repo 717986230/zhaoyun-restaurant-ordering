@@ -442,6 +442,30 @@ function boundedText(label, max) {
   };
 }
 
+/** Trimmed text that may be empty (meaning "use the default"). */
+function optionalText(label, max) {
+  return (value) => {
+    const text = String(value ?? "").trim().replace(/\s+/g, " ");
+    if (text.length > max) throw new Error(`${label} must be at most ${max} characters`);
+    return text;
+  };
+}
+
+export const MAX_FEATURED_PRODUCTS = 40;
+
+/** The dishes on the promotions page, in the order the owner put them; no repeats. */
+function normalizeFeaturedIds(value) {
+  if (!Array.isArray(value)) throw new Error("Featured products must be a list");
+  const ids = [];
+  for (const item of value) {
+    const id = String(item ?? "").trim();
+    if (!id || id.length > 64) throw new Error("Featured product ids must be 1 to 64 characters");
+    if (!ids.includes(id)) ids.push(id);
+  }
+  if (ids.length > MAX_FEATURED_PRODUCTS) throw new Error(`At most ${MAX_FEATURED_PRODUCTS} featured products`);
+  return ids;
+}
+
 /**
  * Every setting that lives in `app_settings`, one entry each: the field name
  * the API uses, the key it is stored under, its default, and how an incoming
@@ -469,7 +493,13 @@ export const APP_SETTINGS = {
   showTableNumber: { key: "show_table_number", fallback: () => true, normalize: flag("showTableNumber") },
   // Orders, table billing and printers in the admin console. Off while the
   // menu is view-only: those sections would have nothing to show.
-  showOrdering: { key: "admin_show_ordering", fallback: () => false, normalize: flag("showOrdering") }
+  showOrdering: { key: "admin_show_ordering", fallback: () => false, normalize: flag("showOrdering") },
+  // The promotions page: set menus and dishes the restaurant wants seen first.
+  // Off until the owner switches it on; an empty title means the menu's own
+  // wording ("精选推荐" / "Empfehlungen" / "Signature").
+  featuredEnabled: { key: "featured_enabled", fallback: () => false, normalize: flag("featuredEnabled") },
+  featuredTitle: { key: "featured_title", fallback: () => "", normalize: optionalText("Featured title", 32) },
+  featuredProductIds: { key: "featured_products", fallback: () => [], normalize: normalizeFeaturedIds }
 };
 
 function readAppSetting(definition, stored) {
@@ -511,7 +541,36 @@ export function menuSettingsView(settings) {
     title: settings.menuTitle,
     restaurantName: settings.restaurantName,
     defaultScheme: settings.menuDefaultScheme,
-    showTableNumber: settings.showTableNumber
+    showTableNumber: settings.showTableNumber,
+    // Only when switched on: a guest has no use for a list of ids otherwise.
+    featured: settings.featuredEnabled ? { title: settings.featuredTitle, productIds: settings.featuredProductIds } : null
+  };
+}
+
+/**
+ * What "copy this dish" saves: everything the owner typed, under names that
+ * say it is a copy, with a code of its own and — until someone has looked at
+ * it — kept off the menu, so a half-edited twin never reaches a guest.
+ */
+export function duplicateInput(product) {
+  const mark = { zh: "（副本）", de: " (Kopie)", en: " (copy)" };
+  const names = Object.fromEntries(Object.entries(product.names).map(([language, name]) => [language, name ? `${name}${mark[language] ?? " (copy)"}` : name]));
+  return {
+    kind: product.kind,
+    category: product.category,
+    names,
+    description: product.description,
+    price: product.price,
+    vatPercent: product.vatPercent,
+    allergens: product.allergens,
+    details: product.details,
+    appearance: product.appearance,
+    modifiers: product.modifiers,
+    bundleItems: product.bundleItems,
+    available: product.available,
+    published: false,
+    sortOrder: product.sortOrder,
+    printStation: product.printStation
   };
 }
 

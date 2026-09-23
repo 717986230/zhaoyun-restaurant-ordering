@@ -255,6 +255,13 @@ export function registerRoutes(app, { database, realtime, config }) {
     return reply.code(204).send();
   });
 
+  app.post("/api/admin/products/:id/duplicate", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
+    const product = database.duplicateProduct(request.params.id);
+    if (!product) return errorReply(reply, new Error("Product not found"), 404);
+    realtime.broadcast("catalog.changed", { productId: product.id });
+    return reply.code(201).send({ product });
+  });
+
   app.post("/api/admin/products/:id/media", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const part = await request.file({ limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
     if (!part) return errorReply(reply, new Error("Media file is required"));
