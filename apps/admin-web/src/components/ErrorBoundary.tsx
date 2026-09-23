@@ -1,5 +1,6 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { initialAdminLanguage, translate } from "../app/i18n";
 
 interface Props { children: ReactNode }
 interface State { error: Error | null }
@@ -18,10 +19,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override render(): ReactNode {
     if (!this.state.error) return this.props.children;
+    // A class component cannot read the language context, and whatever broke
+    // may have been the context itself, so it asks storage directly.
+    const language = initialAdminLanguage();
     return <div className="admin-crash">
-      <h1>管理台出错了</h1>
-      <p>请重新载入页面；如果反复出现，请把下面的信息发给维护人员。</p>
-      <button className="primary-action" onClick={() => window.location.reload()}>重新载入</button>
+      <h1>{translate(language, "crashTitle")}</h1>
+      <p>{translate(language, "crashBody")}</p>
+      <button className="primary-action" onClick={() => window.location.reload()}>{translate(language, "reload")}</button>
       <pre>{this.state.error.message}</pre>
     </div>;
   }

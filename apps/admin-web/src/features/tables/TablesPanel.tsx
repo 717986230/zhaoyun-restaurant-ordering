@@ -1,23 +1,16 @@
 import type { StaffRole, TableOverview } from "@zhaoyun/api-client";
-import type { ApiBill, ApiOrder } from "@zhaoyun/contracts";
+import type { ApiBill } from "@zhaoyun/contracts";
+import { formatMoney, formatTime, useI18n } from "../../app/i18n";
+import type { CopyKey } from "../../app/i18n";
+import { ORDER_STATUS_KEYS } from "../board/BoardPanel";
 
-const stateLabels: Record<TableOverview["state"], string> = {
-  free: "空闲",
-  seated: "用餐中",
-  locked: "已锁定"
+const STATE_KEYS: Record<TableOverview["state"], CopyKey> = {
+  free: "tableFree",
+  seated: "tableSeated",
+  locked: "tableLocked"
 };
 
-const orderStatusLabels: Record<ApiOrder["status"], string> = {
-  new: "新订单",
-  preparing: "制作中",
-  ready: "可上菜",
-  completed: "已完成",
-  cancelled: "已取消"
-};
-
-function time(value: string): string {
-  return new Date(value).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
-}
+const euro = (amount: number) => Math.round(amount * 100);
 
 interface Props {
   tables: TableOverview[];
@@ -46,65 +39,66 @@ interface Props {
  * anything afterwards.
  */
 export function TablesPanel(props: Props) {
+  const { t, language } = useI18n();
   const seated = props.tables.filter((table) => table.state !== "free");
   const takings = props.tables.reduce((sum, table) => sum + table.total, 0);
 
   return <section id="tablesPanel" className="admin-panel active">
     <div className="list-head">
       <div>
-        <h1>桌位</h1>
-        <p>{seated.length} 桌在用 · 未结账 EUR {takings.toFixed(2)} · 每 5 秒自动刷新</p>
+        <h1>{t("tablesTitle")}</h1>
+        <p>{t("tablesLead", { seated: seated.length, total: takings.toFixed(2) })}</p>
       </div>
-      <button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>刷新</button>
+      <button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>{t("refresh")}</button>
     </div>
 
     <div className="table-grid">{props.tables.length ? props.tables.map((table) => <article className={`table-tile ${table.state}`} key={table.table}>
       <div className="table-tile-head">
-        <b>桌 {table.table}</b>
-        <span className={`status ${table.state}`}>{stateLabels[table.state]}</span>
+        <b>{t("table", { table: table.table })}</b>
+        <span className={`status ${table.state}`}>{t(STATE_KEYS[table.state])}</span>
       </div>
       <small className="table-tile-meta">
         {table.label || "—"}
-        {table.since ? ` · 自 ${time(table.since)}` : ""}
-        {table.registered ? "" : " · 未登记"}
-        {table.enabled ? "" : " · 已停用"}
+        {table.since ? ` · ${t("tableSince", { time: formatTime(table.since, language) })}` : ""}
+        {table.registered ? "" : ` · ${t("tableUnregistered")}`}
+        {table.enabled ? "" : ` · ${t("tableDisabled")}`}
       </small>
 
       {table.orders.length ? <>
         <ul className="table-tile-orders">{table.orders.map((order) => <li key={order.id}>
           <div className="table-tile-order-head">
             <span>{order.no}</span>
-            <span className={`status ${order.status}`}>{orderStatusLabels[order.status]}</span>
+            <span className={`status ${order.status}`}>{t(ORDER_STATUS_KEYS[order.status])}</span>
           </div>
           <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>
             {item.qty} × {item.name || item.id}
-            {item.modifiers?.length ? <em> （{item.modifiers.map((modifier) => modifier.name).join(" · ")}）</em> : null}
+            {item.modifiers?.length ? <em> ({item.modifiers.map((modifier) => modifier.name).join(" · ")})</em> : null}
           </li>)}</ul>
-          {order.note && <p className="board-note">备注：{order.note}</p>}
+          {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}
         </li>)}</ul>
-        <div className="table-tile-total"><span>未结账</span><b>EUR {table.total.toFixed(2)}</b></div>
-      </> : <p className="table-tile-empty">暂无订单</p>}
+        <div className="table-tile-total"><span>{t("tableOpen")}</span><b>{formatMoney(euro(table.total), language)}</b></div>
+      </> : <p className="table-tile-empty">{t("tableNoOrders")}</p>}
 
       <div className="board-actions">
         <button
           className="ghost-action"
           disabled={props.busy || !table.registered}
-          title={table.registered ? "" : "这桌没有登记，先到「连接设置」里加上"}
+          title={table.registered ? "" : t("tableRegisterFirst")}
           onClick={() => void props.onLock(table.table, !table.locked)}
-        >{table.locked ? "解除锁定" : "锁定桌号"}</button>
-        {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>结账</button>}
+        >{t(table.locked ? "tableUnlock" : "tableLock")}</button>
+        {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>}
       </div>
-    </article>) : <div className="admin-empty">还没有登记任何桌位，去「连接设置」添加</div>}</div>
+    </article>) : <div className="admin-empty">{t("tablesEmpty")}</div>}</div>
 
-    {props.bill && <div className="bill-sheet" role="dialog" aria-label="账单">
-      <div className="board-card-head"><b>桌 {props.bill.table} 账单</b><button className="ghost-action" onClick={props.onCloseBill}>关闭</button></div>
+    {props.bill && <div className="bill-sheet" role="dialog" aria-label={t("billDialog")}>
+      <div className="board-card-head"><b>{t("billTitle", { table: props.bill.table })}</b><button className="ghost-action" onClick={props.onCloseBill}>{t("close")}</button></div>
       {props.bill.items.length ? <>
         <ul className="bill-items">{props.bill.items.map((item, index) => <li key={`${item.orderNo}-${index}`}><span>{item.qty} × {item.name}</span><span>{item.lineTotal.toFixed(2)} · {item.vatPercent}%</span></li>)}</ul>
-        <div className="bill-total"><span>合计</span><b>EUR {props.bill.total.toFixed(2)}</b></div>
-        <table className="bill-vat"><thead><tr><th>税率</th><th>净额</th><th>税额</th><th>含税</th></tr></thead><tbody>{props.bill.vatBreakdown.map((group) => <tr key={group.percent}><td>{group.percent}%</td><td>{group.net.toFixed(2)}</td><td>{group.vat.toFixed(2)}</td><td>{group.gross.toFixed(2)}</td></tr>)}</tbody></table>
-        <p className="bill-disclaimer">内部账单，不是税务收据；正式收据仍需由收银系统开具。结账后这桌会自动解除锁定。</p>
-        <button className="primary-action" disabled={props.busy} onClick={() => void props.onSettleBill(props.bill!.table)}>打印账单并结账</button>
-      </> : <div className="admin-empty">这桌没有待结账的订单</div>}
+        <div className="bill-total"><span>{t("billTotal")}</span><b>{formatMoney(euro(props.bill.total), language)}</b></div>
+        <table className="bill-vat"><thead><tr><th>{t("billRate")}</th><th>{t("billNet")}</th><th>{t("billVat")}</th><th>{t("billGross")}</th></tr></thead><tbody>{props.bill.vatBreakdown.map((group) => <tr key={group.percent}><td>{group.percent}%</td><td>{group.net.toFixed(2)}</td><td>{group.vat.toFixed(2)}</td><td>{group.gross.toFixed(2)}</td></tr>)}</tbody></table>
+        <p className="bill-disclaimer">{t("billDisclaimer")}</p>
+        <button className="primary-action" disabled={props.busy} onClick={() => void props.onSettleBill(props.bill!.table)}>{t("billSettle")}</button>
+      </> : <div className="admin-empty">{t("billEmpty")}</div>}
     </div>}
   </section>;
 }

@@ -217,6 +217,28 @@ test("the menu style the server picked changes only the accent, at load", async 
   expect(bg).toBe("#0f1113");
 });
 
+test("the owner's title, table-number choice and default look reach the guest", async ({ page }) => {
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+    products, theme: "jade", languages: ["zh", "en", "de"],
+    menu: { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false }
+  }) }));
+  await page.goto("/?table=12");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await expect(page.locator(".topbar .title strong")).toHaveText("Speisekarte");
+  await expect(page).toHaveTitle("Goldener Drache · Speisekarte");
+  // Switched off: the card still carries the table, the header just keeps quiet.
+  await expect(page.locator(".topbar .title small")).toHaveCount(0);
+  // A guest who never chose sees the restaurant's default …
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  // … and a guest who did keeps their own choice over it.
+  await page.getByRole("button", { name: "切换到深色" }).click();
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
 test("a tablet that has never reached the server shows the menu the app ships with", async ({ page }) => {
   // A freshly installed tablet has no cache and, until someone configures the
   // API address, no server either. It used to invent 15 demo dishes whose ids

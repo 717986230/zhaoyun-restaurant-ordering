@@ -1,19 +1,19 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type ColorScheme = "dark" | "light";
 
 const storageKey = "zy_color_scheme";
 
 /**
- * Dark unless this guest has asked for light. Dark is the menu as designed —
- * a dim dining room, the artwork glowing — and light is the one a guest by a
- * window at lunch switches to; it is their phone, so the choice stays on it.
+ * The guest's own pick, if they have made one on this phone; null if not.
+ * Until they do, the menu shows the restaurant's default (设置 → 默认明暗).
  */
-export function storedColorScheme(): ColorScheme {
+export function storedColorScheme(): ColorScheme | null {
   try {
-    return localStorage.getItem(storageKey) === "light" ? "light" : "dark";
+    const stored = localStorage.getItem(storageKey);
+    return stored === "light" || stored === "dark" ? stored : null;
   } catch {
-    return "dark";
+    return null;
   }
 }
 
@@ -23,15 +23,22 @@ export function applyColorScheme(scheme: ColorScheme): void {
   document.documentElement.dataset.theme = scheme;
 }
 
-export function useColorScheme(): [ColorScheme, () => void] {
-  const [scheme, setScheme] = useState<ColorScheme>(storedColorScheme);
+/**
+ * `restaurantDefault` is what the restaurant chose; the guest's own tap
+ * overrides it on their phone and is remembered there. Dark when neither has
+ * said anything — the menu as designed, for a dim dining room.
+ */
+export function useColorScheme(restaurantDefault: ColorScheme | undefined): [ColorScheme, () => void] {
+  const [chosen, setChosen] = useState<ColorScheme | null>(storedColorScheme);
+  const scheme: ColorScheme = chosen ?? restaurantDefault ?? "dark";
+
+  useEffect(() => { applyColorScheme(scheme); }, [scheme]);
+
   const toggle = useCallback(() => {
-    setScheme((current) => {
-      const next: ColorScheme = current === "dark" ? "light" : "dark";
-      applyColorScheme(next);
-      try { localStorage.setItem(storageKey, next); } catch { /* A private tab keeps it for this visit only. */ }
-      return next;
-    });
-  }, []);
+    const next: ColorScheme = scheme === "dark" ? "light" : "dark";
+    setChosen(next);
+    try { localStorage.setItem(storageKey, next); } catch { /* A private tab keeps it for this visit only. */ }
+  }, [scheme]);
+
   return [scheme, toggle];
 }

@@ -1,5 +1,6 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { cachedMenuSettings } from "../app/useCatalog";
 
 interface Props { children: ReactNode }
 interface State { error: Error | null }
@@ -35,7 +36,9 @@ export class ErrorBoundary extends Component<Props, State> {
   override render(): ReactNode {
     if (!this.state.error) return this.props.children;
     return <section className="crash">
-      <h1>赵云</h1>
+      {/* Whatever broke may have been the catalogue itself, so the name comes
+          from the last one this phone kept, and is simply left out without it. */}
+      {cachedMenuSettings()?.restaurantName && <h1>{cachedMenuSettings()?.restaurantName}</h1>}
       <p>菜单出了问题，请叫服务员</p>
       <p>Es ist ein Fehler aufgetreten. Bitte rufen Sie das Personal.</p>
       <p>Something went wrong. Please call our staff.</p>

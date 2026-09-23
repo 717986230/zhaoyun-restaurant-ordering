@@ -7,7 +7,7 @@ import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
   adminGateView, assertPassword, auditView, billView, hashPassword,
-  hashSessionToken, newSessionToken, normalizeBundleItems, normalizeMenuLanguages, normalizeMenuTheme,
+  hashSessionToken, newSessionToken, normalizeBundleItems, normalizeSettingsInput,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
   tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
@@ -423,7 +423,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deleteAllSessions: db.prepare("DELETE FROM admin_sessions"),
     deleteExpiredSessions: db.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?"),
     getSettings: db.prepare("SELECT * FROM restaurant_settings WHERE id = 1"),
-    getAppSetting: db.prepare("SELECT value FROM app_settings WHERE key = ?"),
+    allAppSettings: db.prepare("SELECT key, value FROM app_settings"),
     setAppSetting: db.prepare(`
       INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
@@ -793,17 +793,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
   }
 
   function getSettings() {
-    return settingsView(statements.getSettings.get(), statements.getAppSetting.get("menu_languages")?.value);
+    const values = Object.fromEntries(statements.allAppSettings.all().map((row) => [row.key, row.value]));
+    return settingsView(statements.getSettings.get(), values);
   }
 
-  /** Either setting may come alone; the one left out keeps its value. */
+  /** Any subset of the settings may come; the ones left out keep their value.
+   *  All of it is checked before any of it is written. */
   function saveSettings(input) {
-    // Both validated before either is written, so a bad language list does not
-    // leave a half-applied save behind.
-    const menuTheme = input.menuTheme === undefined ? undefined : normalizeMenuTheme(input.menuTheme);
-    const menuLanguages = input.menuLanguages === undefined ? undefined : normalizeMenuLanguages(input.menuLanguages);
-    if (menuTheme !== undefined) statements.upsertSettings.run(menuTheme, now());
-    if (menuLanguages !== undefined) statements.setAppSetting.run("menu_languages", JSON.stringify(menuLanguages), now());
+    const { menuTheme, rows } = normalizeSettingsInput(input);
+    const timestamp = now();
+    if (menuTheme !== undefined) statements.upsertSettings.run(menuTheme, timestamp);
+    for (const [key, value] of rows) statements.setAppSetting.run(key, value, timestamp);
     return getSettings();
   }
 

@@ -103,10 +103,30 @@ export type MenuThemeId = "jade" | "teal" | "terracotta";
 /** The languages a guest can switch the menu into, in flag order. */
 export type MenuLanguage = "zh" | "en" | "de";
 
+export type ColorScheme = "dark" | "light";
+
 export interface ApiSettings {
   menuTheme: MenuThemeId;
   /** Which of the three the menu offers; at least one. */
   menuLanguages: MenuLanguage[];
+  /** On the admin console, the browser tab and the printed table cards. */
+  restaurantName: string;
+  /** The heading of the guest menu. */
+  menuTitle: string;
+  /** What a guest sees before touching the sun/moon; their own pick wins. */
+  menuDefaultScheme: ColorScheme;
+  showTableNumber: boolean;
+  /** Orders, table billing and printers in the admin console; off while the
+   *  menu is view-only. */
+  showOrdering: boolean;
+}
+
+/** The part of the settings the guest menu reads, served with the catalogue. */
+export interface ApiMenuSettings {
+  title: string;
+  restaurantName: string;
+  defaultScheme: ColorScheme;
+  showTableNumber: boolean;
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

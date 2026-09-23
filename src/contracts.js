@@ -111,11 +111,20 @@ export const ProductBody = Type.Object({
 // same list, and parity.test.ts holds the two to each other.
 export const MENU_LANGUAGES = ["zh", "en", "de"];
 
-// Either setting may be saved alone; an empty body is a mistake, not a save.
+export const COLOR_SCHEMES = ["dark", "light"];
+
+// Any subset may be saved; an empty body is a mistake, not a save. The text
+// limits are the ones shared/rules.mjs enforces after trimming, stated here too
+// so an oversized value is a 400 at the edge.
 export const SettingsBody = Type.Object({
   menuTheme: Type.Optional(literals(MENU_THEMES)),
-  menuLanguages: Type.Optional(Type.Array(literals(MENU_LANGUAGES), { minItems: 1, maxItems: MENU_LANGUAGES.length, uniqueItems: true }))
-}, { minProperties: 1 });
+  menuLanguages: Type.Optional(Type.Array(literals(MENU_LANGUAGES), { minItems: 1, maxItems: MENU_LANGUAGES.length, uniqueItems: true })),
+  restaurantName: Type.Optional(Type.String({ minLength: 1, maxLength: 40 })),
+  menuTitle: Type.Optional(Type.String({ minLength: 1, maxLength: 24 })),
+  menuDefaultScheme: Type.Optional(literals(COLOR_SCHEMES)),
+  showTableNumber: Type.Optional(Type.Boolean()),
+  showOrdering: Type.Optional(Type.Boolean())
+}, { minProperties: 1, additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces
 // — stated twice on purpose, so a too-short password is refused at the edge

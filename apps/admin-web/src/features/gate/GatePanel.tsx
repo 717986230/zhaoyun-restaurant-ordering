@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../../app/i18n";
 
 /**
  * The door of the console, and the whole of it.
@@ -19,6 +20,7 @@ export interface GatePanelProps {
 const PASSWORD_MIN = 6;
 
 export function GatePanel({ configured, busy, error, onSignIn, onSetPassword }: GatePanelProps) {
+  const { t } = useI18n();
   const [password, setPassword] = useState("");
   const [repeat, setRepeat] = useState("");
   // Checked here as well as on the server, because the server never sees the
@@ -40,15 +42,13 @@ export function GatePanel({ configured, busy, error, onSignIn, onSetPassword }: 
     <form className="editor-form gate-form" onSubmit={submit}>
       <div className="form-title">
         <div>
-          <h1>{configured ? "管理台" : "设置管理密码"}</h1>
-          <p>{configured
-            ? "输入管理密码即可修改菜单"
-            : "这台设备第一次打开管理台。设置一个密码，之后改菜单都用它。"}</p>
+          <h1>{t(configured ? "gateTitle" : "gateSetTitle")}</h1>
+          <p>{t(configured ? "gateLead" : "gateSetLead")}</p>
         </div>
       </div>
 
       <label>
-        <span>{configured ? "管理密码" : `新密码（至少 ${PASSWORD_MIN} 位）`}</span>
+        <span>{configured ? t("gatePassword") : t("gateNewPassword", { min: PASSWORD_MIN })}</span>
         <input
           type="password"
           name="admin-password"
@@ -60,7 +60,7 @@ export function GatePanel({ configured, busy, error, onSignIn, onSetPassword }: 
       </label>
 
       {!configured && <label>
-        <span>再输入一次</span>
+        <span>{t("gateRepeat")}</span>
         <input
           type="password"
           name="admin-password-repeat"
@@ -70,17 +70,15 @@ export function GatePanel({ configured, busy, error, onSignIn, onSetPassword }: 
         />
       </label>}
 
-      {tooShort && <p className="gate-note">密码至少 {PASSWORD_MIN} 位</p>}
-      {mismatch && <p className="gate-note">两次输入不一致</p>}
+      {tooShort && <p className="gate-note">{t("gateTooShort", { min: PASSWORD_MIN })}</p>}
+      {mismatch && <p className="gate-note">{t("gateMismatch")}</p>}
       {error && <p className="gate-note error" role="alert">{error}</p>}
 
       <button type="submit" className="primary-action" disabled={!ready || busy}>
-        {busy ? "请稍候…" : configured ? "进入管理台" : "设置密码并进入"}
+        {busy ? t("gateWait") : t(configured ? "gateEnter" : "gateSetAndEnter")}
       </button>
 
-      {!configured && <p className="gate-note">
-        密码只保存在你自己的后端里，服务器存的是它的哈希，不是密码本身。
-      </p>}
+      {!configured && <p className="gate-note">{t("gateStored")}</p>}
     </form>
   </div>;
 }

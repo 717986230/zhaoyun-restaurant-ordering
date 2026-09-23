@@ -1,4 +1,4 @@
-import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest, MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
+import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
 import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
@@ -28,7 +28,8 @@ export interface AdminState {
   gate: GateState;
   auditEntries: AuditEntry[];
   connected: boolean;
-  connectionText: string;
+  /** Why the last attempt to reach the backend failed, when it did. */
+  connectionError: string | null;
   products: Product[];
   orders: ApiOrder[];
   requests: ApiServiceRequest[];
@@ -42,7 +43,7 @@ export interface AdminState {
   editingProduct: Product | null;
   editingPrinter: PrinterProfile | null;
   productFilter: ProductFilter;
-  menuTheme: MenuThemeId | null;
-  menuLanguages: MenuLanguage[] | null;
+  /** Null until the console has loaded them, and for roles that cannot. */
+  settings: ApiSettings | null;
   toast: { message: string; kind: "success" | "warning" | "error" } | null;
 }

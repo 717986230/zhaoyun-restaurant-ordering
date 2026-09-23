@@ -1,25 +1,25 @@
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
-import type { AdminStorage, AuditEntry, RestaurantTable } from "@zhaoyun/api-client";
-import type { MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
+import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
+import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
 import { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES } from "@zhaoyun/domain";
+import { useI18n } from "../../app/i18n";
+import type { CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 
 interface Props {
   storage: AdminStorage;
+  settings: ApiSettings | null;
   tables: RestaurantTable[];
   auditEntries: AuditEntry[];
-  menuTheme: MenuThemeId | null;
-  onSave: (storage: AdminStorage) => Promise<void>;
-  onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<void>;
+  onSaveSettings: (change: Partial<ApiSettings>, done: CopyKey) => Promise<void>;
+  onSaveConnection: (storage: AdminStorage) => Promise<void>;
+  onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<boolean>;
   onDeleteTable: (table: string) => Promise<void>;
-  onSaveMenuTheme: (menuTheme: MenuThemeId) => Promise<void>;
-  menuLanguages: MenuLanguage[] | null;
-  onSaveMenuLanguages: (menuLanguages: MenuLanguage[]) => Promise<void>;
-  onChangePassword: (password: string, currentPassword: string) => Promise<void>;
+  onChangePassword: (password: string, currentPassword: string) => Promise<boolean>;
 }
 
-const ROLE_LABELS: Record<string, string> = { manager: "经理", staff: "服务员", kitchen: "厨房" };
+const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
 
 function detailSummary(entry: AuditEntry): string {
   const parts = Object.entries(entry.detail)
@@ -32,9 +32,38 @@ function entryUrl(baseUrl: string, table: RestaurantTable): string {
   return `${baseUrl.replace(/\/+$/, "")}/?table=${encodeURIComponent(table.table)}&k=${encodeURIComponent(table.token)}`;
 }
 
+/** One group of settings, as a card with its heading and one line of why. */
+function Section({ title, hint, children, id }: { title: string; hint?: string; children: ReactNode; id: string }) {
+  return <section className="settings-card" aria-labelledby={`${id}-title`}>
+    <h2 id={`${id}-title`}>{title}</h2>
+    {hint && <p className="settings-hint">{hint}</p>}
+    {children}
+  </section>;
+}
+
+/** A switch that saves on change: the setting is on screen the moment it is
+ *  flipped, and the console puts it back if the save fails. */
+function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
+  return <label className="settings-switch">
+    <input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    <span>{label}</span>
+  </label>;
+}
+
 export function SettingsPanel(props: Props) {
+  const { t, language } = useI18n();
   const [showCards, setShowCards] = useState(false);
   const [passwordNote, setPasswordNote] = useState("");
+  const settings = props.settings;
+
+  function saveRestaurant(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    void props.onSaveSettings({
+      restaurantName: String(data.get("restaurantName") || "").trim(),
+      menuTitle: String(data.get("menuTitle") || "").trim()
+    }, "restaurantSaved");
+  }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,103 +73,145 @@ export function SettingsPanel(props: Props) {
     // The server never sees the second field, so the typo has to be caught
     // here: a password nobody wrote down is how a restaurant locks itself out.
     if (next !== String(data.get("repeatPassword") || "")) {
-      setPasswordNote("两次输入不一致");
+      setPasswordNote(t("gateMismatch"));
       return;
     }
     setPasswordNote("");
-    await props.onChangePassword(next, String(data.get("currentPassword") || ""));
-    form.reset();
+    if (await props.onChangePassword(next, String(data.get("currentPassword") || ""))) form.reset();
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  function saveConnection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    void props.onSave({ baseUrl: String(data.get("baseUrl")), token: String(data.get("token")) });
+    void props.onSaveConnection({ baseUrl: String(data.get("baseUrl")), token: String(data.get("token")) });
   }
 
-  function addTable(event: FormEvent<HTMLFormElement>) {
+  async function addTable(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
-    void props.onSaveTable({ table: String(data.get("table") || ""), label: String(data.get("label") || "") }).then(() => form.reset());
+    if (await props.onSaveTable({ table: String(data.get("table") || ""), label: String(data.get("label") || "") })) form.reset();
   }
 
-  return <section id="systemPanel" className="admin-panel active"><div className="system-pane">
-    <h1>服务器连接</h1>
-    <p>Android 设备请填写餐厅局域网内后端电脑的地址。</p>
-    <form id="connectionForm" className="editor-form compact-form" onSubmit={submit}>
-      <label><span>API 地址</span><input name="baseUrl" required defaultValue={props.storage.baseUrl} placeholder="http://192.168.1.20:8787" /></label>
-      <label><span>管理员令牌</span><input name="token" required type="password" defaultValue={props.storage.token} autoComplete="current-password" /></label>
-      <button className="primary-action" type="submit">测试并保存连接</button>
-    </form>
+  const themeName = (theme: (typeof MENU_THEMES)[keyof typeof MENU_THEMES]) =>
+    language === "zh" ? theme.nameZh : language === "de" ? theme.nameDe : theme.nameEn;
+  const offered = settings?.menuLanguages ?? DEFAULT_MENU_LANGUAGES;
 
-    <h1>管理密码</h1>
-    <p>改密码会让所有已登录的设备重新输入一次。忘了密码就用上面的管理员令牌重设。</p>
-    <form className="editor-form compact-form" onSubmit={(event) => void changePassword(event)}>
-      <label><span>当前密码</span><input name="currentPassword" required type="password" autoComplete="current-password" /></label>
-      <label><span>新密码（至少 6 位）</span><input name="nextPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
-      <label><span>再输入一次</span><input name="repeatPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
-      {passwordNote && <p className="gate-note error" role="alert">{passwordNote}</p>}
-      <button className="primary-action" type="submit">修改密码</button>
-    </form>
+  return <section id="systemPanel" className="admin-panel active"><div className="settings-page">
+    <h1 className="settings-title">{t("settingsTitle")}</h1>
 
-    <h1>菜单样式</h1>
-    <p>只改变一处强调色，菜单其余部分（背景、文字、对比度）保持不变，选完立即在顾客菜单上生效。</p>
-    <div className="theme-picker">{Object.values(MENU_THEMES).map((theme) => <button
-      key={theme.id}
-      type="button"
-      className={`theme-swatch ${props.menuTheme === theme.id ? "selected" : ""}`}
-      style={{ "--swatch": theme.accent } as React.CSSProperties}
-      onClick={() => void props.onSaveMenuTheme(theme.id)}
-    ><i /><span>{theme.nameZh}</span></button>)}</div>
+    {settings && <div className="settings-grid">
+      <Section id="restaurant" title={t("sectionRestaurant")}>
+        {/* Keyed on the saved values so the fields show what the server kept
+            (trimmed, spaces collapsed) once a save comes back. */}
+        <form key={`${settings.restaurantName}|${settings.menuTitle}`} className="editor-form" onSubmit={saveRestaurant}>
+          <label><span>{t("restaurantName")}</span><input name="restaurantName" required maxLength={40} defaultValue={settings.restaurantName} /><small>{t("restaurantNameHint")}</small></label>
+          <label><span>{t("menuTitle")}</span><input name="menuTitle" required maxLength={24} defaultValue={settings.menuTitle} /><small>{t("menuTitleHint")}</small></label>
+          <button className="primary-action" type="submit">{t("save")}</button>
+        </form>
+      </Section>
 
-    <h1>菜单语言</h1>
-    <p>客人菜单右上角会出现这几种语言的国旗，点一下就切换。至少留一种。</p>
-    <div className="language-picker" role="group" aria-label="菜单语言">{MENU_LANGUAGES.map((language) => {
-      const offered = props.menuLanguages ?? DEFAULT_MENU_LANGUAGES;
-      const on = offered.includes(language);
-      // The last one cannot be switched off: a menu has to be in something.
-      const last = on && offered.length === 1;
-      const next = on ? offered.filter((item) => item !== language) : [...offered, language];
-      return <button
-        key={language}
-        type="button"
-        className={`language-toggle ${on ? "selected" : ""}`}
-        aria-pressed={on}
-        disabled={last}
-        title={last ? "至少保留一种语言" : undefined}
-        onClick={() => void props.onSaveMenuLanguages(next)}
-      ><img src={LANGUAGE_INFO[language].flag} alt="" /><span>{LANGUAGE_INFO[language].name}</span></button>;
-    })}</div>
+      <Section id="appearance" title={t("sectionAppearance")}>
+        <p className="settings-label">{t("menuStyle")}</p>
+        <div className="theme-picker">{Object.values(MENU_THEMES).map((theme) => <button
+          key={theme.id}
+          type="button"
+          className={`theme-swatch ${settings.menuTheme === theme.id ? "selected" : ""}`}
+          aria-pressed={settings.menuTheme === theme.id}
+          style={{ "--swatch": theme.accent } as React.CSSProperties}
+          onClick={() => void props.onSaveSettings({ menuTheme: theme.id }, "menuStyleSaved")}
+        ><i /><span>{themeName(theme)}</span></button>)}</div>
+        <p className="settings-label">{t("defaultScheme")}</p>
+        <div className="scheme-picker" role="group" aria-label={t("defaultScheme")}>{(["dark", "light"] as ColorScheme[]).map((scheme) => <button
+          key={scheme}
+          type="button"
+          className={settings.menuDefaultScheme === scheme ? "on" : ""}
+          aria-pressed={settings.menuDefaultScheme === scheme}
+          onClick={() => void props.onSaveSettings({ menuDefaultScheme: scheme }, "appearanceSaved")}
+        >{scheme === "dark" ? "☾" : "☀"} {t(scheme === "dark" ? "schemeDark" : "schemeLight")}</button>)}</div>
+        <small className="settings-hint">{t("defaultSchemeHint")}</small>
+        <Toggle checked={settings.showTableNumber} label={t("showTableNumber")} onChange={(showTableNumber) => void props.onSaveSettings({ showTableNumber }, "appearanceSaved")} />
+      </Section>
 
-    <h1>桌台</h1>
-    <p>登记桌台后，服务端只接受已登记的桌号，并要求设备带上该桌的令牌。没有登记任何桌台时保持开放模式。</p>
-    <form className="editor-form compact-form" onSubmit={addTable}>
-      <div className="field-grid">
-        <label><span>桌号</span><input name="table" required maxLength={8} placeholder="12 / T-3" /></label>
-        <label><span>备注</span><input name="label" maxLength={64} placeholder="露台 / 包间" /></label>
-      </div>
-      <button className="primary-action" type="submit">登记桌台</button>
-    </form>
-    {props.tables.length > 0 && <div className="table-cards-launch">
-      <button className="ghost-action" onClick={() => setShowCards(true)}>生成桌卡（二维码，可打印）</button>
-      <small>客人用自己的手机扫码进入，桌号和令牌随链接带上。同一个链接写进 NFC 标签也可以，安卓碰一下就会打开。</small>
+      <Section id="languages" title={t("sectionLanguages")} hint={t("languagesHint")}>
+        <div className="language-picker" role="group" aria-label={t("sectionLanguages")}>{MENU_LANGUAGES.map((option) => {
+          const on = offered.includes(option);
+          // The last one cannot be switched off: a menu has to be in something.
+          const last = on && offered.length === 1;
+          const next: MenuLanguage[] = on ? offered.filter((item) => item !== option) : [...offered, option];
+          return <button
+            key={option}
+            type="button"
+            className={`language-toggle ${on ? "selected" : ""}`}
+            aria-pressed={on}
+            disabled={last}
+            title={last ? t("keepOneLanguage") : undefined}
+            onClick={() => void props.onSaveSettings({ menuLanguages: next }, "languagesSaved")}
+          ><img src={LANGUAGE_INFO[option].flag} alt="" /><span>{LANGUAGE_INFO[option].name}</span></button>;
+        })}</div>
+      </Section>
+
+      <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")}>
+        <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
+      </Section>
     </div>}
-    {showCards && <TableCards tables={props.tables} entryUrl={(table) => entryUrl(props.storage.baseUrl, table)} onClose={() => setShowCards(false)} />}
 
-    <div className="table-list">{props.tables.length ? props.tables.map((table) => <div className="table-row" key={table.table}>
-      <div><b>桌 {table.table}</b>{table.label && <small> · {table.label}</small>}<code>{entryUrl(props.storage.baseUrl, table)}</code></div>
-      <div className="table-row-actions">
-        <button className="ghost-action" onClick={() => void props.onSaveTable({ table: table.table, label: table.label, rotateToken: true })}>更换令牌</button>
-        <button className="ghost-action" onClick={() => void props.onDeleteTable(table.table)}>删除</button>
-      </div>
-    </div>) : <div className="admin-empty">还没有登记桌台，任何设备都可以自报桌号</div>}</div>
+    <div className="settings-grid">
+      <Section id="tables" title={t("sectionTables")} hint={t("tablesHint")}>
+        <form className="editor-form" onSubmit={(event) => void addTable(event)}>
+          <div className="field-grid">
+            <label><span>{t("tableNumber")}</span><input name="table" required maxLength={8} placeholder="12 / T-3" /></label>
+            <label><span>{t("tableNote")}</span><input name="label" maxLength={64} placeholder={t("tableNotePlaceholder")} /></label>
+          </div>
+          <button className="primary-action" type="submit">{t("registerTable")}</button>
+        </form>
+        {props.tables.length > 0 && <button className="ghost-action settings-cards-button" onClick={() => setShowCards(true)}>{t("printCards")}</button>}
+        {showCards && <TableCards
+          tables={props.tables}
+          restaurantName={settings?.restaurantName ?? ""}
+          menuLanguages={offered}
+          entryUrl={(table) => entryUrl(props.storage.baseUrl, table)}
+          onClose={() => setShowCards(false)}
+        />}
+        <div className="table-list">{props.tables.length ? props.tables.map((table) => <div className="table-row" key={table.table}>
+          <div><b>{t("table", { table: table.table })}</b>{table.label && <small> · {table.label}</small>}<code>{entryUrl(props.storage.baseUrl, table)}</code></div>
+          <div className="table-row-actions">
+            <button className="ghost-action" onClick={() => void props.onSaveTable({ table: table.table, label: table.label, rotateToken: true })}>{t("rotateToken")}</button>
+            <button className="ghost-action" onClick={() => void props.onDeleteTable(table.table)}>{t("delete")}</button>
+          </div>
+        </div>) : <div className="admin-empty">{t("noTables")}</div>}</div>
+      </Section>
 
-    <h1>操作记录</h1>
-    <p>所有带令牌的写操作和被拒绝的越权尝试。共享令牌记不到人，但记得到「什么被改了、什么时候、哪台设备、什么角色」。</p>
-    <div className="audit-list">{props.auditEntries.length ? props.auditEntries.map((entry) => <div className={`audit-row ${entry.status >= 400 ? "denied" : ""}`} key={entry.id}>
-      <span className="audit-role">{ROLE_LABELS[entry.role] ?? entry.role}</span>
-      <span className="audit-what"><b>{entry.method} {entry.route}</b><small>{new Date(entry.at).toLocaleString("de-AT")} · {entry.ip} · {entry.status}{detailSummary(entry)}</small></span>
-    </div>) : <div className="admin-empty">还没有记录</div>}</div>
+      <Section id="password" title={t("sectionPassword")} hint={t("passwordHint")}>
+        <form className="editor-form" onSubmit={(event) => void changePassword(event)}>
+          <label><span>{t("currentPassword")}</span><input name="currentPassword" required type="password" autoComplete="current-password" /></label>
+          <label><span>{t("newPassword")}</span><input name="nextPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
+          <label><span>{t("gateRepeat")}</span><input name="repeatPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
+          {passwordNote && <p className="gate-note error" role="alert">{passwordNote}</p>}
+          <button className="primary-action" type="submit">{t("changePassword")}</button>
+        </form>
+      </Section>
+    </div>
+
+    <details className="settings-card settings-fold">
+      <summary>{t("sectionAudit")}</summary>
+      <p className="settings-hint">{t("auditHint")}</p>
+      <div className="audit-list">{props.auditEntries.length ? props.auditEntries.map((entry) => <div className={`audit-row ${entry.status >= 400 ? "denied" : ""}`} key={entry.id}>
+        <span className="audit-role">{ROLE_KEYS[entry.role] ? t(ROLE_KEYS[entry.role]) : entry.role}</span>
+        <span className="audit-what"><b>{entry.method} {entry.route}</b><small>{new Date(entry.at).toLocaleString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")} · {entry.ip} · {entry.status}{detailSummary(entry)}</small></span>
+      </div>) : <div className="admin-empty">{t("auditEmpty")}</div>}</div>
+    </details>
+
+    {/* Open by itself only when the console could not reach its backend —
+        then the address is the thing to fix. */}
+    <details className="settings-card settings-fold" open={!settings}>
+      <summary>{t("sectionConnection")}</summary>
+      <p className="settings-hint">{t("connectionHint")}</p>
+      <form id="connectionForm" className="editor-form" onSubmit={saveConnection}>
+        <label><span>{t("apiAddress")}</span><input name="baseUrl" required defaultValue={props.storage.baseUrl} placeholder="https://…" /></label>
+        <label><span>{t("adminToken")}</span><input name="token" type="password" defaultValue={props.storage.token} autoComplete="off" /></label>
+        <button className="primary-action" type="submit">{t("saveConnection")}</button>
+      </form>
+    </details>
   </div></section>;
 }

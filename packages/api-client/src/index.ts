@@ -1,5 +1,5 @@
 import type {
-  ApiBill, ApiCatalogProduct, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
+  ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile } from "@zhaoyun/domain";
@@ -241,7 +241,7 @@ export class RestaurantApi {
     return `${this.#baseUrl()}${path}`;
   }
 
-  catalog(): Promise<{ products: ApiCatalogProduct[]; theme?: MenuThemeId; languages?: MenuLanguage[] }> {
+  catalog(): Promise<{ products: ApiCatalogProduct[]; theme?: MenuThemeId; languages?: MenuLanguage[]; menu?: ApiMenuSettings }> {
     return this.#request("/api/catalog");
   }
 

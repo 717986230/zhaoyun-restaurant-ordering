@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminApi } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
-import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
+import { LANGUAGE_INFO } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
+import { ADMIN_LANGUAGES, useI18n } from "./i18n";
+import type { CopyKey } from "./i18n";
 import { GatePanel } from "../features/gate/GatePanel";
 import { BoardPanel } from "../features/board/BoardPanel";
 import { TablesPanel } from "../features/tables/TablesPanel";
@@ -34,42 +37,57 @@ const initialState: AdminState = {
   tab: "catalog", role: null,
   gate: { checking: true, configured: false, busy: false, error: null, reachable: true },
   auditEntries: [],
-  connected: false, connectionText: "未连接", products: [], printers: [],
+  connected: false, connectionError: null, products: [], printers: [],
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
-  discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", menuTheme: null, menuLanguages: null, toast: null
+  discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", settings: null, toast: null
 };
 
 const BOARD_REFRESH_MS = 5000;
 
-// The waiter tablet and the kitchen screen open the same console; the role
-// decides which of it exists at all, so nobody is offered a 403.
-const TABS_BY_ROLE: Record<StaffRole, AdminTab[]> = {
-  manager: ["catalog", "board", "tables", "printers", "system"],
-  staff: ["board", "tables"],
-  kitchen: ["board"]
+/**
+ * Which sections exist for whom. The waiter tablet and the kitchen screen
+ * open the same console, and the role decides which of it exists at all, so
+ * nobody is offered a 403. For the owner, orders, tables and printers only
+ * appear once ordering is switched on: while the menu is view-only they would
+ * be three empty screens.
+ */
+function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
+  if (role === "kitchen") return ["board"];
+  if (role === "staff") return ["board", "tables"];
+  return showOrdering ? ["catalog", "board", "tables", "printers", "system"] : ["catalog", "system"];
+}
+
+const TAB_KEYS: Record<AdminTab, CopyKey> = {
+  catalog: "tabCatalog",
+  board: "tabBoard",
+  tables: "tabTables",
+  printers: "tabPrinters",
+  system: "tabSettings"
 };
 
-const ROLE_LABELS: Record<StaffRole, string> = { manager: "经理", staff: "服务员", kitchen: "厨房" };
-
-const TAB_LABELS: Record<AdminTab, string> = {
-  catalog: "商品与媒体",
-  board: "订单看板",
-  tables: "桌位",
-  printers: "打印机",
-  system: "连接设置"
-};
+const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
 
 export function App() {
+  const { t, language, setLanguage } = useI18n();
   const [state, setState] = useState(initialState);
   // The board polls on an interval; keeping the role in a ref avoids rebuilding
   // that callback (and restarting the timer) on every reconnect.
   const roleRef = useRef<StaffRole | null>(null);
   const storage = useMemo(() => adminApi.storage, [state.connected, state.tab]);
+  const restaurantName = state.settings?.restaurantName ?? "";
+
+  useEffect(() => {
+    document.title = restaurantName ? `${restaurantName} · ${t("admin")}` : t("admin");
+  }, [restaurantName, t]);
 
   const notify = useCallback((message: string, kind: "success" | "warning" | "error" = "success") => {
     setState((current) => ({ ...current, toast: { message, kind } }));
     window.setTimeout(() => setState((current) => ({ ...current, toast: null })), 2400);
   }, []);
+
+  const failed = useCallback((error: unknown, fallback: CopyKey) => {
+    notify(error instanceof Error && error.message ? error.message : t(fallback), "error");
+  }, [notify, t]);
 
   /** True when the console is through and loaded; false when whatever is in
    *  the header did not open the door. */
@@ -82,21 +100,23 @@ export function App() {
       const [catalog, printerList, settings] = manager
         ? await Promise.all([adminApi.products(), adminApi.printers(), adminApi.settings()])
         : [{ products: [] }, { printers: [] }, null];
-      setState((current) => ({
-        ...current,
-        role,
-        connected: true,
-        connectionText: `服务器在线 · ${ROLE_LABELS[role]}`,
-        products: catalog.products.map(mapProduct),
-        printers: printerList.printers,
-        menuTheme: settings?.menuTheme ?? current.menuTheme,
-        menuLanguages: settings?.menuLanguages ?? current.menuLanguages,
-        tab: TABS_BY_ROLE[role].includes(current.tab) ? current.tab : TABS_BY_ROLE[role][0] ?? "board"
-      }));
+      setState((current) => {
+        const tabs = tabsFor(role, settings?.showOrdering ?? false);
+        return {
+          ...current,
+          role,
+          connected: true,
+          connectionError: null,
+          products: catalog.products.map(mapProduct),
+          printers: printerList.printers,
+          settings: settings ?? current.settings,
+          tab: tabs.includes(current.tab) ? current.tab : tabs[0] ?? "board"
+        };
+      });
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "连接失败";
-      setState((current) => ({ ...current, role: null, connected: false, connectionText: message }));
+      const message = error instanceof Error ? error.message : null;
+      setState((current) => ({ ...current, role: null, connected: false, connectionError: message }));
       return false;
     }
   }, []);
@@ -112,20 +132,20 @@ export function App() {
           .then(([a, b, c]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables }));
       setState((current) => ({ ...current, orders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables }));
     } catch (error) {
-      if (!silent) notify(error instanceof Error ? error.message : "看板加载失败", "error");
+      if (!silent) failed(error, "boardLoadFailed");
     }
-  }, [notify]);
+  }, [failed]);
 
   /**
    * Ask the door before drawing anything.
    *
    * A token already in the header gets first go — that is a session from
    * earlier in this browser tab, or an ADMIN_TOKEN somebody configured on the
-   * connection tab, and either way there is nothing to ask. Only when it does
-   * not open the door does the gate appear.
+   * connection section, and either way there is nothing to ask. Only when it
+   * does not open the door does the gate appear.
    *
-   * If the gate itself is unreachable the console falls back to the connection
-   * tab, because then the problem is the address, not the password.
+   * If the gate itself is unreachable the console falls back to settings,
+   * because then the problem is the address, not the password.
    */
   useEffect(() => {
     void (async () => {
@@ -140,7 +160,7 @@ export function App() {
         setState((current) => ({
           ...current,
           tab: "system",
-          connectionText: error instanceof Error ? error.message : "连接失败",
+          connectionError: error instanceof Error ? error.message : null,
           gate: { ...current.gate, checking: false, reachable: false }
         }));
       }
@@ -156,15 +176,15 @@ export function App() {
       const entered = await connect();
       setState((current) => ({
         ...current,
-        gate: { ...current.gate, checking: false, configured: true, busy: false, error: entered ? null : current.connectionText }
+        gate: { ...current.gate, checking: false, configured: true, busy: false, error: entered ? null : current.connectionError }
       }));
     } catch (error) {
       setState((current) => ({
         ...current,
-        gate: { ...current.gate, busy: false, error: error instanceof Error ? error.message : "登录失败" }
+        gate: { ...current.gate, busy: false, error: error instanceof Error ? error.message : t("signInFailed") }
       }));
     }
-  }, [connect]);
+  }, [connect, t]);
 
   const signIn = useCallback((password: string) => enterWith(() => adminApi.signIn(password)), [enterWith]);
 
@@ -213,21 +233,21 @@ export function App() {
       await loadBoard(true);
       notify(message);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "操作失败", "error");
+      failed(error, "genericFailed");
     } finally {
       setState((current) => ({ ...current, boardBusy: false }));
     }
   }
 
   async function lockTable(table: string, locked: boolean) {
-    await runBoardAction(() => adminApi.setTableLock(table, locked), locked ? `桌 ${table} 已锁定，暂不接受新订单` : `桌 ${table} 已解除锁定`);
+    await runBoardAction(() => adminApi.setTableLock(table, locked), t(locked ? "tableLockedToast" : "tableUnlockedToast", { table }));
   }
 
   async function openBill(table: string) {
     try {
       const { bill } = await adminApi.bill(table);
       setState((current) => ({ ...current, bill }));
-    } catch (error) { notify(error instanceof Error ? error.message : "账单加载失败", "error"); }
+    } catch (error) { failed(error, "billLoadFailed"); }
   }
 
   async function settleBill(table: string) {
@@ -236,36 +256,43 @@ export function App() {
       const { bill } = await adminApi.settleBill(table);
       setState((current) => ({ ...current, bill: null }));
       await loadBoard(true);
-      notify(`桌 ${table} 已结账 EUR ${bill.total.toFixed(2)}，账单已送前台打印，桌位已释放`);
+      notify(t("billSettled", { table, total: bill.total.toFixed(2) }));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "结账失败", "error");
+      failed(error, "billSettleFailed");
     } finally {
       setState((current) => ({ ...current, boardBusy: false }));
     }
   }
 
-  async function saveProduct(input: AdminProductInput, id: string | null, media: File | null) {
+  async function saveProduct(input: AdminProductInput, id: string | null, media: File | null): Promise<boolean> {
     try {
       const result = id ? await adminApi.updateProduct(id, input) : await adminApi.createProduct(input);
       if (media) await adminApi.uploadMedia(result.product.id, media);
       setState((current) => ({ ...current, editingProduct: null }));
       await connect();
-      notify("商品已保存");
-    } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
+      notify(t("productSaved"));
+      return true;
+    } catch (error) {
+      failed(error, "saveFailed");
+      return false;
+    }
   }
 
   async function deleteProduct(id: string) {
-    try { await adminApi.deleteProduct(id); setState((current) => ({ ...current, editingProduct: null })); await connect(); notify("商品已删除"); }
-    catch (error) { notify(error instanceof Error ? error.message : "删除失败", "error"); }
+    try {
+      await adminApi.deleteProduct(id);
+      setState((current) => ({ ...current, editingProduct: null }));
+      await connect();
+      notify(t("productDeleted"));
+    } catch (error) { failed(error, "deleteFailed"); }
   }
 
   async function discoverPrinters() {
-    if (!nativePrinter.isNative()) { notify("周围设备搜索需要在 Android App 内运行；网页端可手动填写 IP", "warning"); return; }
     try {
       const { devices } = await nativePrinter.plugin.discover();
       setState((current) => ({ ...current, discoveredPrinters: devices }));
-      notify(`发现 ${devices.length} 台设备`);
-    } catch (error) { notify(error instanceof Error ? error.message : "搜索失败", "error"); }
+      notify(t("printersFoundToast", { count: devices.length }));
+    } catch (error) { failed(error, "printersSearchFailed"); }
   }
 
   async function savePrinter(profile: Omit<PrinterProfile, "id">, id: string | null) {
@@ -273,106 +300,150 @@ export function App() {
       if (id) await adminApi.updatePrinter(id, profile); else await adminApi.createPrinter(profile);
       setState((current) => ({ ...current, editingPrinter: null }));
       await connect();
-      notify("打印机配置已保存");
-    } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
+      notify(t("printerSaved"));
+    } catch (error) { failed(error, "saveFailed"); }
   }
 
   async function testPrinter(profile: PrinterProfile) {
-    if (!nativePrinter.isNative()) { notify("测试打印需要在 Android App 内运行", "warning"); return; }
-    try { await nativePrinter.plugin.testPrint(profile); notify("测试页已发送"); }
-    catch (error) { notify(error instanceof Error ? error.message : "测试打印失败", "error"); }
-  }
-
-  async function saveMenuTheme(menuTheme: MenuThemeId) {
-    try {
-      const settings = await adminApi.updateSettings({ menuTheme });
-      setState((current) => ({ ...current, menuTheme: settings.menuTheme }));
-      notify("菜单样式已更新");
-    } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
+    try { await nativePrinter.plugin.testPrint(profile); notify(t("printerTestSent")); }
+    catch (error) { failed(error, "printerTestFailed"); }
   }
 
   /**
-   * Shown at once, saved behind it. Each toggle works out the next list from
-   * the one on screen, so waiting for the server before updating the screen
-   * meant a second tap during the save was computed from the list before the
-   * first one — and saved a set of languages nobody chose.
+   * Every setting saves the same way: shown at once, saved behind it. A
+   * control works out its next value from what is on screen, so waiting for
+   * the server before updating the screen meant a second tap during a save
+   * was computed from the value before the first — which is how the language
+   * toggles once saved a set of languages nobody chose.
    */
-  async function saveMenuLanguages(menuLanguages: MenuLanguage[]) {
-    let previous: MenuLanguage[] | null = null;
-    setState((current) => {
-      previous = current.menuLanguages;
-      return { ...current, menuLanguages };
-    });
+  async function saveSettings(change: Partial<ApiSettings>, done: CopyKey) {
+    const before = state.settings;
+    if (!before) return;
+    const optimistic = { ...before, ...change };
+    setState((current) => ({
+      ...current,
+      settings: current.settings ? { ...current.settings, ...change } : current.settings
+    }));
     try {
-      const settings = await adminApi.updateSettings({ menuLanguages });
-      // Only adopt the server's answer if nothing newer is on screen.
-      setState((current) => current.menuLanguages === menuLanguages ? { ...current, menuLanguages: settings.menuLanguages } : current);
-      notify("菜单语言已更新");
+      const saved = await adminApi.updateSettings(change);
+      // Only adopt the server's answer for what this save touched, so a later
+      // change already on screen is not rolled back by an earlier reply.
+      setState((current) => {
+        if (!current.settings) return current;
+        const merged = { ...current.settings };
+        for (const key of Object.keys(change) as Array<keyof ApiSettings>) {
+          if (current.settings[key] === optimistic[key]) (merged as Record<string, unknown>)[key] = saved[key];
+        }
+        const tabs = current.role ? tabsFor(current.role, merged.showOrdering) : [];
+        return { ...current, settings: merged, tab: current.role && !tabs.includes(current.tab) ? "system" : current.tab };
+      });
+      notify(t(done));
     } catch (error) {
-      setState((current) => current.menuLanguages === menuLanguages ? { ...current, menuLanguages: previous } : current);
-      notify(error instanceof Error ? error.message : "保存失败", "error");
+      setState((current) => {
+        if (!current.settings) return current;
+        const reverted = { ...current.settings };
+        for (const key of Object.keys(change) as Array<keyof ApiSettings>) {
+          if (current.settings[key] === optimistic[key]) (reverted as Record<string, unknown>)[key] = before[key];
+        }
+        return { ...current, settings: reverted };
+      });
+      failed(error, "saveFailed");
     }
   }
 
   /** Changing the password ends every session opened with the old one — this
    *  one included, so the console signs itself back in with the new one. */
-  async function changePassword(password: string, currentPassword: string) {
+  async function changePassword(password: string, currentPassword: string): Promise<boolean> {
     try {
       await adminApi.setPassword(password, currentPassword);
       const { token } = await adminApi.signIn(password);
       adminApi.remember(token);
-      notify("管理密码已修改，其他设备需要重新登录");
-    } catch (error) { notify(error instanceof Error ? error.message : "修改密码失败", "error"); }
+      notify(t("passwordChanged"));
+      return true;
+    } catch (error) {
+      failed(error, "passwordChangeFailed");
+      return false;
+    }
   }
 
   async function saveConnection(nextStorage: AdminStorage) {
     adminApi.configure(nextStorage);
     await connect();
     await loadTables();
-    notify("连接设置已保存");
+    notify(t("connectionSaved"));
   }
 
-  async function saveTable(input: { table: string; label?: string; rotateToken?: boolean }) {
+  async function saveTable(input: { table: string; label?: string; rotateToken?: boolean }): Promise<boolean> {
     try {
       await adminApi.saveTable(input);
       await loadTables();
-      notify(input.rotateToken ? "桌台令牌已更换，请重新分发入口链接" : "桌台已登记");
-    } catch (error) { notify(error instanceof Error ? error.message : "桌台保存失败", "error"); }
+      notify(t(input.rotateToken ? "tokenRotated" : "tableRegistered"));
+      return true;
+    } catch (error) {
+      failed(error, "tableSaveFailed");
+      return false;
+    }
   }
 
   async function deleteTable(table: string) {
     try {
       await adminApi.deleteTable(table);
       await loadTables();
-      notify("桌台已删除");
-    } catch (error) { notify(error instanceof Error ? error.message : "删除失败", "error"); }
+      notify(t("tableDeleted"));
+    } catch (error) { failed(error, "deleteFailed"); }
   }
 
-  async function returnToApp() {
+  async function openMenu() {
     if (kiosk.isNative()) { try { await kiosk.plugin.lock(); } catch { /* Navigation remains available in test mode. */ } }
     window.location.href = "index.html";
   }
 
   function setTab(tab: AdminTab) { setState((current) => ({ ...current, tab })); }
 
+  const languagePicker = <div className="admin-languages" role="group" aria-label={t("language")}>{ADMIN_LANGUAGES.map((option) => <button
+    key={option}
+    type="button"
+    className={option === language ? "on" : ""}
+    aria-label={LANGUAGE_INFO[option].name}
+    aria-pressed={option === language}
+    onClick={() => setLanguage(option)}
+  ><img src={LANGUAGE_INFO[option].flag} alt="" /></button>)}</div>;
+
   // The gate stands in front of everything, and nothing behind it is rendered
   // — not even the tab strip, which is what a hidden tab would be.
   if (state.gate.checking) {
-    return <div className="admin-shell gate-shell"><p className="gate-note">正在连接…</p></div>;
+    return <div className="admin-shell gate-shell"><p className="gate-note">{t("connecting")}</p></div>;
   }
   if (!state.role && state.gate.reachable) {
-    return <div className="admin-shell gate-shell"><GatePanel
-      configured={state.gate.configured}
-      busy={state.gate.busy}
-      error={state.gate.error}
-      onSignIn={signIn}
-      onSetPassword={setFirstPassword}
-    /></div>;
+    return <div className="admin-shell gate-shell">
+      <div className="gate-languages">{languagePicker}</div>
+      <GatePanel
+        configured={state.gate.configured}
+        busy={state.gate.busy}
+        error={state.gate.error}
+        onSignIn={signIn}
+        onSetPassword={setFirstPassword}
+      />
+    </div>;
   }
 
+  const tabs = state.role ? tabsFor(state.role, state.settings?.showOrdering ?? false) : (["system"] as AdminTab[]);
+
   return <><div className="admin-shell">
-    <header className="admin-head"><div><strong>赵云餐厅管理台</strong><small>ZHAO YUN OPERATIONS</small></div><div className="admin-head-actions"><div className="connection"><i className={state.connected ? "online" : ""} /><span>{state.connectionText}</span></div><button onClick={() => void returnToApp()}>返回点餐</button><button onClick={() => void signOut()}>退出</button></div></header>
-    <nav className="admin-tabs" aria-label="管理模块">{(state.role ? TABS_BY_ROLE[state.role] : (["system"] as AdminTab[])).map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} onClick={() => setTab(tab)}>{TAB_LABELS[tab]}</button>)}</nav>
+    <header className="admin-head">
+      <div className="admin-brand">
+        <strong>{restaurantName || t("admin")}</strong>
+        {state.role && <span className={`admin-role ${state.role}`}>{t(ROLE_KEYS[state.role])}</span>}
+        <i className={`admin-status ${state.connected ? "online" : ""}`} title={t(state.connected ? "online" : "offline")} aria-label={t(state.connected ? "online" : "offline")} />
+      </div>
+      <div className="admin-head-actions">
+        {languagePicker}
+        <button className="head-action" onClick={() => void openMenu()} aria-label={t("openMenu")} title={t("openMenu")}><span aria-hidden="true">↗</span><em>{t("openMenu")}</em></button>
+        {state.role && <button className="head-action" onClick={() => void signOut()} aria-label={t("signOut")} title={t("signOut")}><span aria-hidden="true">⏻</span><em>{t("signOut")}</em></button>}
+      </div>
+    </header>
+    <nav className="admin-tabs" aria-label={t("modules")}>{tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}</nav>
+    {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     <main>
       {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel
@@ -381,9 +452,9 @@ export function App() {
         failedJobs={state.failedJobs}
         busy={state.boardBusy}
         onRefresh={() => loadBoard()}
-        onOrderStatus={(id: string, status: ApiOrder["status"]) => runBoardAction(() => adminApi.updateOrderStatus(id, status), "订单状态已更新")}
-        onRequestStatus={(id: string, status: ApiServiceRequest["status"]) => runBoardAction(() => adminApi.updateServiceRequestStatus(id, status), "服务呼叫已处理")}
-        onRetryJob={(id: string) => runBoardAction(() => adminApi.retryPrintJob(id), "打印任务已重新排队")}
+        onOrderStatus={(id: string, status: ApiOrder["status"]) => runBoardAction(() => adminApi.updateOrderStatus(id, status), t("orderUpdated"))}
+        onRequestStatus={(id: string, status: ApiServiceRequest["status"]) => runBoardAction(() => adminApi.updateServiceRequestStatus(id, status), t("callHandled"))}
+        onRetryJob={(id: string) => runBoardAction(() => adminApi.retryPrintJob(id), t("jobRequeued"))}
         role={state.role}
       />}
       {state.tab === "tables" && <TablesPanel
@@ -397,8 +468,18 @@ export function App() {
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
         onSettleBill={settleBill}
       />}
-      {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
-      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} menuTheme={state.menuTheme} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} onSaveMenuTheme={saveMenuTheme} menuLanguages={state.menuLanguages} onSaveMenuLanguages={saveMenuLanguages} onChangePassword={changePassword} />}
+      {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
+      {state.tab === "system" && <SettingsPanel
+        storage={storage}
+        settings={state.settings}
+        tables={state.tables}
+        auditEntries={state.auditEntries}
+        onSaveSettings={saveSettings}
+        onSaveConnection={saveConnection}
+        onSaveTable={saveTable}
+        onDeleteTable={deleteTable}
+        onChangePassword={changePassword}
+      />}
     </main>
   </div><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;
 }
