@@ -6,7 +6,7 @@ import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
-  adminGateView, assertPassword, auditView, billView, DEFAULT_MENU_THEME, hashPassword,
+  adminGateView, assertPassword, auditView, billView, hashPassword,
   hashSessionToken, newSessionToken, normalizeBundleItems, normalizeMenuTheme,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
   tableOverviewView, tableView, verifyPassword
@@ -273,16 +273,25 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
-    -- One restaurant, one row, and the console's password lives on it: there
-    -- is nothing to name or list, so a table of accounts would be a table of
-    -- one. The hash is stored, never the password.
     CREATE TABLE IF NOT EXISTS restaurant_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       menu_theme TEXT NOT NULL DEFAULT 'jade',
-      admin_password_hash TEXT,
-      admin_password_salt TEXT,
-      admin_password_iterations INTEGER,
-      admin_password_set_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    -- The console's password. One restaurant, one row: there is nothing to
+    -- name or list, so a table of accounts would be a table of one. The hash
+    -- is stored, never the password.
+    --
+    -- A table of its own rather than four columns on restaurant_settings,
+    -- because that is what a deployed D1 can be given: CREATE TABLE IF NOT
+    -- EXISTS is a no-op on a database that already has it, and SQLite has no
+    -- ADD COLUMN IF NOT EXISTS. See migrations/0003_admin_password_gate.sql.
+    CREATE TABLE IF NOT EXISTS admin_gate (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_iterations INTEGER NOT NULL,
       updated_at TEXT NOT NULL
     );
 
@@ -310,13 +319,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
     "ALTER TABLE orders ADD COLUMN billed_at TEXT",
     "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
-    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'",
-    // A database from before the console had a password gate has the settings
-    // row already; these four columns are how it gets one without a rebuild.
-    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_hash TEXT",
-    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_salt TEXT",
-    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_iterations INTEGER",
-    "ALTER TABLE restaurant_settings ADD COLUMN admin_password_set_at TEXT"
+    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'"
   ]) {
     try {
       db.exec(statement);
@@ -392,14 +395,14 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
     releaseTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?"),
     openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
-    setAdminPassword: db.prepare(`
-      INSERT INTO restaurant_settings (id, menu_theme, admin_password_hash, admin_password_salt, admin_password_iterations, admin_password_set_at, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?)
+    getAdminGate: db.prepare("SELECT * FROM admin_gate WHERE id = 1"),
+    setAdminGate: db.prepare(`
+      INSERT INTO admin_gate (id, password_hash, password_salt, password_iterations, updated_at)
+      VALUES (1, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
-        admin_password_hash = excluded.admin_password_hash,
-        admin_password_salt = excluded.admin_password_salt,
-        admin_password_iterations = excluded.admin_password_iterations,
-        admin_password_set_at = excluded.admin_password_set_at,
+        password_hash = excluded.password_hash,
+        password_salt = excluded.password_salt,
+        password_iterations = excluded.password_iterations,
         updated_at = excluded.updated_at
     `),
     insertSession: db.prepare("INSERT INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)"),
@@ -698,7 +701,18 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
   }
 
   function adminGate() {
-    return adminGateView(statements.getSettings.get());
+    return adminGateView(statements.getAdminGate.get());
+  }
+
+  /** Sets the password without asking for the current one. Only the ADMIN_TOKEN
+   *  recovery route and a first-run set reach this. */
+  async function resetAdminGatePassword(password) {
+    const stored = await hashPassword(assertPassword(password));
+    statements.setAdminGate.run(stored.hash, stored.salt, stored.iterations, now());
+    // Changing the password ends every session opened with the old one; that
+    // is most of the reason anyone changes it.
+    statements.deleteAllSessions.run();
+    return adminGateView(statements.getAdminGate.get());
   }
 
   /**
@@ -710,25 +724,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
    * caller answers it the way it answers a wrong sign-in — one refusal, no
    * detail — and its rate limiter counts it.
    */
-  async function resetAdminGatePassword(password) {
-    const row = statements.getSettings.get();
-    const stored = await hashPassword(assertPassword(password));
-    const timestamp = now();
-    statements.setAdminPassword.run(
-      row?.menu_theme ?? DEFAULT_MENU_THEME,
-      stored.hash, stored.salt, stored.iterations, timestamp, timestamp
-    );
-    // Changing the password ends every session opened with the old one; that
-    // is most of the reason anyone changes it.
-    statements.deleteAllSessions.run();
-    return adminGateView(statements.getSettings.get());
-  }
-
   async function setAdminGatePassword(password, currentPassword) {
-    const row = statements.getSettings.get();
-    if (row?.admin_password_hash) {
+    const row = statements.getAdminGate.get();
+    if (row) {
       const correct = await verifyPassword(String(currentPassword ?? ""), {
-        hash: row.admin_password_hash, salt: row.admin_password_salt, iterations: row.admin_password_iterations
+        hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations
       });
       if (!correct) return null;
     }
@@ -737,14 +737,14 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
   /** Exchanges the password for a session token, or nothing at all. */
   async function signIn(password) {
-    const row = statements.getSettings.get();
-    const stored = row?.admin_password_hash
-      ? { hash: row.admin_password_hash, salt: row.admin_password_salt, iterations: row.admin_password_iterations }
+    const row = statements.getAdminGate.get();
+    const stored = row
+      ? { hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations }
       // Verify against a throwaway hash anyway, so an unconfigured gate does
       // not answer faster than a wrong password and say so by timing.
       : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
     const correct = await verifyPassword(String(password ?? ""), stored);
-    if (!row?.admin_password_hash || !correct) return null;
+    if (!row || !correct) return null;
 
     const token = newSessionToken();
     const timestamp = now();

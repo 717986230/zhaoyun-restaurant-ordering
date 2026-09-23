@@ -247,33 +247,30 @@ export function createStore(db) {
    * differ here.
    */
   async function adminGate() {
-    return adminGateView(await first("SELECT * FROM restaurant_settings WHERE id = 1"));
+    return adminGateView(await first("SELECT * FROM admin_gate WHERE id = 1"));
   }
 
   async function resetAdminGatePassword(password) {
-    const row = await first("SELECT * FROM restaurant_settings WHERE id = 1");
     const stored = await hashPassword(assertPassword(password));
-    const timestamp = now();
     await run(
-      `INSERT INTO restaurant_settings (id, menu_theme, admin_password_hash, admin_password_salt, admin_password_iterations, admin_password_set_at, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO admin_gate (id, password_hash, password_salt, password_iterations, updated_at)
+       VALUES (1, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         admin_password_hash = excluded.admin_password_hash,
-         admin_password_salt = excluded.admin_password_salt,
-         admin_password_iterations = excluded.admin_password_iterations,
-         admin_password_set_at = excluded.admin_password_set_at,
+         password_hash = excluded.password_hash,
+         password_salt = excluded.password_salt,
+         password_iterations = excluded.password_iterations,
          updated_at = excluded.updated_at`,
-      normalizeMenuTheme(row?.menu_theme), stored.hash, stored.salt, stored.iterations, timestamp, timestamp
+      stored.hash, stored.salt, stored.iterations, now()
     );
     await run("DELETE FROM admin_sessions");
     return adminGate();
   }
 
   async function setAdminGatePassword(password, currentPassword) {
-    const row = await first("SELECT * FROM restaurant_settings WHERE id = 1");
-    if (row?.admin_password_hash) {
+    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
+    if (row) {
       const correct = await verifyPassword(String(currentPassword ?? ""), {
-        hash: row.admin_password_hash, salt: row.admin_password_salt, iterations: row.admin_password_iterations
+        hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations
       });
       if (!correct) return null;
     }
@@ -281,12 +278,12 @@ export function createStore(db) {
   }
 
   async function signIn(password) {
-    const row = await first("SELECT * FROM restaurant_settings WHERE id = 1");
-    const stored = row?.admin_password_hash
-      ? { hash: row.admin_password_hash, salt: row.admin_password_salt, iterations: row.admin_password_iterations }
+    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
+    const stored = row
+      ? { hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations }
       : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
     const correct = await verifyPassword(String(password ?? ""), stored);
-    if (!row?.admin_password_hash || !correct) return null;
+    if (!row || !correct) return null;
 
     const token = newSessionToken();
     const timestamp = now();

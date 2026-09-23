@@ -140,7 +140,7 @@ export async function hashSessionToken(token) {
 /** What the console asks before it draws anything: is there a password yet,
  *  or is this the first person through the door. */
 export function adminGateView(row) {
-  return { configured: Boolean(row?.admin_password_hash) };
+  return { configured: Boolean(row?.password_hash) };
 }
 
 const TABLE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,7}$/;

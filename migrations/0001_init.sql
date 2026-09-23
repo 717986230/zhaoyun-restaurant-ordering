@@ -116,10 +116,13 @@ CREATE TABLE print_jobs (
 CREATE TABLE restaurant_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       menu_theme TEXT NOT NULL DEFAULT 'jade',
-      admin_password_hash TEXT,
-      admin_password_salt TEXT,
-      admin_password_iterations INTEGER,
-      admin_password_set_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE admin_gate (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_iterations INTEGER NOT NULL,
       updated_at TEXT NOT NULL
     );
 CREATE TABLE admin_sessions (
