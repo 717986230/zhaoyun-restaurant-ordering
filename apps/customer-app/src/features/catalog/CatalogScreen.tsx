@@ -13,7 +13,7 @@ interface Props {
   dispatch: CustomerDispatch;
   products: Product[];
   offlineMenu?: boolean;
-  /** No-op outside a Capacitor build; wired to a 7-tap unlock on the title. */
+  /** Counts taps on the title; the seventh within four seconds opens the admin console. */
   onAdminTap: () => Promise<void>;
 }
 
@@ -205,9 +205,9 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false, 
           switches to next, so three languages fit the same 56px icon track a
           back arrow used to sit in — there is nowhere left to go back to. */}
       <button className="icon-btn lang-toggle" onClick={() => dispatch({ type: "language", language: NEXT_LANGUAGE[state.language] })}>{LANGUAGE_NAMES[state.language]}</button>
-      {/* Admin access lives here now, exactly as it did on the home screen this
-          replaced: seven taps within four seconds, and only inside the native
-          shell — `useKiosk` is a no-op everywhere else. */}
+      {/* The hidden way into the admin console: seven taps within four
+          seconds. On the web it opens admin.html, which asks for the password;
+          in the Android kiosk shell it asks for the kiosk PIN first. */}
       <div className="title" role="button" tabIndex={0} onClick={() => void onAdminTap()} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") void onAdminTap(); }}>
         <strong>La Carte</strong><small>TISCH {tableNo()}</small>
       </div>
