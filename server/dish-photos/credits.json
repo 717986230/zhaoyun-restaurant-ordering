@@ -448,15 +448,15 @@
     ]
   },
   "photo-m2": {
-    "query": null,
+    "query": "hosomaki salmon",
     "pick": 0,
-    "pinned": "File:Salmon maki Solaire Resort North1.jpg",
-    "file": "File:Salmon maki Solaire Resort North1.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Salmon_maki_Solaire_Resort_North1.jpg",
-    "author": "Unknown",
+    "pinned": null,
+    "file": "File:Salmon and avocado uramaki with smelt egg topping, avocado norimaki.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Salmon_and_avocado_uramaki_with_smelt_egg_topping,_avocado_norimaki.jpg",
+    "author": "RoyTek",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 24503,
+    "bytes": 28761,
     "alternatives": []
   },
   "photo-m3": {
@@ -1363,7 +1363,7 @@
     "author": "Flickr.com user \"Blue Lotus\"",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 25443,
+    "bytes": 25465,
     "alternatives": []
   },
   "photo-u4": {
@@ -1691,16 +1691,22 @@
     ]
   },
   "photo-wine-spritzer": {
-    "query": null,
+    "query": "Weinschorle",
     "pick": 0,
-    "pinned": "File:Fröccs.jpg",
-    "file": "File:Fröccs.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Fr%C3%B6ccs.jpg",
-    "author": "tutu from Budapest, Hungary",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 22528,
-    "alternatives": []
+    "pinned": null,
+    "file": "File:Jamaica Spritz.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Jamaica_Spritz.jpg",
+    "author": "Sarah Stierch",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "bytes": 17179,
+    "alternatives": [
+      "File:Limoncello spritzer (6104943642).jpg",
+      "File:Heuriger Zum Renner Wiener Spritzer Thymian.jpg",
+      "File:Heuriger Zum Renner Wiener Spritzer.jpg",
+      "File:Fröccs.jpg",
+      "File:Hosta Spritzer 1zz.jpg"
+    ]
   },
   "photo-aperol": {
     "query": "aperol spritz",
