@@ -420,13 +420,17 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
   const stackRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const chipsRef = useRef<HTMLElement>(null);
-  // Which way the last turn went: the new page comes in from that side, and
-  // going back lands at the bottom of the previous page, where the guest was.
-  const turn = useRef<{ direction: -1 | 0 | 1 }>({ direction: 0 });
+  // How the last turn went. `direction` is the side the new page comes in
+  // from. `atEnd` is set only by pulling back past the top of a page: that
+  // guest was reading upwards, so they land at the bottom of the page before,
+  // where they left it. A chip or a button always opens a page at its top —
+  // a page picked by name is read from its first line.
+  const turn = useRef<{ direction: -1 | 0 | 1; atEnd: boolean }>({ direction: 0, atEnd: false });
 
-  function turnTo(category: string) {
+  function turnTo(category: string, atEnd = false) {
     const target = categories.indexOf(category);
     turn.current.direction = target > pageIndex ? 1 : target < pageIndex ? -1 : 0;
+    turn.current.atEnd = atEnd;
     if (category !== state.category) dispatch({ type: "category", category });
   }
 
@@ -436,13 +440,14 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
     canTurn: (direction: TurnDirection) => Boolean(direction === "next" ? nextPage : prevPage),
     onTurn: (direction: TurnDirection) => {
       const target = direction === "next" ? nextPage : prevPage;
-      if (target) turnTo(target);
+      if (target) turnTo(target, direction === "prev");
     }
   });
 
   useLayoutEffect(() => {
     const stack = stackRef.current;
-    if (stack) stack.scrollTop = turn.current.direction < 0 ? stack.scrollHeight : 0;
+    if (stack) stack.scrollTop = turn.current.atEnd ? stack.scrollHeight : 0;
+    turn.current.atEnd = false;
     // The chip for the page on screen stays in view as the pages turn.
     const chip = chipsRef.current?.querySelector<HTMLElement>(".chip.on");
     chip?.scrollIntoView?.({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
