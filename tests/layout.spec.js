@@ -102,6 +102,34 @@ test("the longest names open into a detail card whose heading clears the close b
   }
 });
 
+test("a page picked from the chips opens at its top, whichever side of it the guest was on", async ({ page }) => {
+  // The owner's promotions, so that page and the set menus both sit to the left of "all".
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+    products: catalog, theme: "jade", languages: ["zh", "en", "de"],
+    menu: { title: "Chiri Kitchen", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true,
+      featured: { title: "今日套餐", productIds: catalog.slice(0, 6).map((dish) => dish.id), template: "gallery" } }
+  }) }));
+  await page.reload();
+  const stack = page.locator("#stack");
+  const allChip = page.locator(".chip:not(.chip-sets):not(.chip-featured)").first();
+  for (const chip of [page.locator(".chip-sets"), page.locator(".chip-featured")]) {
+    await allChip.click();
+    await expect(allChip).toHaveClass(/\bon\b/);
+    // Deep into the list, the way a guest who has been reading is.
+    await stack.evaluate((node) => { node.scrollTop = node.scrollHeight / 2; });
+    await chip.click();
+    await expect(chip).toHaveClass(/\bon\b/);
+    await expect(page.locator(".featured-hero")).toBeInViewport();
+    expect(await stack.evaluate((node) => node.scrollTop)).toBe(0);
+    // Back to "all" from there: its top as well.
+    await stack.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    await allChip.click();
+    await expect(allChip).toHaveClass(/\bon\b/);
+    expect(await stack.evaluate((node) => node.scrollTop)).toBe(0);
+  }
+});
+
 const TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];
 
 /** In one card: every visible piece of text inside the card, and none on another. */
