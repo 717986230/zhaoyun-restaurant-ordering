@@ -77,9 +77,23 @@ export function roleAllows(role, minimumRole) {
  * PBKDF2 through WebCrypto because it is the one password hash both runtimes
  * have — `node:crypto`'s scrypt is not on Workers, and a second
  * implementation of a password hash is how the two quietly stop agreeing.
- * 210k iterations is the OWASP 2023 floor for PBKDF2-HMAC-SHA256.
+ *
+ * 100,000 iterations, because that is the most Cloudflare Workers will run:
+ * deployed WebCrypto refuses anything higher with "iteration counts above
+ * 100000 are not supported", while local `wrangler dev` does not enforce the
+ * cap, so a higher number passes every test and fails only in production.
+ * server/tests/password.test.mjs holds the constant to it for that reason.
+ *
+ * That is below OWASP's 600,000 for PBKDF2-HMAC-SHA256. What makes up for it
+ * here is that guessing online is throttled to five failures per address per
+ * five minutes, and guessing offline needs the database first. Each stored
+ * hash records its own iteration count, so raising this later re-hashes on
+ * the next password change without invalidating anything.
  */
-export const PASSWORD_ITERATIONS = 210_000;
+export const PASSWORD_ITERATIONS = 100_000;
+/** The ceiling deployed Workers put on PBKDF2. Not a setting — a fact about
+ *  the runtime, stated once so the test can hold PASSWORD_ITERATIONS to it. */
+export const WORKERS_PBKDF2_MAX_ITERATIONS = 100_000;
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const PASSWORD_MIN = 8;
 

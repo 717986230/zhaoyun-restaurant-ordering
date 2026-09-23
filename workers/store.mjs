@@ -18,7 +18,7 @@ import {
 } from "../shared/rules.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
-// console with no password costs the same 210k iterations as one with.
+// console with no password costs the same PBKDF2 work as one with.
 const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
 const PRODUCT_COLUMNS = [

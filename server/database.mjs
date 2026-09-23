@@ -13,7 +13,7 @@ import {
 } from "../shared/rules.mjs";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
-// password yet still spends the same 210k iterations as one that does, so the
+// password yet still spends the same PBKDF2 work as one that does, so the
 // response time does not say which it was.
 const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
