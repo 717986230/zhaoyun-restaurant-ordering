@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeEnvelope } from "@zhaoyun/contracts";
 import { restaurantApi } from "./api";
@@ -47,6 +47,16 @@ export function App() {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });
   }), [queryClient]);
 
+  // The promotions page's dishes, in the owner's order; a dish since taken off
+  // the menu is skipped, and a page left with nothing on it is not shown.
+  const featuredSettings = catalog.menu?.featured;
+  const featured = useMemo(() => {
+    if (!featuredSettings) return null;
+    const byId = new Map(catalog.products.map((product) => [product.id, product]));
+    const products = featuredSettings.productIds.flatMap((id) => byId.get(id) ?? []);
+    return products.length ? { title: featuredSettings.title, products } : null;
+  }, [featuredSettings, catalog.products]);
+
   return <main className="app-shell">
     <CatalogScreen
       state={{ ...state, language }}
@@ -58,6 +68,7 @@ export function App() {
       scheme={scheme}
       onToggleScheme={toggleScheme}
       onAdminTap={handleAdminTap}
+      featured={featured}
     />
   </main>;
 }

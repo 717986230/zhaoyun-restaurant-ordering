@@ -17,6 +17,10 @@ interface Props {
   onSave: (input: AdminProductInput, id: string | null, media: File | null) => Promise<boolean>;
   onDelete: (id: string) => Promise<void>;
   onRefresh: () => Promise<void>;
+  onDuplicate: (id: string) => Promise<void>;
+  /** The dishes on the promotions page. */
+  featuredIds: string[];
+  onToggleFeatured: (id: string, on: boolean) => void;
 }
 
 function readText(form: FormData, name: string): string { return String(form.get(name) || "").trim(); }
@@ -162,6 +166,11 @@ export function CatalogPanel(props: Props) {
         <div><h2>{product ? t("catalogEdit") : t("catalogNew")}</h2></div>
         <button type="button" className="ghost-action editor-back" onClick={() => setEditorOpen(false)}>← {t("catalogBack")}</button>
       </div>
+      {/* Saved dishes only: a copy of an unsaved form is just the form. */}
+      {product && <div className="editor-tools">
+        <button type="button" className="ghost-action" onClick={() => void props.onDuplicate(product.id)}>⧉ {t("duplicateProduct")}</button>
+        <button type="button" className={`feature-toggle ${props.featuredIds.includes(product.id) ? "on" : ""}`} aria-pressed={props.featuredIds.includes(product.id)} onClick={() => props.onToggleFeatured(product.id, !props.featuredIds.includes(product.id))}>✦ {t(props.featuredIds.includes(product.id) ? "featuredOn" : "featuredAdd")}</button>
+      </div>}
       <div className="segmented">{(["food", "drink", "sushi"] as const).map((value) => <label key={value}><input type="radio" name="kind" value={value} defaultChecked={(product?.kind ?? "food") === value} /><span>{kindLabels[value]}</span></label>)}</div>
       <label><span>{t("fieldNameZh")}</span><input name="nameZh" defaultValue={product?.names.zh ?? ""} /></label>
       <label><span>{t("fieldNameDe")}</span><input name="nameDe" defaultValue={product?.names.de ?? ""} /></label>
@@ -203,7 +212,7 @@ export function CatalogPanel(props: Props) {
       <div className="filter-tabs">{(["all", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : kindLabels[value]}</button>)}</div>
       <div className="product-list">{rows.length ? rows.map((row) => {
         const media = row.media[0];
-        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><span className="product-thumb">{media?.type === "image" ? <img src={props.mediaUrl(media.url)} alt="" /> : <span className="media-mark">{media?.type === "video" ? "▶" : row.kind === "drink" ? "杯" : row.kind === "sushi" ? "鮨" : "菜"}</span>}</span><span className="product-copy"><b>{nameIn(row, language)}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><span className="product-thumb">{media?.type === "image" ? <img src={props.mediaUrl(media.url)} alt="" /> : <span className="media-mark">{media?.type === "video" ? "▶" : row.kind === "drink" ? "杯" : row.kind === "sushi" ? "鮨" : "菜"}</span>}</span><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
     </section>
   </div></section>;

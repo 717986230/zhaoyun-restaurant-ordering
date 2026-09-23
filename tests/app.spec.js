@@ -402,6 +402,67 @@ test("a photo that failed from the cached menu still shows once the server names
   await expect(page.locator(".photo-credit")).toContainText("Jane Doe · CC BY 4.0");
 });
 
+test.describe("the promotions page", () => {
+  const withFeatured = (featured) => async ({ page }) => {
+    await page.unroute("**/api/catalog");
+    await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      products, theme: "jade", languages: ["zh", "en", "de"],
+      menu: { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, featured }
+    }) }));
+    await page.evaluate(() => sessionStorage.clear());
+    await page.reload();
+  };
+
+  test.describe("switched on", () => {
+    test.beforeEach(withFeatured({ title: "", productIds: ["combo-1", "80", "gone-from-the-menu"] }));
+
+    test("is the first page a guest sees, in its own design", async ({ page }) => {
+      await expect(page.locator(".chip").first()).toHaveText("✦ 精选推荐");
+      await expect(page.locator(".chip.on")).toHaveText("✦ 精选推荐");
+      await expect(page.locator(".menu.on-featured")).toBeVisible();
+      await expect(page.locator(".featured-hero h2")).toHaveText("精选推荐");
+      // In the owner's order; a dish no longer on the menu is simply skipped.
+      const cards = page.locator(".featured-card");
+      await expect(cards).toHaveCount(2);
+      await expect(cards.nth(0)).toContainText("双人套餐");
+      await expect(cards.nth(0).locator(".featured-number")).toHaveText("01");
+      // A set spells out what it holds.
+      await expect(cards.nth(0).locator(".featured-contents")).toContainText("黑椒牛柳");
+      await expect(cards.nth(0).locator(".featured-contents")).toContainText("2× 蔬菜拉面");
+      await expect(cards.nth(1)).toContainText("黑椒牛柳");
+    });
+
+    test("opens a dish like any other page, and turns on to everything", async ({ page }) => {
+      await page.locator(".featured-card").nth(1).click();
+      await expect(page.locator(".dish-detail-card")).toContainText("黑椒牛柳");
+      await page.getByRole("button", { name: "关闭详情" }).click();
+      await page.locator(".page-next").click();
+      await expect(page.locator(".chip.on")).toHaveText("全部");
+      await expect(page.locator(".menu.on-featured")).toHaveCount(0);
+    });
+
+    test("a guest who moved on is not sent back to it on every reload", async ({ page }) => {
+      await page.getByRole("button", { name: "RAMEN", exact: true }).click();
+      await page.reload();
+      await expect(page.locator(".chip.on")).not.toHaveText("✦ 精选推荐");
+    });
+  });
+
+  test("takes the owner's title when there is one", async ({ page }) => {
+    await withFeatured({ title: "Chef's Table", productIds: ["80"] })({ page });
+    await expect(page.locator(".featured-hero h2")).toHaveText("Chef's Table");
+    await expect(page.locator(".chip").first()).toHaveText("✦ Chef's Table");
+  });
+
+  test("is not there when switched off, or when none of its dishes are on the menu", async ({ page }) => {
+    await withFeatured(null)({ page });
+    await expect(page.locator(".chip").first()).toHaveText("全部");
+    await withFeatured({ title: "", productIds: ["gone-from-the-menu"] })({ page });
+    await expect(page.locator(".chip").first()).toHaveText("全部");
+    await expect(page.locator(".featured-page")).toHaveCount(0);
+  });
+});
+
 test.describe("the menu turns its pages", () => {
   const onChip = (page) => page.locator(".chip.on");
 

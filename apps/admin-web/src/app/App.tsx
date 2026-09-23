@@ -278,6 +278,22 @@ export function App() {
     }
   }
 
+  /** Copies a dish and opens the copy, so only what differs needs typing. */
+  async function duplicateProduct(id: string) {
+    try {
+      const { product } = await adminApi.duplicateProduct(id);
+      await connect();
+      setState((current) => ({ ...current, editingProduct: mapProduct(product) }));
+      notify(t("productDuplicated"));
+    } catch (error) { failed(error, "saveFailed"); }
+  }
+
+  function toggleFeatured(id: string, on: boolean) {
+    const current = state.settings?.featuredProductIds ?? [];
+    const next = on ? [...current.filter((item) => item !== id), id] : current.filter((item) => item !== id);
+    void saveSettings({ featuredProductIds: next }, on ? "featuredAdded" : "featuredRemoved");
+  }
+
   async function deleteProduct(id: string) {
     try {
       await adminApi.deleteProduct(id);
@@ -445,7 +461,7 @@ export function App() {
     <nav className="admin-tabs" aria-label={t("modules")}>{tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}</nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     <main>
-      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onRefresh={async () => { await connect(); }} />}
+      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel
         orders={state.orders}
         requests={state.requests}
@@ -472,6 +488,7 @@ export function App() {
       {state.tab === "system" && <SettingsPanel
         storage={storage}
         settings={state.settings}
+        products={state.products}
         tables={state.tables}
         auditEntries={state.auditEntries}
         onSaveSettings={saveSettings}

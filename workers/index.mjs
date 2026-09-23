@@ -507,6 +507,10 @@ async function handle(request, env) {
           ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
           : fail("Product not found", 404);
       }
+      if (path.length === 5 && path[4] === "duplicate" && method === "POST") {
+        const product = await store.duplicateProduct(path[3]);
+        return product ? json({ product }, 201) : fail("Product not found", 404);
+      }
       if (path.length === 5 && path[4] === "media" && method === "POST") {
         // Pictures only, and small enough for one D1 row (2 MB). A video needs
         // a bucket this deployment does not have.
