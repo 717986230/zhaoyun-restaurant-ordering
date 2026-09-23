@@ -143,11 +143,6 @@ CREATE TABLE admin_sessions (
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
-CREATE TABLE product_schedules (
-      product_id TEXT PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
-      schedule_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
 CREATE INDEX idx_admin_sessions_expiry ON admin_sessions(expires_at);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);

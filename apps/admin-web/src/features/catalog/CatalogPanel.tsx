@@ -1,13 +1,11 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { ALLERGENS } from "../../../../../src/allergens.js";
-import type { BundleItem, ModifierGroup, Product, ProductSchedule, VatPercent } from "@zhaoyun/domain";
+import type { BundleItem, ModifierGroup, Product, VatPercent } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
 import { formatMoney, useI18n } from "../../app/i18n";
 import type { AdminLanguage, Translate } from "../../app/i18n";
-import { isOnSchedule } from "../../../../../src/schedule.js";
-import { describeSchedule, readScheduleField, ScheduleFieldset } from "./ScheduleFieldset";
 
 interface Props {
   products: Product[];
@@ -23,8 +21,6 @@ interface Props {
   /** The dishes on the promotions page. */
   featuredIds: string[];
   onToggleFeatured: (id: string, on: boolean) => void;
-  /** The restaurant's clock, for "hidden now" beside a dish with hours. */
-  timeZone: string;
 }
 
 function readText(form: FormData, name: string): string { return String(form.get(name) || "").trim(); }
@@ -151,8 +147,6 @@ export function CatalogPanel(props: Props) {
   // this is ignored.
   const [editorOpen, setEditorOpen] = useState(false);
   const [formError, setFormError] = useState("");
-  // Read once per render: the list is re-rendered on every change anyway.
-  const now = new Date();
   const productIndex = useMemo(() => new Map(props.products.map((item) => [item.id, item])), [props.products]);
   const rows = props.products.filter((product) => props.filter === "all"
     || (props.filter === "sets" ? Boolean(product.bundleItems?.length) : product.kind === props.filter));
@@ -172,10 +166,8 @@ export function CatalogPanel(props: Props) {
     const formElement = event.currentTarget;
     const data = new FormData(formElement);
     let modifiers: ModifierGroup[];
-    let schedule: ProductSchedule | null;
     try {
       modifiers = readModifiers(data, t);
-      schedule = readScheduleField(readText(data, "schedule"), t);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : t("modifiersInvalid"));
       return;
@@ -193,7 +185,6 @@ export function CatalogPanel(props: Props) {
       vatPercent: (Number(data.get("vatPercent")) || 10) as VatPercent,
       modifiers,
       bundleItems: readBundleItems(data),
-      schedule,
       printStation: readText(data, "printStation") as AdminProductInput["printStation"],
       available: data.get("available") === "on",
       published: data.get("published") === "on"
@@ -228,7 +219,6 @@ export function CatalogPanel(props: Props) {
       <fieldset className="allergen-picker"><legend>{t("fieldAllergens")}</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {language === "zh" ? allergen.zh : allergen.de}</span></label>)}</fieldset>
       <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>{t("fieldMedia")}</b><small>{t("fieldMediaHint")}</small></label>
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
-      <ScheduleFieldset schedule={product?.schedule ?? null} timeZone={props.timeZone} />
       <BundleFieldset product={product} products={props.products} mediaUrl={props.mediaUrl} />
       {/* What a restaurant rarely touches: numbering, printing, tax and the raw
           option groups. Folded away so the form is the dish, not the plumbing. */}
@@ -255,7 +245,7 @@ export function CatalogPanel(props: Props) {
       </header>
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}</div>
       <div className="product-list">{rows.length ? rows.map((row) => {
-        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}{row.schedule && !isOnSchedule(row.schedule, now, props.timeZone) && <em className="draft-mark off-hours-mark">{t("scheduleHiddenNow")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}{row.schedule ? ` · ⏱ ${describeSchedule(row.schedule, t, language)}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
     </section>
   </div></section>;

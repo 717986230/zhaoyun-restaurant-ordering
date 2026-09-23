@@ -8,12 +8,11 @@ import { dishPhotos } from "./dish-photos.mjs";
 import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
-  adminGateView, assertOnSchedule, assertPassword, auditView, billView, hashPassword,
+  adminGateView, assertPassword, assertSetServed, auditView, billView, hashPassword,
   duplicateInput, hashSessionToken, newSessionToken, normalizeBundleItems, normalizeSettingsInput,
-  normalizeTableNo, PASSWORD_ITERATIONS, PRODUCT_SELECT, SESSION_TTL_MS, settingsView,
-  tableOverviewView, tableView, verifyPassword, writeScheduleSql
+  normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
+  tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
-import { normalizeSchedule, readSchedule } from "../src/schedule.js";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
 // password yet still spends the same PBKDF2 work as one that does, so the
@@ -90,7 +89,6 @@ function mapProduct(row, media = []) {
     },
     modifiers: parseJson(row.modifiers_json, []),
     bundleItems: parseJson(row.bundle_items_json, []),
-    schedule: readSchedule(row.schedule_json),
     available: Boolean(row.available),
     published: Boolean(row.published),
     sortOrder: row.sort_order,
@@ -139,7 +137,6 @@ function normalizeProduct(input, current = {}) {
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
     modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
     bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
-    schedule: input.schedule === undefined ? undefined : normalizeSchedule(input.schedule),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
     sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
@@ -335,16 +332,9 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
-    -- When a dish is on the menu — "Mon–Fri 11:00–14:30" for a lunch set; the
-    -- rules are src/schedule.js. No row is "always". A table of its own and
-    -- not a column on products for the reason app_settings is one: a deployed
-    -- D1 database can be given a new table, never a new column, safely.
-    -- See migrations/0051_product_schedules.sql.
-    CREATE TABLE IF NOT EXISTS product_schedules (
-      product_id TEXT PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
-      schedule_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
+    -- Hours were briefly kept per dish; they belong to the promotions and set
+    -- menus pages (app_settings). See migrations/0052_drop_product_schedules.sql.
+    DROP TABLE IF EXISTS product_schedules;
 
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
@@ -380,10 +370,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
   const statements = {
     productCount: db.prepare("SELECT COUNT(*) AS count FROM products"),
-    productById: db.prepare(`${PRODUCT_SELECT} WHERE products.id = ?`),
+    productById: db.prepare("SELECT * FROM products WHERE id = ?"),
     productBySku: db.prepare("SELECT * FROM products WHERE sku = ?"),
-    allProducts: db.prepare(`${PRODUCT_SELECT} ORDER BY products.sort_order, products.created_at`),
-    catalogProducts: db.prepare(`${PRODUCT_SELECT} WHERE products.published = 1 AND products.available = 1 ORDER BY products.sort_order, products.created_at`),
+    allProducts: db.prepare("SELECT * FROM products ORDER BY sort_order, created_at"),
+    catalogProducts: db.prepare("SELECT * FROM products WHERE published = 1 AND available = 1 ORDER BY sort_order, created_at"),
     // The credit comes along for pictures kept in media_files (the seeded
     // photos); an upload has none to give.
     mediaForProduct: db.prepare(`
@@ -516,8 +506,6 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         product.vatPercent, product.bundleItemsJson, timestamp, timestamp
       );
     }
-    const schedule = writeScheduleSql(product.id, product.schedule, timestamp);
-    if (schedule) db.prepare(schedule[0]).run(...schedule[1]);
     return getProduct(product.id);
   }
 
@@ -629,12 +617,12 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     if (existing) return orderView(existing);
     if (!Array.isArray(input.items) || !input.items.length) throw new Error("Order requires at least one item");
 
-    const { timeZone } = getSettings();
+    const hours = getSettings();
     const resolvedItems = input.items.map((item) => {
       const product = statements.productById.get(String(item.id));
       const quantity = Number(item.qty);
       if (!product || !product.published || !product.available) throw new Error(`Product ${item.id} is unavailable`);
-      assertOnSchedule(product, timeZone);
+      assertSetServed(product, hours);
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error("Invalid item quantity");
       const modifiers = resolveModifiers(product, item.modifiers);
       const modifierTotalCents = modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);

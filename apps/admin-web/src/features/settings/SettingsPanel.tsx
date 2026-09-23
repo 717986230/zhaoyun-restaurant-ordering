@@ -5,17 +5,27 @@ import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts"
 import type { Product } from "@zhaoyun/domain";
 import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES } from "@zhaoyun/domain";
 import { useI18n } from "../../app/i18n";
-import type { CopyKey } from "../../app/i18n";
+import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { downloadQrCard } from "../qr/qrCard";
+import { ScheduleEditor } from "./ScheduleEditor";
 
-// Where restaurants that use this are; every zone the browser knows follows.
-const COMMON_ZONES = ["Europe/Vienna", "Europe/Berlin", "Europe/Zurich", "Europe/Rome", "Europe/Paris", "Europe/London", "Asia/Shanghai"];
+// The time zones on offer: where a restaurant like this one is. A short list
+// on purpose — the server takes any real zone, so one saved from elsewhere is
+// still shown and kept.
+const TIME_ZONES: Array<[string, Record<AdminLanguage, string>]> = [
+  ["Europe/Vienna", { zh: "维也纳", en: "Vienna", de: "Wien" }],
+  ["Europe/Berlin", { zh: "柏林", en: "Berlin", de: "Berlin" }],
+  ["Europe/Zurich", { zh: "苏黎世", en: "Zurich", de: "Zürich" }],
+  ["Europe/Rome", { zh: "罗马", en: "Rome", de: "Rom" }],
+  ["Europe/Paris", { zh: "巴黎", en: "Paris", de: "Paris" }],
+  ["Europe/London", { zh: "伦敦", en: "London", de: "London" }],
+  ["Asia/Shanghai", { zh: "北京", en: "Beijing", de: "Peking" }]
+];
 
-/** The zones to offer: the common ones first, then the rest, and the saved one whatever it is. */
-function timeZones(saved: string): string[] {
-  const all = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.("timeZone") ?? [];
-  return [...new Set([saved, ...COMMON_ZONES, ...all].filter(Boolean))];
+function timeZoneOptions(saved: string, language: AdminLanguage): Array<[string, string]> {
+  const known = TIME_ZONES.map(([zone, names]) => [zone, names[language]] as [string, string]);
+  return known.some(([zone]) => zone === saved) || !saved ? known : [[saved, saved.replace(/_/g, " ")], ...known];
 }
 
 interface Props {
@@ -153,7 +163,7 @@ export function SettingsPanel(props: Props) {
         <form key={`${settings.restaurantName}|${settings.menuTitle}|${settings.timeZone}`} className="editor-form" onSubmit={saveRestaurant}>
           <label><span>{t("restaurantName")}</span><input name="restaurantName" required maxLength={40} defaultValue={settings.restaurantName} /><small>{t("restaurantNameHint")}</small></label>
           <label><span>{t("menuTitle")}</span><input name="menuTitle" required maxLength={24} defaultValue={settings.menuTitle} /><small>{t("menuTitleHint")}</small></label>
-          <label><span>{t("timeZone")}</span><select name="timeZone" defaultValue={settings.timeZone}>{timeZones(settings.timeZone).map((zone) => <option key={zone} value={zone}>{zone.replace(/_/g, " ")}</option>)}</select><small>{t("timeZoneHint")}</small></label>
+          <label><span>{t("timeZone")}</span><select name="timeZone" defaultValue={settings.timeZone}>{timeZoneOptions(settings.timeZone, language).map(([zone, name]) => <option key={zone} value={zone}>{name}</option>)}</select><small>{t("timeZoneHint")}</small></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>
@@ -200,6 +210,8 @@ export function SettingsPanel(props: Props) {
 
       <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")}>
         <Toggle checked={settings.featuredEnabled} label={t("featuredEnable")} onChange={(featuredEnabled) => void props.onSaveSettings({ featuredEnabled }, "featuredSaved")} />
+        <p className="settings-label">{t("pageHours")}</p>
+        <ScheduleEditor key={JSON.stringify(settings.featuredSchedule)} value={settings.featuredSchedule} timeZone={settings.timeZone} onSave={(featuredSchedule) => props.onSaveSettings({ featuredSchedule }, "featuredSaved")} />
         <form key={settings.featuredTitle} className="editor-form" onSubmit={(event) => {
           event.preventDefault();
           void props.onSaveSettings({ featuredTitle: String(new FormData(event.currentTarget).get("featuredTitle") || "") }, "featuredSaved");
@@ -223,6 +235,11 @@ export function SettingsPanel(props: Props) {
           <small>{template.hints[language]}</small>
         </button>)}</div>
         <FeaturedList ids={settings.featuredProductIds} products={props.products} onChange={(featuredProductIds) => void props.onSaveSettings({ featuredProductIds }, "featuredSaved")} />
+      </Section>
+
+      <Section id="sets" title={t("sectionSets")} hint={t("setsHint")}>
+        <p className="settings-label">{t("pageHours")}</p>
+        <ScheduleEditor key={JSON.stringify(settings.setsSchedule)} value={settings.setsSchedule} timeZone={settings.timeZone} onSave={(setsSchedule) => props.onSaveSettings({ setsSchedule }, "setsSaved")} />
       </Section>
 
       <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")}>

@@ -49,21 +49,25 @@ export function App() {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });
   }), [queryClient]);
 
-  // A dish with hours of its own (a lunch set) is on the menu only in them,
-  // by the restaurant's clock, and comes and goes as the minutes turn — on the
-  // promotions page, the set menus, a search, everywhere. The hours come with
-  // the catalogue, so a phone that has cached it keeps to them offline too.
+  // The promotions page and the set menus page may each have hours — a lunch
+  // offer, Mon–Fri 11:00–14:30 — by the restaurant's clock. Outside them the
+  // page and its tab are gone (and the sets with it, from a search too); they
+  // come and go as the minutes turn. The hours come with the catalogue, so a
+  // phone that has cached it keeps to them offline as well.
   const now = useMinuteClock();
   const timeZone = catalog.menu?.timeZone ?? DEFAULT_TIME_ZONE;
   const minute = Math.floor(now.getTime() / 60_000);
+  const isOpen = (schedule: Parameters<typeof isOnSchedule>[0]) => isOnSchedule(schedule, new Date(minute * 60_000), timeZone);
+  const setsOpen = isOpen(catalog.menu?.setsSchedule ?? null);
+  const featuredOpen = isOpen(catalog.menu?.featured?.schedule ?? null);
   const products = useMemo(
-    () => catalog.products.filter((product) => isOnSchedule(product.schedule, new Date(minute * 60_000), timeZone)),
-    [catalog.products, minute, timeZone]
+    () => (setsOpen ? catalog.products : catalog.products.filter((product) => !product.bundleItems?.length)),
+    [catalog.products, setsOpen]
   );
 
   // The promotions page's dishes, in the owner's order; a dish since taken off
   // the menu is skipped, and a page left with nothing on it is not shown.
-  const featuredSettings = catalog.menu?.featured;
+  const featuredSettings = featuredOpen ? catalog.menu?.featured : null;
   const featured = useMemo(() => {
     if (!featuredSettings) return null;
     const byId = new Map(products.map((product) => [product.id, product]));

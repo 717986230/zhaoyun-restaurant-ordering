@@ -81,7 +81,7 @@ export const ServiceRequestBody = Type.Object({
 export const OrderStatusBody = Type.Object({ status: OrderStatusSchema });
 export const ServiceStatusBody = Type.Object({ status: ServiceStatusSchema });
 
-// When a dish is on the menu; src/schedule.js has the rules and checks them
+// When a page is on the menu; src/schedule.js has the rules and checks them
 // again (a from/to pattern here, the rest there), null is "always".
 const Clock = Type.String({ pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" });
 const Schedule = Type.Object({
@@ -114,8 +114,7 @@ export const ProductBody = Type.Object({
   modifiers: Type.Optional(Type.Array(ModifierGroup, { maxItems: 16 })),
   // A combo: the existing dishes it packages, so it is otherwise a normal
   // product with its own name, price and photo, not a distinct product kind.
-  bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 })),
-  schedule: Type.Optional(Type.Union([Schedule, Type.Null()]))
+  bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 }))
 });
 
 // The languages a menu can offer, in flag order; shared/rules.mjs holds the
@@ -140,7 +139,10 @@ export const SettingsBody = Type.Object({
   featuredProductIds: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { maxItems: 40 })),
   featuredTemplate: Type.Optional(literals(FEATURED_TEMPLATES)),
   // An IANA zone ("Europe/Vienna"); which ones exist is Intl's to say.
-  timeZone: Type.Optional(Type.String({ minLength: 1, maxLength: 64 }))
+  timeZone: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+  // The promotions and set menus pages' hours; null: always on.
+  featuredSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
+  setsSchedule: Type.Optional(Type.Union([Schedule, Type.Null()]))
 }, { minProperties: 1, additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces

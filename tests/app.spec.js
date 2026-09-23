@@ -707,63 +707,57 @@ test.describe("a restaurant that has not switched Chinese on", () => {
   });
 });
 
-test.describe("dishes with hours of their own", () => {
+test.describe("the promotions and set menus pages keep their hours", () => {
   // A phone set to Shanghai time at a restaurant in Vienna: the restaurant's
   // clock is the one that counts.
   test.use({ timezoneId: "Asia/Shanghai" });
 
-  const lunchSet = {
-    ...products[3], id: "lunch-set", sku: "SET-L",
-    names: { zh: "午市套餐", de: "Mittagsmenü", en: "Lunch Set" },
-    schedule: { days: [1, 2, 3, 4, 5], from: "11:00", to: "14:30" }
-  };
-  const lateNight = {
-    ...products[2], id: "late-ramen", sku: "N1",
-    names: { zh: "深夜拉面", de: "Nacht-Ramen", en: "Late-night Ramen" },
-    schedule: { days: [1, 2, 3, 4, 5, 6, 7], from: "22:00", to: "02:00" }
-  };
-
   async function openAt(page, iso) {
     await page.unroute("**/api/catalog");
     await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-      products: [...products, lunchSet, lateNight], theme: "jade", languages: ["zh", "en", "de"],
-      menu: { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna" }
+      products, theme: "jade", languages: ["zh", "en", "de"],
+      menu: {
+        title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna",
+        // Lunch offers: the promotions on weekdays, the set menus every day.
+        featured: { title: "今日套餐", productIds: ["80"], template: "gallery", schedule: { days: [1, 2, 3, 4, 5], from: "11:00", to: "14:30" } },
+        setsSchedule: { days: [1, 2, 3, 4, 5, 6, 7], from: "11:00", to: "14:30" }
+      }
     }) }));
     // Off the app first, so the fake clock is in place before the menu's
     // first line runs and no navigation of the old page is still in flight.
     await page.goto("about:blank");
+    await page.evaluate(() => sessionStorage.clear()).catch(() => {});
     await page.clock.install({ time: new Date(iso) });
     await page.goto("/");
   }
 
-  test("a lunch set is on the menu at lunch, and goes when lunch does, without a reload", async ({ page }) => {
+  test("at lunch both pages are there; when lunch ends they go, tabs and all, without a reload", async ({ page }) => {
     // Wednesday 14:29 in Vienna (20:29 on the phone's own clock).
     await openAt(page, "2026-09-23T12:29:00Z");
-    await page.getByRole("button", { name: "套餐", exact: true }).click();
-    const cards = page.locator(".featured-card");
-    await expect(cards).toHaveCount(2);
-    await expect(page.locator(".featured-card", { hasText: "午市套餐" })).toBeVisible();
-    // Not night yet.
-    await page.getByRole("button", { name: "全部", exact: true }).click();
-    await expect(page.locator(".dish-card", { hasText: "深夜拉面" })).toHaveCount(0);
+    await expect(page.locator(".chip-featured")).toHaveText("✦ 今日套餐");
+    await expect(page.locator(".chip.on")).toHaveText("✦ 今日套餐");
+    await expect(page.locator(".chip-sets")).toHaveText("套餐");
 
-    await page.getByRole("button", { name: "套餐", exact: true }).click();
     await page.clock.runFor("02:00");
-    await expect(page.locator(".featured-card", { hasText: "午市套餐" })).toHaveCount(0);
-    await expect(cards).toHaveCount(1);
+    await expect(page.locator(".chip-featured")).toHaveCount(0);
+    await expect(page.locator(".chip-sets")).toHaveCount(0);
+    // The guest was on the promotions page; they are on everything now.
+    await expect(page.locator(".chip.on")).toHaveText("全部");
+    // A set is not found by searching for it either, while its page is shut.
+    await page.locator("#searchBtn").click();
+    await page.locator("#searchInput").fill("双人套餐");
+    await expect(page.locator(".dish-card")).toHaveCount(0);
+    // Dishes have no hours.
+    await page.locator("#searchInput").fill("黑椒牛柳");
+    await expect(page.locator(".dish-card")).toHaveCount(1);
   });
 
-  test("a set menu's page follows the day of the week, and a late menu runs past midnight", async ({ page }) => {
-    // Saturday 12:00 in Vienna: no lunch set at the weekend.
+  test("each page keeps its own days", async ({ page }) => {
+    // Saturday noon in Vienna: the set menus are on, the weekday promotions are not.
     await openAt(page, "2026-09-26T10:00:00Z");
-    await page.getByRole("button", { name: "套餐", exact: true }).click();
-    await expect(page.locator(".featured-card")).toHaveCount(1);
-    await expect(page.locator(".featured-card", { hasText: "午市套餐" })).toHaveCount(0);
-
-    // Sunday 01:30 in Vienna: Saturday night's late menu is still on, and a search finds it.
-    await openAt(page, "2026-09-26T23:30:00Z");
-    await page.locator("#searchBtn").click();
-    await page.locator("#searchInput").fill("深夜");
-    await expect(page.locator(".dish-card", { hasText: "深夜拉面" })).toHaveCount(1);
+    await expect(page.locator(".chip-sets")).toHaveText("套餐");
+    await expect(page.locator(".chip-featured")).toHaveCount(0);
+    await page.locator(".chip-sets").click();
+    await expect(page.locator(".featured-card", { hasText: "双人套餐" })).toBeVisible();
   });
 });

@@ -1,15 +1,23 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// On CI the tests run against the production build the job has just made
+// (`vite preview` serves dist/web), not the dev server: the dev server hands
+// the browser hundreds of untransformed modules on every page load, which
+// across some four hundred tests was most of an eleven-minute run. And every
+// core the runner has — Playwright otherwise uses half of them.
+const ci = Boolean(process.env.CI);
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 30000,
+  workers: ci ? 4 : undefined,
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "retain-on-failure",
     screenshot: "only-on-failure"
   },
   webServer: {
-    command: "npm run start -- --port 5173",
+    command: ci ? "npx vite preview --host 127.0.0.1 --port 5173 --strictPort" : "npm run start -- --port 5173",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120000

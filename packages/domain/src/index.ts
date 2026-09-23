@@ -38,14 +38,6 @@ export interface BundleItem {
   quantity: number;
 }
 
-/** When a dish is on the menu: the weekdays it starts on (1 = Monday) and
- *  "HH:MM" to "HH:MM". The rules are src/schedule.js. */
-export interface ProductSchedule {
-  days: number[];
-  from: string;
-  to: string;
-}
-
 export interface Product {
   id: string;
   sku: string;
@@ -63,8 +55,6 @@ export interface Product {
   /** Present on a combo: the existing dishes it packages, by id. A combo is
    *  otherwise an ordinary product — its own name, price and photo. */
   bundleItems?: BundleItem[];
-  /** Hours of its own, or null: always on. */
-  schedule: ProductSchedule | null;
   available: boolean;
   published: boolean;
   printStation: PrintStation;
