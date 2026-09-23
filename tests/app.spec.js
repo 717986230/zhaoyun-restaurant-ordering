@@ -442,6 +442,9 @@ test.describe("the promotions page", () => {
       await page.locator(".featured-card").nth(1).click();
       await expect(page.locator(".dish-detail-card")).toContainText("黑椒牛柳");
       await page.getByRole("button", { name: "关闭详情" }).click();
+      // The page after the promotions is the set menus, then everything else.
+      await page.locator(".page-next").click();
+      await expect(page.locator(".chip.on")).toHaveText("套餐");
       await page.locator(".page-next").click();
       await expect(page.locator(".chip.on")).toHaveText("全部");
       await expect(page.locator(".menu.on-featured")).toHaveCount(0);
@@ -462,9 +465,10 @@ test.describe("the promotions page", () => {
 
   test("is not there when switched off, or when none of its dishes are on the menu", async ({ page }) => {
     await withFeatured(null)({ page });
-    await expect(page.locator(".chip").first()).toHaveText("全部");
+    await expect(page.locator(".chip-featured")).toHaveCount(0);
+    await expect(page.locator(".chip.on")).toHaveText("全部");
     await withFeatured({ title: "", productIds: ["gone-from-the-menu"] })({ page });
-    await expect(page.locator(".chip").first()).toHaveText("全部");
+    await expect(page.locator(".chip-featured")).toHaveCount(0);
     await expect(page.locator(".featured-page")).toHaveCount(0);
   });
 });
@@ -537,10 +541,13 @@ test("the header shows no table number the guest was never given, and nothing in
   // show; the placeholder "08" used to appear as if it were real.
   await expect(page.locator(".topbar .title small")).toHaveCount(0);
   await expect(page.getByText(/TISCH/)).toHaveCount(0);
-  // The "all" chip speaks the guest's language.
-  await expect(page.locator(".chip").first()).toHaveText("全部");
+  // The "all" chip speaks the guest's language (the set menus' page comes before it).
+  const allChip = page.locator(".chip:not(.chip-sets):not(.chip-featured)").first();
+  await expect(allChip).toHaveText("全部");
+  await expect(page.locator(".chip-sets")).toHaveText("套餐");
   await page.getByRole("button", { name: "English" }).click();
-  await expect(page.locator(".chip").first()).toHaveText("All");
+  await expect(allChip).toHaveText("All");
+  await expect(page.locator(".chip-sets")).toHaveText("Set menus");
   await page.locator("#searchBtn").click();
   await expect(page.locator("#searchInput")).toHaveAttribute("placeholder", "Search dish or number");
 });
@@ -626,7 +633,7 @@ test("set menus have a page of their own, apart from the dishes", async ({ page 
 test("a combo names the dishes it packages, not just its own price", async ({ page }) => {
   await page.getByRole("button", { name: "套餐", exact: true }).click();
   await page.locator(".featured-card", { hasText: "双人套餐" }).click();
-  const bundle = page.locator(".dish-detail-card .set-list");
+  const bundle = page.locator(".dish-detail-card .detail-front .set-list");
   await expect(bundle).toBeVisible();
   await expect(bundle.locator("li")).toHaveCount(2);
   // Quantities above one are shown; the singular dish is not prefixed with "1×".
