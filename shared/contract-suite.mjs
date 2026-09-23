@@ -29,6 +29,40 @@ export function contractChecks(call, assert) {
       assert.ok(json.products.some((product) => product.category === "MAIN DISHES"));
     }],
 
+    ["a dish's photo is served where the catalogue says, and a new one can be uploaded", async () => {
+      const { json } = await call("GET", "/api/catalog");
+      // The seeded photos, when there are any, come out of the database with
+      // their credit, cacheable for good since their URL names their bytes.
+      const seeded = json.products.flatMap((product) => product.media).find((media) => media.credit);
+      if (seeded) {
+        const photo = await call("GET", seeded.url);
+        assert.equal(photo.status, 200, `${seeded.url} is in the catalogue but not served`);
+        assert.match(String(photo.headers["content-type"]), /^image\/jpeg/);
+        assert.match(String(photo.headers["cache-control"]), /immutable/);
+        assert.ok(photo.bytes.length > 1000, "a photo is more than a few bytes");
+        assert.ok(photo.bytes[0] === 0xff && photo.bytes[1] === 0xd8, "a JPEG starts with FF D8");
+      }
+      assert.equal((await call("GET", "/media/no-such-picture.jpg")).status, 404);
+
+      // A 1×1 PNG, uploaded the way the admin console does it.
+      const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+      const boundary = "contract-boundary-7f3a";
+      const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="dish.png"\r\nContent-Type: image/png\r\n\r\n`),
+        png,
+        Buffer.from(`\r\n--${boundary}--\r\n`)
+      ]);
+      const raw = { contentType: `multipart/form-data; boundary=${boundary}`, body };
+      assert.equal((await call("POST", "/api/admin/products/photo-d1/media", { raw })).status, 401, "uploading needs a token");
+      const uploaded = await call("POST", "/api/admin/products/photo-d1/media", { raw, admin: true });
+      assert.equal(uploaded.status, 201);
+      const added = uploaded.json.product.media.at(-1);
+      assert.equal(added.type, "image");
+      const served = await call("GET", added.url);
+      assert.equal(served.status, 200);
+      assert.ok(Buffer.from(served.bytes).equals(png), "the upload comes back byte for byte");
+    }],
+
     ["an order prices its modifiers and routes one job per station", async () => {
       const created = await call("POST", "/api/orders", {
         body: {

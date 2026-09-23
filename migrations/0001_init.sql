@@ -130,6 +130,14 @@ CREATE TABLE app_settings (
       value TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE media_files (
+      id TEXT PRIMARY KEY,
+      content_type TEXT NOT NULL,
+      bytes BLOB NOT NULL,
+      credit TEXT,
+      source_url TEXT,
+      created_at TEXT NOT NULL
+    );
 CREATE TABLE admin_sessions (
       token_hash TEXT PRIMARY KEY,
       expires_at TEXT NOT NULL,

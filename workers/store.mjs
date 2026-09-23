@@ -54,7 +54,8 @@ export function createStore(db) {
   async function mediaFor(productIds) {
     if (!productIds.length) return new Map();
     const rows = await selectByIds(
-      "SELECT * FROM product_media WHERE product_id IN (?) ORDER BY sort_order, created_at",
+      // Same join as the Node server: pictures kept in media_files carry a credit.
+      "SELECT product_media.*, media_files.credit AS credit FROM product_media LEFT JOIN media_files ON product_media.url = '/media/' || media_files.id WHERE product_media.product_id IN (?) ORDER BY product_media.sort_order, product_media.created_at",
       productIds
     );
     const map = new Map(productIds.map((id) => [id, []]));
@@ -115,6 +116,23 @@ export function createStore(db) {
       uuid(), String(productId), media.type, media.url, media.posterUrl || null, Number(media.sortOrder || 0), now()
     );
     return getProduct(productId);
+  }
+
+  /** D1 hands a BLOB back as an array of numbers or an ArrayBuffer, depending on the runtime. */
+  async function getMediaFile(id) {
+    const row = await first("SELECT content_type, bytes FROM media_files WHERE id = ?", String(id));
+    return row ? { contentType: row.content_type, bytes: new Uint8Array(row.bytes) } : null;
+  }
+
+  /** A picture uploaded from the admin console, kept in D1: this deployment has no disk. */
+  async function storeMedia(productId, { contentType, extension, bytes }) {
+    if (!(await first("SELECT id FROM products WHERE id = ?", String(productId)))) return null;
+    const fileId = `${uuid()}${extension}`;
+    await run(
+      "INSERT INTO media_files (id, content_type, bytes, credit, source_url, created_at) VALUES (?, ?, ?, NULL, NULL, ?)",
+      fileId, contentType, bytes, now()
+    );
+    return addMedia(productId, { type: "image", url: `/media/${fileId}` });
   }
 
   async function viewOrder(row) {
@@ -344,6 +362,8 @@ export function createStore(db) {
     saveProduct,
     deleteProduct: async (id) => (await run("DELETE FROM products WHERE id = ?", String(id))) > 0,
     addMedia,
+    getMediaFile,
+    storeMedia,
     listOrders: async (limit = 100) => {
       const rows = await all("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?", boundedLimit(limit));
       return Promise.all(rows.map(viewOrder));

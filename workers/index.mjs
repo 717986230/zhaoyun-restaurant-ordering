@@ -32,6 +32,9 @@ const SECURITY_HEADERS = {
   "x-frame-options": "DENY"
 };
 
+const UPLOAD_IMAGE_TYPES = new Map([["image/jpeg", ".jpg"], ["image/png", ".png"], ["image/webp", ".webp"]]);
+const MAX_STORED_IMAGE_BYTES = 1.5 * 1024 * 1024;
+
 const AUTH_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_MAX_FAILURES = 5;
 const AUTH_MAX_TRACKED_SOURCES = 10_000;
@@ -505,7 +508,20 @@ async function handle(request, env) {
           : fail("Product not found", 404);
       }
       if (path.length === 5 && path[4] === "media" && method === "POST") {
-        return fail("Media upload needs an R2 bucket; this deployment has none configured", 501);
+        // Pictures only, and small enough for one D1 row (2 MB). A video needs
+        // a bucket this deployment does not have.
+        let file;
+        try {
+          file = (await request.formData()).get("file");
+        } catch {
+          return fail("Media file is required");
+        }
+        if (!file || typeof file === "string") return fail("Media file is required");
+        const accepted = UPLOAD_IMAGE_TYPES.get(file.type);
+        if (!accepted) return fail("Only JPEG, PNG and WebP pictures can be stored here");
+        if (file.size > MAX_STORED_IMAGE_BYTES) return fail("Picture exceeds 1.5 MB — make it smaller first", 413);
+        const product = await store.storeMedia(path[3], { contentType: file.type, extension: accepted, bytes: new Uint8Array(await file.arrayBuffer()) });
+        return product ? json({ product }, 201) : fail("Product not found", 404);
       }
     }
 
@@ -562,6 +578,21 @@ async function handle(request, env) {
   }
 
   if (path[0] === "api") return fail("API route not found", 404);
+
+  // Pictures kept in D1. The id carries a hash (seeded photos) or is a fresh
+  // uuid (uploads), so a URL never changes what it points at.
+  if (path[0] === "media" && path.length === 2 && (method === "GET" || method === "HEAD")) {
+    const media = await store.getMediaFile(path[1]);
+    if (!media) return fail("Media not found", 404);
+    return new Response(method === "HEAD" ? null : media.bytes, {
+      headers: {
+        ...SECURITY_HEADERS,
+        "content-type": media.contentType,
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-security-policy": "default-src 'none'; sandbox"
+      }
+    });
+  }
 
   // Anything that is not /api/ is the web app. ASSETS is bound when the built
   // site is deployed with the Worker; without it, this is an API-only

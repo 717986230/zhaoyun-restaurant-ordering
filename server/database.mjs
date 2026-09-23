@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
+import { dishPhotos } from "./dish-photos.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
   adminGateView, assertPassword, auditView, billView, hashPassword,
@@ -96,7 +97,8 @@ function mapProduct(row, media = []) {
       type: item.type,
       url: item.url,
       posterUrl: item.poster_url,
-      sortOrder: item.sort_order
+      sortOrder: item.sort_order,
+      credit: item.credit ?? null
     })),
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -307,6 +309,20 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    -- Pictures kept in the database itself, served at /media/<id>. The Worker
+    -- has no disk and no bucket, so this is where its photos live; the Node
+    -- server keeps the seeded dish photos here too, so both answer the same
+    -- URL. Uploads on the Node server still go to UPLOAD_DIR.
+    -- See migrations/0005_dish_photos.sql.
+    CREATE TABLE IF NOT EXISTS media_files (
+      id TEXT PRIMARY KEY,
+      content_type TEXT NOT NULL,
+      bytes BLOB NOT NULL,
+      credit TEXT,
+      source_url TEXT,
+      created_at TEXT NOT NULL
+    );
+
     -- Only the SHA-256 of a session token is kept, so the table is useless to
     -- anyone who reads it: it cannot be replayed as a credential.
     CREATE TABLE IF NOT EXISTS admin_sessions (
@@ -353,7 +369,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     productBySku: db.prepare("SELECT * FROM products WHERE sku = ?"),
     allProducts: db.prepare("SELECT * FROM products ORDER BY sort_order, created_at"),
     catalogProducts: db.prepare("SELECT * FROM products WHERE published = 1 AND available = 1 ORDER BY sort_order, created_at"),
-    mediaForProduct: db.prepare("SELECT * FROM product_media WHERE product_id = ? ORDER BY sort_order, created_at"),
+    // The credit comes along for pictures kept in media_files (the seeded
+    // photos); an upload has none to give.
+    mediaForProduct: db.prepare(`
+      SELECT product_media.*, media_files.credit AS credit FROM product_media
+      LEFT JOIN media_files ON product_media.url = '/media/' || media_files.id
+      WHERE product_media.product_id = ? ORDER BY product_media.sort_order, product_media.created_at
+    `),
+    mediaFile: db.prepare("SELECT content_type, bytes FROM media_files WHERE id = ?"),
+    mediaFileExists: db.prepare("SELECT 1 FROM media_files WHERE id = ?"),
+    insertMediaFile: db.prepare("INSERT INTO media_files (id, content_type, bytes, credit, source_url, created_at) VALUES (?, ?, ?, ?, ?, ?)"),
+    mediaCount: db.prepare("SELECT COUNT(*) AS count FROM product_media WHERE product_id = ?"),
     insertProduct: db.prepare(`
       INSERT INTO products (
         id, sku, kind, category, name_zh, name_de, name_en, description, price_cents,
@@ -874,7 +900,37 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     }
   }
 
+  /**
+   * A photo for every dish that has none. Each photo is attached once: its
+   * row in media_files is the record that it was, so a photo the owner later
+   * removes from a dish stays removed across restarts.
+   */
+  function seedPhotos() {
+    const photos = dishPhotos();
+    if (!photos.length) return;
+    db.exec("BEGIN");
+    try {
+      for (const photo of photos) {
+        if (statements.mediaFileExists.get(photo.fileId)) continue;
+        statements.insertMediaFile.run(photo.fileId, photo.contentType, photo.bytes, photo.credit, photo.sourceUrl, now());
+        if (statements.productById.get(photo.productId) && !statements.mediaCount.get(photo.productId).count) {
+          statements.insertMedia.run(`seed-${photo.fileId}`, photo.productId, "image", `/media/${photo.fileId}`, null, 0, now());
+        }
+      }
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  function getMediaFile(id) {
+    const row = statements.mediaFile.get(String(id));
+    return row ? { contentType: row.content_type, bytes: Buffer.from(row.bytes) } : null;
+  }
+
   seed();
+  seedPhotos();
 
   return {
     close: () => db.close(),
@@ -883,6 +939,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     saveProduct,
     deleteProduct: (id) => statements.deleteProduct.run(String(id)).changes > 0,
     addMedia,
+    getMediaFile,
     deleteMedia: (id) => statements.deleteMedia.run(String(id)).changes > 0,
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),
     createOrder,

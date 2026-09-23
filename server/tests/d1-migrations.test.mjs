@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { generate, committed } from "../../scripts/export-d1-migrations.mjs";
+import { generate, generatePhotos, committed } from "../../scripts/export-d1-migrations.mjs";
+import { dishPhotos } from "../dish-photos.mjs";
 
 function schemaOf(db) {
   return db.prepare("SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name").all();
@@ -32,13 +33,60 @@ const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), ".
 const incremental = [
   { file: "0003_admin_password_gate.sql", drop: "DROP INDEX idx_admin_sessions_expiry; DROP TABLE admin_sessions; DROP TABLE admin_gate;" },
   { file: "0004_app_settings.sql", drop: "DROP TABLE app_settings;" }
-].map((migration) => ({ ...migration, sql: readFileSync(path.join(migrationsDir, migration.file), "utf8") }));
+].map((migration) => ({ ...migration, sql: readFileSync(path.join(migrationsDir, migration.file), "utf8") }))
+  // The photo parts each create media_files, so each has to stand alone on a
+  // database deployed before that table existed.
+  .concat(committed().photos.map((part) => ({ file: part.name, drop: "DROP TABLE media_files;", sql: part.sql })));
 
 test("the committed migrations match the schema and seed the server creates", () => {
   const generated = generate();
   const onDisk = committed();
   assert.equal(onDisk.schema, generated.schema, "migrations/0001_init.sql is stale — run: npm run d1:migrations");
   assert.equal(onDisk.catalog, generated.catalog, "migrations/0002_seed_catalog.sql is stale — run: npm run d1:migrations");
+  assert.deepEqual(onDisk.photos, generatePhotos(), "the dish photo migrations are stale — run: npm run d1:migrations");
+});
+
+/**
+ * Every dish photo reaches D1 as the same bytes, under the same URL the Node
+ * server gives it, and a D1 database that already had pictures keeps them.
+ */
+test("the photo migrations give D1 the dishes' photos, byte for byte", () => {
+  const sql = committed();
+  const photos = dishPhotos();
+  const migrated = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    // A dish the owner already gave a picture must not get a second one.
+    if (photos.length) {
+      db.prepare("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES ('own', ?, 'image', '/media/own.jpg', NULL, 0, 'x')").run(photos[0].productId);
+    }
+    for (const part of sql.photos) db.exec(part.sql);
+    const result = {
+      media: db.prepare("SELECT product_id, url FROM product_media ORDER BY product_id, url").all(),
+      files: db.prepare("SELECT id, bytes FROM media_files").all()
+    };
+    db.close();
+    return result;
+  });
+  const seeded = inTempDatabase((file) => {
+    createDatabase(file).close();
+    const db = new DatabaseSync(file);
+    const result = db.prepare("SELECT product_id, url FROM product_media ORDER BY product_id, url").all();
+    db.close();
+    return result;
+  });
+
+  assert.equal(migrated.files.length, photos.length);
+  for (const photo of photos) {
+    const row = migrated.files.find((file) => file.id === photo.fileId);
+    assert.ok(row, `${photo.fileId} is missing from D1`);
+    assert.ok(Buffer.from(row.bytes).equals(photo.bytes), `${photo.fileId} changed on the way into D1`);
+  }
+  const withOwn = migrated.media.filter((item) => item.product_id === photos[0]?.productId);
+  if (photos.length) assert.deepEqual(withOwn.map((item) => item.url), ["/media/own.jpg"]);
+  // Apart from the dish given its own picture above, D1 and the Node server agree.
+  assert.deepEqual(migrated.media.filter((item) => item.url !== "/media/own.jpg"), seeded.filter((item) => item.product_id !== photos[0]?.productId));
 });
 
 /**

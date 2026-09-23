@@ -43,13 +43,15 @@ test("Node server satisfies the API contract", async (context) => {
         // are the configured shared tokens. Both travel in the same header.
         ...(options.token ? { "x-admin-token": options.token } : {}),
         ...(options.admin || options.role ? { "x-admin-token": TOKENS[options.role || "manager"] } : {}),
-        ...(options.tableToken ? { "x-table-token": options.tableToken } : {})
+        ...(options.tableToken ? { "x-table-token": options.tableToken } : {}),
+        ...(options.raw ? { "content-type": options.raw.contentType } : {})
       },
-      ...(options.body ? { payload: options.body } : {})
+      ...(options.body ? { payload: options.body } : {}),
+      ...(options.raw ? { payload: options.raw.body } : {})
     });
     let json = {};
     try { json = response.body ? response.json() : {}; } catch { json = {}; }
-    return { status: response.statusCode, json };
+    return { status: response.statusCode, json, bytes: response.rawPayload, headers: response.headers };
   };
 
   for (const [name, check] of contractChecks(call, assert)) {
