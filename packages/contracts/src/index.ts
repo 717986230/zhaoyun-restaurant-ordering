@@ -25,6 +25,13 @@ export interface CreateServiceRequestCommand {
   type: string;
 }
 
+/** ISO weekdays it starts on (1 = Monday) and "HH:MM" to "HH:MM". */
+export interface ApiSchedule {
+  days: number[];
+  from: string;
+  to: string;
+}
+
 export interface ApiCatalogProduct {
   id: string;
   sku: string;
@@ -44,6 +51,8 @@ export interface ApiCatalogProduct {
     options: Array<{ id: string; names: { zh: string; de: string; en: string }; priceCents: number }>;
   }>;
   bundleItems?: Array<{ productId: string; quantity: number }>;
+  /** When it is on the menu (src/schedule.js); null or absent: always. */
+  schedule?: ApiSchedule | null;
   media?: Array<{ id?: string; type: "image" | "video"; url: string; posterUrl?: string | null; sortOrder?: number; credit?: string | null }>;
   available?: boolean;
   published?: boolean;
@@ -127,6 +136,8 @@ export interface ApiSettings {
   featuredTitle: string;
   featuredProductIds: string[];
   featuredTemplate: FeaturedTemplateId;
+  /** The restaurant's clock ("Europe/Vienna"), which dish hours follow. */
+  timeZone: string;
 }
 
 /** The part of the settings the guest menu reads, served with the catalogue. */
@@ -135,6 +146,8 @@ export interface ApiMenuSettings {
   restaurantName: string;
   defaultScheme: ColorScheme;
   showTableNumber: boolean;
+  /** The restaurant's clock; absent from a server older than dish hours. */
+  timeZone?: string;
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */
   featured?: { title: string; productIds: string[]; template: FeaturedTemplateId } | null;

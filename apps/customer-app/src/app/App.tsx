@@ -9,6 +9,8 @@ import { useColorScheme } from "./useColorScheme";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, resolveMenuLanguage } from "@zhaoyun/domain";
 import { CatalogScreen } from "../features/catalog/CatalogScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
+import { useMinuteClock } from "./useMinuteClock";
+import { DEFAULT_TIME_ZONE, isOnSchedule } from "../../../../src/schedule.js";
 
 /**
  * The guest app is a menu, and nothing else.
@@ -47,22 +49,35 @@ export function App() {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });
   }), [queryClient]);
 
+  // A dish with hours of its own (a lunch set) is on the menu only in them,
+  // by the restaurant's clock, and comes and goes as the minutes turn — on the
+  // promotions page, the set menus, a search, everywhere. The hours come with
+  // the catalogue, so a phone that has cached it keeps to them offline too.
+  const now = useMinuteClock();
+  const timeZone = catalog.menu?.timeZone ?? DEFAULT_TIME_ZONE;
+  const minute = Math.floor(now.getTime() / 60_000);
+  const products = useMemo(
+    () => catalog.products.filter((product) => isOnSchedule(product.schedule, new Date(minute * 60_000), timeZone)),
+    [catalog.products, minute, timeZone]
+  );
+
   // The promotions page's dishes, in the owner's order; a dish since taken off
   // the menu is skipped, and a page left with nothing on it is not shown.
   const featuredSettings = catalog.menu?.featured;
   const featured = useMemo(() => {
     if (!featuredSettings) return null;
-    const byId = new Map(catalog.products.map((product) => [product.id, product]));
-    const products = featuredSettings.productIds.flatMap((id) => byId.get(id) ?? []);
+    const byId = new Map(products.map((product) => [product.id, product]));
+    const chosen = featuredSettings.productIds.flatMap((id) => byId.get(id) ?? []);
     // An older server sends no template; the gallery is what it showed.
-    return products.length ? { title: featuredSettings.title, products, template: featuredSettings.template ?? DEFAULT_FEATURED_TEMPLATE } : null;
-  }, [featuredSettings, catalog.products]);
+    return chosen.length ? { title: featuredSettings.title, products: chosen, template: featuredSettings.template ?? DEFAULT_FEATURED_TEMPLATE } : null;
+  }, [featuredSettings, products]);
 
   return <main className="app-shell">
     <CatalogScreen
       state={{ ...state, language }}
       dispatch={dispatch}
-      products={catalog.products}
+      products={products}
+      catalog={catalog.products}
       languages={languages}
       title={menuTitle}
       showTableNumber={catalog.menu?.showTableNumber ?? true}

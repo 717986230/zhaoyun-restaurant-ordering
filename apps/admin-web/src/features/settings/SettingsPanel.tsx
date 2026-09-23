@@ -9,6 +9,15 @@ import type { CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { downloadQrCard } from "../qr/qrCard";
 
+// Where restaurants that use this are; every zone the browser knows follows.
+const COMMON_ZONES = ["Europe/Vienna", "Europe/Berlin", "Europe/Zurich", "Europe/Rome", "Europe/Paris", "Europe/London", "Asia/Shanghai"];
+
+/** The zones to offer: the common ones first, then the rest, and the saved one whatever it is. */
+function timeZones(saved: string): string[] {
+  const all = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.("timeZone") ?? [];
+  return [...new Set([saved, ...COMMON_ZONES, ...all].filter(Boolean))];
+}
+
 interface Props {
   storage: AdminStorage;
   settings: ApiSettings | null;
@@ -97,7 +106,8 @@ export function SettingsPanel(props: Props) {
     const data = new FormData(event.currentTarget);
     void props.onSaveSettings({
       restaurantName: String(data.get("restaurantName") || "").trim(),
-      menuTitle: String(data.get("menuTitle") || "").trim()
+      menuTitle: String(data.get("menuTitle") || "").trim(),
+      timeZone: String(data.get("timeZone") || "")
     }, "restaurantSaved");
   }
 
@@ -140,9 +150,10 @@ export function SettingsPanel(props: Props) {
       <Section id="restaurant" title={t("sectionRestaurant")}>
         {/* Keyed on the saved values so the fields show what the server kept
             (trimmed, spaces collapsed) once a save comes back. */}
-        <form key={`${settings.restaurantName}|${settings.menuTitle}`} className="editor-form" onSubmit={saveRestaurant}>
+        <form key={`${settings.restaurantName}|${settings.menuTitle}|${settings.timeZone}`} className="editor-form" onSubmit={saveRestaurant}>
           <label><span>{t("restaurantName")}</span><input name="restaurantName" required maxLength={40} defaultValue={settings.restaurantName} /><small>{t("restaurantNameHint")}</small></label>
           <label><span>{t("menuTitle")}</span><input name="menuTitle" required maxLength={24} defaultValue={settings.menuTitle} /><small>{t("menuTitleHint")}</small></label>
+          <label><span>{t("timeZone")}</span><select name="timeZone" defaultValue={settings.timeZone}>{timeZones(settings.timeZone).map((zone) => <option key={zone} value={zone}>{zone.replace(/_/g, " ")}</option>)}</select><small>{t("timeZoneHint")}</small></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>

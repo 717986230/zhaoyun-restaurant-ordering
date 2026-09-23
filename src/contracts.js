@@ -81,6 +81,15 @@ export const ServiceRequestBody = Type.Object({
 export const OrderStatusBody = Type.Object({ status: OrderStatusSchema });
 export const ServiceStatusBody = Type.Object({ status: ServiceStatusSchema });
 
+// When a dish is on the menu; src/schedule.js has the rules and checks them
+// again (a from/to pattern here, the rest there), null is "always".
+const Clock = Type.String({ pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" });
+const Schedule = Type.Object({
+  days: Type.Array(Type.Integer({ minimum: 1, maximum: 7 }), { minItems: 1, maxItems: 7 }),
+  from: Clock,
+  to: Clock
+});
+
 export const ProductBody = Type.Object({
   sku: Type.String({ maxLength: 64 }),
   kind: Type.Union([Type.Literal("food"), Type.Literal("drink"), Type.Literal("sushi")]),
@@ -105,7 +114,8 @@ export const ProductBody = Type.Object({
   modifiers: Type.Optional(Type.Array(ModifierGroup, { maxItems: 16 })),
   // A combo: the existing dishes it packages, so it is otherwise a normal
   // product with its own name, price and photo, not a distinct product kind.
-  bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 }))
+  bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 })),
+  schedule: Type.Optional(Type.Union([Schedule, Type.Null()]))
 });
 
 // The languages a menu can offer, in flag order; shared/rules.mjs holds the
@@ -128,7 +138,9 @@ export const SettingsBody = Type.Object({
   featuredEnabled: Type.Optional(Type.Boolean()),
   featuredTitle: Type.Optional(Type.String({ maxLength: 32 })),
   featuredProductIds: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { maxItems: 40 })),
-  featuredTemplate: Type.Optional(literals(FEATURED_TEMPLATES))
+  featuredTemplate: Type.Optional(literals(FEATURED_TEMPLATES)),
+  // An IANA zone ("Europe/Vienna"); which ones exist is Intl's to say.
+  timeZone: Type.Optional(Type.String({ minLength: 1, maxLength: 64 }))
 }, { minProperties: 1, additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces
