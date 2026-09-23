@@ -9,11 +9,17 @@
  * atomic `batch()` here.
  */
 import {
-  assertOrderTransition, assertRequestTransition, auditView, billView, bool, boundedLimit, mapProduct,
-  normalizeMenuTheme, normalizePrinter, normalizeProduct, normalizeTableNo, now, orderProductIds, orderView,
-  parseJson, planOrder, planPrintFailure, printerView, printJobView, serviceRequestView, settingsView,
-  tableOverviewView, tableView, uuid
+  adminGateView, assertOrderTransition, assertPassword, assertRequestTransition, auditView,
+  billView, bool, boundedLimit, hashPassword, hashSessionToken, mapProduct, newSessionToken,
+  normalizeMenuTheme, normalizePrinter, normalizeProduct, normalizeTableNo, now,
+  orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
+  printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
+  verifyPassword
 } from "../shared/rules.mjs";
+
+// Matches server/database.mjs: a salt for nobody, so signing in against a
+// console with no password costs the same 210k iterations as one with.
+const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
 const PRODUCT_COLUMNS = [
   "id", "sku", "kind", "category", "name_zh", "name_de", "name_en", "description", "price_cents",
@@ -234,6 +240,77 @@ export function createStore(db) {
     return printerView(await first("SELECT * FROM printer_profiles WHERE id = ?", printer.id));
   }
 
+  /**
+   * The password gate and its sessions, the same decisions
+   * server/database.mjs makes — the hashing, the token shape and the session
+   * lifetime all come from shared/rules.mjs, so only the reads and writes
+   * differ here.
+   */
+  async function adminGate() {
+    return adminGateView(await first("SELECT * FROM admin_gate WHERE id = 1"));
+  }
+
+  async function resetAdminGatePassword(password) {
+    const stored = await hashPassword(assertPassword(password));
+    await run(
+      `INSERT INTO admin_gate (id, password_hash, password_salt, password_iterations, updated_at)
+       VALUES (1, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         password_hash = excluded.password_hash,
+         password_salt = excluded.password_salt,
+         password_iterations = excluded.password_iterations,
+         updated_at = excluded.updated_at`,
+      stored.hash, stored.salt, stored.iterations, now()
+    );
+    await run("DELETE FROM admin_sessions");
+    return adminGate();
+  }
+
+  async function setAdminGatePassword(password, currentPassword) {
+    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
+    if (row) {
+      const correct = await verifyPassword(String(currentPassword ?? ""), {
+        hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations
+      });
+      if (!correct) return null;
+    }
+    return resetAdminGatePassword(password);
+  }
+
+  async function signIn(password) {
+    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
+    const stored = row
+      ? { hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations }
+      : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(password ?? ""), stored);
+    if (!row || !correct) return null;
+
+    const token = newSessionToken();
+    const timestamp = now();
+    await run("DELETE FROM admin_sessions WHERE expires_at <= ?", timestamp);
+    await run(
+      "INSERT INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)",
+      await hashSessionToken(token), new Date(Date.now() + SESSION_TTL_MS).toISOString(), timestamp
+    );
+    return { token, expiresInMs: SESSION_TTL_MS };
+  }
+
+  async function roleForSession(token) {
+    if (!token) return null;
+    const row = await first("SELECT * FROM admin_sessions WHERE token_hash = ?", await hashSessionToken(token));
+    if (!row) return null;
+    if (row.expires_at <= now()) {
+      await run("DELETE FROM admin_sessions WHERE token_hash = ?", row.token_hash);
+      return null;
+    }
+    return { role: "manager" };
+  }
+
+  async function signOut(token) {
+    if (!token) return false;
+    return (await run("DELETE FROM admin_sessions WHERE token_hash = ?", await hashSessionToken(token))) > 0;
+  }
+
   async function getSettings() {
     return settingsView(await first("SELECT * FROM restaurant_settings WHERE id = 1"));
   }
@@ -269,6 +346,12 @@ export function createStore(db) {
     deletePrinter: async (id) => (await run("DELETE FROM printer_profiles WHERE id = ?", String(id))) > 0,
     getSettings,
     saveSettings,
+    adminGate,
+    setAdminGatePassword,
+    resetAdminGatePassword,
+    signIn,
+    signOut,
+    roleForSession,
     listPrintJobs: async (status = "queued", limit = 100) =>
       (await all("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?", String(status), boundedLimit(limit)))
         .map(printJobView),

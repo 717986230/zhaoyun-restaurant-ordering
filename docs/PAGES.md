@@ -24,7 +24,7 @@ guest phone ──▶ 717986230.github.io/zhaoyun-restaurant-ordering/   the pag
    published to it.
 2. **`API_BASE_URL`**, a repository *variable* (Settings → Secrets and
    variables → Actions → Variables), set to the deployed Worker, e.g.
-   `https://zhaoyun-ordering.<subdomain>.workers.dev`. The same variable the
+   `https://ck.<subdomain>.workers.dev`. The same variable the
    Android job already uses to point the APK at a backend.
 3. **The Worker deployed**, so there is something to point at — `docs/D1.md`.
    `CORS_ORIGIN` in `wrangler.toml` already lists the Pages origin, because

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
 import { generate, committed } from "../../scripts/export-d1-migrations.mjs";
@@ -19,6 +21,11 @@ function inTempDatabase(run) {
     rmSync(directory, { recursive: true, force: true });
   }
 }
+
+const gateMigration = readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "migrations", "0003_admin_password_gate.sql"),
+  "utf8"
+);
 
 test("the committed migrations match the schema and seed the server creates", () => {
   const generated = generate();
@@ -71,4 +78,45 @@ test("applying the migrations reproduces the server's database", () => {
     const { created_at: _c2, updated_at: _u2, ...expected } = seeded.products[index];
     assert.deepEqual(actual, expected, `product ${product.sku} differs after migration`);
   }
+});
+
+/**
+ * Wrangler applies each migration file once per database and never again, so
+ * the two databases 0003 meets in practice are these: one created from today's
+ * 0001, which already has the gate tables, and one deployed before the gate
+ * existed, which does not. Both must end up where the Node server does.
+ */
+test("0003 is a no-op on a fresh database and brings a deployed one up to date", () => {
+  const sql = committed();
+  const expected = inTempDatabase((file) => {
+    createDatabase(file).close();
+    const db = new DatabaseSync(file);
+    const result = schemaOf(db);
+    db.close();
+    return result;
+  });
+
+  const fresh = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    db.exec(gateMigration);
+    const result = schemaOf(db);
+    db.close();
+    return result;
+  });
+  assert.deepEqual(fresh, expected, "0003 must not change a database created from today's 0001");
+
+  const deployed = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    // The shape of a D1 database that applied 0001 before the gate was added.
+    db.exec("DROP INDEX idx_admin_sessions_expiry; DROP TABLE admin_sessions; DROP TABLE admin_gate;");
+    db.exec(gateMigration);
+    const result = schemaOf(db);
+    db.close();
+    return result;
+  });
+  assert.deepEqual(deployed, expected, "0003 must give an already-deployed database the gate tables");
 });

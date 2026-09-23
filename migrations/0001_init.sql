@@ -118,7 +118,20 @@ CREATE TABLE restaurant_settings (
       menu_theme TEXT NOT NULL DEFAULT 'jade',
       updated_at TEXT NOT NULL
     );
+CREATE TABLE admin_gate (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_iterations INTEGER NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE admin_sessions (
+      token_hash TEXT PRIMARY KEY,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
+CREATE INDEX idx_admin_sessions_expiry ON admin_sessions(expires_at);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
 CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);
 CREATE INDEX idx_audit_at ON audit_log(at DESC);

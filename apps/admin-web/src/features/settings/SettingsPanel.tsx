@@ -14,6 +14,7 @@ interface Props {
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<void>;
   onDeleteTable: (table: string) => Promise<void>;
   onSaveMenuTheme: (menuTheme: MenuThemeId) => Promise<void>;
+  onChangePassword: (password: string, currentPassword: string) => Promise<void>;
 }
 
 const ROLE_LABELS: Record<string, string> = { manager: "经理", staff: "服务员", kitchen: "厨房" };
@@ -31,6 +32,23 @@ function entryUrl(baseUrl: string, table: RestaurantTable): string {
 
 export function SettingsPanel(props: Props) {
   const [showCards, setShowCards] = useState(false);
+  const [passwordNote, setPasswordNote] = useState("");
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const next = String(data.get("nextPassword") || "");
+    // The server never sees the second field, so the typo has to be caught
+    // here: a password nobody wrote down is how a restaurant locks itself out.
+    if (next !== String(data.get("repeatPassword") || "")) {
+      setPasswordNote("两次输入不一致");
+      return;
+    }
+    setPasswordNote("");
+    await props.onChangePassword(next, String(data.get("currentPassword") || ""));
+    form.reset();
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,6 +70,16 @@ export function SettingsPanel(props: Props) {
       <label><span>API 地址</span><input name="baseUrl" required defaultValue={props.storage.baseUrl} placeholder="http://192.168.1.20:8787" /></label>
       <label><span>管理员令牌</span><input name="token" required type="password" defaultValue={props.storage.token} autoComplete="current-password" /></label>
       <button className="primary-action" type="submit">测试并保存连接</button>
+    </form>
+
+    <h1>管理密码</h1>
+    <p>改密码会让所有已登录的设备重新输入一次。忘了密码就用上面的管理员令牌重设。</p>
+    <form className="editor-form compact-form" onSubmit={(event) => void changePassword(event)}>
+      <label><span>当前密码</span><input name="currentPassword" required type="password" autoComplete="current-password" /></label>
+      <label><span>新密码（至少 8 位）</span><input name="nextPassword" required minLength={8} type="password" autoComplete="new-password" /></label>
+      <label><span>再输入一次</span><input name="repeatPassword" required minLength={8} type="password" autoComplete="new-password" /></label>
+      {passwordNote && <p className="gate-note error" role="alert">{passwordNote}</p>}
+      <button className="primary-action" type="submit">修改密码</button>
     </form>
 
     <h1>菜单样式</h1>

@@ -1,4 +1,7 @@
-name = "zhaoyun-ordering"
+# The Worker's name is the first label of its address: ck.<subdomain>.workers.dev.
+# Short on purpose — it is what goes on the QR code and what people type. The
+# D1 database below keeps its own name; renaming the Worker does not move data.
+name = "ck"
 account_id = "567821d20c9f5cb759b0b218d0ba0c39"
 main = "workers/index.mjs"
 compatibility_date = "2026-09-01"

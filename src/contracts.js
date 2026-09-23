@@ -111,6 +111,24 @@ export const SettingsBody = Type.Object({
   menuTheme: literals(MENU_THEMES)
 });
 
+// The console's password gate. The floor is the one `assertPassword` enforces
+// — stated twice on purpose, so a too-short password is refused at the edge
+// with a 400 rather than turning into a 500 further in. There is no username:
+// there is one console and one password on it.
+const Password = Type.String({ minLength: 8, maxLength: 200 });
+
+export const SignInBody = Type.Object({
+  password: Password
+});
+
+// `currentPassword` is absent the first time, when there is nothing to prove,
+// and required afterwards — a rule the database enforces, because only it
+// knows whether a password is already set.
+export const SetPasswordBody = Type.Object({
+  password: Password,
+  currentPassword: Type.Optional(Password)
+});
+
 export const PrinterBody = Type.Object({
   name: Type.String({ minLength: 1, maxLength: 120 }),
   transport: Type.Union([Type.Literal("lan"), Type.Literal("bluetooth"), Type.Literal("usb")]),

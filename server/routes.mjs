@@ -5,7 +5,8 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
   CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody, SettingsBody, TableBody, TableLockBody, TableParams
+  ProductBody, ServiceRequestBody, ServiceStatusBody, SetPasswordBody, SettingsBody,
+  SignInBody, TableBody, TableLockBody, TableParams
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
@@ -82,8 +83,17 @@ export function registerRoutes(app, { database, realtime, config }) {
     done();
   }
 
-  function resolveRole(request) {
+  /**
+   * The header carries one of two things: a session token the console got by
+   * typing the password, or one of the configured tokens. The session is asked
+   * first because it is what everyone uses; the tokens stay for the tablets
+   * that were configured with one, and for getting back in when the password
+   * has been forgotten.
+   */
+  async function resolveRole(request) {
     const provided = request.headers["x-admin-token"];
+    const session = await database.roleForSession(provided);
+    if (session) return session.role;
     return resolveStaffRole((expected) => tokenMatches(provided, expected), {
       manager: config.adminToken,
       staff: config.staffToken,
@@ -91,39 +101,55 @@ export function registerRoutes(app, { database, realtime, config }) {
     });
   }
 
+  /**
+   * One budget per client address, shared by the guards and the sign-in route,
+   * so guessing the password and guessing a token are counted together. Returns
+   * null once the budget is spent, having already sent the 429.
+   */
+  function authThrottle(request, reply) {
+    const moment = Date.now();
+    const key = request.ip || "unknown";
+    const current = authFailures.get(key);
+    if (current && current.resetAt <= moment) authFailures.delete(key);
+    const active = authFailures.get(key);
+    if (active && active.failures >= AUTH_MAX_FAILURES) {
+      const retryAfter = Math.max(1, Math.ceil((active.resetAt - moment) / 1000));
+      reply.header("retry-after", retryAfter);
+      reply.code(429).send({ error: "Too many authentication attempts", retryAfter });
+      return null;
+    }
+    return {
+      fail() {
+        const failures = (active?.failures ?? 0) + 1;
+        if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(moment);
+        authFailures.set(key, { failures, resetAt: moment + AUTH_WINDOW_MS });
+      },
+      pass() {
+        authFailures.delete(key);
+      }
+    };
+  }
+
   /** @param {"manager"|"staff"|"kitchen"} minimumRole */
   function requireRole(minimumRole) {
     const required = ROLE_RANK[minimumRole];
-    return function guard(request, reply, done) {
-      const now = Date.now();
-      const key = request.ip || "unknown";
-      const current = authFailures.get(key);
-      if (current && current.resetAt <= now) authFailures.delete(key);
-      const active = authFailures.get(key);
-      if (active && active.failures >= AUTH_MAX_FAILURES) {
-        const retryAfter = Math.max(1, Math.ceil((active.resetAt - now) / 1000));
-        reply.header("retry-after", retryAfter);
-        reply.code(429).send({ error: "Too many authentication attempts", retryAfter });
-        return;
-      }
-      const role = resolveRole(request);
+    return async function guard(request, reply) {
+      const throttle = authThrottle(request, reply);
+      if (!throttle) return reply;
+      const role = await resolveRole(request);
       if (!role) {
-        const failures = (active?.failures ?? 0) + 1;
-        if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(now);
-        authFailures.set(key, { failures, resetAt: now + AUTH_WINDOW_MS });
-        reply.code(401).send({ error: "Admin authentication required" });
-        return;
+        throttle.fail();
+        return reply.code(401).send({ error: "Admin authentication required" });
       }
-      authFailures.delete(key);
+      throttle.pass();
       request.staffRole = role;
       if (ROLE_RANK[role] < required) {
         // A valid token used beyond its role is worth recording, not just refusing.
         request.auditedDenial = true;
         database.recordAudit({ role, ip: request.ip, method: request.method, route: request.url, status: 403, detail: { denied: minimumRole } });
-        reply.code(403).send({ error: `This role may not perform ${minimumRole} actions` });
-        return;
+        return reply.code(403).send({ error: `This role may not perform ${minimumRole} actions` });
       }
-      done();
+      return undefined;
     };
   }
 
@@ -293,6 +319,61 @@ export function registerRoutes(app, { database, realtime, config }) {
     } catch (error) {
       return errorReply(reply, error);
     }
+  });
+
+  /**
+   * The door of the admin console.
+   *
+   * `GET` is deliberately open: it answers one bit — has a password been set —
+   * which the console needs before it can draw anything, and which anyone who
+   * tried to sign in would learn regardless.
+   */
+  app.get("/api/admin/gate", async () => database.adminGate());
+
+  app.post("/api/admin/gate/sign-in", { schema: { body: SignInBody } }, async (request, reply) => {
+    const throttle = authThrottle(request, reply);
+    if (!throttle) return reply;
+    const session = await database.signIn(request.body?.password);
+    if (!session) {
+      throttle.fail();
+      return reply.code(401).send({ error: "Wrong password" });
+    }
+    throttle.pass();
+    return session;
+  });
+
+  /**
+   * Sets the password: once for whoever opens the console first, because there
+   * is nothing yet to prove, and thereafter only for someone who can produce
+   * the one in force.
+   *
+   * The recovery path is ADMIN_TOKEN, and it is the token that is accepted
+   * here rather than a live session on purpose: a stolen session must not be
+   * able to change the password and lock the owner out of their own menu.
+   */
+  app.post("/api/admin/gate/password", { schema: { body: SetPasswordBody } }, async (request, reply) => {
+    const throttle = authThrottle(request, reply);
+    if (!throttle) return reply;
+    const provided = request.headers["x-admin-token"];
+    const recovering = Boolean(config.adminToken) && tokenMatches(provided, config.adminToken);
+    try {
+      const gate = recovering
+        ? await database.resetAdminGatePassword(request.body?.password)
+        : await database.setAdminGatePassword(request.body?.password, request.body?.currentPassword);
+      if (!gate) {
+        throttle.fail();
+        return reply.code(401).send({ error: "Wrong password" });
+      }
+      throttle.pass();
+      return gate;
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+
+  app.post("/api/admin/gate/sign-out", { preHandler: requireKitchen }, async (request, reply) => {
+    await database.signOut(request.headers["x-admin-token"]);
+    return reply.code(204).send();
   });
 
   app.get("/api/admin/session", { preHandler: requireKitchen }, async (request) => ({ role: request.staffRole }));

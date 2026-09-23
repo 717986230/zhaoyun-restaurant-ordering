@@ -130,6 +130,30 @@ export class AdminApi {
     // writer to the same key would only produce a table the server refuses.
   }
 
+  /** The session token replaces the one in the header for every later call;
+   *  it is the same header, so nothing else about this client changes. */
+  remember(token: string): void {
+    sessionStorage.setItem("zy_admin_token", token);
+  }
+
+  forget(): void {
+    sessionStorage.removeItem("zy_admin_token");
+  }
+
+  /** Open on purpose: one bit, which the console needs before it can decide
+   *  whether to ask for a password or to set one. */
+  gate(): Promise<{ configured: boolean }> { return this.#request("/api/admin/gate"); }
+  signIn(password: string): Promise<{ token: string; expiresInMs: number }> {
+    return this.#request("/api/admin/gate/sign-in", { method: "POST", body: JSON.stringify({ password }) });
+  }
+  setPassword(password: string, currentPassword?: string): Promise<{ configured: boolean }> {
+    return this.#request("/api/admin/gate/password", {
+      method: "POST",
+      body: JSON.stringify(currentPassword ? { password, currentPassword } : { password })
+    });
+  }
+  signOut(): Promise<void> { return this.#request("/api/admin/gate/sign-out", { method: "POST" }); }
+
   mediaUrl(path: string): string { return `${this.storage.baseUrl}${path}`; }
   health(): Promise<{ ok: boolean }> { return this.#request("/api/health"); }
   products(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/admin/products"); }
