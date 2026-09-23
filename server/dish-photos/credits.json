@@ -1,33 +1,33 @@
 {
   "photo-r1": {
-    "query": "vegetable ramen bowl",
+    "query": "vegetarian ramen",
     "pick": 0,
     "pinned": null,
-    "file": "File:Fusion of Japanese and Meitei cuisines - Mixed bowl of octopus ramen noodles and traditional Meetei vegetables - Imphal, Kangleipak (Manipur) 01.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Fusion_of_Japanese_and_Meitei_cuisines_-_Mixed_bowl_of_octopus_ramen_noodles_and_traditional_Meetei_vegetables_-_Imphal,_Kangleipak_(Manipur)_01.jpg",
-    "author": "Haoreima",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 35754,
+    "file": "File:Vegetarian Ramen 20260716 - 02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Vegetarian_Ramen_20260716_-_02.jpg",
+    "author": "Wiki Asmah",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "bytes": 39714,
     "alternatives": [
-      "File:Fusion of Japanese and Meitei cuisines - Mixed bowl of octopus ramen noodles and traditional Meetei vegetables - Imphal, Kangleipak (Manipur) 02.jpg",
-      "File:Mitaka Ramen.jpg",
-      "File:Pho for Dinner (Unsplash).jpg"
+      "File:Vegetarian Ramen 20260716 - 01.jpg",
+      "File:Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49021050081).jpg",
+      "File:Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49020524758).jpg",
+      "File:Pumpkin @ Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49020524178).jpg",
+      "File:Ajitama egg @ Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49020522648).jpg"
     ]
   },
   "photo-r2": {
-    "query": "chicken ramen bowl",
+    "query": "shoyu ramen chicken chashu",
     "pick": 0,
     "pinned": null,
-    "file": "File:Nissanchickenrameninabowl-oct-2014.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Nissanchickenrameninabowl-oct-2014.jpg",
-    "author": "Nesnad",
-    "license": "CC BY 3.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
-    "bytes": 27545,
-    "alternatives": [
-      "File:HomeCookedRamenNoodles.jpg"
-    ]
+    "file": "File:Shoyu ramen - Goemon Ramen Bar 2024-01-26.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Shoyu_ramen_-_Goemon_Ramen_Bar_2024-01-26.jpg",
+    "author": "Andy Li",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "bytes": 31599,
+    "alternatives": []
   },
   "photo-r3": {
     "query": "beef ramen noodle soup",
@@ -102,16 +102,20 @@
     ]
   },
   "photo-t3": {
-    "query": "spicy fried prawns sichuan",
+    "query": "stir fried shrimp chili peppers",
     "pick": 0,
     "pinned": null,
-    "file": "File:HK TKL 調景嶺 Tiu Keng Leng 彩明街 Choi Ming Street 景嶺道 King Ling Road 彩明商場 Choi Ming Shopping Centre 茶魚飯后 restaurant menu January 2023 Px3.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:HK_TKL_%E8%AA%BF%E6%99%AF%E5%B6%BA_Tiu_Keng_Leng_%E5%BD%A9%E6%98%8E%E8%A1%97_Choi_Ming_Street_%E6%99%AF%E5%B6%BA%E9%81%93_King_Ling_Road_%E5%BD%A9%E6%98%8E%E5%95%86%E5%A0%B4_Choi_Ming_Shopping_Centre_%E8%8C%B6%E9%AD%9A%E9%A3%AF%E5%90%8E_restaurant_menu_January_2023_Px3.jpg",
-    "author": "KASMYSZIEpago MEIGAUM",
+    "file": "File:Udang Tumis Bawang Putih Cili.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Udang_Tumis_Bawang_Putih_Cili.jpg",
+    "author": "Mdsheth1986",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 39606,
-    "alternatives": []
+    "bytes": 31311,
+    "alternatives": [
+      "File:Stuffed Peppers (1337055553).jpg",
+      "File:HK TKL 調景嶺 Tiu Keng Leng 彩明街 Choi Ming Street 景嶺道 King Ling Road 彩明商場 Choi Ming Shopping Centre 茶魚飯后 restaurant menu January 2023 Px3.jpg",
+      "File:HK Sai Kung District 將軍澳 TKO 康城路1號 Lohas Park Road Montara LOHAS Park 日出康城商場 The Lohas Shopping Mall shop FRESH 新鮮生活 Supermarket cooked food October 2022 Px3 01.jpg"
+    ]
   },
   "photo-t4": {
     "query": "mapo tofu",
@@ -149,30 +153,72 @@
       "File:Mapo Tofu (麻婆豆腐).jpg"
     ]
   },
-  "photo-a2": {
-    "query": "gua bao chicken",
+  "photo-a1": {
+    "query": "gua bao",
     "pick": 0,
     "pinned": null,
-    "file": "File:Master Bao - Taiwanese street food restaurant in Westfield London.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Master_Bao_-_Taiwanese_street_food_restaurant_in_Westfield_London.jpg",
-    "author": "Heeheemalu",
+    "file": "File:Fish Gua Bao 2023.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Fish_Gua_Bao_2023.jpg",
+    "author": "Sleeps-Darkly",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 44062,
-    "alternatives": []
+    "bytes": 26025,
+    "alternatives": [
+      "File:Gua bao a València. 刈包.jpg",
+      "File:Gua Bao VLC - 1.jpeg",
+      "File:Taiwanese Gua Bao @ Bao & Bing, London.jpg",
+      "File:Gua Bao VLC - 3.jpeg",
+      "File:Gua Bao VLC - 2.jpeg"
+    ]
+  },
+  "photo-a2": {
+    "query": "gua bao",
+    "pick": 1,
+    "pinned": null,
+    "file": "File:Gua Bao VLC - 1.jpeg",
+    "page": "https://commons.wikimedia.org/wiki/File:Gua_Bao_VLC_-_1.jpeg",
+    "author": "Coentor",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "bytes": 20130,
+    "alternatives": [
+      "File:Fish Gua Bao 2023.jpg",
+      "File:Gua bao a València. 刈包.jpg",
+      "File:Taiwanese Gua Bao @ Bao & Bing, London.jpg",
+      "File:Gua Bao VLC - 3.jpeg",
+      "File:Gua Bao VLC - 2.jpeg"
+    ]
   },
   "photo-a3": {
-    "query": "bao bun beef",
+    "query": "gua bao",
+    "pick": 2,
+    "pinned": null,
+    "file": "File:Gua Bao VLC - 3.jpeg",
+    "page": "https://commons.wikimedia.org/wiki/File:Gua_Bao_VLC_-_3.jpeg",
+    "author": "Coentor",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "bytes": 15458,
+    "alternatives": [
+      "File:Fish Gua Bao 2023.jpg",
+      "File:Gua bao a València. 刈包.jpg",
+      "File:Gua Bao VLC - 1.jpeg",
+      "File:Taiwanese Gua Bao @ Bao & Bing, London.jpg",
+      "File:Gua Bao VLC - 2.jpeg"
+    ]
+  },
+  "photo-a4": {
+    "query": "peking duck bun",
     "pick": 0,
     "pinned": null,
-    "file": "File:牛肉锅贴 Pan-fried Beef Dumplings - Ants Bistro.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:%E7%89%9B%E8%82%89%E9%94%85%E8%B4%B4_Pan-fried_Beef_Dumplings_-_Ants_Bistro.jpg",
-    "author": "avlxyz",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 22517,
+    "file": "File:Peking Roasted Duck Slices with Side Dishes and Bun from King Lodge.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Peking_Roasted_Duck_Slices_with_Side_Dishes_and_Bun_from_King_Lodge.jpg",
+    "author": "Peachyeung316",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 21107,
     "alternatives": [
-      "File:红油抄手 Chilli Oil Dumplings - Ants Bistro.jpg"
+      "File:Yank Sing Peking Duck (24441687246).jpg"
     ]
   },
   "photo-h1": {
@@ -230,21 +276,21 @@
     ]
   },
   "photo-h4": {
-    "query": "mongolian hot pot lamb",
+    "query": "instant-boiled mutton",
     "pick": 0,
     "pinned": null,
-    "file": "File:Happy Lamb - Flickr - Barb Henry.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Happy_Lamb_-_Flickr_-_Barb_Henry.jpg",
-    "author": "Barb Henry from Albany, OR, USA",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 21856,
+    "file": "File:Instant-boiled mutton hot pot at Yangfang Shengli (20200111153612).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Instant-boiled_mutton_hot_pot_at_Yangfang_Shengli_(20200111153612).jpg",
+    "author": "N509FZ",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 35855,
     "alternatives": [
-      "File:HK MK 旺角 Mong Kok 豉油街 Soy Street Concord Building shop Happy Lamb Hot Pot Restaurant October 2025 N13P 06.jpg",
-      "File:HK MK 旺角 Mong Kok 豉油街 Soy Street 鴻都大廈 Concord Building shop Happy Lamb Hot Pot Restaurant October 2025 N13P 06.jpg",
-      "File:HK MK 旺角 Mong Kok 豉油街 Soy Street 鴻都大廈 Concord Building shop Happy Lamb Hot Pot Restaurant October 2025 N13P 03.jpg",
-      "File:HK MK 旺角 Mong Kok 豉油街 Soy Street 鴻都大廈 Concord Building shop Happy Lamb Hot Pot Restaurant October 2025 N13P 02.jpg",
-      "File:Happy Lamb Hot Pot Restaurant beside Hmart 06.jpg"
+      "File:Instant-boiled mutton hot pot at Yangfang Shengli before dipping (20200111153525).jpg",
+      "File:Instant-boiled mutton with sesame sauce.jpg",
+      "File:Northeast China Style Instant-boiled Mutton Hot Pot at Louwailou in Changchun 20260318.jpg",
+      "File:Instant-boiled mutton.JPG",
+      "File:Instant-boiled mutton of Beijing.jpg"
     ]
   },
   "photo-n1-6": {
@@ -401,6 +447,24 @@
       "File:NGO Minami Kasadera Monzen Kappa Sushi Ehomaki 20230203.jpg"
     ]
   },
+  "photo-m2": {
+    "query": "salmon maki",
+    "pick": 0,
+    "pinned": null,
+    "file": "File:Salmon maki 1.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Salmon_maki_1.jpg",
+    "author": "Unknown",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 38686,
+    "alternatives": [
+      "File:Salmon maki Solaire Resort North1.jpg",
+      "File:Salmon maki Solaire Resort North food court5.jpg",
+      "File:Salmon with a Kick and Mango Satay Chick Sushi Bowls - Happy Maki.jpg",
+      "File:Salmon skin maki.jpg",
+      "File:Norwegia Roll Salmon Sushi.jpg"
+    ]
+  },
   "photo-m3": {
     "query": "avocado maki",
     "pick": 0,
@@ -464,22 +528,16 @@
     ]
   },
   "photo-s1-9": {
-    "query": "salmon sashimi",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Salmon Sashimi ingredients.png",
-    "page": "https://commons.wikimedia.org/wiki/File:Salmon_Sashimi_ingredients.png",
-    "author": "GeoO",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 21753,
-    "alternatives": [
-      "File:Sashimi of São Paulo.jpg",
-      "File:Salmon Sashimi with Calamansi.JPG",
-      "File:Salmon sashimi slices.jpg",
-      "File:Salmon sashimi appetizers.jpeg",
-      "File:Salmon sashimi fish.jpg"
-    ]
+    "pinned": "File:Salmon Sashimi with Calamansi.JPG",
+    "file": "File:Salmon Sashimi with Calamansi.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Salmon_Sashimi_with_Calamansi.JPG",
+    "author": "User:Paraluman",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "bytes": 15161,
+    "alternatives": []
   },
   "photo-s1-18": {
     "query": "salmon sashimi",
@@ -500,22 +558,16 @@
     ]
   },
   "photo-s2-9": {
-    "query": "salmon tuna sashimi",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Daily Catch- Amberjack, amberjack belly, salmon, octopus, fluke, ocean trout, bigeye tuna, sea urchin with ikura.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Daily_Catch-_Amberjack,_amberjack_belly,_salmon,_octopus,_fluke,_ocean_trout,_bigeye_tuna,_sea_urchin_with_ikura.jpg",
-    "author": "T.Tseng",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 30161,
-    "alternatives": [
-      "File:Sashimi of São Paulo.jpg",
-      "File:Mixed Sashimi - Taro 2025-10-24.jpg",
-      "File:Sashimi Set Ichiban Sushi.jpg",
-      "File:Sashimi Bowl from Donggang Seafood Market in Pingtung, Taiwan - Flickr - midnightbreakfastcafe.jpg",
-      "File:202407171815 IMG 7123.jpg"
-    ]
+    "pinned": "File:Mixed Sashimi - Taro 2025-10-24.jpg",
+    "file": "File:Mixed Sashimi - Taro 2025-10-24.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Mixed_Sashimi_-_Taro_2025-10-24.jpg",
+    "author": "Andy Li",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "bytes": 31486,
+    "alternatives": []
   },
   "photo-s2-18": {
     "query": "salmon tuna sashimi",
@@ -619,22 +671,16 @@
     "alternatives": []
   },
   "photo-x4": {
-    "query": "spicy tuna roll",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Spicy Tuna Roll - Diane Sushi AUD1.80 (3484892107).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Spicy_Tuna_Roll_-_Diane_Sushi_AUD1.80_(3484892107).jpg",
-    "author": "Alpha from Melbourne, Australia",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 18065,
-    "alternatives": [
-      "File:Spicy tuna roll.jpg",
-      "File:Spicy Tuna Hand Roll.jpg",
-      "File:Crunchy Spicy Tuna, big eye tuna, shiso panko, togarashi ($21) (32807112472).jpg",
-      "File:Today Special California Roll, Spicy Tuna Sushi - Diane Sushi AUD1.60, AUD1.80 - k850i (4330232606).jpg",
-      "File:Today Special California Roll, Spicy Tuna Sushi - Diane Sushi AUD1.60, AUD1.80 - Nexus One (4329498233).jpg"
-    ]
+    "pinned": "File:Spicy tuna roll.jpg",
+    "file": "File:Spicy tuna roll.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Spicy_tuna_roll.jpg",
+    "author": "CNEcija12345",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 32120,
+    "alternatives": []
   },
   "photo-x5": {
     "query": "dragon roll sushi",
@@ -723,22 +769,16 @@
     ]
   },
   "photo-b1": {
-    "query": "sesame chicken",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:麻油雞.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:%E9%BA%BB%E6%B2%B9%E9%9B%9E.jpg",
-    "author": "Rockhsp",
+    "pinned": "File:Chinese honey sesame chicken (cropped).jpg",
+    "file": "File:Chinese honey sesame chicken (cropped).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Chinese_honey_sesame_chicken_(cropped).jpg",
+    "author": "Nithyasrm",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 30746,
-    "alternatives": [
-      "File:Sesame chicken wth broccoli.jpg",
-      "File:Fried chicken pieces coated in sauce with sesame seeds 2025.jpg",
-      "File:Crispy sesame chicken and broccoli - Cambridge, MA.jpg",
-      "File:Chinese honey sesame chicken (cropped).jpg",
-      "File:Chicken and sesame.jpg"
-    ]
+    "bytes": 37054,
+    "alternatives": []
   },
   "photo-b2": {
     "query": "thai red curry chicken",
@@ -903,22 +943,16 @@
     ]
   },
   "photo-b11": {
-    "query": "nasi goreng",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Nasi goreng pattaya 20231028 120535.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Nasi_goreng_pattaya_20231028_120535.jpg",
-    "author": "Wiki Farazi",
-    "license": "CC0",
-    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 22763,
-    "alternatives": [
-      "File:Nasi goreng indonesia.jpg",
-      "File:Nasi Goreng Ikan Asin.jpg",
-      "File:Nasi goreng 2.jpg",
-      "File:Nasi Goreng Kampung.jpg",
-      "File:Nasi Goreng Telur Balado.jpg"
-    ]
+    "pinned": "File:Nasi goreng indonesia.jpg",
+    "file": "File:Nasi goreng indonesia.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Nasi_goreng_indonesia.jpg",
+    "author": "Helito",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 26019,
+    "alternatives": []
   },
   "photo-b12": {
     "query": "tteokbokki",
@@ -939,21 +973,21 @@
     ]
   },
   "photo-b13": {
-    "query": "tteokbokki",
-    "pick": 1,
+    "query": "tteok-bokki",
+    "pick": 0,
     "pinned": null,
-    "file": "File:Beef rice pasta - Korpan.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Beef_rice_pasta_-_Korpan.jpg",
-    "author": "Andy Li",
-    "license": "CC0",
-    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 29301,
+    "file": "File:Tteok-bokki 1.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Tteok-bokki_1.jpg",
+    "author": "Jens Ohlig",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "bytes": 32202,
     "alternatives": [
-      "File:Korean.snacks-Tteokbokki-08.jpg",
-      "File:Chicken Rice Pasta - Korpan.jpg",
-      "File:Vegen rice pasta (spicy ver.) - Korpan.jpg",
-      "File:Vegen rice pasta (spicy ver.) - korpan.jpg",
-      "File:Tteokbokki making process step 3.jpg"
+      "File:Tteok-bokki of Bonchon.jpg",
+      "File:Tteok-bokki and kimbap at a Seoul snack bar.jpg",
+      "File:Tteok-bokki 6.jpg",
+      "File:Tteok-bokki 8.jpg",
+      "File:Tteok-bokki 5.jpg"
     ]
   },
   "photo-b14": {
@@ -988,22 +1022,16 @@
     ]
   },
   "photo-v1": {
-    "query": "edamame",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Edamame in a tray.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Edamame_in_a_tray.jpg",
-    "author": "Jiafei Slay Queen",
-    "license": "CC0",
-    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 15924,
-    "alternatives": [
-      "File:Shelled edamame beans.jpg",
-      "File:Edamame on a bamboo bowl by yomi955.jpg",
-      "File:Edamame Sun Drying, August 2014.jpg",
-      "File:Edamame by jark.jpg",
-      "File:Liat Portal for Foodie Disorder - Edamame with Walnuts.jpg"
-    ]
+    "pinned": "File:Edamame on a bamboo bowl by yomi955.jpg",
+    "file": "File:Edamame on a bamboo bowl by yomi955.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Edamame_on_a_bamboo_bowl_by_yomi955.jpg",
+    "author": "yomi955",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "bytes": 30802,
+    "alternatives": []
   },
   "photo-v2": {
     "query": "goi cuon summer roll",
@@ -1129,40 +1157,34 @@
     ]
   },
   "photo-v9": {
-    "query": "kimchi",
+    "query": "baechu kimchi",
     "pick": 0,
     "pinned": null,
-    "file": "File:Triple White Kimchi 05.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Triple_White_Kimchi_05.jpg",
-    "author": "korea.net",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 17759,
+    "file": "File:Baechu-kimchi 배추김치H.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Baechu-kimchi_%EB%B0%B0%EC%B6%94%EA%B9%80%EC%B9%98H.jpg",
+    "author": "Unknown",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 30955,
     "alternatives": [
-      "File:Korean packaged kimchi in a shop.jpg",
-      "File:Various kimchi.jpg",
-      "File:Salsa elaborada con base de kimchi coreano.jpg",
-      "File:Kimchi pancake - Korpan 2023-07-03.jpg",
-      "File:Bok choy green kimchi.jpg"
+      "File:Baechu kimchi.jpg",
+      "File:Baechu-gimchi.jpg",
+      "File:Ramyeon with baechu-gimchi.jpg",
+      "File:Korean cuisine-Kimchi-08.jpg",
+      "File:Baechu-gimchi 1.jpg"
     ]
   },
   "photo-v10": {
-    "query": "avocado salad",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Persea americana fruit 2.JPG",
-    "page": "https://commons.wikimedia.org/wiki/File:Persea_americana_fruit_2.JPG",
-    "author": "B.navez",
-    "license": "CC BY-SA 3.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 32800,
-    "alternatives": [
-      "File:Avocado Hass - single and halved.jpg",
-      "File:Avocado salad in Argentina.jpg",
-      "File:Liat Portal for Foodie Disorder - Israeli avocado salad dinner.jpg",
-      "File:Avocado salad.jpg",
-      "File:Avocado Pear Fruit.jpg"
-    ]
+    "pinned": "File:Avocado salad.jpg",
+    "file": "File:Avocado salad.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Avocado_salad.jpg",
+    "author": "Nowforever",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 24324,
+    "alternatives": []
   },
   "photo-v11": {
     "query": "salmon tartare",
@@ -1199,6 +1221,18 @@
       "File:Coconut Crusted Shrimp on California Zephyr - June 2022 - Sarah Stierch.jpg",
       "File:Coconut shrimp at \"Lety's\".jpg"
     ]
+  },
+  "photo-v13": {
+    "query": null,
+    "pick": 0,
+    "pinned": "File:红油抄手 Chilli Oil Dumplings - Ants Bistro.jpg",
+    "file": "File:红油抄手 Chilli Oil Dumplings - Ants Bistro.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:%E7%BA%A2%E6%B2%B9%E6%8A%84%E6%89%8B_Chilli_Oil_Dumplings_-_Ants_Bistro.jpg",
+    "author": "avlxyz",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "bytes": 24782,
+    "alternatives": []
   },
   "photo-v14": {
     "query": "miso soup",
@@ -1327,22 +1361,16 @@
     ]
   },
   "photo-u3": {
-    "query": "yaki udon",
-    "pick": 2,
-    "pinned": null,
-    "file": "File:Udon by udono.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Udon_by_udono.jpg",
-    "author": "udono",
+    "query": null,
+    "pick": 0,
+    "pinned": "File:Yaki-udon.jpg",
+    "file": "File:Yaki-udon.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Yaki-udon.jpg",
+    "author": "Flickr.com user \"Blue Lotus\"",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 22914,
-    "alternatives": [
-      "File:Yaki udon and tofu curry rice - Pompoko.jpg",
-      "File:Yaki-udon.jpg",
-      "File:Seafood Yaki Udon - Taro 2025-10-24.jpg",
-      "File:Yaki udon in Daegu.jpg",
-      "File:Black pepper tofu fried udon - Stir Fry by CK.jpg"
-    ]
+    "bytes": 25465,
+    "alternatives": []
   },
   "photo-u4": {
     "query": "fried udon noodles",
@@ -1363,22 +1391,16 @@
     ]
   },
   "photo-u5": {
-    "query": "fried udon noodles",
-    "pick": 1,
-    "pinned": null,
-    "file": "File:Sara udon by Charles Haynes in Bangalore, India.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Sara_udon_by_Charles_Haynes_in_Bangalore,_India.jpg",
-    "author": "Charles Haynes from Japanese restaurant Harima (播磨) in Bangalore, Karnataka, India",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 28670,
-    "alternatives": [
-      "File:Stir Fried Duck Udon - CK Bistro.jpg",
-      "File:Sara udon in Nagasaki.jpg",
-      "File:餃子の王将 皿うどん (4580922222).jpg",
-      "File:Thai stir-fry style udon noodles - Itsu 2024-09-19.jpg",
-      "File:Afternoon Tea Set C - Stir-fried Shredded Duck with Udon Noodles - CK Bistro 2024-01-16.jpg"
-    ]
+    "query": null,
+    "pick": 0,
+    "pinned": "File:Yaki udon in Daegu.jpg",
+    "file": "File:Yaki udon in Daegu.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Yaki_udon_in_Daegu.jpg",
+    "author": "Arumdaum",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "bytes": 30986,
+    "alternatives": []
   },
   "photo-side-rice": {
     "query": "bowl of steamed white rice",
@@ -1435,22 +1457,16 @@
     ]
   },
   "photo-d2": {
-    "query": "matcha tiramisu",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Matcha Tiramisu Cake.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Matcha_Tiramisu_Cake.jpg",
-    "author": "MichaellaaRubio",
-    "license": "CC BY 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
-    "bytes": 29756,
-    "alternatives": [
-      "File:Matcha tiramisu.jpg",
-      "File:Matcha Tiramisu 1 2023-11-14.jpg",
-      "File:Matcha Tiramisu 1 2023-04-24.jpeg",
-      "File:Matchatiramisu.jpg",
-      "File:BOCO - Sarah Stierch - January 2026 04.jpg"
-    ]
+    "pinned": "File:Matcha tiramisu.jpg",
+    "file": "File:Matcha tiramisu.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Matcha_tiramisu.jpg",
+    "author": "Gzzz",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 19321,
+    "alternatives": []
   },
   "photo-d3": {
     "query": "apple dumplings dessert",
@@ -1525,40 +1541,34 @@
     ]
   },
   "photo-dr-aloe": {
-    "query": "aloe vera drink",
+    "query": "aloe vera juice",
     "pick": 0,
     "pinned": null,
-    "file": "File:Aloe vera drink.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Aloe_vera_drink.jpg",
-    "author": "Corn cheese",
-    "license": "CC0",
-    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 12102,
+    "file": "File:Aloe vera Lanzarote.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Aloe_vera_Lanzarote.jpg",
+    "author": "H. Zell",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "bytes": 41339,
     "alternatives": [
-      "File:Aloe vera plants.jpg",
-      "File:AGUA DE ALOE VERA HEHCA EN COLOMBIA.png",
-      "File:Grapefruit and aloe jelly drink.jpg",
-      "File:Aloevera cactus.jpg",
-      "File:Antibiotic Refreshment Pot drink.jpg"
+      "File:Aloe Vera in January. Madeira, Portugal.jpg",
+      "File:Cape Town (ZA), Table Mountain, Aloe vera -- 2024 -- 2869.jpg",
+      "File:Puerto del Carmen. Lanzarote. Aloe.jpg",
+      "File:Aloe vera MHNT.BOT.2011.3.95.jpg",
+      "File:Aloe vera en cerro Santa Lucía.jpg"
     ]
   },
   "photo-dr-apple": {
-    "query": "glass of apple juice",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Apple juice glass.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Apple_juice_glass.jpg",
-    "author": "JeanBono",
-    "license": "CC BY 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
-    "bytes": 14988,
-    "alternatives": [
-      "File:A plate serving of cheese ,kiwi ,grapes,salami with a glass of apple juice.jpg",
-      "File:Russet apple juice.JPG",
-      "File:Measuring a green apple beside fresh juice in a bright kitchen setting during a healthy lifestyle moment.jpg",
-      "File:Matchbox label - Apple Juice - Soviet Union (circa 1940s) - MBP1524456805.jpg",
-      "File:Freshly squeezed orange juice with assorted fruits on kitchen counter.jpg"
-    ]
+    "pinned": "File:Russet apple juice.JPG",
+    "file": "File:Russet apple juice.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Russet_apple_juice.JPG",
+    "author": "Zigzig20s",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "bytes": 10512,
+    "alternatives": []
   },
   "photo-dr-orange": {
     "query": "glass of orange juice",
@@ -1597,34 +1607,40 @@
     ]
   },
   "photo-beer-wiesel-fass": {
-    "query": "glass of lager beer",
+    "query": "draft beer glass",
     "pick": 0,
     "pinned": null,
-    "file": "File:Lager beer in glass.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Lager_beer_in_glass.jpg",
-    "author": "Bjarki Sigursveinsson",
-    "license": "Public domain",
-    "licenseUrl": null,
-    "bytes": 25079,
+    "file": "File:Orion Premium Draft Beer, 633 mL bottle as sold in Canada.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Orion_Premium_Draft_Beer,_633_mL_bottle_as_sold_in_Canada.jpg",
+    "author": "Yuet Man Lee",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 16435,
     "alternatives": [
-      "File:Kilimanjaro Lager beer.JPG",
-      "File:Mythos Lager Beer PL.JPG",
-      "File:Saigon lager beer red label.jpg",
-      "File:Kingfisher Premium Lager Beer.jpg",
-      "File:Castle Lager South Africa.png"
+      "File:Taiwan Beer glass bottles 20101124.jpg",
+      "File:Sapporo Ginjikomi Special Clean Malt Draft Beer (224291451).jpg",
+      "File:Juan Gris - Playing Cards and Glass of Beer (1913).jpg",
+      "File:Juan Gris - Glass of Beer and Playing Cards.jpg",
+      "File:Miller Genuine Draft bottle.jpg"
     ]
   },
   "photo-beer-wiesel-stamm": {
-    "query": "Wieselburger beer",
+    "query": "Märzen beer",
     "pick": 0,
     "pinned": null,
-    "file": "File:2017-04-15 Osterhase der SPÖ Frankenfels (2).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:2017-04-15_Osterhase_der_SP%C3%96_Frankenfels_(2).jpg",
-    "author": "Ing. Günter Tuder, A-3213 Frankenfels",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 28857,
-    "alternatives": []
+    "file": "File:La cerveza Voll-Damm en vaso.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:La_cerveza_Voll-Damm_en_vaso.jpg",
+    "author": "Voll Damm",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "bytes": 13582,
+    "alternatives": [
+      "File:Voll-Damm en Botella 25cl.jpg",
+      "File:Voll-Damm Lata de 33cl.jpg",
+      "File:Cerveza Voll-Damm en los años 90.jpg",
+      "File:Paulaner Oktoberfest Marzen 11.2oz bottle and beer mug.jpg",
+      "File:Gösser Märzen can.jpg"
+    ]
   },
   "photo-beer-nonalc": {
     "query": "non-alcoholic beer glass",
@@ -1645,40 +1661,34 @@
     ]
   },
   "photo-beer-japan": {
-    "query": "japanese beer glass",
+    "query": "Asahi Super Dry",
     "pick": 0,
     "pinned": null,
-    "file": "File:Iki Beer Ginger.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Iki_Beer_Ginger.jpg",
-    "author": "FakirNL",
-    "license": "CC BY-SA 3.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 13702,
+    "file": "File:Asahi Breweries headquarters building with the Asahi Flame and Skytree at blue hour with full moon, Sumida-ku, Tokyo, Japan.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Asahi_Breweries_headquarters_building_with_the_Asahi_Flame_and_Skytree_at_blue_hour_with_full_moon,_Sumida-ku,_Tokyo,_Japan.jpg",
+    "author": "Basile Morin",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 23775,
     "alternatives": [
-      "File:Beer poster in Japan 2015-06-25.png",
-      "File:Heartland beer.jpg",
-      "File:Otaru Dunkel Beer (Flickr).jpg",
-      "File:OrionBeer.jpg",
-      "File:Suntory Malts beer.jpg"
+      "File:Asahi Super Dry Rugby2023.jpg",
+      "File:Asahi superdry japan.JPG",
+      "File:Asahi SUPER DRY 20110111.jpg",
+      "File:Asahi Super Dry Crystal.jpg",
+      "File:Asahi Super Dry.jpg"
     ]
   },
   "photo-wine-white": {
-    "query": "glass of white wine",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Red and white wine in glass.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Red_and_white_wine_in_glass.jpg",
-    "author": "André Karwath",
-    "license": "CC BY-SA 2.5",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5",
-    "bytes": 10263,
-    "alternatives": [
-      "File:Bottle and glass of Barefoot white zinfandel wine, 2012.jpg",
-      "File:Glass of White Wine shot with a bottle of white wine - Evan Swigart.jpg",
-      "File:Strnad Muslin glass White Wine Glass, 1916–17 (CH 18732037).jpg",
-      "File:No. 98 White Wine Glass, 1865 (CH 18731923).jpg",
-      "File:White Wine picto.PNG"
-    ]
+    "pinned": "File:Glass of White Wine shot with a bottle of white wine - Evan Swigart.jpg",
+    "file": "File:Glass of White Wine shot with a bottle of white wine - Evan Swigart.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Glass_of_White_Wine_shot_with_a_bottle_of_white_wine_-_Evan_Swigart.jpg",
+    "author": "Evan Swigart from Chicago, USA",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "bytes": 12345,
+    "alternatives": []
   },
   "photo-wine-red": {
     "query": "glass of red wine",
@@ -1699,22 +1709,16 @@
     ]
   },
   "photo-wine-spritzer": {
-    "query": "white wine spritzer",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Jamaica Spritz.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Jamaica_Spritz.jpg",
-    "author": "Sarah Stierch",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 17179,
-    "alternatives": [
-      "File:Limoncello spritzer (6104943642).jpg",
-      "File:Heuriger Zum Renner Wiener Spritzer Thymian.jpg",
-      "File:Heuriger Zum Renner Wiener Spritzer.jpg",
-      "File:Fröccs.jpg",
-      "File:Hosta Spritzer 1zz.jpg"
-    ]
+    "pinned": "File:Heuriger Zum Renner Wiener Spritzer.jpg",
+    "file": "File:Heuriger Zum Renner Wiener Spritzer.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Heuriger_Zum_Renner_Wiener_Spritzer.jpg",
+    "author": "Geolina163",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "bytes": 28497,
+    "alternatives": []
   },
   "photo-aperol": {
     "query": "aperol spritz",
@@ -1770,41 +1774,47 @@
       "File:15-09-26-RalfR-WLC-0063.jpg"
     ]
   },
-  "photo-coffee-espresso": {
-    "query": "espresso cup",
+  "photo-sake": {
+    "query": "sake ochoko",
     "pick": 0,
     "pinned": null,
-    "file": "File:Gray espresso cup with amaretto.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Gray_espresso_cup_with_amaretto.jpg",
-    "author": "Friedrich Haag",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 11738,
+    "file": "File:Eiraku Tokuzen - Sake cup (ochoko) with Phoenix design - Walters 49323 - Interior.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Eiraku_Tokuzen_-_Sake_cup_(ochoko)_with_Phoenix_design_-_Walters_49323_-_Interior.jpg",
+    "author": "Eiraku Tokuzen",
+    "license": "Public domain",
+    "licenseUrl": null,
+    "bytes": 9846,
     "alternatives": [
-      "File:20231223 una tazza di bokeh PD104696 1.jpg",
-      "File:Cup of espresso 02.jpg",
-      "File:Gray espresso cup with amaretto 1.jpg",
-      "File:Tray with espresso cups.jpg",
-      "File:20241223 tazza di bokeh PD104669.jpg"
+      "File:Eiraku Tokuzen - Sake cup (ochoko) with Phoenix design - Walters 49323 - Profile.jpg",
+      "File:Eiraku Tokuzen - Sake cup (ochoko) with Phoenix design - Walters 49323 - Mark A.jpg",
+      "File:No More Sake (773030522).jpg",
+      "File:Collection de bois de la Xylothèque du Cirad. Bois de la Collection de référence. Scyphocephalium mannii Warb. (Syn. Myristica mannii) - ossoko - Famille des Myristicacées (Gabon) - btv1b101135185.jpg",
+      "File:Collection de bois de la Xylothèque du Cirad. Bois de la Collection de référence. Scyphocephalium mannii Warb. (Syn. Myristica mannii) - ossoko - Famille des Myristicacées (Gabon) - btv1b10114444k.jpg"
     ]
   },
-  "photo-coffee-cappuccino": {
-    "query": "cappuccino",
+  "photo-coffee-espresso": {
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Cappuccino 8.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Cappuccino_8.jpg",
-    "author": "Gaurav Dhwaj Khadka",
+    "pinned": "File:Cup of espresso 02.jpg",
+    "file": "File:Cup of espresso 02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cup_of_espresso_02.jpg",
+    "author": "Kritzolina",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 18707,
-    "alternatives": [
-      "File:Cappuccino and cookie.jpg",
-      "File:Cappuccino 6.jpg",
-      "File:Cappuccino at ARS Cafe.jpg",
-      "File:Cappuccino 7.jpg",
-      "File:Classical Cappuccino in Savour Cafe.jpg"
-    ]
+    "bytes": 28420,
+    "alternatives": []
+  },
+  "photo-coffee-cappuccino": {
+    "query": null,
+    "pick": 0,
+    "pinned": "File:Cappuccino at ARS Cafe.jpg",
+    "file": "File:Cappuccino at ARS Cafe.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cappuccino_at_ARS_Cafe.jpg",
+    "author": "Robert Smith",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "bytes": 18900,
+    "alternatives": []
   },
   "photo-coffee-latte": {
     "query": "latte macchiato",
@@ -1825,21 +1835,15 @@
     ]
   },
   "photo-tea": {
-    "query": "jasmine tea cup",
+    "query": null,
     "pick": 0,
-    "pinned": null,
-    "file": "File:Jasmine tea bag of mainland China.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Jasmine_tea_bag_of_mainland_China.jpg",
-    "author": "白洛嘉",
+    "pinned": "File:Jasmine tea at Bangkok 9.jpg",
+    "file": "File:Jasmine tea at Bangkok 9.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Jasmine_tea_at_Bangkok_9.jpg",
+    "author": "JIP",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 15601,
-    "alternatives": [
-      "File:Dilmah Green Tea Jasmine Petals MJF Group tea cup water.JPG",
-      "File:Jasmine tea at Bangkok 9.jpg",
-      "File:Jasmine tea at Pizza Hut Sudirman, Yogyakarta, 2014-08-12.jpg",
-      "File:Bamboo Green Tea.jpg",
-      "File:2-cent stall tea at Laoshe Teahouse (20200907153108).jpg"
-    ]
+    "bytes": 11633,
+    "alternatives": []
   }
 }
