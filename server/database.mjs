@@ -7,7 +7,7 @@ import { photoMenuDishes } from "./photo-menu.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
   adminGateView, assertPassword, auditView, billView, hashPassword,
-  hashSessionToken, newSessionToken, normalizeBundleItems, normalizeMenuTheme,
+  hashSessionToken, newSessionToken, normalizeBundleItems, normalizeMenuLanguages, normalizeMenuTheme,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
   tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
@@ -295,6 +295,18 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    -- Settings that are one value each, keyed by name. A key/value table
+    -- rather than another column on restaurant_settings, because a deployed
+    -- D1 database can only be given a new table safely: CREATE TABLE IF NOT
+    -- EXISTS is a no-op where it exists, and SQLite has no ADD COLUMN IF NOT
+    -- EXISTS. The next setting is a new key here, not a migration.
+    -- See migrations/0004_app_settings.sql.
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     -- Only the SHA-256 of a session token is kept, so the table is useless to
     -- anyone who reads it: it cannot be replayed as a credential.
     CREATE TABLE IF NOT EXISTS admin_sessions (
@@ -411,6 +423,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deleteAllSessions: db.prepare("DELETE FROM admin_sessions"),
     deleteExpiredSessions: db.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?"),
     getSettings: db.prepare("SELECT * FROM restaurant_settings WHERE id = 1"),
+    getAppSetting: db.prepare("SELECT value FROM app_settings WHERE key = ?"),
+    setAppSetting: db.prepare(`
+      INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `),
     upsertSettings: db.prepare(`
       INSERT INTO restaurant_settings (id, menu_theme, updated_at) VALUES (1, ?, ?)
       ON CONFLICT(id) DO UPDATE SET menu_theme = excluded.menu_theme, updated_at = excluded.updated_at
@@ -776,12 +793,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
   }
 
   function getSettings() {
-    return settingsView(statements.getSettings.get());
+    return settingsView(statements.getSettings.get(), statements.getAppSetting.get("menu_languages")?.value);
   }
 
+  /** Either setting may come alone; the one left out keeps its value. */
   function saveSettings(input) {
-    const menuTheme = normalizeMenuTheme(input.menuTheme);
-    statements.upsertSettings.run(menuTheme, now());
+    // Both validated before either is written, so a bad language list does not
+    // leave a half-applied save behind.
+    const menuTheme = input.menuTheme === undefined ? undefined : normalizeMenuTheme(input.menuTheme);
+    const menuLanguages = input.menuLanguages === undefined ? undefined : normalizeMenuLanguages(input.menuLanguages);
+    if (menuTheme !== undefined) statements.upsertSettings.run(menuTheme, now());
+    if (menuLanguages !== undefined) statements.setAppSetting.run("menu_languages", JSON.stringify(menuLanguages), now());
     return getSettings();
   }
 

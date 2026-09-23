@@ -100,8 +100,13 @@ export interface ApiServiceRequest {
 
 export type MenuThemeId = "jade" | "teal" | "terracotta";
 
+/** The languages a guest can switch the menu into, in flag order. */
+export type MenuLanguage = "zh" | "en" | "de";
+
 export interface ApiSettings {
   menuTheme: MenuThemeId;
+  /** Which of the three the menu offers; at least one. */
+  menuLanguages: MenuLanguage[];
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

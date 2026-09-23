@@ -107,9 +107,15 @@ export const ProductBody = Type.Object({
   bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 }))
 });
 
+// The languages a menu can offer, in flag order; shared/rules.mjs holds the
+// same list, and parity.test.ts holds the two to each other.
+export const MENU_LANGUAGES = ["zh", "en", "de"];
+
+// Either setting may be saved alone; an empty body is a mistake, not a save.
 export const SettingsBody = Type.Object({
-  menuTheme: literals(MENU_THEMES)
-});
+  menuTheme: Type.Optional(literals(MENU_THEMES)),
+  menuLanguages: Type.Optional(Type.Array(literals(MENU_LANGUAGES), { minItems: 1, maxItems: MENU_LANGUAGES.length, uniqueItems: true }))
+}, { minProperties: 1 });
 
 // The console's password gate. The floor is the one `assertPassword` enforces
 // — stated twice on purpose, so a too-short password is refused at the edge

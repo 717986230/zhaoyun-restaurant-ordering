@@ -5,6 +5,8 @@ import { restaurantApi } from "./api";
 import { useCatalog } from "./useCatalog";
 import { useCustomerState } from "./model";
 import { useMenuTheme } from "./useMenuTheme";
+import { useColorScheme } from "./useColorScheme";
+import { DEFAULT_MENU_LANGUAGES, resolveMenuLanguage } from "@zhaoyun/domain";
 import { CatalogScreen } from "../features/catalog/CatalogScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
 
@@ -26,13 +28,30 @@ export function App() {
   const { data: catalog, usingBundledMenu } = useCatalog();
   const queryClient = useQueryClient();
   const handleAdminTap = useKiosk();
-  useMenuTheme(catalog.theme);
+  const [scheme, toggleScheme] = useColorScheme();
+  useMenuTheme(catalog.theme, scheme);
+
+  // The flags the restaurant switched on in 连接设置, and the one of them this
+  // guest reads: their own pick while it is still offered, else their phone's
+  // language, else German.
+  const languages = catalog.languages?.length ? catalog.languages : DEFAULT_MENU_LANGUAGES;
+  const language = resolveMenuLanguage(state.languageChosen ? state.language : null, languages, navigator.languages ?? []);
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
 
   useEffect(() => restaurantApi.connect((message: RealtimeEnvelope) => {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });
   }), [queryClient]);
 
   return <main className="app-shell">
-    <CatalogScreen state={state} dispatch={dispatch} products={catalog.products} offlineMenu={usingBundledMenu} onAdminTap={handleAdminTap} />
+    <CatalogScreen
+      state={{ ...state, language }}
+      dispatch={dispatch}
+      products={catalog.products}
+      offlineMenu={usingBundledMenu}
+      languages={languages}
+      scheme={scheme}
+      onToggleScheme={toggleScheme}
+      onAdminTap={handleAdminTap}
+    />
   </main>;
 }

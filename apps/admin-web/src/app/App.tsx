@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminApi } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
-import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, MenuThemeId } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
@@ -36,7 +36,7 @@ const initialState: AdminState = {
   auditEntries: [],
   connected: false, connectionText: "未连接", products: [], printers: [],
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
-  discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", menuTheme: null, toast: null
+  discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", menuTheme: null, menuLanguages: null, toast: null
 };
 
 const BOARD_REFRESH_MS = 5000;
@@ -90,6 +90,7 @@ export function App() {
         products: catalog.products.map(mapProduct),
         printers: printerList.printers,
         menuTheme: settings?.menuTheme ?? current.menuTheme,
+        menuLanguages: settings?.menuLanguages ?? current.menuLanguages,
         tab: TABS_BY_ROLE[role].includes(current.tab) ? current.tab : TABS_BY_ROLE[role][0] ?? "board"
       }));
       return true;
@@ -284,9 +285,17 @@ export function App() {
 
   async function saveMenuTheme(menuTheme: MenuThemeId) {
     try {
-      const settings = await adminApi.updateSettings(menuTheme);
+      const settings = await adminApi.updateSettings({ menuTheme });
       setState((current) => ({ ...current, menuTheme: settings.menuTheme }));
       notify("菜单样式已更新");
+    } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
+  }
+
+  async function saveMenuLanguages(menuLanguages: MenuLanguage[]) {
+    try {
+      const settings = await adminApi.updateSettings({ menuLanguages });
+      setState((current) => ({ ...current, menuLanguages: settings.menuLanguages }));
+      notify("菜单语言已更新");
     } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
   }
 
@@ -374,7 +383,7 @@ export function App() {
         onSettleBill={settleBill}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
-      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} menuTheme={state.menuTheme} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} onSaveMenuTheme={saveMenuTheme} onChangePassword={changePassword} />}
+      {state.tab === "system" && <SettingsPanel storage={storage} tables={state.tables} auditEntries={state.auditEntries} menuTheme={state.menuTheme} onSave={saveConnection} onSaveTable={saveTable} onDeleteTable={deleteTable} onSaveMenuTheme={saveMenuTheme} menuLanguages={state.menuLanguages} onSaveMenuLanguages={saveMenuLanguages} onChangePassword={changePassword} />}
     </main>
   </div><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;
 }

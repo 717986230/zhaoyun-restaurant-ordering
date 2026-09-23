@@ -68,9 +68,77 @@
   --dur-base: 0.24s;
   --dur-slow: 0.35s;
 
+  /* The light menu, for a guest by a window at lunch. Same rules as above:
+     cool neutrals with no brown in them, one accent, and every ink held to
+     the same WCAG floors in styles.test.ts. The dish artwork keeps its dark
+     tokens (--porcelain, --art-*, --inset-art) in both modes — it is a
+     picture on the page, not the page. The accent's light variant is set by
+     useMenuTheme, because each 菜单样式 needs its own darker shade. */
+  --light-bg-deep: #eef1f2;
+  --light-bg: #f3f5f6;
+  --light-bg-2: #eceff0;
+  --light-panel: #ffffff;
+  --light-panel-2: #f6f7f7;
+  --light-panel-3: #e7ebec;
+  --light-panel-glass: rgba(255, 255, 255, 0.94);
+  --light-field: #f2f4f4;
+  --light-field-glass: rgba(255, 255, 255, 0.72);
+  --light-fade-1: rgba(243, 245, 246, 0.97);
+  --light-fade-2: rgba(243, 245, 246, 0.86);
+  --light-room-glow: rgba(47, 107, 86, 0.06);
+  --light-line-soft: rgba(20, 26, 24, 0.07);
+  --light-line: rgba(20, 26, 24, 0.13);
+  --light-line-strong: rgba(20, 26, 24, 0.24);
+  --light-wash: rgba(20, 26, 24, 0.035);
+  --light-wash-2: rgba(20, 26, 24, 0.06);
+  --light-ink: #1a1f1d;
+  --light-ink-2: #36403c;
+  --light-muted: #5a6460;
+  --light-faint: #58625e;
+  --light-danger: #a3472f;
+  --light-danger-ink: #8f3c27;
+  --light-shadow-1: 0 12px 26px rgba(20, 26, 24, 0.12);
+  --light-shadow-2: 0 18px 38px rgba(20, 26, 24, 0.16);
+  --light-shadow-3: 0 26px 60px rgba(20, 26, 24, 0.22);
+  --light-scrim: rgba(20, 26, 24, 0.26);
+
+  color-scheme: dark;
   color: var(--ink);
   background: var(--bg-deep);
   font-family: Inter, system-ui, -apple-system, "Noto Sans SC", sans-serif;
+}
+
+/* Switched by the sun/moon button in the menu's top bar. Only references here:
+   the colours themselves live in the block above. */
+:root[data-theme="light"] {
+  --bg-deep: var(--light-bg-deep);
+  --bg: var(--light-bg);
+  --bg-2: var(--light-bg-2);
+  --panel: var(--light-panel);
+  --panel-2: var(--light-panel-2);
+  --panel-3: var(--light-panel-3);
+  --panel-glass: var(--light-panel-glass);
+  --field: var(--light-field);
+  --field-glass: var(--light-field-glass);
+  --fade-1: var(--light-fade-1);
+  --fade-2: var(--light-fade-2);
+  --room-glow: var(--light-room-glow);
+  --line-soft: var(--light-line-soft);
+  --line: var(--light-line);
+  --line-strong: var(--light-line-strong);
+  --wash: var(--light-wash);
+  --wash-2: var(--light-wash-2);
+  --ink: var(--light-ink);
+  --ink-2: var(--light-ink-2);
+  --muted: var(--light-muted);
+  --faint: var(--light-faint);
+  --danger: var(--light-danger);
+  --danger-ink: var(--light-danger-ink);
+  --shadow-1: var(--light-shadow-1);
+  --shadow-2: var(--light-shadow-2);
+  --shadow-3: var(--light-shadow-3);
+  --scrim: var(--light-scrim);
+  color-scheme: light;
 }
 
 
@@ -382,8 +450,60 @@ html.plt-android .screen.active {
   background: linear-gradient(var(--fade-1), var(--fade-2), transparent);
 }
 
+/* Search on the left, the title in the middle, and on the right the flags and
+   the light/dark switch — which grows by a flag when Chinese is switched on,
+   so that column is sized by its content and the title takes what is left. */
 .topbar {
-  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.topbar-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: end;
+}
+
+.flags {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* A 44px touch target around a 24px flag: the flag is small so three of them
+   fit a phone's header, the button is not, so a guest can still hit one. */
+.flag {
+  width: 36px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.flag img {
+  width: 24px;
+  height: 16px;
+  border-radius: 2px;
+  object-fit: cover;
+  opacity: 0.42;
+  box-shadow: 0 0 0 1px var(--line);
+  transition: opacity var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* The language being read: full colour and ringed in the accent. */
+.flag.on img {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.icon-btn.scheme-toggle {
+  width: 40px;
+  font-size: 20px;
+  color: var(--muted);
 }
 
 .panel-head {
@@ -397,8 +517,7 @@ html.plt-android .screen.active {
   text-align: center;
 }
 
-/* The admin unlock lives on this title now — seven taps, native builds only —
-   so it needs to look reachable the way the old brand button did. */
+/* The hidden way into the admin console: seven taps on this title. */
 .topbar .title {
   cursor: pointer;
 }
@@ -407,6 +526,9 @@ html.plt-android .screen.active {
   display: block;
   font: italic clamp(34px, 7vw, 48px) / 1 Georgia, serif;
   font-weight: 400;
+  /* One line, always: wrapped, "La / Carte" pushed the table number down over
+     whatever came next. */
+  white-space: nowrap;
 }
 
 .panel-head h2 {
@@ -423,16 +545,6 @@ html.plt-android .screen.active {
   background: transparent;
   color: var(--ink);
   font-size: 34px;
-}
-
-/* The language picker collapsed into one button — it shows the language a tap
-   switches to, so the 34px glyph size above would make "English" overflow a
-   48px track; this is text, not an icon. */
-.icon-btn.lang-toggle {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--muted);
 }
 
 .back {
@@ -1063,8 +1175,38 @@ html.plt-android .screen.active {
 }
 
 @media (max-width: 380px) {
+  /* Four columns, as everywhere else: a row is the picture, the number, the
+     name and the price. This rule used to declare two, from before the number
+     and the price joined the row, so on a 360px phone — most Android phones —
+     the name wrapped under the picture and was hidden behind it. Narrower
+     tracks and a tighter gap instead. */
   .summary {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 44px 28px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 11px 12px;
+  }
+
+  .summary .art.art-thumb,
+  .summary .dish-media.dish-media-thumb {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* The header's middle column shrinks by a flag when Chinese is on. */
+  .title strong {
+    font-size: 26px;
+  }
+
+  .flag {
+    width: 32px;
+  }
+}
+
+/* The smallest phones still sold: an italic "Carte" overhangs its box, and at
+   26px it reaches the first flag. */
+@media (max-width: 340px) {
+  .title strong {
+    font-size: 22px;
   }
 
   .summary .cat {

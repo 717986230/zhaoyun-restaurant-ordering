@@ -200,7 +200,10 @@ export function registerRoutes(app, { database, realtime, config }) {
     realtime.connect(socket, TABLE_PATTERN.test(table) ? table : null);
   });
 
-  app.get("/api/catalog", async () => ({ products: database.listProducts(true), theme: database.getSettings().menuTheme }));
+  app.get("/api/catalog", async () => {
+    const { menuTheme, menuLanguages } = database.getSettings();
+    return { products: database.listProducts(true), theme: menuTheme, languages: menuLanguages };
+  });
   app.get("/api/admin/settings", { preHandler: requireAdmin }, async () => database.getSettings());
   app.put("/api/admin/settings", { preHandler: requireAdmin, schema: { body: SettingsBody } }, async (request, reply) => {
     try {

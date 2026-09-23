@@ -157,3 +157,5 @@ export { deconstruct, ingredients, ingredientTerms } from "./ingredients.js";
 export type { Deconstruction, DishPart, IngredientEntry } from "./ingredients.js";
 export { DEFAULT_MENU_THEME, MENU_THEME_IDS, MENU_THEMES } from "./themes.js";
 export type { MenuTheme, MenuThemeId } from "./themes.js";
+export { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, resolveMenuLanguage } from "./languages.js";
+export type { MenuLanguage } from "./languages.js";

@@ -392,8 +392,45 @@ export function normalizeMenuTheme(value, fallback = DEFAULT_MENU_THEME) {
   return theme;
 }
 
-export function settingsView(row) {
-  return { menuTheme: row ? row.menu_theme : DEFAULT_MENU_THEME };
+/**
+ * The languages a guest can switch the menu into, in the order their flags
+ * appear. Every dish already carries all three names; this only decides
+ * which flags the menu offers. English and German by default, because the
+ * restaurant is in Austria and most guests read one of those two — Chinese
+ * is one switch away in 连接设置 for a restaurant that wants it.
+ */
+export const MENU_LANGUAGES = ["zh", "en", "de"];
+export const DEFAULT_MENU_LANGUAGES = ["en", "de"];
+
+/** A list to store: known languages only, at least one, in flag order. */
+export function normalizeMenuLanguages(value) {
+  if (!Array.isArray(value)) throw new Error("Menu languages must be a list");
+  const unknown = value.filter((language) => !MENU_LANGUAGES.includes(language));
+  if (unknown.length) throw new Error(`Unsupported menu language: ${unknown.join(", ")}`);
+  const chosen = MENU_LANGUAGES.filter((language) => value.includes(language));
+  if (!chosen.length) throw new Error("The menu needs at least one language");
+  return chosen;
+}
+
+/** What is stored, read back leniently: anything unreadable is the default,
+ *  never an empty menu with no language to show it in. */
+export function parseMenuLanguages(stored) {
+  try {
+    return normalizeMenuLanguages(JSON.parse(stored));
+  } catch {
+    return [...DEFAULT_MENU_LANGUAGES];
+  }
+}
+
+/** `languagesValue` is the raw `app_settings` value for `menu_languages`,
+ *  or undefined when it has never been set. */
+export function settingsView(row, languagesValue) {
+  return {
+    menuTheme: row ? row.menu_theme : DEFAULT_MENU_THEME,
+    menuLanguages: languagesValue === undefined || languagesValue === null
+      ? [...DEFAULT_MENU_LANGUAGES]
+      : parseMenuLanguages(languagesValue)
+  };
 }
 
 export function printerView(row) {

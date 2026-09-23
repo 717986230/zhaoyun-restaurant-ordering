@@ -125,6 +125,11 @@ CREATE TABLE admin_gate (
       password_iterations INTEGER NOT NULL,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 CREATE TABLE admin_sessions (
       token_hash TEXT PRIMARY KEY,
       expires_at TEXT NOT NULL,
