@@ -66,6 +66,13 @@ export function tableNo(): string {
   return tableIdentity().tableNo;
 }
 
+/** The table this device was actually given, or null. The menu must not show
+ *  the placeholder: "Table 08" on a phone that scanned no card is made up. */
+export function assignedTableNo(): string | null {
+  const identity = tableIdentity();
+  return identity.configured ? identity.tableNo : null;
+}
+
 export function tableToken(): string {
   return tableIdentity().token;
 }

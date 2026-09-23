@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
     return <section className="crash">
       <h1>赵云</h1>
-      <p>点餐程序遇到问题，请叫服务员</p>
+      <p>菜单出了问题，请叫服务员</p>
       <p>Es ist ein Fehler aufgetreten. Bitte rufen Sie das Personal.</p>
       <p>Something went wrong. Please call our staff.</p>
       <button className="primary" onClick={() => window.location.reload()}>重新载入 · Neu laden · Reload</button>

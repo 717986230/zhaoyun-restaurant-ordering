@@ -1,19 +1,18 @@
 import { useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { deconstruct, formatEuro, LANGUAGE_INFO } from "@zhaoyun/domain";
+import { deconstruct, LANGUAGE_INFO } from "@zhaoyun/domain";
 import type { DishPart, MenuLanguage, Product } from "@zhaoyun/domain";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
-import { tableNo } from "../../app/table";
-import { productName, t } from "../../app/i18n";
+import { assignedTableNo } from "../../app/table";
+import { formatPrice, productName, secondaryName, t } from "../../app/i18n";
 import type { ColorScheme } from "../../app/useColorScheme";
 
 interface Props {
   state: CustomerState;
   dispatch: CustomerDispatch;
   products: Product[];
-  offlineMenu?: boolean;
   /** The languages the restaurant switched on, in flag order. */
   languages: MenuLanguage[];
   scheme: ColorScheme;
@@ -109,7 +108,7 @@ function DishOptions({ product, language }: { product: Product; language: Custom
     {product.modifiers.map((group) => <p className="dish-options-group" key={group.id}>
       <b>{localized(group.names, language)}</b>
       {group.options.map((option) => <span key={option.id}>
-        {localized(option.names, language)}{option.priceCents > 0 ? ` +${formatEuro(option.priceCents)}` : ""}
+        {localized(option.names, language)}{option.priceCents > 0 ? ` +${formatPrice(option.priceCents, language)}` : ""}
       </span>)}
     </p>)}
   </div>;
@@ -153,19 +152,19 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
             <span className="number">{product.sku}</span><span className="cat">{product.category}</span>
-            <h3>{productName(product, state.language)}</h3><p>{product.names.de}</p>
+            <h3>{productName(product, state.language)}</h3>{secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}
           </div>
           <div className="detail-scroll">
             <div className="feature">
               <ProductMedia product={product} />
-              <div><h4>{product.names.en}</h4><p>{product.description}</p></div>
+              <div><p>{product.description}</p></div>
             </div>
             <DishOptions product={product} language={state.language} />
             <BundleContents product={product} products={products} language={state.language} />
             <div className="meta"><span>{product.details.time}</span><span>{product.details.people}</span><span>{product.details.level}</span></div>
           </div>
           <div className="detail-buy">
-            <div className="buyline"><strong>{formatEuro(product.priceCents)}</strong></div>
+            <div className="buyline"><strong>{formatPrice(product.priceCents, state.language)}</strong></div>
           </div>
         </section>
         <section className="detail-face detail-back" aria-label={t(state.language, "detailRegion")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
@@ -190,7 +189,7 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
   </motion.div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, offlineMenu = false, languages, scheme, onToggleScheme, onAdminTap }: Props) {
+export function CatalogScreen({ state, dispatch, products, languages, scheme, onToggleScheme, onAdminTap }: Props) {
   const query = state.query.trim().toLowerCase();
   const visible = products.filter((product) => {
     const categoryMatch = state.category === "ALLE" || product.category === state.category;
@@ -199,6 +198,7 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false, 
   });
   const categories = ["ALLE", ...new Set(products.map((product) => product.category))];
   const activeProduct = products.find((product) => product.id === state.activeProductId);
+  const table = assignedTableNo();
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
@@ -207,7 +207,7 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false, 
           seconds. On the web it opens admin.html, which asks for the password;
           in the Android kiosk shell it asks for the kiosk PIN first. */}
       <div className="title" role="button" tabIndex={0} onClick={() => void onAdminTap()} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") void onAdminTap(); }}>
-        <strong>La Carte</strong><small>TISCH {tableNo()}</small>
+        <strong>La Carte</strong>{table && <small>{t(state.language, "tableLabel").replace("{table}", table)}</small>}
       </div>
       <div className="topbar-end">
         {/* A flag per language the restaurant switched on, and none when there
@@ -227,18 +227,17 @@ export function CatalogScreen({ state, dispatch, products, offlineMenu = false, 
       </div>
     </header>
     <div id="searchBox" className={`search-box ${state.searchOpen ? "open" : ""}`}>
-      <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={`${t(state.language, "search")} / SKU`} autoFocus={state.searchOpen} />
+      <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={t(state.language, "searchPlaceholder")} autoFocus={state.searchOpen} />
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
-    {offlineMenu && <p className="local-board-note">{t(state.language, "menuOffline")}</p>}
-    <nav id="chips" className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} onClick={() => dispatch({ type: "category", category })}>{category}</button>)}</nav>
+    <nav id="chips" className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} onClick={() => dispatch({ type: "category", category })}>{category === "ALLE" ? t(state.language, "allCategories") : category}</button>)}</nav>
     <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
       <div className="summary">
         <ProductMedia product={product} size="thumb" />
         <span className="number">{product.sku}</span>
-        <div><h3>{productName(product, state.language)}</h3><p>{product.names.de}</p></div>
+        <div><h3>{productName(product, state.language)}</h3>{secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}</div>
         {/* A menu without prices sends a guest into every dish to find one. */}
-        <span className="row-price">{formatEuro(product.priceCents)}</span>
+        <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
       </div>
     </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}</div>
     <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} products={products} state={state} dispatch={dispatch} />}</AnimatePresence>

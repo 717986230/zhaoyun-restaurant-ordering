@@ -236,7 +236,11 @@ test("a tablet that has never reached the server shows the menu the app ships wi
   // Having never reached the server, it has not heard that this restaurant
   // switched Chinese on either, so it offers the default two — and a Chinese
   // phone falls back to German, the language of the house.
-  await expect(page.locator(".local-board-note")).toContainText("Offline-Speisekarte");
+  await expect(page.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
+  // And no banner about it: the guest cannot do anything with "offline", and
+  // the prices shown are the menu's own.
+  await expect(page.getByText(/offline/i)).toHaveCount(0);
+  await expect(page.getByText("离线菜单")).toHaveCount(0);
 });
 
 // The CSS prefers-reduced-motion block cannot reach motion/react's JS-driven
@@ -292,9 +296,45 @@ test("the platform class is set, and it is what turns the expensive blur off", a
   expect(onAndroid, "the Android rule must drop the blur").toBe("none");
 });
 
+test("the header shows no table number the guest was never given, and nothing in the wrong language", async ({ page }) => {
+  // This phone opened the menu without a table card, so there is no table to
+  // show; the placeholder "08" used to appear as if it were real.
+  await expect(page.locator(".topbar .title small")).toHaveCount(0);
+  await expect(page.getByText(/TISCH/)).toHaveCount(0);
+  // The "all" chip speaks the guest's language.
+  await expect(page.locator(".chip").first()).toHaveText("全部");
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.locator(".chip").first()).toHaveText("All");
+  await page.locator("#searchBtn").click();
+  await expect(page.locator("#searchInput")).toHaveAttribute("placeholder", "Search dish or number");
+});
+
+test("a card's table number shows, in the guest's language", async ({ page }) => {
+  await page.goto("/?table=12");
+  await expect(page.locator(".topbar .title small")).toHaveText("桌 12");
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.locator(".topbar .title small")).toHaveText("Tisch 12");
+});
+
+test("a dish's second line is its name in another language, never the same name twice", async ({ page }) => {
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  const row = page.locator(".dish-card", { hasText: "Ramen mit Gemüse" });
+  // German on top, English below — not German twice.
+  await expect(row.locator("h3")).toHaveText("Ramen mit Gemüse");
+  await expect(row.locator("p")).toHaveText("Ramen with Vegetables");
+  await page.getByRole("button", { name: "English" }).click();
+  const english = page.locator(".dish-card", { hasText: "Ramen with Vegetables" });
+  await expect(english.locator("p")).toHaveText("Ramen mit Gemüse");
+});
+
 test("the list carries a price, so nothing has to be opened to find one", async ({ page }) => {
   const row = page.locator(".dish-card", { hasText: "蔬菜拉面" });
-  await expect(row.locator(".row-price")).toHaveText("EUR 12.50");
+  // Written the way each language writes a price, not "EUR 12.50".
+  await expect(row.locator(".row-price")).toHaveText("€12.50");
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  // Austrian German: the euro sign first, a decimal comma.
+  await expect(page.locator(".dish-card", { hasText: "Ramen mit Gemüse" }).locator(".row-price")).toHaveText(/^€\s12,50$/);
+  await page.getByRole("button", { name: "中文" }).click();
   // The picture slot is in the row whether or not a photo exists yet, so the
   // layout does not move the day one is uploaded.
   await expect(row.locator(".art, .dish-media")).toHaveCount(1);

@@ -7,7 +7,6 @@ export type Language = CustomerState["language"];
 const copy = {
   zh: {
     start: "开始点餐", orders: "订单状态", service: "呼叫服务员", staff: "员工看板",
-    menuOffline: "离线菜单，价格以店内为准",
     menu: "菜单", cart: "购物车", search: "搜索菜品", clear: "清除", empty: "没有找到商品", unavailable: "菜单暂时不可用，请呼叫服务员",
     add: "加入购物车", customize: "口味与加料", bundleIncludes: "套餐包含", close: "关闭详情", flip: "点击卡片翻转查看详情", back: "返回正面",
     ingredients: "主要食材", allergens: "过敏原", time: "制作时间", portion: "份量 / 难度",
@@ -38,11 +37,11 @@ const copy = {
     setTable: "设置桌号", tablePrompt: "请输入本设备所在的桌号（1-8 位字母或数字）", tableInvalid: "桌号无效，请使用 1-8 位字母或数字",
     tableUnset: "本设备还没有分配桌号，订单会记到默认桌号",
     breakdown: "拆解", parts: "组成", alsoContains: "另含（未标注到具体食材）", portionOf: "规格",
-    language: "语言", lightMode: "切换到浅色", darkMode: "切换到深色"
+    language: "语言", lightMode: "切换到浅色", darkMode: "切换到深色",
+    allCategories: "全部", searchPlaceholder: "搜索菜名或编号", tableLabel: "桌 {table}"
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
-    menuOffline: "Offline-Speisekarte, Preise laut Lokal",
     menu: "Speisekarte", cart: "Warenkorb", search: "Gericht suchen", clear: "Löschen", empty: "Keine Gerichte gefunden", unavailable: "Speisekarte nicht verfügbar, bitte Service rufen",
     add: "In den Warenkorb", customize: "Geschmack & Extras", bundleIncludes: "Im Set enthalten", close: "Details schließen", flip: "Karte für Details antippen", back: "Vorderseite",
     ingredients: "Zutaten", allergens: "Allergene", time: "Zubereitungszeit", portion: "Portion / Schärfe",
@@ -73,11 +72,11 @@ const copy = {
     setTable: "Tisch einstellen", tablePrompt: "Tischnummer dieses Geräts eingeben (1-8 Zeichen)", tableInvalid: "Ungültige Tischnummer: 1-8 Buchstaben oder Ziffern",
     tableUnset: "Diesem Gerät ist noch kein Tisch zugewiesen",
     breakdown: "Aufgeschlüsselt", parts: "Bestandteile", alsoContains: "Außerdem enthalten (keiner Zutat zugeordnet)", portionOf: "Menge",
-    language: "Sprache", lightMode: "Helles Design", darkMode: "Dunkles Design"
+    language: "Sprache", lightMode: "Helles Design", darkMode: "Dunkles Design",
+    allCategories: "Alle", searchPlaceholder: "Gericht oder Nummer suchen", tableLabel: "Tisch {table}"
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
-    menuOffline: "Offline menu, prices as shown in the restaurant",
     menu: "Menu", cart: "Cart", search: "Search dishes", clear: "Clear", empty: "No dishes found", unavailable: "Menu unavailable, please call service",
     add: "Add to cart", customize: "Flavors & extras", bundleIncludes: "Included in this set", close: "Close details", flip: "Tap card to see details", back: "Front side",
     ingredients: "Ingredients", allergens: "Allergens", time: "Preparation time", portion: "Portion / level",
@@ -108,7 +107,8 @@ const copy = {
     setTable: "Set table", tablePrompt: "Enter the table number of this device (1-8 characters)", tableInvalid: "Invalid table number: use 1-8 letters or digits",
     tableUnset: "This device has no table assigned yet",
     breakdown: "Taken apart", parts: "Components", alsoContains: "Also contains (not tied to one ingredient)", portionOf: "Serving",
-    language: "Language", lightMode: "Switch to light", darkMode: "Switch to dark"
+    language: "Language", lightMode: "Switch to light", darkMode: "Switch to dark",
+    allCategories: "All", searchPlaceholder: "Search dish or number", tableLabel: "Table {table}"
   }
 } as const;
 
@@ -149,4 +149,25 @@ export function serviceName(serviceType: ServiceRequest["serviceType"], language
 
 export function productName(product: Product, language: Language): string {
   return product.names[language] || product.names.en || product.names.de || product.names.zh;
+}
+
+const priceLocale: Record<Language, string> = { zh: "zh-CN", de: "de-AT", en: "en-GB" };
+
+/** A price the way each language writes one: "€ 12,50" in Austrian German,
+ *  "€12.50" in English and Chinese — not "EUR 12.50", which is how nobody
+ *  writes it. */
+export function formatPrice(cents: number, language: Language): string {
+  return new Intl.NumberFormat(priceLocale[language], { style: "currency", currency: "EUR" }).format(cents / 100);
+}
+
+/**
+ * The line under a dish's name: its name in another language, for the guest
+ * who wants to point at it for the waiter. German under everything except
+ * German, which gets English — and nothing when the two are the same, rather
+ * than the same name twice.
+ */
+export function secondaryName(product: Product, language: Language): string {
+  const primary = productName(product, language);
+  const secondary = language === "de" ? product.names.en : product.names.de;
+  return secondary && secondary !== primary ? secondary : "";
 }

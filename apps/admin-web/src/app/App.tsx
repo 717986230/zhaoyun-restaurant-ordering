@@ -291,12 +291,27 @@ export function App() {
     } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
   }
 
+  /**
+   * Shown at once, saved behind it. Each toggle works out the next list from
+   * the one on screen, so waiting for the server before updating the screen
+   * meant a second tap during the save was computed from the list before the
+   * first one — and saved a set of languages nobody chose.
+   */
   async function saveMenuLanguages(menuLanguages: MenuLanguage[]) {
+    let previous: MenuLanguage[] | null = null;
+    setState((current) => {
+      previous = current.menuLanguages;
+      return { ...current, menuLanguages };
+    });
     try {
       const settings = await adminApi.updateSettings({ menuLanguages });
-      setState((current) => ({ ...current, menuLanguages: settings.menuLanguages }));
+      // Only adopt the server's answer if nothing newer is on screen.
+      setState((current) => current.menuLanguages === menuLanguages ? { ...current, menuLanguages: settings.menuLanguages } : current);
       notify("菜单语言已更新");
-    } catch (error) { notify(error instanceof Error ? error.message : "保存失败", "error"); }
+    } catch (error) {
+      setState((current) => current.menuLanguages === menuLanguages ? { ...current, menuLanguages: previous } : current);
+      notify(error instanceof Error ? error.message : "保存失败", "error");
+    }
   }
 
   /** Changing the password ends every session opened with the old one — this
