@@ -1,114 +1,350 @@
 {
   "_comment": "What scripts/fetch-dish-photos.mjs searches Wikimedia Commons for, per dish. `query` is a Commons search; `pick` chooses another of the ranked candidates (0 is the first) once a photo has been looked at and found wrong; `file` pins an exact Commons file. Change an entry and the next run fetches that dish again.",
-  "photo-r1": { "query": "vegetable ramen bowl" },
-  "photo-r2": { "query": "chicken ramen bowl" },
-  "photo-r3": { "query": "beef ramen noodle soup" },
-  "photo-r4": { "query": "shrimp ramen" },
-  "photo-t1": { "query": "shuizhu beef" },
-  "photo-t2": { "query": "laziji chongqing chicken" },
-  "photo-t3": { "query": "spicy fried prawns sichuan" },
-  "photo-t4": { "query": "mapo tofu" },
-  "photo-t4c": { "query": "mapo tofu", "pick": 1 },
-  "photo-a1": { "query": "gua bao vegetarian" },
-  "photo-a2": { "query": "gua bao chicken" },
-  "photo-a3": { "query": "bao bun beef" },
-  "photo-a4": { "query": "duck bao bun" },
-  "photo-h1": { "query": "vegetable hot pot chinese" },
-  "photo-h2": { "query": "beef hot pot" },
-  "photo-h3": { "query": "seafood hot pot" },
-  "photo-h4": { "query": "mongolian hot pot lamb" },
-  "photo-n1-6": { "query": "salmon nigiri" },
-  "photo-n1-10": { "query": "salmon nigiri", "pick": 1 },
-  "photo-n2-6": { "query": "nigiri sushi assortment" },
-  "photo-n2-10": { "query": "nigiri sushi assortment", "pick": 1 },
-  "photo-n3-6": { "query": "salmon tuna nigiri" },
-  "photo-n3-10": { "query": "salmon tuna nigiri", "pick": 1 },
-  "photo-n4-6": { "query": "maguro nigiri" },
-  "photo-n4-10": { "query": "tuna nigiri sushi" },
-  "photo-m1": { "query": "kappa maki" },
-  "photo-m2": { "query": "sake maki salmon roll" },
-  "photo-m3": { "query": "avocado maki" },
-  "photo-m5": { "query": "mango avocado sushi roll" },
-  "photo-m6": { "query": "ebi avocado sushi roll" },
-  "photo-m7": { "query": "salmon avocado roll sushi" },
-  "photo-s1-9": { "query": "salmon sashimi" },
-  "photo-s1-18": { "query": "salmon sashimi", "pick": 1 },
-  "photo-s2-9": { "query": "salmon tuna sashimi" },
-  "photo-s2-18": { "query": "salmon tuna sashimi", "pick": 1 },
-  "photo-s3-9": { "query": "sashimi platter" },
-  "photo-s3-18": { "query": "sashimi platter", "pick": 1 },
-  "photo-x1": { "query": "rainbow roll sushi" },
-  "photo-x2": { "query": "tempura sushi roll" },
-  "photo-x3": { "query": "alaska roll sushi" },
-  "photo-x4": { "query": "spicy tuna roll" },
-  "photo-x5": { "query": "dragon roll sushi" },
-  "photo-x6": { "query": "duck sushi roll" },
-  "photo-x7": { "query": "uramaki sushi roll" },
-  "photo-x8": { "query": "cucumber avocado uramaki" },
-  "photo-x9": { "query": "california roll" },
-  "photo-b1": { "query": "sesame chicken" },
-  "photo-b2": { "query": "thai red curry chicken" },
-  "photo-b3": { "query": "sweet and sour chicken pineapple" },
-  "photo-b4": { "query": "chicken katsu" },
-  "photo-b5": { "query": "chili beef stir fry" },
-  "photo-b6": { "query": "bulgogi" },
-  "photo-b7": { "query": "kung pao chicken" },
-  "photo-b8": { "query": "salmon teriyaki" },
-  "photo-b9": { "query": "tom yum prawns" },
-  "photo-b10": { "query": "bok choy tofu" },
-  "photo-b11": { "query": "nasi goreng" },
-  "photo-b12": { "query": "tteokbokki" },
-  "photo-b13": { "query": "tteokbokki", "pick": 1 },
-  "photo-b14": { "query": "jiaozi dumplings plate" },
-  "photo-b15": { "query": "boiled dumplings jiaozi", "pick": 1 },
-  "photo-v1": { "query": "edamame" },
-  "photo-v2": { "query": "goi cuon summer roll" },
-  "photo-v3": { "query": "goi cuon shrimp" },
-  "photo-v4": { "query": "spring rolls fried" },
-  "photo-v5": { "query": "gyoza" },
-  "photo-v6": { "query": "gyoza", "pick": 1 },
-  "photo-v7": { "query": "gyoza", "pick": 2 },
-  "photo-v8": { "query": "takoyaki" },
-  "photo-v9": { "query": "kimchi" },
-  "photo-v10": { "query": "avocado salad" },
-  "photo-v11": { "query": "salmon tartare" },
-  "photo-v12": { "query": "coconut shrimp" },
-  "photo-v13": { "query": "hongyou chaoshou wontons chili oil" },
-  "photo-v14": { "query": "miso soup" },
-  "photo-v15": { "query": "wonton soup" },
-  "photo-v16": { "query": "tom yum goong" },
-  "photo-v17": { "query": "tom kha gai" },
-  "photo-v18": { "query": "har gow" },
-  "photo-u1": { "query": "yaki udon" },
-  "photo-u2": { "query": "yaki udon", "pick": 1 },
-  "photo-u3": { "query": "yaki udon", "pick": 2 },
-  "photo-u4": { "query": "fried udon noodles" },
-  "photo-u5": { "query": "fried udon noodles", "pick": 1 },
-  "photo-side-rice": { "query": "bowl of steamed white rice" },
-  "photo-side-fried-rice": { "query": "egg fried rice" },
-  "photo-d1": { "query": "mochi daifuku" },
-  "photo-d2": { "query": "matcha tiramisu" },
-  "photo-d3": { "query": "apple dumplings dessert" },
-  "photo-dr-cola": { "query": "glass of cola with ice" },
-  "photo-dr-eistee": { "query": "iced tea glass" },
-  "photo-dr-water": { "query": "glass of sparkling water" },
-  "photo-dr-aloe": { "query": "aloe vera drink" },
-  "photo-dr-apple": { "query": "glass of apple juice" },
-  "photo-dr-orange": { "query": "glass of orange juice" },
-  "photo-dr-redbull": { "query": "red bull energy drink can" },
-  "photo-beer-wiesel-fass": { "query": "glass of lager beer" },
-  "photo-beer-wiesel-stamm": { "query": "Wieselburger beer" },
-  "photo-beer-nonalc": { "query": "non-alcoholic beer glass" },
-  "photo-beer-japan": { "query": "japanese beer glass" },
-  "photo-wine-white": { "query": "glass of white wine" },
-  "photo-wine-red": { "query": "glass of red wine" },
-  "photo-wine-spritzer": { "query": "white wine spritzer" },
-  "photo-aperol": { "query": "aperol spritz" },
-  "photo-aperol-prosecco": { "query": "aperol spritz", "pick": 1 },
-  "photo-hugo": { "query": "hugo cocktail" },
-  "photo-sake": { "query": "sake tokkuri ochoko" },
-  "photo-coffee-espresso": { "query": "espresso cup" },
-  "photo-coffee-cappuccino": { "query": "cappuccino" },
-  "photo-coffee-latte": { "query": "latte macchiato" },
-  "photo-tea": { "query": "jasmine tea cup" }
+  "photo-r1": {
+    "query": "vegetarian ramen"
+  },
+  "photo-r2": {
+    "query": "shoyu ramen chicken chashu"
+  },
+  "photo-r3": {
+    "query": "beef ramen noodle soup"
+  },
+  "photo-r4": {
+    "query": "shrimp ramen"
+  },
+  "photo-t1": {
+    "query": "shuizhu beef"
+  },
+  "photo-t2": {
+    "query": "laziji chongqing chicken"
+  },
+  "photo-t3": {
+    "query": "stir fried shrimp chili peppers"
+  },
+  "photo-t4": {
+    "query": "mapo tofu"
+  },
+  "photo-t4c": {
+    "query": "mapo tofu",
+    "pick": 1
+  },
+  "photo-a1": {
+    "query": "gua bao"
+  },
+  "photo-a2": {
+    "query": "gua bao",
+    "pick": 1
+  },
+  "photo-a3": {
+    "query": "gua bao",
+    "pick": 2
+  },
+  "photo-a4": {
+    "query": "peking duck bun"
+  },
+  "photo-h1": {
+    "query": "vegetable hot pot chinese"
+  },
+  "photo-h2": {
+    "query": "beef hot pot"
+  },
+  "photo-h3": {
+    "query": "seafood hotpot shrimp clams"
+  },
+  "photo-h4": {
+    "query": "instant-boiled mutton"
+  },
+  "photo-n1-6": {
+    "query": "salmon nigiri"
+  },
+  "photo-n1-10": {
+    "query": "salmon nigiri",
+    "pick": 1
+  },
+  "photo-n2-6": {
+    "query": "nigiri sushi assortment"
+  },
+  "photo-n2-10": {
+    "query": "nigiri sushi assortment",
+    "pick": 1
+  },
+  "photo-n3-6": {
+    "query": "salmon tuna nigiri"
+  },
+  "photo-n3-10": {
+    "query": "salmon tuna nigiri",
+    "pick": 1
+  },
+  "photo-n4-6": {
+    "query": "maguro nigiri"
+  },
+  "photo-n4-10": {
+    "query": "tuna nigiri sushi"
+  },
+  "photo-m1": {
+    "query": "kappa maki"
+  },
+  "photo-m2": {
+    "query": "salmon maki"
+  },
+  "photo-m3": {
+    "query": "avocado maki"
+  },
+  "photo-m5": {
+    "query": "mango avocado sushi roll"
+  },
+  "photo-m6": {
+    "query": "ebi avocado sushi roll"
+  },
+  "photo-m7": {
+    "query": "salmon avocado roll sushi"
+  },
+  "photo-s1-9": {
+    "file": "File:Salmon Sashimi with Calamansi.JPG"
+  },
+  "photo-s1-18": {
+    "query": "salmon sashimi",
+    "pick": 1
+  },
+  "photo-s2-9": {
+    "file": "File:Mixed Sashimi - Taro 2025-10-24.jpg"
+  },
+  "photo-s2-18": {
+    "query": "salmon tuna sashimi",
+    "pick": 1
+  },
+  "photo-s3-9": {
+    "query": "sashimi platter"
+  },
+  "photo-s3-18": {
+    "query": "sashimi platter",
+    "pick": 1
+  },
+  "photo-x1": {
+    "query": "rainbow roll sushi"
+  },
+  "photo-x2": {
+    "query": "tempura sushi roll"
+  },
+  "photo-x3": {
+    "query": "alaska roll sushi"
+  },
+  "photo-x4": {
+    "file": "File:Spicy tuna roll.jpg"
+  },
+  "photo-x5": {
+    "query": "dragon roll sushi"
+  },
+  "photo-x6": {
+    "query": "duck sushi roll"
+  },
+  "photo-x7": {
+    "query": "uramaki sushi roll"
+  },
+  "photo-x8": {
+    "query": "cucumber avocado uramaki"
+  },
+  "photo-x9": {
+    "query": "california roll"
+  },
+  "photo-b1": {
+    "file": "File:Chinese honey sesame chicken (cropped).jpg"
+  },
+  "photo-b2": {
+    "query": "thai red curry chicken"
+  },
+  "photo-b3": {
+    "query": "sweet and sour chicken pineapple"
+  },
+  "photo-b4": {
+    "query": "chicken katsu"
+  },
+  "photo-b5": {
+    "query": "chili beef stir fry"
+  },
+  "photo-b6": {
+    "query": "bulgogi"
+  },
+  "photo-b7": {
+    "query": "kung pao chicken"
+  },
+  "photo-b8": {
+    "query": "salmon teriyaki"
+  },
+  "photo-b9": {
+    "query": "tom yum prawns"
+  },
+  "photo-b10": {
+    "query": "bok choy tofu"
+  },
+  "photo-b11": {
+    "file": "File:Nasi goreng indonesia.jpg"
+  },
+  "photo-b12": {
+    "query": "tteokbokki"
+  },
+  "photo-b13": {
+    "query": "tteok-bokki"
+  },
+  "photo-b14": {
+    "query": "jiaozi dumplings plate"
+  },
+  "photo-b15": {
+    "query": "boiled dumplings jiaozi",
+    "pick": 1
+  },
+  "photo-v1": {
+    "file": "File:Edamame on a bamboo bowl by yomi955.jpg"
+  },
+  "photo-v2": {
+    "query": "goi cuon summer roll"
+  },
+  "photo-v3": {
+    "query": "goi cuon shrimp"
+  },
+  "photo-v4": {
+    "query": "spring rolls fried"
+  },
+  "photo-v5": {
+    "query": "gyoza"
+  },
+  "photo-v6": {
+    "query": "gyoza",
+    "pick": 1
+  },
+  "photo-v7": {
+    "query": "gyoza",
+    "pick": 2
+  },
+  "photo-v8": {
+    "query": "takoyaki"
+  },
+  "photo-v9": {
+    "query": "baechu kimchi"
+  },
+  "photo-v10": {
+    "file": "File:Avocado salad.jpg"
+  },
+  "photo-v11": {
+    "query": "salmon tartare"
+  },
+  "photo-v12": {
+    "query": "coconut shrimp"
+  },
+  "photo-v13": {
+    "file": "File:红油抄手 Chilli Oil Dumplings - Ants Bistro.jpg"
+  },
+  "photo-v14": {
+    "query": "miso soup"
+  },
+  "photo-v15": {
+    "query": "wonton soup"
+  },
+  "photo-v16": {
+    "query": "tom yum goong"
+  },
+  "photo-v17": {
+    "query": "tom kha gai"
+  },
+  "photo-v18": {
+    "query": "har gow"
+  },
+  "photo-u1": {
+    "query": "yaki udon"
+  },
+  "photo-u2": {
+    "query": "yaki udon",
+    "pick": 1
+  },
+  "photo-u3": {
+    "file": "File:Yaki-udon.jpg"
+  },
+  "photo-u4": {
+    "query": "fried udon noodles"
+  },
+  "photo-u5": {
+    "file": "File:Yaki udon in Daegu.jpg"
+  },
+  "photo-side-rice": {
+    "query": "bowl of steamed white rice"
+  },
+  "photo-side-fried-rice": {
+    "query": "egg fried rice"
+  },
+  "photo-d1": {
+    "query": "mochi daifuku"
+  },
+  "photo-d2": {
+    "file": "File:Matcha tiramisu.jpg"
+  },
+  "photo-d3": {
+    "query": "apple dumplings dessert"
+  },
+  "photo-dr-cola": {
+    "query": "glass of cola with ice"
+  },
+  "photo-dr-eistee": {
+    "query": "iced tea glass"
+  },
+  "photo-dr-water": {
+    "query": "glass of sparkling water"
+  },
+  "photo-dr-aloe": {
+    "query": "aloe vera juice"
+  },
+  "photo-dr-apple": {
+    "file": "File:Russet apple juice.JPG"
+  },
+  "photo-dr-orange": {
+    "query": "glass of orange juice"
+  },
+  "photo-dr-redbull": {
+    "query": "red bull energy drink can"
+  },
+  "photo-beer-wiesel-fass": {
+    "query": "draft beer glass"
+  },
+  "photo-beer-wiesel-stamm": {
+    "query": "Märzen beer"
+  },
+  "photo-beer-nonalc": {
+    "query": "non-alcoholic beer glass"
+  },
+  "photo-beer-japan": {
+    "query": "Asahi Super Dry"
+  },
+  "photo-wine-white": {
+    "file": "File:Glass of White Wine shot with a bottle of white wine - Evan Swigart.jpg"
+  },
+  "photo-wine-red": {
+    "query": "glass of red wine"
+  },
+  "photo-wine-spritzer": {
+    "file": "File:Heuriger Zum Renner Wiener Spritzer.jpg"
+  },
+  "photo-aperol": {
+    "query": "aperol spritz"
+  },
+  "photo-aperol-prosecco": {
+    "query": "aperol spritz",
+    "pick": 1
+  },
+  "photo-hugo": {
+    "query": "hugo cocktail"
+  },
+  "photo-sake": {
+    "query": "sake ochoko"
+  },
+  "photo-coffee-espresso": {
+    "file": "File:Cup of espresso 02.jpg"
+  },
+  "photo-coffee-cappuccino": {
+    "file": "File:Cappuccino at ARS Cafe.jpg"
+  },
+  "photo-coffee-latte": {
+    "query": "latte macchiato"
+  },
+  "photo-tea": {
+    "file": "File:Jasmine tea at Bangkok 9.jpg"
+  }
 }
