@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|NotebookEdit|mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/laya_gate.py",
+            "timeout": 10,
+            "statusMessage": "Laya 正在判断…"
+          }
+        ]
+      }
+    ]
+  }
+}
