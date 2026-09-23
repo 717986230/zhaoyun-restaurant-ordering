@@ -3053,3 +3053,31 @@ button:focus-visible,
 .menu.search-open .chips {
   visibility: hidden;
 }
+
+/* Card text never widens its card: a grid or flex item defaults to its
+   content's width, and Safari holds to that where Chrome squeezes it. */
+.featured-body,
+.featured-body > *,
+.featured-foot > * {
+  min-width: 0;
+}
+
+.featured-foot {
+  flex-wrap: wrap;
+}
+
+/* The magazine design needs room for two columns; on a narrow phone the
+   photo goes above the text, as in every other design. */
+@media (max-width: 480px) {
+  .featured-page[data-template="editorial"] .featured-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .featured-page[data-template="editorial"] .featured-card:nth-child(even) .featured-photo {
+    order: 0;
+  }
+
+  .featured-page[data-template="editorial"] .featured-photo {
+    aspect-ratio: 4 / 3;
+  }
+}
