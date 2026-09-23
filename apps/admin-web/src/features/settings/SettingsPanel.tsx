@@ -76,8 +76,8 @@ export function SettingsPanel(props: Props) {
     <p>改密码会让所有已登录的设备重新输入一次。忘了密码就用上面的管理员令牌重设。</p>
     <form className="editor-form compact-form" onSubmit={(event) => void changePassword(event)}>
       <label><span>当前密码</span><input name="currentPassword" required type="password" autoComplete="current-password" /></label>
-      <label><span>新密码（至少 8 位）</span><input name="nextPassword" required minLength={8} type="password" autoComplete="new-password" /></label>
-      <label><span>再输入一次</span><input name="repeatPassword" required minLength={8} type="password" autoComplete="new-password" /></label>
+      <label><span>新密码（至少 6 位）</span><input name="nextPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
+      <label><span>再输入一次</span><input name="repeatPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
       {passwordNote && <p className="gate-note error" role="alert">{passwordNote}</p>}
       <button className="primary-action" type="submit">修改密码</button>
     </form>
