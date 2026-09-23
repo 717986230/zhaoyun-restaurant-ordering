@@ -14,7 +14,12 @@ import type { TurnDirection } from "./usePageTurn";
 interface Props {
   state: CustomerState;
   dispatch: CustomerDispatch;
+  /** What is on the menu right now. */
   products: Product[];
+  /** Everything, dishes outside their hours included: a set still names a
+   *  dish that is not served on its own at this hour, and a card a guest has
+   *  open stays open when its hours end. Defaults to `products`. */
+  catalog?: Product[];
   /** The languages the restaurant switched on, in flag order. */
   languages: MenuLanguage[];
   /** The heading the owner set; "La Carte" until they set one. */
@@ -368,13 +373,13 @@ function FeaturedPage({ title, eyebrow, template, products, byId, language, onOp
   </div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured }: Props) {
+export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured }: Props) {
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
   // Set menus have a page of their own and stay out of "all" and the
   // categories, so a guest looking for a dish does not wade through bundles.
-  const byId = useMemo<ProductIndex>(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const byId = useMemo<ProductIndex>(() => new Map(catalog.map((product) => [product.id, product])), [catalog]);
   const sets = useMemo(() => products.filter(isSet), [products]);
   const dishes = useMemo(() => products.filter((product) => !isSet(product)), [products]);
   const onSets = sets.length > 0 && state.category === SETS_PAGE && !query;
@@ -386,7 +391,7 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
   });
   // The promotions page, when there is one, is the first page of the menu.
   const categories = [...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))];
-  const activeProduct = products.find((product) => product.id === state.activeProductId);
+  const activeProduct = state.activeProductId ? byId.get(state.activeProductId) : undefined;
   const table = assignedTableNo();
   const reduceMotion = useReducedMotion();
 

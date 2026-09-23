@@ -12,7 +12,7 @@ import {
   adminGateView, assertOrderTransition, assertPassword, assertRequestTransition, auditView,
   billView, bool, boundedLimit, duplicateInput, hashPassword, hashSessionToken, mapProduct, newSessionToken,
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
-  orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
+  orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView, PRODUCT_SELECT, writeScheduleSql,
   printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
   verifyPassword
 } from "../shared/rules.mjs";
@@ -64,7 +64,7 @@ export function createStore(db) {
   }
 
   async function getProduct(id) {
-    const row = await first("SELECT * FROM products WHERE id = ?", String(id));
+    const row = await first(`${PRODUCT_SELECT} WHERE products.id = ?`, String(id));
     if (!row) return null;
     const media = await mediaFor([row.id]);
     return mapProduct(row, media.get(row.id));
@@ -72,8 +72,8 @@ export function createStore(db) {
 
   async function listProducts(publishedOnly = false) {
     const rows = publishedOnly
-      ? await all("SELECT * FROM products WHERE published = 1 AND available = 1 ORDER BY sort_order, created_at")
-      : await all("SELECT * FROM products ORDER BY sort_order, created_at");
+      ? await all(`${PRODUCT_SELECT} WHERE products.published = 1 AND products.available = 1 ORDER BY products.sort_order, products.created_at`)
+      : await all(`${PRODUCT_SELECT} ORDER BY products.sort_order, products.created_at`);
     const media = await mediaFor(rows.map((row) => row.id));
     return rows.map((row) => mapProduct(row, media.get(row.id)));
   }
@@ -83,8 +83,11 @@ export function createStore(db) {
     if (id && !current) return null;
     const product = normalizeProduct({ ...input, id: id || input.id }, current || {});
     const timestamp = now();
+    // The row and its hours in one batch: D1 runs a batch as one transaction.
+    const statements = [];
+    const statement = (sql, ...params) => statements.push(db.prepare(sql).bind(...params));
     if (current) {
-      await run(
+      statement(
         `UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
            name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
            portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
@@ -97,7 +100,7 @@ export function createStore(db) {
         product.printStation, product.modifiersJson, product.bundleItemsJson, timestamp, product.id
       );
     } else {
-      await run(
+      statement(
         `INSERT INTO products (${PRODUCT_COLUMNS.join(", ")}) VALUES (${PRODUCT_COLUMNS.map(() => "?").join(", ")})`,
         product.id, product.sku, product.kind, product.category, product.nameZh,
         product.nameDe, product.nameEn, product.description, product.priceCents,
@@ -106,6 +109,9 @@ export function createStore(db) {
         product.published, product.sortOrder, product.printStation, product.modifiersJson, product.bundleItemsJson, timestamp, timestamp
       );
     }
+    const schedule = writeScheduleSql(product.id, product.schedule, timestamp);
+    if (schedule) statement(schedule[0], ...schedule[1]);
+    await db.batch(statements);
     return getProduct(product.id);
   }
 
@@ -186,10 +192,10 @@ export function createStore(db) {
 
     const ids = [...new Set(orderProductIds(input))];
     const products = new Map();
-    for (const row of await selectByIds("SELECT * FROM products WHERE id IN (?)", ids)) {
+    for (const row of await selectByIds(`${PRODUCT_SELECT} WHERE products.id IN (?)`, ids)) {
       products.set(String(row.id), row);
     }
-    const plan = planOrder(input, products);
+    const plan = planOrder(input, products, { timeZone: (await getSettings()).timeZone });
     const { id, orderNo, clientRequestId, table, note, totalCents, timestamp } = plan.order;
 
     // A locked table is one whose bill is being settled. Refusing here is the

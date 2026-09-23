@@ -1954,6 +1954,81 @@ h2 {
   }
 }
 
+/* Serving hours: off is always; on, a row of weekday chips and two times. */
+.schedule-picker {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 12px 14px;
+  border: 1px solid var(--a-line);
+  border-radius: 5px;
+}
+
+.schedule-picker legend {
+  padding: 0 4px;
+  color: var(--a-ink-2);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.schedule-presets,
+.schedule-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.schedule-presets button,
+.schedule-days button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  font-size: 13px;
+}
+
+/* Seven equal chips on one line, down to the narrowest phone. */
+.schedule-days {
+  flex-wrap: nowrap;
+}
+
+.schedule-days button {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 56px;
+  padding: 0;
+}
+
+.schedule-presets button.on,
+.schedule-days button.on {
+  border-color: var(--a-accent);
+  background: var(--a-accent);
+  color: var(--a-on-accent);
+  font-weight: 650;
+}
+
+.schedule-status {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--a-sunken);
+  color: var(--a-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.schedule-status.live {
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.off-hours-mark {
+  border-style: dashed;
+}
+
 /* A row off screen costs nothing until it is scrolled to. */
 .product-row {
   content-visibility: auto;

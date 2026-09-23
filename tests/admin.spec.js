@@ -584,6 +584,66 @@ test("a set opened for editing shows its dishes, and saving it keeps them", asyn
   await expect.poll(() => saved?.bundleItems).toEqual([{ productId: "80", quantity: 2 }]);
 });
 
+test("a set is given serving hours in its editor, shown in the list, and taken away again", async ({ page }) => {
+  const set = {
+    id: "set-lunch", sku: "SET-5", kind: "food", category: "SET",
+    names: { zh: "午间套餐", de: "Mittagsmenü", en: "Lunch Set" }, description: "",
+    price: 19.9, allergens: [], details: { ingredients: "", time: "", people: "", level: "" },
+    appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: [], schedule: null
+  };
+  let current = set;
+  const saves = [];
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [current] }) }));
+  await page.route("**/api/admin/products/set-lunch", (route) => {
+    const body = route.request().postDataJSON();
+    saves.push(body);
+    current = { ...set, schedule: body.schedule ?? null };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: current }) });
+  });
+  await page.reload();
+  const row = page.locator(".product-row", { hasText: "午间套餐" });
+  await row.click({ force: true });
+
+  const picker = page.locator(".schedule-picker");
+  await expect(picker.locator(".schedule-days")).toHaveCount(0);
+  await picker.getByText("限时供应").click();
+  // Weekday lunch is what it starts at; the owner makes it the weekend, 11:30 to 15:00.
+  await picker.getByRole("button", { name: "周末" }).click();
+  await picker.getByLabel("开始").fill("11:30");
+  await picker.getByLabel("结束").fill("15:00");
+  await expect(picker.locator(".schedule-status")).toContainText("周末 11:30–15:00");
+  await page.getByRole("button", { name: "保存修改" }).click({ force: true });
+  await expect.poll(() => saves.at(-1)?.schedule).toEqual({ days: [6, 7], from: "11:30", to: "15:00" });
+  await expect(row).toContainText("⏱ 周末 11:30–15:00");
+
+  // No day left is a mistake the form catches before the server does.
+  await row.click({ force: true });
+  await picker.getByRole("button", { name: "六", exact: true }).click();
+  await picker.getByRole("button", { name: "日", exact: true }).click();
+  await page.getByRole("button", { name: "保存修改" }).click({ force: true });
+  await expect(page.locator(".form-error")).toHaveText("至少选一天");
+  expect(saves).toHaveLength(1);
+
+  // Switched off, the hours go: always on the menu again.
+  await picker.getByText("限时供应").click();
+  await page.getByRole("button", { name: "保存修改" }).click({ force: true });
+  await expect.poll(() => saves.length).toBe(2);
+  expect(saves[1].schedule).toBeNull();
+  await expect(row).not.toContainText("⏱");
+});
+
+test("the restaurant's time zone is chosen in settings", async ({ page }) => {
+  appSettings.timeZone = "Europe/Vienna";
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const zone = page.getByLabel("时区");
+  await expect(zone).toHaveValue("Europe/Vienna");
+  await zone.selectOption("Europe/Berlin");
+  await page.locator(".settings-card", { has: page.getByRole("heading", { name: "餐厅", exact: true }) }).getByRole("button", { name: "保存" }).click();
+  await expect.poll(() => appSettings.timeZone).toBe("Europe/Berlin");
+});
+
 test("the header fits on the narrowest phone, every button inside the screen and drawn", async ({ page }) => {
   // The sign-out icon was a font glyph some Android phones do not have — an
   // empty circle — and the header ran off the right edge of a phone.

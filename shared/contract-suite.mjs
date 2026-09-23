@@ -10,6 +10,14 @@
  * `app.inject` for Fastify, `fetch` for the Worker. It returns
  * `{ status, json }`.
  */
+import { wallClock } from "../src/schedule.js";
+
+const EVERY_DAY = [1, 2, 3, 4, 5, 6, 7];
+const clockTime = (minute) => {
+  const wrapped = ((minute % 1440) + 1440) % 1440;
+  return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+};
+
 export function contractChecks(call, assert) {
   return [
     ["the catalogue is the seeded menu", async () => {
@@ -295,7 +303,7 @@ export function contractChecks(call, assert) {
 
     ["the restaurant's name, the menu's title and its look are the owner's to set", async () => {
       const before = await call("GET", "/api/catalog");
-      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, featured: null },
+      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", featured: null },
         "a fresh restaurant ships with these");
 
       assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
@@ -311,7 +319,7 @@ export function contractChecks(call, assert) {
       assert.equal(saved.status, 200);
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
       assert.deepEqual((await call("GET", "/api/catalog")).json.menu,
-        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, featured: null });
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", featured: null });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
       // A save of one setting leaves the rest where they were.
       assert.equal(saved.json.menuTheme, "jade");
@@ -564,6 +572,61 @@ export function contractChecks(call, assert) {
       // Leave the room as it was found: a registered table changes how every
       // later order is authenticated.
       assert.equal((await call("DELETE", "/api/admin/tables/L1", { admin: true })).status, 204);
+    }],
+
+    ["a dish with hours of its own is served only then, by the restaurant's clock", async () => {
+      // Built around the moment the test runs: a window that has not begun,
+      // and one that is open now. Two hours either side of a minute boundary.
+      const { minute } = wallClock(new Date(), "Europe/Vienna");
+      const later = { days: EVERY_DAY, from: clockTime(minute + 120), to: clockTime(minute + 180) };
+      const open = { days: EVERY_DAY, from: clockTime(minute - 120), to: clockTime(minute + 120) };
+      const dish = { sku: "CONTRACT-LUNCH", kind: "food", category: "SET", names: { zh: "午市", de: "Mittag", en: "Lunch" }, price: 12, printStation: "kitchen" };
+
+      const created = await call("POST", "/api/admin/products", { admin: true, body: { ...dish, schedule: { ...later, days: [5, 1, 5] } } });
+      assert.equal(created.status, 201);
+      assert.deepEqual(created.json.product.schedule, { ...later, days: [1, 5] }, "days are kept in order, once each");
+      const id = created.json.product.id;
+      await call("PUT", `/api/admin/products/${id}`, { admin: true, body: { ...dish, schedule: later } });
+
+      // The menu gets the hours and the clock to read them by; hiding is the
+      // menu's, so a menu left open all afternoon still changes on time.
+      const catalog = await call("GET", "/api/catalog");
+      assert.deepEqual(catalog.json.products.find((product) => product.id === id).schedule, later);
+      assert.equal(catalog.json.products.find((product) => product.id === "photo-r1").schedule, null, "no hours: always");
+      assert.equal(catalog.json.menu.timeZone, "Europe/Vienna");
+
+      const order = (clientRequestId) => call("POST", "/api/orders", { body: { clientRequestId, table: "19", note: "", items: [{ id, qty: 1 }] } });
+      assert.equal((await order("contract-before-hours")).status, 400, "not before its hours");
+
+      // A save that leaves the hours out leaves them alone …
+      const renamed = await call("PUT", `/api/admin/products/${id}`, { admin: true, body: { ...dish, names: { ...dish.names, en: "Lunch set" } } });
+      assert.deepEqual(renamed.json.product.schedule, later);
+      // … and a copy keeps them.
+      const copy = await call("POST", `/api/admin/products/${id}/duplicate`, { admin: true });
+      assert.deepEqual(copy.json.product.schedule, later);
+      assert.equal((await call("DELETE", `/api/admin/products/${copy.json.product.id}`, { admin: true })).status, 204);
+
+      const opened = await call("PUT", `/api/admin/products/${id}`, { admin: true, body: { ...dish, schedule: open } });
+      assert.deepEqual(opened.json.product.schedule, open);
+      assert.equal((await order("contract-in-hours")).status, 201, "served in its hours");
+
+      for (const schedule of [{ days: [], from: "11:00", to: "14:00" }, { days: [8], from: "11:00", to: "14:00" }, { days: [1], from: "25:00", to: "14:00" }, { days: [1], from: "11:00" }]) {
+        const refused = await call("PUT", `/api/admin/products/${id}`, { admin: true, body: { ...dish, schedule } });
+        assert.equal(refused.status, 400, JSON.stringify(schedule));
+      }
+
+      const cleared = await call("PUT", `/api/admin/products/${id}`, { admin: true, body: { ...dish, schedule: null } });
+      assert.equal(cleared.json.product.schedule, null, "null takes the hours away: always on");
+
+      // The clock is a setting; a zone no one has heard of is refused.
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { timeZone: "Mars/Olympus" } })).status, 400);
+      const moved = await call("PUT", "/api/admin/settings", { admin: true, body: { timeZone: "Asia/Shanghai" } });
+      assert.equal(moved.status, 200);
+      assert.equal(moved.json.timeZone, "Asia/Shanghai");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.timeZone, "Asia/Shanghai");
+      await call("PUT", "/api/admin/settings", { admin: true, body: { timeZone: "Europe/Vienna" } });
+
+      assert.equal((await call("DELETE", `/api/admin/products/${id}`, { admin: true })).status, 204);
     }],
 
     ["an unknown API route is a JSON 404, not the web app", async () => {

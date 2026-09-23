@@ -32,7 +32,8 @@ const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), ".
  */
 const incremental = [
   { file: "0003_admin_password_gate.sql", drop: "DROP INDEX idx_admin_sessions_expiry; DROP TABLE admin_sessions; DROP TABLE admin_gate;" },
-  { file: "0004_app_settings.sql", drop: "DROP TABLE app_settings;" }
+  { file: "0004_app_settings.sql", drop: "DROP TABLE app_settings;" },
+  { file: "0051_product_schedules.sql", drop: "DROP TABLE product_schedules;" }
 ].map((migration) => ({ ...migration, sql: readFileSync(path.join(migrationsDir, migration.file), "utf8") }))
   // The photo parts each create media_files, so each has to stand alone on a
   // database deployed before that table existed.

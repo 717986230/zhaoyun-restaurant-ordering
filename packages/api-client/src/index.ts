@@ -2,7 +2,7 @@ import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
 } from "@zhaoyun/contracts";
-import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
+import type { BundleItem, ModifierGroup, PrinterProfile, Product, ProductSchedule } from "@zhaoyun/domain";
 
 /**
  * A product as the server sends it, as the apps work with it. One function
@@ -24,6 +24,7 @@ export function toProduct(product: ApiCatalogProduct): Product {
     appearance: product.appearance,
     modifiers: product.modifiers ?? [],
     bundleItems: product.bundleItems ?? [],
+    schedule: product.schedule ?? null,
     media: (product.media ?? []).map((media) => ({ ...media })),
     available: product.available ?? true,
     published: product.published ?? true,
@@ -55,6 +56,8 @@ export interface AdminProductInput {
   published: boolean;
   modifiers?: ModifierGroup[];
   bundleItems?: BundleItem[];
+  /** null clears the hours; leaving it out keeps them. */
+  schedule?: ProductSchedule | null;
 }
 
 export type StaffRole = "manager" | "staff" | "kitchen";
