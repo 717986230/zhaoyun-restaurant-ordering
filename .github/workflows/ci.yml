@@ -48,18 +48,43 @@ jobs:
       - name: Production dependency audit
         run: npm audit --omit=dev
 
+  # The browser tests, split three ways across three runners: some four
+  # hundred of them, each a real page load, were most of a fifteen-minute
+  # run on one. Each shard builds the site itself and serves that build
+  # (playwright.config.js), so they start at once instead of after checks.
+  e2e:
+    name: Browser tests (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Web build
+        run: npm run build
+
       # WebKit for the iPhone projects: every browser on iOS is WebKit.
       - name: Install Playwright Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
 
       - name: Responsive end-to-end tests
-        run: npm test
+        run: npx playwright test --shard=${{ matrix.shard }}/3
 
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
@@ -141,7 +166,7 @@ jobs:
     name: Deploy Worker and D1
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: checks
+    needs: [checks, e2e]
     # Only a push that lands on main deploys. A pull_request run, however
     # green, never touches the real database or the live Worker.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
