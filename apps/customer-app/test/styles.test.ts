@@ -91,6 +91,26 @@ describe.each(Object.entries(sheets))("%s stylesheet", (_name, css) => {
   });
 });
 
+describe("iPhones render the menu as Android phones do", () => {
+  it("keeps iOS from inflating text on its own", () => {
+    expect(sheets.guest).toMatch(/-webkit-text-size-adjust:\s*100%/);
+  });
+
+  it("gives every text field at least 16px, so iOS never zooms the page on a tap", () => {
+    const fields = [...sheets.guest.matchAll(/([^{}]*\binput\b[^{}]*)\{([^}]*)\}/g)]
+      .filter(([, selector]) => !/checkbox|radio|::/.test(selector));
+    const sizes = fields.flatMap(([, , block]) => [...block.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1])));
+    expect(sizes.length).toBeGreaterThan(0);
+    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(16);
+  });
+
+  it("prefixes every backdrop blur for Safari", () => {
+    const plain = (sheets.guest.match(/(?<!-webkit-)backdrop-filter:/g) || []).length;
+    const prefixed = (sheets.guest.match(/-webkit-backdrop-filter:/g) || []).length;
+    expect(prefixed).toBe(plain);
+  });
+});
+
 describe("contrast", () => {
   const guest = tokens(sheets.guest);
   const admin = tokens(sheets.admin);

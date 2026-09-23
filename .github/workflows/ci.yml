@@ -48,8 +48,9 @@ jobs:
       - name: Production dependency audit
         run: npm audit --omit=dev
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      # WebKit for the iPhone projects: every browser on iOS is WebKit.
+      - name: Install Playwright Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Responsive end-to-end tests
         run: npm test
