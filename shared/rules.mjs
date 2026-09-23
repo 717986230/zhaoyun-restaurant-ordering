@@ -453,6 +453,15 @@ function optionalText(label, max) {
 
 export const MAX_FEATURED_PRODUCTS = 40;
 
+/**
+ * The promotions page's designs. One list, read by both backends and — via
+ * src/contracts.js — by the request schema; the names and previews live in
+ * packages/domain/src/featured.ts, and a parity test holds the two together.
+ * A new design is an id here, an entry there and a CSS block in styles.css.
+ */
+export const FEATURED_TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];
+export const DEFAULT_FEATURED_TEMPLATE = "gallery";
+
 /** The dishes on the promotions page, in the order the owner put them; no repeats. */
 function normalizeFeaturedIds(value) {
   if (!Array.isArray(value)) throw new Error("Featured products must be a list");
@@ -499,7 +508,15 @@ export const APP_SETTINGS = {
   // wording ("精选推荐" / "Empfehlungen" / "Signature").
   featuredEnabled: { key: "featured_enabled", fallback: () => false, normalize: flag("featuredEnabled") },
   featuredTitle: { key: "featured_title", fallback: () => "", normalize: optionalText("Featured title", 32) },
-  featuredProductIds: { key: "featured_products", fallback: () => [], normalize: normalizeFeaturedIds }
+  featuredProductIds: { key: "featured_products", fallback: () => [], normalize: normalizeFeaturedIds },
+  featuredTemplate: {
+    key: "featured_template",
+    fallback: () => DEFAULT_FEATURED_TEMPLATE,
+    normalize: (value) => {
+      if (!FEATURED_TEMPLATES.includes(value)) throw new Error("Unknown promotions template");
+      return value;
+    }
+  }
 };
 
 function readAppSetting(definition, stored) {
@@ -543,7 +560,9 @@ export function menuSettingsView(settings) {
     defaultScheme: settings.menuDefaultScheme,
     showTableNumber: settings.showTableNumber,
     // Only when switched on: a guest has no use for a list of ids otherwise.
-    featured: settings.featuredEnabled ? { title: settings.featuredTitle, productIds: settings.featuredProductIds } : null
+    featured: settings.featuredEnabled
+      ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate }
+      : null
   };
 }
 

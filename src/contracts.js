@@ -1,5 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import { ALLERGEN_CODES } from "./allergens.js";
+import { FEATURED_TEMPLATES } from "../shared/rules.mjs";
 
 /**
  * The wire contract, defined once.
@@ -126,7 +127,8 @@ export const SettingsBody = Type.Object({
   showOrdering: Type.Optional(Type.Boolean()),
   featuredEnabled: Type.Optional(Type.Boolean()),
   featuredTitle: Type.Optional(Type.String({ maxLength: 32 })),
-  featuredProductIds: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { maxItems: 40 }))
+  featuredProductIds: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { maxItems: 40 })),
+  featuredTemplate: Type.Optional(literals(FEATURED_TEMPLATES))
 }, { minProperties: 1, additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces

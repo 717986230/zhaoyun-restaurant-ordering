@@ -3,10 +3,11 @@ import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES } from "@zhaoyun/domain";
 import { useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
+import { downloadQrCard } from "../qr/qrCard";
 
 interface Props {
   storage: AdminStorage;
@@ -31,8 +32,13 @@ function detailSummary(entry: AuditEntry): string {
   return parts.length ? ` · ${parts.join(" ")}` : "";
 }
 
+/** The guest menu's address: where this console's API lives, else this site. */
+function menuUrl(baseUrl: string): string {
+  return `${(baseUrl || window.location.origin).replace(/\/+$/, "")}/`;
+}
+
 function entryUrl(baseUrl: string, table: RestaurantTable): string {
-  return `${baseUrl.replace(/\/+$/, "")}/?table=${encodeURIComponent(table.table)}&k=${encodeURIComponent(table.token)}`;
+  return `${menuUrl(baseUrl)}?table=${encodeURIComponent(table.table)}&k=${encodeURIComponent(table.token)}`;
 }
 
 /** One group of settings, as a card with its heading and one line of why. */
@@ -190,6 +196,21 @@ export function SettingsPanel(props: Props) {
           <label><span>{t("featuredTitleLabel")}</span><input name="featuredTitle" maxLength={32} defaultValue={settings.featuredTitle} placeholder={t("featuredTitlePlaceholder")} /></label>
           <button className="ghost-action" type="submit">{t("save")}</button>
         </form>
+        <p className="settings-label">{t("featuredTemplateLabel")}</p>
+        {/* Each sketch is drawn by CSS from the same id the menu uses, so the
+            picker and the page cannot describe different designs. */}
+        <div className="template-picker" role="radiogroup" aria-label={t("featuredTemplateLabel")}>{FEATURED_TEMPLATES.map((template) => <button
+          key={template.id}
+          type="button"
+          role="radio"
+          aria-checked={settings.featuredTemplate === template.id}
+          className={settings.featuredTemplate === template.id ? "on" : ""}
+          onClick={() => void props.onSaveSettings({ featuredTemplate: template.id }, "featuredSaved")}
+        >
+          <span className="template-thumb" data-template={template.id} aria-hidden="true"><i /><i /><i /><i /></span>
+          <b>{template.names[language]}</b>
+          <small>{template.hints[language]}</small>
+        </button>)}</div>
         <FeaturedList ids={settings.featuredProductIds} products={props.products} onChange={(featuredProductIds) => void props.onSaveSettings({ featuredProductIds }, "featuredSaved")} />
       </Section>
 
@@ -207,7 +228,11 @@ export function SettingsPanel(props: Props) {
           </div>
           <button className="primary-action" type="submit">{t("registerTable")}</button>
         </form>
-        {props.tables.length > 0 && <button className="ghost-action settings-cards-button" onClick={() => setShowCards(true)}>{t("printCards")}</button>}
+        {/* The menu's own code, with no table in it: for the door, a flyer, social media. */}
+        <div className="qr-actions">
+          <button className="primary-action" type="button" onClick={() => void downloadQrCard({ url: menuUrl(props.storage.baseUrl), restaurantName: settings?.restaurantName ?? "", menuLanguages: offered })}>⬇ {t("downloadMenuQr")}</button>
+          {props.tables.length > 0 && <button className="ghost-action settings-cards-button" onClick={() => setShowCards(true)}>{t("printCards")}</button>}
+        </div>
         {showCards && <TableCards
           tables={props.tables}
           restaurantName={settings?.restaurantName ?? ""}
@@ -218,6 +243,7 @@ export function SettingsPanel(props: Props) {
         <div className="table-list">{props.tables.length ? props.tables.map((table) => <div className="table-row" key={table.table}>
           <div><b>{t("table", { table: table.table })}</b>{table.label && <small> · {table.label}</small>}<code>{entryUrl(props.storage.baseUrl, table)}</code></div>
           <div className="table-row-actions">
+            <button className="ghost-action" onClick={() => void downloadQrCard({ url: entryUrl(props.storage.baseUrl, table), restaurantName: settings?.restaurantName ?? "", menuLanguages: offered, table: table.table, label: table.label })}>⬇ {t("qrShort")}</button>
             <button className="ghost-action" onClick={() => void props.onSaveTable({ table: table.table, label: table.label, rotateToken: true })}>{t("rotateToken")}</button>
             <button className="ghost-action" onClick={() => void props.onDeleteTable(table.table)}>{t("delete")}</button>
           </div>

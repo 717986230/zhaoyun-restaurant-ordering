@@ -92,7 +92,7 @@ export function contractChecks(call, assert) {
     }],
 
     ["the promotions page is off until switched on, and lists what the owner chose", async () => {
-      const refusals = [{ featuredEnabled: "yes" }, { featuredTitle: "x".repeat(33) }, { featuredProductIds: Array.from({ length: 41 }, (_, index) => `dish-${index}`) }, { featuredProductIds: [""] }];
+      const refusals = [{ featuredEnabled: "yes" }, { featuredTitle: "x".repeat(33) }, { featuredProductIds: Array.from({ length: 41 }, (_, index) => `dish-${index}`) }, { featuredProductIds: [""] }, { featuredTemplate: "neon" }];
       for (const body of refusals) {
         assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body })).status, 400, `${JSON.stringify(body)} must be refused`);
       }
@@ -103,9 +103,11 @@ export function contractChecks(call, assert) {
       assert.equal((await call("GET", "/api/catalog")).json.menu.featured, null, "chosen but not switched on: nothing for a guest");
 
       await call("PUT", "/api/admin/settings", { admin: true, body: { featuredEnabled: true } });
-      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.featured, { title: "Chef's Selection", productIds: ["photo-t4", "photo-r1"] });
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.featured, { title: "Chef's Selection", productIds: ["photo-t4", "photo-r1"], template: "gallery" });
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { featuredTemplate: "tasting" } })).json.featuredTemplate, "tasting");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.featured.template, "tasting");
 
-      await call("PUT", "/api/admin/settings", { admin: true, body: { featuredEnabled: false, featuredTitle: "", featuredProductIds: [] } });
+      await call("PUT", "/api/admin/settings", { admin: true, body: { featuredEnabled: false, featuredTitle: "", featuredProductIds: [], featuredTemplate: "gallery" } });
       assert.equal((await call("GET", "/api/catalog")).json.menu.featured, null);
     }],
 

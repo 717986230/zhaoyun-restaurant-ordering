@@ -3,7 +3,8 @@ import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zha
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
 export type AdminTab = "catalog" | "board" | "tables" | "printers" | "system";
-export type ProductFilter = "all" | "food" | "drink" | "sushi";
+/** "sets" is every dish that packages others, whatever its kind. */
+export type ProductFilter = "all" | "food" | "drink" | "sushi" | "sets";
 
 /**
  * What the console knows about the door in front of it. `checking` is the

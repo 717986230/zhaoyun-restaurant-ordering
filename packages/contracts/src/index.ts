@@ -1,3 +1,5 @@
+import type { FeaturedTemplateId } from "@zhaoyun/domain";
+
 /**
  * Types for the wire format. The request shapes are validated at runtime by
  * `src/contracts.js`, which both the server and these types describe; the
@@ -124,6 +126,7 @@ export interface ApiSettings {
   featuredEnabled: boolean;
   featuredTitle: string;
   featuredProductIds: string[];
+  featuredTemplate: FeaturedTemplateId;
 }
 
 /** The part of the settings the guest menu reads, served with the catalogue. */
@@ -134,7 +137,7 @@ export interface ApiMenuSettings {
   showTableNumber: boolean;
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */
-  featured?: { title: string; productIds: string[] } | null;
+  featured?: { title: string; productIds: string[]; template: FeaturedTemplateId } | null;
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

@@ -381,12 +381,20 @@ h2 {
   background: var(--a-rail);
 }
 
+/* The radio sits inside its own segment. Positioned against nothing, the
+   form's width:100% on inputs made each one as wide as the page, and the
+   whole console scrolled sideways into empty space. */
 .segmented label {
+  position: relative;
   display: block;
 }
 
 .segmented input {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
   pointer-events: none;
 }
@@ -417,11 +425,18 @@ h2 {
   text-align: center;
 }
 
+.upload-zone {
+  position: relative;
+}
+
 .upload-zone input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
+  cursor: pointer;
 }
 
 .upload-zone b {
@@ -1735,4 +1750,182 @@ h2 {
 .featured-actions button:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* The promotions page's ten designs, each with a small sketch of its layout. */
+.template-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.template-picker button {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 12px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-picker button.on {
+  border-color: var(--a-accent);
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
+}
+
+.template-picker small {
+  color: var(--a-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* The sketch: a tiny dark page with four blocks the design arranges. */
+.template-thumb {
+  width: 100%;
+  height: 64px;
+  margin-bottom: 4px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  padding: 5px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--a-head);
+}
+
+.template-thumb i {
+  min-height: 0;
+  border-radius: 3px;
+  background: var(--a-head-muted);
+}
+
+.template-thumb[data-template="gallery"] i:nth-child(n + 3),
+.template-thumb[data-template="poster"] i:nth-child(n + 2),
+.template-thumb[data-template="framed"] i:nth-child(n + 3),
+.template-thumb[data-template="monochrome"] i:nth-child(n + 3) {
+  display: none;
+}
+
+.template-thumb:is([data-template="spotlight"], [data-template="editorial"], [data-template="bento"]) {
+  grid-template-columns: 1fr 1fr;
+}
+
+.template-thumb[data-template="spotlight"] i:first-child,
+.template-thumb[data-template="bento"] i:first-child {
+  grid-column: span 2;
+}
+
+.template-thumb[data-template="spotlight"] i:last-child {
+  display: none;
+}
+
+.template-thumb[data-template="editorial"] i:is(:nth-child(2), :nth-child(3)) {
+  background: var(--a-head-2);
+}
+
+.template-thumb[data-template="tasting"] {
+  justify-items: center;
+  align-content: space-evenly;
+}
+
+.template-thumb[data-template="tasting"] i {
+  width: 60%;
+  height: 4px;
+}
+
+.template-thumb[data-template="framed"] i {
+  border: 1px solid var(--a-head-ink-2);
+  background: var(--a-head-2);
+}
+
+.template-thumb[data-template="carousel"] {
+  display: flex;
+}
+
+.template-thumb[data-template="carousel"] i {
+  flex: 0 0 62%;
+}
+
+.template-thumb[data-template="minimal"] {
+  align-content: space-evenly;
+}
+
+.template-thumb[data-template="minimal"] i {
+  height: 6px;
+  border-left: 8px solid var(--a-head-ink-2);
+  background: var(--a-head-2);
+}
+
+.template-thumb[data-template="monochrome"] i {
+  background: linear-gradient(90deg, var(--a-head-ink-2), var(--a-head-2));
+}
+
+/* On a wide screen the dishes page is a framed sheet of a readable width,
+   not a form and a list pulled to the two edges of a 27-inch monitor. */
+@media (min-width: 1200px) {
+  .catalog-layout {
+    max-width: 1480px;
+    min-height: calc(100vh - 170px);
+    margin: 24px auto 40px;
+    overflow: hidden;
+    border: 1px solid var(--a-line);
+    border-radius: 16px;
+    background: var(--a-shell);
+    box-shadow: 0 18px 50px var(--a-shadow-1);
+  }
+
+  .admin-panel.active:has(> .catalog-layout) {
+    padding: 0 clamp(20px, 3vw, 40px);
+  }
+}
+
+/* A row off screen costs nothing until it is scrolled to. */
+.product-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 65px;
+}
+
+/* Rows rise into place as they scroll into view — driven by the scroll
+   itself, no script, and simply absent where a browser cannot do it. */
+@supports (animation-timeline: view()) {
+  .product-row {
+    animation: admin-row-in linear backwards;
+    animation-timeline: view();
+    animation-range: entry 0% entry 70%;
+  }
+
+  @keyframes admin-row-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-row {
+    animation: none;
+  }
+}
+
+.qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-card-download {
+  justify-self: center;
+  margin-top: 8px;
+}
+
+/* A download button has no business on the printed card. */
+@media print {
+  .table-card-download {
+    display: none;
+  }
 }

@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
+
+const require = createRequire(import.meta.url);
 
 // The board refetches after every mutation, so the stubbed list has to answer
 // with the status the stubbed PATCH just accepted. A fixture frozen at "new"
@@ -186,6 +190,10 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
 
   await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-list")).toContainText("黑椒牛柳");
+  // "套餐" lists the dishes that package others — none yet.
+  await page.locator(".filter-tabs").getByRole("button", { name: "套餐" }).click();
+  await expect(page.locator(".product-row")).toHaveCount(0);
+  await page.locator(".filter-tabs").getByRole("button", { name: "全部" }).click();
   // On a phone the list and the form take turns; the button opens a blank one.
   await page.getByRole("button", { name: "＋ 新增菜品" }).click();
 
@@ -445,4 +453,65 @@ test("a dish goes onto the promotions page from its editor, and the page is swit
   await expect.poll(() => appSettings.featuredTitle).toBe("主厨套餐");
   await card.getByRole("button", { name: "移除" }).click();
   await expect.poll(() => appSettings.featuredProductIds).toEqual([]);
+});
+
+test("no admin screen is wider than the window, at any common width", async ({ page }) => {
+  // Hidden radios once took the page's full width, so the console scrolled
+  // sideways into empty space on every screen with the dish editor open.
+  // Measured against the width set here, not window.innerWidth: a phone-sized
+  // browser widens its layout to fit oversized content, which hides the bug.
+  let width = 0;
+  const fits = () => page.evaluate((limit) => document.scrollingElement.scrollWidth <= limit + 1, width);
+  for (width of [360, 768, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+    expect(await fits(), `dishes at ${width}px`).toBe(true);
+    await page.locator(".product-row").first().click({ force: true });
+    expect(await fits(), `dish editor at ${width}px`).toBe(true);
+    await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+    expect(await fits(), `settings at ${width}px`).toBe(true);
+  }
+});
+
+test("the menu's QR code downloads as a PNG that a phone can scan", async ({ page }) => {
+  await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
+  await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
+    { table: "12", label: "窗边", token: "tok-12-secret", enabled: true }
+  ] }) }));
+  await page.goto("/admin.html");
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+
+  /** The downloaded file, decoded in the page by a real QR reader. */
+  const scan = async (trigger) => {
+    const [download] = await Promise.all([page.waitForEvent("download"), trigger()]);
+    const bytes = readFileSync(await download.path());
+    expect(bytes.subarray(1, 4).toString()).toBe("PNG");
+    const text = await page.evaluate(async (base64) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${base64}`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      return window.jsQR(pixels.data, pixels.width, pixels.height)?.data ?? null;
+    }, bytes.toString("base64"));
+    return { name: download.suggestedFilename(), text };
+  };
+  await page.addScriptTag({ path: require.resolve("jsqr/dist/jsQR.js") });
+
+  // The code has to carry exactly the link the console shows for that table.
+  const row = page.locator(".table-row", { hasText: "桌 12" });
+  const shown = await row.locator("code").textContent();
+  expect(shown).toContain("?table=12&k=tok-12-secret");
+
+  const menu = await scan(() => page.getByRole("button", { name: /下载菜单二维码/ }).click());
+  expect(menu.name).toBe("menu-qr.png");
+  expect(menu.text).toBe(shown.split("?")[0]);
+
+  const table = await scan(() => row.getByRole("button", { name: /二维码/ }).click());
+  expect(table.name).toBe("table-12-qr.png");
+  expect(table.text).toBe(shown);
 });

@@ -6,7 +6,7 @@ import { useCatalog } from "./useCatalog";
 import { useCustomerState } from "./model";
 import { useMenuTheme } from "./useMenuTheme";
 import { useColorScheme } from "./useColorScheme";
-import { DEFAULT_MENU_LANGUAGES, resolveMenuLanguage } from "@zhaoyun/domain";
+import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, resolveMenuLanguage } from "@zhaoyun/domain";
 import { CatalogScreen } from "../features/catalog/CatalogScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
 
@@ -54,7 +54,8 @@ export function App() {
     if (!featuredSettings) return null;
     const byId = new Map(catalog.products.map((product) => [product.id, product]));
     const products = featuredSettings.productIds.flatMap((id) => byId.get(id) ?? []);
-    return products.length ? { title: featuredSettings.title, products } : null;
+    // An older server sends no template; the gallery is what it showed.
+    return products.length ? { title: featuredSettings.title, products, template: featuredSettings.template ?? DEFAULT_FEATURED_TEMPLATE } : null;
   }, [featuredSettings, catalog.products]);
 
   return <main className="app-shell">

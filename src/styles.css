@@ -2189,7 +2189,8 @@ button:focus-visible,
     var(--velvet);
 }
 
-.chip.chip-featured {
+.chip.chip-featured,
+.chip.chip-sets {
   border-color: var(--line-strong);
   font-family: Georgia, "Noto Serif SC", serif;
   font-style: italic;
@@ -2428,4 +2429,450 @@ button:focus-visible,
   aspect-ratio: auto;
   max-height: none;
   border-radius: 0;
+}
+
+/* What every design starts from (the gallery): the name and number live on
+   the photo, so their copies in the text are hidden, as are the caption's
+   price and the dotted leader. A design shows what it needs of these. An id
+   with no block below — a newer server, an older app — gets the gallery. */
+.featured-body-number,
+.featured-name,
+.featured-caption-price,
+.featured-leader {
+  display: none;
+}
+
+.featured-name {
+  margin: 0;
+  color: var(--ink);
+  font: 400 24px/1.15 Georgia, "Noto Serif SC", serif;
+  overflow-wrap: anywhere;
+}
+
+.featured-body-number {
+  color: var(--muted);
+  font: 11px/1 Georgia, serif;
+  letter-spacing: 0.32em;
+}
+
+/* Designs that set the name in the text rather than on the photo. */
+.featured-page:is([data-template="editorial"], [data-template="tasting"], [data-template="framed"], [data-template="poster"], [data-template="minimal"]) .featured-caption {
+  display: none;
+}
+
+.featured-page:is([data-template="editorial"], [data-template="tasting"], [data-template="framed"], [data-template="poster"], [data-template="minimal"]) .featured-name {
+  display: block;
+}
+
+.featured-page:is([data-template="editorial"], [data-template="tasting"], [data-template="poster"]) .featured-body-number {
+  display: block;
+}
+
+/* Designs without the card's panel around them. */
+.featured-page:is([data-template="editorial"], [data-template="tasting"], [data-template="minimal"], [data-template="monochrome"]) .featured-card {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* 2 · Spotlight: the first dish across the page, the rest two to a row. */
+.featured-page[data-template="spotlight"] .featured-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:first-child {
+  grid-column: 1 / -1;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) .featured-photo {
+  aspect-ratio: 1;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) .featured-caption {
+  padding: 40px 12px 10px;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) .featured-caption h3 {
+  font-size: 17px;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) :is(.featured-second, .featured-description, .featured-contents, .featured-view) {
+  display: none;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) .featured-body {
+  padding: 10px 12px 12px;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) .featured-foot {
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) .featured-price {
+  font-size: 18px;
+}
+
+/* 3 · Editorial: photo and text side by side, changing sides every dish. */
+.featured-page[data-template="editorial"] .featured-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 30px;
+}
+
+.featured-page[data-template="editorial"] .featured-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  overflow: visible;
+}
+
+.featured-page[data-template="editorial"] .featured-card:nth-child(even) .featured-photo {
+  order: 2;
+}
+
+.featured-page[data-template="editorial"] .featured-photo {
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: var(--shadow-2);
+}
+
+.featured-page[data-template="editorial"] .featured-body {
+  padding: 0;
+}
+
+.featured-page[data-template="editorial"] .featured-description {
+  -webkit-line-clamp: 4;
+}
+
+/* 4 · Tasting menu: no photos; courses set centred, like a fine-dining card. */
+.featured-page[data-template="tasting"] .featured-photo {
+  display: none;
+}
+
+.featured-page[data-template="tasting"] .featured-grid {
+  grid-template-columns: minmax(0, 560px);
+  justify-content: center;
+  gap: 0;
+}
+
+.featured-page[data-template="tasting"] .featured-card {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+
+.featured-page[data-template="tasting"] .featured-card:last-child {
+  border-bottom: 0;
+}
+
+.featured-page[data-template="tasting"] .featured-name {
+  font-size: 26px;
+  font-style: italic;
+}
+
+.featured-page[data-template="tasting"] .featured-body {
+  justify-items: center;
+  padding: 0;
+}
+
+.featured-page[data-template="tasting"] .featured-foot {
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.featured-page[data-template="tasting"] .featured-view {
+  display: none;
+}
+
+/* 5 · Menu card: a ruled card inside a ruled card, the way a set is printed. */
+.featured-page[data-template="framed"] .featured-card {
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  outline: 1px solid var(--line);
+  outline-offset: -7px;
+  box-shadow: none;
+}
+
+.featured-page[data-template="framed"] .featured-photo {
+  overflow: hidden;
+  border-radius: 3px;
+  aspect-ratio: 4 / 3;
+}
+
+.featured-page[data-template="framed"] .featured-body {
+  justify-items: center;
+  padding: 16px 6px 4px;
+  text-align: center;
+}
+
+.featured-page[data-template="framed"] .featured-name {
+  font-style: italic;
+}
+
+.featured-page[data-template="framed"] .featured-foot {
+  justify-content: center;
+  width: 100%;
+}
+
+.featured-page[data-template="framed"] .featured-view {
+  display: none;
+}
+
+/* 6 · Poster: one dish to a screen, the text on the photo. */
+.menu[data-featured-template="poster"] .stack {
+  scroll-snap-type: y proximity;
+}
+
+.featured-page[data-template="poster"] .featured-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.featured-page[data-template="poster"] .featured-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: calc(100dvh - 200px - env(safe-area-inset-top));
+  border-radius: 22px;
+  scroll-snap-align: start;
+  scroll-margin-top: 8px;
+}
+
+.featured-page[data-template="poster"] .featured-photo {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+}
+
+.featured-page[data-template="poster"] .featured-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 30%, var(--veil) 78%);
+}
+
+.featured-page[data-template="poster"] .featured-body {
+  position: relative;
+  padding: 24px 22px 22px;
+}
+
+.featured-page[data-template="poster"] :is(.featured-name, .featured-price) {
+  color: var(--pearl);
+}
+
+.featured-page[data-template="poster"] .featured-name {
+  font-size: clamp(30px, 9vw, 46px);
+}
+
+.featured-page[data-template="poster"] :is(.featured-body-number, .featured-second, .featured-description, .featured-contents, .featured-contents span, .featured-view) {
+  color: var(--pearl-2);
+}
+
+.featured-page[data-template="poster"] .featured-foot {
+  border-top-color: var(--pearl-2);
+}
+
+/* 7 · Carousel: a row of cards to swipe through, one in view at a time. */
+.featured-page[data-template="carousel"] .featured-grid {
+  display: flex;
+  gap: 14px;
+  margin: 0 -18px;
+  padding: 4px 18px 20px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.featured-page[data-template="carousel"] .featured-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.featured-page[data-template="carousel"] .featured-card {
+  flex: 0 0 min(84%, 420px);
+  scroll-snap-align: center;
+}
+
+.featured-page[data-template="carousel"] .featured-photo {
+  aspect-ratio: 4 / 5;
+}
+
+/* 8 · Bento: tiles of two sizes, name and price on each. */
+.featured-page[data-template="bento"] .featured-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 10px;
+}
+
+.featured-page[data-template="bento"] .featured-card:nth-child(3n + 1) {
+  grid-column: span 2;
+}
+
+.featured-page[data-template="bento"] .featured-card {
+  border-radius: 16px;
+}
+
+.featured-page[data-template="bento"] .featured-photo {
+  aspect-ratio: 1;
+}
+
+.featured-page[data-template="bento"] .featured-card:nth-child(3n + 1) .featured-photo {
+  aspect-ratio: 2 / 1;
+}
+
+.featured-page[data-template="bento"] .featured-body {
+  display: none;
+}
+
+.featured-page[data-template="bento"] .featured-caption {
+  padding: 36px 14px 12px;
+}
+
+.featured-page[data-template="bento"] .featured-caption h3 {
+  font-size: clamp(16px, 4.6vw, 24px);
+}
+
+.featured-page[data-template="bento"] .featured-caption-price {
+  display: block;
+  margin-top: 6px;
+  color: var(--pearl-2);
+  font: 15px/1 Georgia, serif;
+}
+
+@media (min-width: 720px) {
+  .featured-page[data-template="bento"] .featured-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* 9 · Minimal: a round thumbnail, the name, a dotted line to the price. */
+.featured-page[data-template="minimal"] .featured-grid {
+  grid-template-columns: minmax(0, 640px);
+  justify-content: center;
+  gap: 0;
+}
+
+.featured-page[data-template="minimal"] .featured-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.featured-page[data-template="minimal"] .featured-photo {
+  width: 64px;
+  height: 64px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.featured-page[data-template="minimal"] .featured-body {
+  gap: 4px;
+  padding: 0;
+}
+
+.featured-page[data-template="minimal"] .featured-name {
+  font-size: 19px;
+}
+
+.featured-page[data-template="minimal"] :is(.featured-description, .featured-contents) {
+  font-size: 12px;
+  -webkit-line-clamp: 1;
+}
+
+.featured-page[data-template="minimal"] .featured-foot {
+  align-items: flex-end;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.featured-page[data-template="minimal"] .featured-view {
+  display: none;
+}
+
+.featured-page[data-template="minimal"] .featured-leader {
+  display: block;
+  flex: 1;
+  margin-bottom: 5px;
+  border-bottom: 1px dotted var(--line-strong);
+}
+
+.featured-page[data-template="minimal"] .featured-price {
+  font-size: 18px;
+}
+
+/* 10 · Monochrome — photography without colour, and plain capitals; colour
+   comes back under the finger. */
+.featured-page[data-template="monochrome"] :is(.dish-media, .art) {
+  filter: grayscale(1) contrast(1.08);
+  transition: filter 0.5s var(--ease-out), opacity var(--dur-slow) var(--ease-out);
+}
+
+.featured-page[data-template="monochrome"] .featured-card:is(:active, :hover, :focus-visible) :is(.dish-media, .art) {
+  filter: none;
+}
+
+.featured-page[data-template="monochrome"] .featured-card {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.featured-page[data-template="monochrome"] .featured-photo {
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.featured-page[data-template="monochrome"] :is(.featured-hero h2, .featured-caption h3) {
+  font-family: system-ui, -apple-system, "Noto Sans SC", sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.featured-page[data-template="monochrome"] .featured-body {
+  padding: 14px 2px 12px;
+}
+
+.featured-page[data-template="monochrome"] .featured-price {
+  font: 700 20px/1 system-ui, -apple-system, sans-serif;
+}
+
+/* Rows rise into place as they scroll into view — the scroll drives it, no
+   script runs per frame, and a browser that cannot do it shows them as
+   before. The first twelve rows of a page are left to the page-turn cascade. */
+@supports (animation-timeline: view()) {
+  .stack-page .dish-card:not([style]),
+  .stack-page:not(.turned) .dish-card[style] {
+    animation: menu-row-in linear backwards;
+    animation-timeline: view();
+    animation-range: entry 0% entry 80%;
+  }
+
+  @keyframes menu-row-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px) scale(0.97);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stack-page .dish-card {
+    animation: none;
+  }
 }
