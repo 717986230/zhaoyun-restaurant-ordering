@@ -16,36 +16,38 @@
 
 这个门要装在你**本机**的 Claude Code 里才能拦住它。云端会话是临时的，而且连不上 HuggingFace，下载不了 Laya 的模型权重。
 
-**1. 启动 Laya**（第一次会从 HuggingFace 下载模型）
+**一条命令安装**（在这个仓库的目录里运行）：
 
 ```bash
-python3 -m venv ~/laya-venv
-~/laya-venv/bin/python -m pip install "laya[serve]"
-~/laya-venv/bin/laya-serve            # 监听 0.0.0.0:8000
+bash tools/laya-gate/install.sh                                      # macOS / Linux
 ```
 
-没有 NVIDIA 显卡也能跑，走 CPU。启动时加 `LAYA_DEVICE=cpu`。
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\laya-gate\install.ps1   # Windows
+```
 
-**2. 放好钩子脚本**
+安装脚本做五件事，别的都不碰：
+
+1. 在 `~/.laya` 建一个独立的 Python 虚拟环境，不动系统里的 Python；
+2. 装 PyTorch 和 `laya[serve]`。没有 NVIDIA 显卡时装 CPU 版 PyTorch，几百 MB，不是几 GB；
+3. 把 `laya_gate.py` 放进 `~/.claude/hooks/`；
+4. 把钩子**合并**进 `~/.claude/settings.json`，先备份。你原有的设置和钩子都保留；重复运行只会更新，不会多加一条；原文件不是有效的 JSON 时，一个字都不改，直接停下来告诉你；
+5. 生成 `~/.laya/start.sh`（Windows 上是 `start.ps1`），让 Laya 只监听 `127.0.0.1`，局域网里的其他设备连不上它。
+
+装完以后：
 
 ```bash
-mkdir -p ~/.claude/hooks
-cp tools/laya-gate/laya_gate.py ~/.claude/hooks/
+~/.laya/start.sh                                    # 启动 Laya，保持终端开着
+HF_ENDPOINT=https://hf-mirror.com ~/.laya/start.sh  # 国内下载不了模型时用镜像
 ```
 
-脚本只用 Python 标准库，任何 `python3` 都能跑，不需要装进 Laya 的虚拟环境。
+然后在 Claude Code 里打开一次 `/hooks`（或者重启），钩子就生效了。pip 下载慢可以设 `PIP_INDEX_URL` 换国内源。
 
-**3. 打开钩子**
-
-把 `settings.example.json` 里的 `hooks` 部分合并进 `~/.claude/settings.json`（对所有项目生效），或者合并进某个项目的 `.claude/settings.local.json`（只对这个项目生效）。如果文件里已经有 `hooks`，是**合并**，不是覆盖。
-
-然后在 Claude Code 里打开一次 `/hooks`（或者重启），配置才会生效。
-
-**4. 试一下**
+**试一下**
 
 ```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"git push --force origin main"}}' \
-  | python3 ~/.claude/hooks/laya_gate.py
+  | ~/.laya/venv/bin/python ~/.claude/hooks/laya_gate.py
 ```
 
 应该输出一段 JSON，里面的 `permissionDecision` 是 `deny` 或 `ask`。
@@ -66,7 +68,7 @@ Laya 跑在本机时，钩子会绕过系统代理，开着 VPN 也连得上本�
 ## 测试
 
 ```bash
-python3 -m unittest tools/laya-gate/test_laya_gate.py
+python3 -m unittest tools/laya-gate/test_laya_gate.py tools/laya-gate/test_merge_settings.py
 ```
 
-测试用一个假的 Laya 服务，不用下载模型，只检查 Laya 的回答是怎样被换成"拒绝 / 问你 / 放行"的。
+测试用一个假的 Laya 服务，不用下载模型。检查两件事：Laya 的回答是怎样被换成"拒绝 / 问你 / 放行"的；安装脚本改 `settings.json` 时不会弄坏原有设置。
