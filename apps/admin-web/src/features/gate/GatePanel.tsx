@@ -16,7 +16,7 @@ export interface GatePanelProps {
   onSetPassword: (password: string) => void;
 }
 
-const PASSWORD_MIN = 8;
+const PASSWORD_MIN = 6;
 
 export function GatePanel({ configured, busy, error, onSignIn, onSetPassword }: GatePanelProps) {
   const [password, setPassword] = useState("");

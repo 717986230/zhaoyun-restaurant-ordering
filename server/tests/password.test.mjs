@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  hashPassword, PASSWORD_ITERATIONS, verifyPassword, WORKERS_PBKDF2_MAX_ITERATIONS
+  assertPassword, hashPassword, PASSWORD_ITERATIONS, verifyPassword, WORKERS_PBKDF2_MAX_ITERATIONS
 } from "../../shared/rules.mjs";
 
 /**
@@ -23,4 +23,9 @@ test("a stored hash verifies the password it was made from, and nothing else", a
   assert.equal(stored.iterations, PASSWORD_ITERATIONS, "the count used is recorded with the hash");
   assert.equal(await verifyPassword("kueche-passwort", stored), true);
   assert.equal(await verifyPassword("kueche-passwort!", stored), false);
+});
+
+test("six characters is enough for the console's password, five is not", () => {
+  assert.equal(assertPassword("123456"), "123456");
+  assert.throws(() => assertPassword("12345"), /at least 6 characters/);
 });

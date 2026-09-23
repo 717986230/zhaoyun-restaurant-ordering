@@ -95,7 +95,7 @@ export const PASSWORD_ITERATIONS = 100_000;
  *  the runtime, stated once so the test can hold PASSWORD_ITERATIONS to it. */
 export const WORKERS_PBKDF2_MAX_ITERATIONS = 100_000;
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const PASSWORD_MIN = 8;
+const PASSWORD_MIN = 6;
 
 function base64(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes)));

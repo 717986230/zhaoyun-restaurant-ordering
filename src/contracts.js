@@ -115,7 +115,7 @@ export const SettingsBody = Type.Object({
 // — stated twice on purpose, so a too-short password is refused at the edge
 // with a 400 rather than turning into a 500 further in. There is no username:
 // there is one console and one password on it.
-const Password = Type.String({ minLength: 8, maxLength: 200 });
+const Password = Type.String({ minLength: 6, maxLength: 200 });
 
 export const SignInBody = Type.Object({
   password: Password
