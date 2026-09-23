@@ -130,7 +130,16 @@
     "published": true,
     "sortOrder": 0,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-r1-6f14f83cc0.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-r1-6f14f83cc0.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Wiki Asmah · CC BY 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-r2",
@@ -263,7 +272,16 @@
     "published": true,
     "sortOrder": 1,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-r2-d89eb86f7a.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-r2-d89eb86f7a.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-r3",
@@ -396,7 +414,16 @@
     "published": true,
     "sortOrder": 2,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-r3-d2d34d2c59.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-r3-d2d34d2c59.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Ecliptics · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-r4",
@@ -530,7 +557,16 @@
     "published": true,
     "sortOrder": 3,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-r4-2dc253a595.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-r4-2dc253a595.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Ceeseven · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-t1",
@@ -606,7 +642,16 @@
     "published": true,
     "sortOrder": 4,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-t1-5a2e811434.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-t1-5a2e811434.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Unknown · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-t2",
@@ -681,7 +726,16 @@
     "published": true,
     "sortOrder": 5,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-t2-4e3461b132.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-t2-4e3461b132.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "N509FZ · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-t3",
@@ -757,7 +811,16 @@
     "published": true,
     "sortOrder": 6,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-t3-8fc957f16f.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-t3-8fc957f16f.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Mdsheth1986 · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-t4",
@@ -832,7 +895,16 @@
     "published": true,
     "sortOrder": 7,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-t4-151b80257a.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-t4-151b80257a.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Sichuanfoodlover · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-t4c",
@@ -907,7 +979,16 @@
     "published": true,
     "sortOrder": 8,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-t4c-dac997638c.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-t4c-dac997638c.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "ZhengZhou · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-a1",
@@ -981,7 +1062,16 @@
     "published": true,
     "sortOrder": 9,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-a1-3daea6efe5.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-a1-3daea6efe5.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Sleeps-Darkly · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-a2",
@@ -1055,7 +1145,16 @@
     "published": true,
     "sortOrder": 10,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-a2-ef01b04ff8.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-a2-ef01b04ff8.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Coentor · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-a3",
@@ -1129,7 +1228,16 @@
     "published": true,
     "sortOrder": 11,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-a3-713afd19f1.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-a3-713afd19f1.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Coentor · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-a4",
@@ -1203,7 +1311,16 @@
     "published": true,
     "sortOrder": 12,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-a4-dd93d71475.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-a4-dd93d71475.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Peachyeung316 · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-h1",
@@ -1336,7 +1453,16 @@
     "published": true,
     "sortOrder": 13,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-h1-a4aefa121b.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-h1-a4aefa121b.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Hollyhe888 · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-h2",
@@ -1469,7 +1595,16 @@
     "published": true,
     "sortOrder": 14,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-h2-270caf3fe0.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-h2-270caf3fe0.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "N509FZ · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-h3",
@@ -1603,7 +1738,16 @@
     "published": true,
     "sortOrder": 15,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-h3-dc5aa3cbe6.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-h3-dc5aa3cbe6.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Wee Keat Chin · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-h4",
@@ -1737,7 +1881,16 @@
     "published": true,
     "sortOrder": 16,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-h4-adff0ba576.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-h4-adff0ba576.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "N509FZ · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n1-6",
@@ -1772,7 +1925,16 @@
     "published": true,
     "sortOrder": 17,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n1-6-11688b40ee.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n1-6-11688b40ee.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Wilfredor · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n1-10",
@@ -1807,7 +1969,16 @@
     "published": true,
     "sortOrder": 18,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n1-10-da0d017e9e.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n1-10-da0d017e9e.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Yumi Kimura · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n2-6",
@@ -1842,7 +2013,16 @@
     "published": true,
     "sortOrder": 19,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n2-6-2f4a9a950e.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n2-6-2f4a9a950e.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "RightCowLeftCoast · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n2-10",
@@ -1877,7 +2057,16 @@
     "published": true,
     "sortOrder": 20,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n2-10-bbf358bc87.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n2-10-bbf358bc87.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "RightCowLeftCoast · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n3-6",
@@ -1911,7 +2100,16 @@
     "published": true,
     "sortOrder": 21,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n3-6-5136e63e9b.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n3-6-5136e63e9b.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Think Draw from Dubai, UAE · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n3-10",
@@ -1945,7 +2143,16 @@
     "published": true,
     "sortOrder": 22,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n3-10-66be0987a7.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n3-10-66be0987a7.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Bobak Ha'Eri · CC BY 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n4-6",
@@ -1979,7 +2186,16 @@
     "published": true,
     "sortOrder": 23,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n4-6-f5b5eaf8e1.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n4-6-f5b5eaf8e1.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Zheng Zhou · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-n4-10",
@@ -2013,7 +2229,16 @@
     "published": true,
     "sortOrder": 24,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-n4-10-af8afe41e2.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-n4-10-af8afe41e2.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Daderot · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-m1",
@@ -2045,7 +2270,16 @@
     "published": true,
     "sortOrder": 25,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-m1-5a14c60fef.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-m1-5a14c60fef.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Lablascovegmenu from London · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-m2",
@@ -2079,7 +2313,16 @@
     "published": true,
     "sortOrder": 26,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-m2-a0ad27a047.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-m2-a0ad27a047.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "RoyTek · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-m3",
@@ -2113,7 +2356,16 @@
     "published": true,
     "sortOrder": 27,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-m3-9a26a43dfc.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-m3-9a26a43dfc.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Lablascovegmenu from London · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-m5",
@@ -2147,7 +2399,16 @@
     "published": true,
     "sortOrder": 28,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-m5-6cdcb79229.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-m5-6cdcb79229.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Loozrboy · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-m6",
@@ -2182,7 +2443,16 @@
     "published": true,
     "sortOrder": 29,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-m6-c1adb2b376.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-m6-c1adb2b376.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Geoff Peters from Vancouver, BC, Canada · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-m7",
@@ -2217,7 +2487,16 @@
     "published": true,
     "sortOrder": 30,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-m7-cda7679e4d.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-m7-cda7679e4d.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Geoff Peters from Vancouver, BC, Canada · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-s1-9",
@@ -2251,7 +2530,16 @@
     "published": true,
     "sortOrder": 31,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-s1-9-d0d129be3f.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-s1-9-d0d129be3f.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "User:Paraluman · CC BY 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-s1-18",
@@ -2285,7 +2573,16 @@
     "published": true,
     "sortOrder": 32,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-s1-18-f48bfdda39.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-s1-18-f48bfdda39.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "CNEcija12345 · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-s2-9",
@@ -2319,7 +2616,16 @@
     "published": true,
     "sortOrder": 33,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-s2-9-a77f4a767b.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-s2-9-a77f4a767b.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-s2-18",
@@ -2353,7 +2659,16 @@
     "published": true,
     "sortOrder": 34,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-s2-18-9a6e971ec3.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-s2-18-9a6e971ec3.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Gunawan Kartapranata · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-s3-9",
@@ -2388,7 +2703,16 @@
     "published": true,
     "sortOrder": 35,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-s3-9-3b3419c210.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-s3-9-3b3419c210.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "T.Tseng · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-s3-18",
@@ -2423,7 +2747,16 @@
     "published": true,
     "sortOrder": 36,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-s3-18-9e339305ae.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-s3-18-9e339305ae.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "T.Tseng · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x1",
@@ -2459,7 +2792,16 @@
     "published": true,
     "sortOrder": 37,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x1-2a2511050b.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x1-2a2511050b.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "BrokenSphere · CC BY 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x2",
@@ -2496,7 +2838,16 @@
     "published": true,
     "sortOrder": 38,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x2-8be2962e7c.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x2-8be2962e7c.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "julie corsi · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x3",
@@ -2531,7 +2882,16 @@
     "published": true,
     "sortOrder": 39,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x3-1d0600158e.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x3-1d0600158e.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "BrokenSphere · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x4",
@@ -2566,7 +2926,16 @@
     "published": true,
     "sortOrder": 40,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x4-c26a718282.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x4-c26a718282.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "CNEcija12345 · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x5",
@@ -2602,7 +2971,16 @@
     "published": true,
     "sortOrder": 41,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x5-33933fbe39.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x5-33933fbe39.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Loozrboy · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x6",
@@ -2637,7 +3015,16 @@
     "published": true,
     "sortOrder": 42,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x6-74386ba938.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x6-74386ba938.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Jazz Guy from New Jersey, United States · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x7",
@@ -2672,7 +3059,16 @@
     "published": true,
     "sortOrder": 43,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x7-df00ce9bdd.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x7-df00ce9bdd.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "tomek strabski (Strab on sxc.hu) · CC BY-SA 2.5 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x8",
@@ -2707,7 +3103,16 @@
     "published": true,
     "sortOrder": 44,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x8-012e2b8eb5.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x8-012e2b8eb5.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Lou Stejskal · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-x9",
@@ -2743,7 +3148,16 @@
     "published": true,
     "sortOrder": 45,
     "printStation": "sushi",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-x9-a43d4fe80d.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-x9-a43d4fe80d.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Ser Amantio di Nicolao · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b1",
@@ -2819,7 +3233,16 @@
     "published": true,
     "sortOrder": 46,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b1-a69afa69b0.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b1-a69afa69b0.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Nithyasrm · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b2",
@@ -2890,7 +3313,16 @@
     "published": true,
     "sortOrder": 47,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b2-69111077ca.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b2-69111077ca.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b3",
@@ -2963,7 +3395,16 @@
     "published": true,
     "sortOrder": 48,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b3-01d5e8a3f3.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b3-01d5e8a3f3.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "PattayaPatrol · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b4",
@@ -3039,7 +3480,16 @@
     "published": true,
     "sortOrder": 49,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b4-2b665991d1.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b4-2b665991d1.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Ocdp · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b5",
@@ -3112,7 +3562,16 @@
     "published": true,
     "sortOrder": 50,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b5-d45f0f1835.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b5-d45f0f1835.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Saigonamthuc · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b6",
@@ -3186,7 +3645,16 @@
     "published": true,
     "sortOrder": 51,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b6-8b18a631dc.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b6-8b18a631dc.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Debbie Tingzon · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b7",
@@ -3260,7 +3728,16 @@
     "published": true,
     "sortOrder": 52,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b7-81370faf80.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b7-81370faf80.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "N509FZ · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b8",
@@ -3336,7 +3813,16 @@
     "published": true,
     "sortOrder": 53,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b8-17428e7368.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b8-17428e7368.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b9",
@@ -3409,7 +3895,16 @@
     "published": true,
     "sortOrder": 54,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b9-f23e9bd28b.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b9-f23e9bd28b.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b10",
@@ -3482,7 +3977,16 @@
     "published": true,
     "sortOrder": 55,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b10-388e370b39.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b10-388e370b39.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "FASTILY · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b11",
@@ -3557,7 +4061,16 @@
     "published": true,
     "sortOrder": 56,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b11-b81326fc9c.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b11-b81326fc9c.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Helito · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b12",
@@ -3632,7 +4145,16 @@
     "published": true,
     "sortOrder": 57,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b12-718166a300.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b12-718166a300.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "by jetalone (flickr) · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b13",
@@ -3708,7 +4230,16 @@
     "published": true,
     "sortOrder": 58,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b13-d9385217f1.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b13-d9385217f1.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Jens Ohlig · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b14",
@@ -3783,7 +4314,16 @@
     "published": true,
     "sortOrder": 59,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b14-06820e52b1.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b14-06820e52b1.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "David Pursehouse from Kawasaki, Japan · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-b15",
@@ -3858,7 +4398,16 @@
     "published": true,
     "sortOrder": 60,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-b15-77274b27d1.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-b15-77274b27d1.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Blue Lotus from Kichijoji, Tokyo · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v1",
@@ -3931,7 +4480,16 @@
     "published": true,
     "sortOrder": 61,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v1-c68a0c9072.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v1-c68a0c9072.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "yomi955 · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v2",
@@ -4006,7 +4564,16 @@
     "published": true,
     "sortOrder": 62,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v2-7fac1e156e.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v2-7fac1e156e.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Phuongnhu · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v3",
@@ -4082,7 +4649,16 @@
     "published": true,
     "sortOrder": 63,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v3-1550cd001f.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v3-1550cd001f.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "cyclonebill from Copenhagen, Denmark · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v4",
@@ -4157,7 +4733,16 @@
     "published": true,
     "sortOrder": 64,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v4-88233340dc.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v4-88233340dc.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Vyacheslav Argenberg · CC BY 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v5",
@@ -4232,7 +4817,16 @@
     "published": true,
     "sortOrder": 65,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v5-7eb3dfdc40.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v5-7eb3dfdc40.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Enming Yan / 闫恩铭 · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v6",
@@ -4307,7 +4901,16 @@
     "published": true,
     "sortOrder": 66,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v6-be4e8fc135.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v6-be4e8fc135.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Unknown · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v7",
@@ -4382,7 +4985,16 @@
     "published": true,
     "sortOrder": 67,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v7-f5dfde6e81.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v7-f5dfde6e81.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Kykk wiki · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v8",
@@ -4459,7 +5071,16 @@
     "published": true,
     "sortOrder": 68,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v8-8f9282563e.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v8-8f9282563e.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "heiwa4126 · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v9",
@@ -4533,7 +5154,16 @@
     "published": true,
     "sortOrder": 69,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v9-d9d25ff35b.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v9-d9d25ff35b.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Unknown · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v10",
@@ -4607,7 +5237,16 @@
     "published": true,
     "sortOrder": 70,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v10-fbff7631fb.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v10-fbff7631fb.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Nowforever · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v11",
@@ -4681,7 +5320,16 @@
     "published": true,
     "sortOrder": 71,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v11-64995eecbd.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v11-64995eecbd.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Benny's Chop House · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v12",
@@ -4755,7 +5403,16 @@
     "published": true,
     "sortOrder": 72,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v12-2853c1ce60.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v12-2853c1ce60.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Stephanie Richard · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v13",
@@ -4831,7 +5488,16 @@
     "published": true,
     "sortOrder": 73,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v13-e4fe8fab8b.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v13-e4fe8fab8b.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "avlxyz · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v14",
@@ -4905,7 +5571,16 @@
     "published": true,
     "sortOrder": 74,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v14-33918bcc0a.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v14-33918bcc0a.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Ocdp · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v15",
@@ -4981,7 +5656,16 @@
     "published": true,
     "sortOrder": 75,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v15-38810e1bae.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v15-38810e1bae.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Grueslayer · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v16",
@@ -5054,7 +5738,16 @@
     "published": true,
     "sortOrder": 76,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v16-e531965d74.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v16-e531965d74.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "kisocci · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v17",
@@ -5127,7 +5820,16 @@
     "published": true,
     "sortOrder": 77,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v17-31f0204f65.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v17-31f0204f65.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "lydiajoy1 · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-v18",
@@ -5203,7 +5905,16 @@
     "published": true,
     "sortOrder": 78,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-v18-cb9a248628.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-v18-cb9a248628.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "N509FZ · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-u1",
@@ -5336,7 +6047,16 @@
     "published": true,
     "sortOrder": 79,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-u1-d5f3ab6a63.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-u1-d5f3ab6a63.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-u2",
@@ -5469,7 +6189,16 @@
     "published": true,
     "sortOrder": 80,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-u2-c4a20ea3fb.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-u2-c4a20ea3fb.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-u3",
@@ -5602,7 +6331,16 @@
     "published": true,
     "sortOrder": 81,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-u3-f17b98914a.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-u3-f17b98914a.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Flickr.com user \"Blue Lotus\" · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-u4",
@@ -5735,7 +6473,16 @@
     "published": true,
     "sortOrder": 82,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-u4-af0a8cf2dd.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-u4-af0a8cf2dd.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-u5",
@@ -5869,7 +6616,16 @@
     "published": true,
     "sortOrder": 83,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-u5-bd00d34b66.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-u5-bd00d34b66.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Arumdaum · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-side-rice",
@@ -5940,7 +6696,16 @@
     "published": true,
     "sortOrder": 84,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-side-rice-9de4d61964.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-side-rice-9de4d61964.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Anna Frodesiak · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-side-fried-rice",
@@ -6014,7 +6779,16 @@
     "published": true,
     "sortOrder": 85,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-side-fried-rice-a0fddbedae.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-side-fried-rice-a0fddbedae.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "daSupremo · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-d1",
@@ -6088,7 +6862,16 @@
     "published": true,
     "sortOrder": 86,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-d1-a162d74f72.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-d1-a162d74f72.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "No machine-readable author provided. Lyzzy assumed (based on copyright claims). · CC BY 2.5 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-d2",
@@ -6163,7 +6946,16 @@
     "published": true,
     "sortOrder": 87,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-d2-5f2c75263a.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-d2-5f2c75263a.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Gzzz · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-d3",
@@ -6237,7 +7029,16 @@
     "published": true,
     "sortOrder": 88,
     "printStation": "kitchen",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-d3-527eeb5c72.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-d3-527eeb5c72.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Valereee · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-dr-cola",
@@ -6269,7 +7070,16 @@
     "published": true,
     "sortOrder": 89,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-dr-cola-d1eb796ce0.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-dr-cola-d1eb796ce0.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Simon Cousins from High Wycombe, England · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-dr-eistee",
@@ -6301,7 +7111,16 @@
     "published": true,
     "sortOrder": 90,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-dr-eistee-d78e6d5257.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-dr-eistee-d78e6d5257.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Evan Swigart from Chicago, USA · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-dr-water",
@@ -6333,7 +7152,16 @@
     "published": true,
     "sortOrder": 91,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-dr-water-068b4ce161.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-dr-water-068b4ce161.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Tony Webster · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-dr-aloe",
@@ -6365,7 +7193,16 @@
     "published": true,
     "sortOrder": 92,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-dr-aloe-5e491c9f21.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-dr-aloe-5e491c9f21.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "ben dalton · CC BY-SA 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-dr-apple",
@@ -6397,7 +7234,16 @@
     "published": true,
     "sortOrder": 93,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-dr-apple-d7cf3785e3.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-dr-apple-d7cf3785e3.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Zigzig20s · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-dr-orange",
@@ -6429,7 +7275,16 @@
     "published": true,
     "sortOrder": 94,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-dr-orange-dfd5192560.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-dr-orange-dfd5192560.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Agency of the United States Department of Agriculture Edited Version by: Arad · Public domain · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-dr-redbull",
@@ -6461,7 +7316,16 @@
     "published": true,
     "sortOrder": 95,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-dr-redbull-764bfe4fc5.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-dr-redbull-764bfe4fc5.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Oto Zapletal · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-beer-wiesel-fass",
@@ -6495,7 +7359,16 @@
     "published": true,
     "sortOrder": 96,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-beer-wiesel-fass-5588a46c29.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-beer-wiesel-fass-5588a46c29.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Public Domain Images · Public domain · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-beer-wiesel-stamm",
@@ -6529,7 +7402,16 @@
     "published": true,
     "sortOrder": 97,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-beer-wiesel-stamm-9ca119d7ff.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-beer-wiesel-stamm-9ca119d7ff.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Voll Damm · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-beer-nonalc",
@@ -6563,7 +7445,16 @@
     "published": true,
     "sortOrder": 98,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-beer-nonalc-361d46a130.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-beer-nonalc-361d46a130.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "JIP · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-beer-japan",
@@ -6597,7 +7488,16 @@
     "published": true,
     "sortOrder": 99,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-beer-japan-7a484323fb.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-beer-japan-7a484323fb.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Yuet Man Lee · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-wine-white",
@@ -6631,7 +7531,16 @@
     "published": true,
     "sortOrder": 100,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-wine-white-815c4e0850.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-wine-white-815c4e0850.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Evan Swigart from Chicago, USA · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-wine-red",
@@ -6665,7 +7574,16 @@
     "published": true,
     "sortOrder": 101,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-wine-red-839f066e5a.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-wine-red-839f066e5a.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Fabio Ingrosso · CC BY 2.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-wine-spritzer",
@@ -6699,7 +7617,16 @@
     "published": true,
     "sortOrder": 102,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-wine-spritzer-68eb7f50e5.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-wine-spritzer-68eb7f50e5.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Geolina163 · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-aperol",
@@ -6733,7 +7660,16 @@
     "published": true,
     "sortOrder": 103,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-aperol-8c33cd9a88.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-aperol-8c33cd9a88.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Missvain · CC BY 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-aperol-prosecco",
@@ -6767,7 +7703,16 @@
     "published": true,
     "sortOrder": 104,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-aperol-prosecco-6f95c51369.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-aperol-prosecco-6f95c51369.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Missvain · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-hugo",
@@ -6801,7 +7746,16 @@
     "published": true,
     "sortOrder": 105,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-hugo-b846152363.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-hugo-b846152363.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "User:Koever · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-sake",
@@ -6833,7 +7787,16 @@
     "published": true,
     "sortOrder": 106,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-sake-72105c8aa3.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-sake-72105c8aa3.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "User:Kentin · CC BY-SA 3.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-coffee-espresso",
@@ -6867,7 +7830,16 @@
     "published": true,
     "sortOrder": 107,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-coffee-espresso-863d16e051.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-coffee-espresso-863d16e051.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Kritzolina · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-coffee-cappuccino",
@@ -6901,7 +7873,16 @@
     "published": true,
     "sortOrder": 108,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-coffee-cappuccino-ee255b3e50.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-coffee-cappuccino-ee255b3e50.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Robert Smith · CC BY 4.0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-coffee-latte",
@@ -6935,7 +7916,16 @@
     "published": true,
     "sortOrder": 109,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-coffee-latte-46e4146270.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-coffee-latte-46e4146270.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "Andy Li · CC0 · Wikimedia Commons"
+      }
+    ]
   },
   {
     "id": "photo-tea",
@@ -6967,6 +7957,15 @@
     "published": true,
     "sortOrder": 110,
     "printStation": "bar",
-    "media": []
+    "media": [
+      {
+        "id": "seed-dish-photo-tea-8ab882f3c6.jpg",
+        "type": "image",
+        "url": "/media/dish-photo-tea-8ab882f3c6.jpg",
+        "posterUrl": null,
+        "sortOrder": 0,
+        "credit": "JIP · CC BY-SA 4.0 · Wikimedia Commons"
+      }
+    ]
   }
 ]

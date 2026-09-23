@@ -9,6 +9,8 @@ export interface ProductMedia {
   url: string;
   posterUrl?: string | null;
   sortOrder?: number;
+  /** Who took it and under which licence, for a photo that is not the restaurant's own. */
+  credit?: string | null;
 }
 
 export interface ModifierOption {

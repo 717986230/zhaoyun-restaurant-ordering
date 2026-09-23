@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, LANGUAGE_INFO } from "@zhaoyun/domain";
 import type { DishPart, MenuLanguage, Product } from "@zhaoyun/domain";
@@ -8,6 +8,8 @@ import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { assignedTableNo } from "../../app/table";
 import { formatPrice, productName, secondaryName, t } from "../../app/i18n";
 import type { ColorScheme } from "../../app/useColorScheme";
+import { usePageTurn } from "./usePageTurn";
+import type { TurnDirection } from "./usePageTurn";
 
 interface Props {
   state: CustomerState;
@@ -30,7 +32,9 @@ interface Props {
  * every duration goes through `useReducedMotion` below instead.
  */
 const EASE = [0.2, 0.8, 0.2, 1] as const;
-const DURATION = { backdrop: 0.2, card: 0.26, flip: 0.42 };
+const DURATION = { backdrop: 0.2, card: 0.3, page: 0.34 };
+/** The card turns like a card: quick off the mark, settling without a wobble. */
+const FLIP_SPRING = { type: "spring", stiffness: 210, damping: 26, mass: 0.9 } as const;
 
 function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
   return names[language] || names.de || names.en;
@@ -39,19 +43,41 @@ function localized(names: { zh: string; de: string; en: string }, language: Cust
 /**
  * One dish, however it is illustrated.
  *
- * None of the 111 dishes has a photo yet, so what a guest sees today is the
- * generated artwork. The slot is the same either way and appears in the list
- * as well as the detail card, so the day photos exist they turn up everywhere
- * at once rather than needing the layout rebuilt around them.
+ * A photo fades in once it has decoded rather than painting in strips, and a
+ * photo that cannot load — a tablet offline, a file removed — falls back to the
+ * dish's generated artwork, so a row is never an empty grey box.
  */
 function ProductMedia({ product, size = "feature" }: { product: Product; size?: "feature" | "thumb" }) {
   const media = product.media[0];
-  if (!media) return <div className={`art ${size === "thumb" ? "art-thumb " : ""}${product.appearance.pattern}`} style={{ "--art": product.appearance.art } as React.CSSProperties} />;
-  const source = restaurantApi.mediaUrl(media.url);
-  const className = size === "thumb" ? "dish-media dish-media-thumb" : "dish-media";
-  return media.type === "video"
-    ? <video className={className} src={source} poster={media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined} playsInline muted loop autoPlay preload="metadata" />
-    : <img className={className} src={source} alt={product.names.zh || product.names.de} loading="lazy" />;
+  // Remembered per URL, not per row: the menu first draws from the copy the
+  // app ships with and then from the server, and a photo that is replaced
+  // gets a new URL — neither may inherit the old one's failure.
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const art = <div className={`art ${size === "thumb" ? "art-thumb " : ""}${product.appearance.pattern}`} style={{ "--art": product.appearance.art } as React.CSSProperties} />;
+  const source = media ? restaurantApi.mediaUrl(media.url) : null;
+  if (!media || !source || failed === source) return art;
+  const className = `${size === "thumb" ? "dish-media dish-media-thumb" : "dish-media"} ${loaded === source ? "loaded" : ""}`;
+  if (media.type === "video") {
+    return <video className={`${className} loaded`} src={source} poster={media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined} playsInline muted loop autoPlay preload="metadata" onError={() => setFailed(source)} />;
+  }
+  return <img
+    className={className}
+    src={source}
+    alt={size === "thumb" ? "" : product.names.zh || product.names.de}
+    width={size === "thumb" ? 48 : 480}
+    height={size === "thumb" ? 48 : 360}
+    loading="lazy"
+    decoding="async"
+    onLoad={() => setLoaded(source)}
+    onError={() => setFailed(source)}
+  />;
+}
+
+/** Whose photo it is, when it is not the restaurant's own. */
+function PhotoCredit({ product }: { product: Product }) {
+  const credit = product.media[0]?.credit;
+  return credit ? <small className="photo-credit">📷 {credit}</small> : null;
 }
 
 /**
@@ -69,7 +95,7 @@ function ProductMedia({ product, size = "feature" }: { product: Product; size?: 
  * redistributes what the kitchen already declared, and whatever it cannot
  * place stays visible under its own heading rather than disappearing.
  */
-function Deconstruction({ product, language, reduceMotion }: { product: Product; language: CustomerState["language"]; reduceMotion: boolean }) {
+function Deconstruction({ product, language, reduceMotion, showing }: { product: Product; language: CustomerState["language"]; reduceMotion: boolean; showing: boolean }) {
   const { parts, portions, unattributed } = useMemo(() => deconstruct(product), [product]);
   const name = (part: DishPart) => (language === "zh" ? part.zh : language === "en" ? part.en : part.de);
   const second = (part: DishPart) => (language === "de" ? part.zh : part.de);
@@ -77,9 +103,11 @@ function Deconstruction({ product, language, reduceMotion }: { product: Product;
   return <div className="dish-parts-block">
     <p className="parts-heading">{t(language, "parts")}</p>
     <ol className="dish-parts">{parts.map((part, index) => <motion.li className="dish-part" key={`${part.de}-${index}`}
-      initial={reduceMotion ? false : { opacity: 0, y: 14, rotateX: -12 }}
-      animate={{ opacity: 1, y: 0, rotateX: 0 }}
-      transition={{ delay: reduceMotion ? 0 : 0.06 + index * 0.05, duration: reduceMotion ? 0 : 0.32, ease: EASE }}>
+      // The parts come off the dish as the card turns over, not while it
+      // is still face up and they cannot be seen.
+      initial={reduceMotion ? false : { opacity: 0, y: 14, rotateX: -24 }}
+      animate={showing || reduceMotion ? { opacity: 1, y: 0, rotateX: 0 } : { opacity: 0, y: 14, rotateX: -24 }}
+      transition={{ delay: reduceMotion || !showing ? 0 : 0.2 + index * 0.045, duration: reduceMotion ? 0 : 0.34, ease: EASE }}>
       <span className="part-index">{String(index + 1).padStart(2, "0")}</span>
       <span className="part-name"><b>{name(part)}</b><small>{second(part)}</small></span>
       {part.allergens.length > 0 && <span className="allergen-list part-allergens">{part.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, language)}>{code}</b>)}</span>}
@@ -149,9 +177,21 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
     onClick={(event) => {
       if (event.target === event.currentTarget) dispatch({ type: "close-product" });
     }}>
-    <motion.div className="dish-detail-card" data-detail-id={product.id} initial={{ y: 16, scale: 0.985 }} animate={{ y: 0, scale: 1 }} exit={{ y: 10, scale: 0.99 }} transition={{ duration: seconds(DURATION.card), ease: EASE }}>
+    {/* Rises toward the guest, tilted back a few degrees, and settles flat. */}
+    <motion.div className="dish-detail-card" data-detail-id={product.id}
+      style={{ transformPerspective: 1400 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.94, rotateX: 9 }}
+      animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+      exit={{ opacity: 0, y: 16, scale: 0.97, rotateX: 4 }}
+      transition={{ duration: seconds(DURATION.card), ease: EASE }}>
       <button className="detail-close" aria-label={t(state.language, "close")} onClick={() => dispatch({ type: "close-product" })}>×</button>
-      <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`} animate={{ rotateY: state.productFlipped ? 180 : 0 }} transition={{ duration: seconds(DURATION.flip), ease: EASE }}>
+      {/* Mid-turn the card dips back a little, the way a card lifted off a
+          table does; the rotation itself is a spring, so a second tap while
+          it is turning reverses it from where it is instead of jumping. */}
+      <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}
+        initial={false}
+        animate={{ rotateY: state.productFlipped ? 180 : 0, scale: reduceMotion ? 1 : [1, 0.94, 1] }}
+        transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP_SPRING, scale: { duration: 0.5, times: [0, 0.45, 1], ease: EASE } }}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
             <span className="number">{product.sku}</span><span className="cat">{product.category}</span>
@@ -159,7 +199,7 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
           </div>
           <div className="detail-scroll">
             <div className="feature">
-              <ProductMedia product={product} />
+              <figure className="feature-media"><ProductMedia product={product} /><PhotoCredit product={product} /></figure>
               <div><p>{product.description}</p></div>
             </div>
             <DishOptions product={product} language={state.language} />
@@ -174,7 +214,7 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
           <button className="flip-back" onClick={(event) => { event.stopPropagation(); dispatch({ type: "toggle-product-flip" }); }}>{t(state.language, "back")}</button>
           <div><small>{product.sku} · {t(state.language, "breakdown")}</small><h3>{productName(product, state.language)}</h3><p>{product.description}</p></div>
           <div className="detail-back-scroll" onClick={(event) => event.stopPropagation()}>
-            <Deconstruction product={product} language={state.language} reduceMotion={Boolean(reduceMotion)} />
+            <Deconstruction product={product} language={state.language} reduceMotion={Boolean(reduceMotion)} showing={state.productFlipped} />
             <dl>
               {/* The declared list stays whole and stays first among the facts:
                   it is the legal statement, and the breakdown above only
@@ -202,6 +242,49 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
   const categories = ["ALLE", ...new Set(products.map((product) => product.category))];
   const activeProduct = products.find((product) => product.id === state.activeProductId);
   const table = assignedTableNo();
+  const reduceMotion = useReducedMotion();
+
+  // Every category is a page, in chip order. A search is one page of its own.
+  const pageIndex = Math.max(0, categories.indexOf(state.category));
+  const paging = !query && categories.length > 1;
+  const nextPage = paging ? categories[pageIndex + 1] : undefined;
+  const prevPage = paging && pageIndex > 0 ? categories[pageIndex - 1] : undefined;
+  const pageName = (category: string) => (category === "ALLE" ? t(state.language, "allCategories") : category);
+
+  const stackRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const chipsRef = useRef<HTMLElement>(null);
+  // Which way the last turn went: the new page comes in from that side, and
+  // going back lands at the bottom of the previous page, where the guest was.
+  const turn = useRef<{ direction: -1 | 0 | 1 }>({ direction: 0 });
+
+  function turnTo(category: string) {
+    const target = categories.indexOf(category);
+    turn.current.direction = target > pageIndex ? 1 : target < pageIndex ? -1 : 0;
+    if (category !== state.category) dispatch({ type: "category", category });
+  }
+
+  usePageTurn({
+    scroller: stackRef,
+    sheet: sheetRef,
+    canTurn: (direction: TurnDirection) => Boolean(direction === "next" ? nextPage : prevPage),
+    onTurn: (direction: TurnDirection) => {
+      const target = direction === "next" ? nextPage : prevPage;
+      if (target) turnTo(target);
+    }
+  });
+
+  useLayoutEffect(() => {
+    const stack = stackRef.current;
+    if (stack) stack.scrollTop = turn.current.direction < 0 ? stack.scrollHeight : 0;
+    // The chip for the page on screen stays in view as the pages turn.
+    const chip = chipsRef.current?.querySelector<HTMLElement>(".chip.on");
+    chip?.scrollIntoView?.({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  }, [state.category, reduceMotion]);
+
+  const enter = reduceMotion || turn.current.direction === 0
+    ? { opacity: 0 }
+    : { opacity: 0, y: 44 * turn.current.direction, rotateX: -7 * turn.current.direction };
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""}`}>
     <header className="topbar">
@@ -233,16 +316,32 @@ export function CatalogScreen({ state, dispatch, products, languages, title, sho
       <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={t(state.language, "searchPlaceholder")} autoFocus={state.searchOpen} />
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
-    <nav id="chips" className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} onClick={() => dispatch({ type: "category", category })}>{category === "ALLE" ? t(state.language, "allCategories") : category}</button>)}</nav>
-    <div id="stack" className="stack">{visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
-      <div className="summary">
-        <ProductMedia product={product} size="thumb" />
-        <span className="number">{product.sku}</span>
-        <div><h3>{productName(product, state.language)}</h3>{secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}</div>
-        {/* A menu without prices sends a guest into every dish to find one. */}
-        <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
+    <nav id="chips" ref={chipsRef} className="chips">{categories.map((category) => <button key={category} className={`chip ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}</nav>
+    <div id="stack" ref={stackRef} className="stack">
+      <div ref={sheetRef} className="page-sheet">
+        {prevPage && <p className="page-hint page-hint-prev" aria-hidden="true"><i /><span className="page-hint-idle">↑ {t(state.language, "prevPage")} · {pageName(prevPage)}</span><span className="page-hint-armed">{t(state.language, "releaseToTurn")} · {pageName(prevPage)}</span></p>}
+        <motion.div key={`${state.category}|${query}`} className="stack-page"
+          initial={enter}
+          animate={{ opacity: 1, y: 0, rotateX: 0 }}
+          transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
+          {visible.length ? visible.map((product) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
+            <div className="summary">
+              <ProductMedia product={product} size="thumb" />
+              <span className="number">{product.sku}</span>
+              <div><h3>{productName(product, state.language)}</h3>{secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}</div>
+              {/* A menu without prices sends a guest into every dish to find one. */}
+              <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
+            </div>
+          </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}
+          {nextPage && <button type="button" className="page-next" onClick={() => turnTo(nextPage)}>
+            <i className="page-next-progress" aria-hidden="true" />
+            <span className="page-next-label"><b>{t(state.language, "nextPage")} · {pageName(nextPage)}</b><small className="page-hint-idle">{t(state.language, "pullForNext")}</small><small className="page-hint-armed">{t(state.language, "releaseToTurn")}</small></span>
+            <span className="page-next-arrow" aria-hidden="true">↓</span>
+          </button>}
+          {paging && !nextPage && visible.length > 0 && <p className="page-end">{t(state.language, "endOfMenu")}</p>}
+        </motion.div>
       </div>
-    </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}</div>
+    </div>
     <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} products={products} state={state} dispatch={dispatch} />}</AnimatePresence>
   </section>;
 }

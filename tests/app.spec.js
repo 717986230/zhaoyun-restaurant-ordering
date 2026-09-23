@@ -298,24 +298,123 @@ test("layout keeps the menu's main controls visible", async ({ page }) => {
   await expect(page.locator(".dish-card").first()).toBeInViewport();
 });
 
-test("the platform class is set, and it is what turns the expensive blur off", async ({ page }) => {
+test("the platform class is set, and nothing blurs the list behind an open dish", async ({ page }) => {
   // `html.plt-android` rules were written and never applied: the class is
-  // Ionic's convention and this app is bare Capacitor, so nothing set it. The
-  // consequence was a real-time blur(3px) over the whole card stack on every
-  // dish tap, on exactly the hardware least able to afford it.
+  // Ionic's convention and this app is bare Capacitor, so nothing set it.
   await expect(page.locator("html")).toHaveClass(/\bplt-/);
 
   await page.locator(".dish-card").first().click();
   const stack = page.locator("#stack");
   await expect(page.locator(".menu.detail-open")).toBeVisible();
 
-  const onWeb = await stack.evaluate((node) => getComputedStyle(node).filter);
-  expect(onWeb, "a browser keeps the blur").toContain("blur");
-
-  // Prove the override the tablet relies on, without a tablet.
+  // A blur over the whole list was re-rendered on every frame of the card
+  // opening — the stutter on a dish tap, on phones as much as on tablets. The
+  // list now only fades and steps back, which the GPU does for free.
+  expect(await stack.evaluate((node) => getComputedStyle(node).filter)).toBe("none");
   await page.evaluate(() => document.documentElement.classList.add("plt-android"));
-  const onAndroid = await stack.evaluate((node) => getComputedStyle(node).filter);
-  expect(onAndroid, "the Android rule must drop the blur").toBe("none");
+  expect(await stack.evaluate((node) => getComputedStyle(node).filter)).toBe("none");
+});
+
+/** A finger on the list, from one height to another, the way a phone reports it. */
+async function drag(page, fromY, toY) {
+  await page.evaluate(([from, to]) => {
+    const list = document.querySelector("#stack");
+    const point = (y) => new Touch({ identifier: 1, target: list, clientX: 180, clientY: y });
+    const send = (type, y, touches) => list.dispatchEvent(new TouchEvent(type, { touches, changedTouches: [point(y)], bubbles: true, cancelable: true }));
+    send("touchstart", from, [point(from)]);
+    for (let step = 1; step <= 10; step += 1) {
+      const y = from + ((to - from) * step) / 10;
+      send("touchmove", y, [point(y)]);
+    }
+    send("touchend", to, []);
+  }, [fromY, toY]);
+}
+
+test("a photo that failed from the cached menu still shows once the server names a new one", async ({ page }) => {
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  await page.route("**/media/old.jpg", (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route("**/media/new.png", (route) => route.fulfill({ status: 200, contentType: "image/png", body: png }));
+  const withPhoto = (url) => products.map((product) => (product.id === "80" ? { ...product, media: [{ type: "image", url, credit: "Jane Doe · CC BY 4.0 · Wikimedia Commons" }] } : product));
+  // Yesterday's menu, kept on the device, pointing at a photo since replaced.
+  await page.evaluate((catalog) => localStorage.setItem("zy_catalog_cache_v3", JSON.stringify(catalog)), {
+    products: withPhoto("/media/old.jpg").map((product) => ({ ...product, priceCents: Math.round(product.price * 100) })), theme: "jade", languages: ["zh", "en", "de"]
+  });
+  await page.unroute("**/api/catalog");
+  let answer;
+  const served = new Promise((resolve) => { answer = resolve; });
+  await page.route("**/api/catalog", async (route) => {
+    await served;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: withPhoto("/media/new.png"), theme: "jade", languages: ["zh", "en", "de"] }) });
+  });
+  await page.reload();
+  const row = page.locator(".dish-card", { hasText: "黑椒牛柳" });
+  // The old one fails first and the row falls back to its artwork …
+  await expect(row.locator(".art")).toBeVisible();
+  answer();
+  // … and the new one is not held to that failure.
+  await expect(row.locator("img.dish-media.loaded")).toHaveAttribute("src", /\/media\/new\.png$/);
+  await row.click();
+  await expect(page.locator(".photo-credit")).toContainText("Jane Doe · CC BY 4.0");
+});
+
+test.describe("the menu turns its pages", () => {
+  const onChip = (page) => page.locator(".chip.on");
+
+  test("the foot of each page names the next one, and a tap turns to it", async ({ page }) => {
+    await expect(onChip(page)).toHaveText("全部");
+    const next = page.locator(".page-next");
+    await expect(next).toContainText("下一页 · MAIN");
+    await next.click();
+    await expect(onChip(page)).toHaveText("MAIN");
+    await expect(page.locator(".dish-card")).toHaveCount(1);
+    await expect(page.locator(".dish-card")).toContainText("黑椒牛柳");
+    // A new page starts at its top.
+    expect(await page.locator("#stack").evaluate((node) => node.scrollTop)).toBe(0);
+  });
+
+  test("pulling up past the last dish turns to the next page, pulling down past the first goes back", async ({ page }) => {
+    await page.getByRole("button", { name: "MAIN", exact: true }).click();
+    // Only a pull that starts at the end turns the page; on a landscape phone
+    // even one dish and the next-page bar are taller than the screen.
+    await page.locator("#stack").evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    await drag(page, 300, 60);
+    await expect(onChip(page)).toHaveText("SUSHI");
+    await drag(page, 60, 300);
+    await expect(onChip(page)).toHaveText("MAIN");
+  });
+
+  test("a short pull springs back without turning", async ({ page }) => {
+    await page.getByRole("button", { name: "MAIN", exact: true }).click();
+    await drag(page, 600, 560);
+    await page.waitForTimeout(400);
+    await expect(onChip(page)).toHaveText("MAIN");
+    // Nothing is left dragged out of place.
+    expect(await page.locator(".page-sheet").evaluate((node) => node.style.transform)).toBe("");
+  });
+
+  test("the first page cannot be pulled back past, and the last says it is the end", async ({ page }) => {
+    await drag(page, 300, 600);
+    await expect(onChip(page)).toHaveText("全部");
+    await page.getByRole("button", { name: "SET", exact: true }).click();
+    await expect(page.locator(".page-next")).toHaveCount(0);
+    await expect(page.locator(".page-end")).toHaveText("菜单到底了");
+    await drag(page, 600, 300);
+    await expect(onChip(page)).toHaveText("SET");
+  });
+
+  test("a search is one page, with nothing to turn to", async ({ page }) => {
+    await page.locator("#searchBtn").click();
+    await page.locator("#searchInput").fill("拉面");
+    await expect(page.locator(".dish-card")).toHaveCount(1);
+    await expect(page.locator(".page-next")).toHaveCount(0);
+    await drag(page, 600, 300);
+    await expect(onChip(page)).toHaveText("全部");
+  });
+
+  test("the next page's name follows the guest's language", async ({ page }) => {
+    await page.getByRole("button", { name: "English" }).click();
+    await expect(page.locator(".page-next")).toContainText("Next · MAIN");
+  });
 });
 
 test("the header shows no table number the guest was never given, and nothing in the wrong language", async ({ page }) => {

@@ -305,7 +305,8 @@ export function mapProduct(row, media = []) {
       type: item.type,
       url: item.url,
       posterUrl: item.poster_url,
-      sortOrder: item.sort_order
+      sortOrder: item.sort_order,
+      credit: item.credit ?? null
     })),
     createdAt: row.created_at,
     updatedAt: row.updated_at

@@ -1,0 +1,67 @@
+name: Dish photos
+
+# Fetches a freely licensed photo per dish from Wikimedia Commons into
+# server/dish-photos/ and commits them to the branch that asked. Runs when the
+# list of what to search for changes, so fixing one dish's search term is a
+# one-line commit; the photos then reach D1 through the next migration export.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - scripts/dish-photos.json
+      - scripts/fetch-dish-photos.mjs
+      - .github/workflows/dish-photos.yml
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Fetch every dish again, not only the ones whose entry changed
+        type: boolean
+        default: false
+
+concurrency:
+  group: dish-photos-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Fetch photos from Wikimedia Commons
+        env:
+          FORCE: ${{ inputs.force && '1' || '0' }}
+        run: node scripts/fetch-dish-photos.mjs
+
+      # The photos reach D1 through migrations, and a tablet that has never
+      # been online through the bundled catalogue; both are generated from
+      # server/dish-photos/, so the commit below is consistent on its own.
+      - name: Regenerate the D1 migrations and the bundled catalogue
+        run: |
+          npm run d1:migrations
+          npm run catalog:bundle
+
+      # A push made with the workflow token starts no further workflows, so this
+      # cannot loop; CI runs on the next ordinary push to the branch.
+      - name: Commit what changed
+        run: |
+          git add server/dish-photos migrations apps/customer-app/src/app/bundled-catalog.json
+          if git diff --cached --quiet; then
+            echo "No photo changed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Dish photos from Wikimedia Commons"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

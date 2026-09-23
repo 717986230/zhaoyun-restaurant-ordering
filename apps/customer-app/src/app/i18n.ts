@@ -38,7 +38,8 @@ const copy = {
     tableUnset: "本设备还没有分配桌号，订单会记到默认桌号",
     breakdown: "拆解", parts: "组成", alsoContains: "另含（未标注到具体食材）", portionOf: "规格",
     language: "语言", lightMode: "切换到浅色", darkMode: "切换到深色",
-    allCategories: "全部", searchPlaceholder: "搜索菜名或编号", tableLabel: "桌 {table}"
+    allCategories: "全部", searchPlaceholder: "搜索菜名或编号", tableLabel: "桌 {table}",
+    nextPage: "下一页", prevPage: "上一页", releaseToTurn: "松手翻页", pullForNext: "上拉或轻点翻页", endOfMenu: "菜单到底了"
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
@@ -73,7 +74,8 @@ const copy = {
     tableUnset: "Diesem Gerät ist noch kein Tisch zugewiesen",
     breakdown: "Aufgeschlüsselt", parts: "Bestandteile", alsoContains: "Außerdem enthalten (keiner Zutat zugeordnet)", portionOf: "Menge",
     language: "Sprache", lightMode: "Helles Design", darkMode: "Dunkles Design",
-    allCategories: "Alle", searchPlaceholder: "Gericht oder Nummer suchen", tableLabel: "Tisch {table}"
+    allCategories: "Alle", searchPlaceholder: "Gericht oder Nummer suchen", tableLabel: "Tisch {table}",
+    nextPage: "Weiter", prevPage: "Zurück", releaseToTurn: "Loslassen zum Blättern", pullForNext: "Hochziehen oder tippen", endOfMenu: "Ende der Karte"
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
@@ -108,7 +110,8 @@ const copy = {
     tableUnset: "This device has no table assigned yet",
     breakdown: "Taken apart", parts: "Components", alsoContains: "Also contains (not tied to one ingredient)", portionOf: "Serving",
     language: "Language", lightMode: "Switch to light", darkMode: "Switch to dark",
-    allCategories: "All", searchPlaceholder: "Search dish or number", tableLabel: "Table {table}"
+    allCategories: "All", searchPlaceholder: "Search dish or number", tableLabel: "Table {table}",
+    nextPage: "Next", prevPage: "Previous", releaseToTurn: "Release to turn the page", pullForNext: "Pull up or tap", endOfMenu: "End of the menu"
   }
 } as const;
 

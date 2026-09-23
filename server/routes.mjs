@@ -200,6 +200,19 @@ export function registerRoutes(app, { database, realtime, config }) {
     realtime.connect(socket, TABLE_PATTERN.test(table) ? table : null);
   });
 
+  // A picture kept in the database answers first; anything else is an upload
+  // on disk. The id carries a hash of the bytes, so it can be cached for good.
+  app.get("/media/:file", async (request, reply) => {
+    const stored = database.getMediaFile(request.params.file);
+    if (stored) {
+      return reply
+        .header("cache-control", "public, max-age=31536000, immutable")
+        .type(stored.contentType)
+        .send(stored.bytes);
+    }
+    return reply.sendFile(request.params.file);
+  });
+
   app.get("/api/catalog", async () => {
     const settings = database.getSettings();
     return { products: database.listProducts(true), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) };

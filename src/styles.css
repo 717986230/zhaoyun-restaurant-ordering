@@ -67,6 +67,8 @@
   --dur-fast: 0.18s;
   --dur-base: 0.24s;
   --dur-slow: 0.35s;
+  /* How far a page turn has been pulled, 0–1; written by usePageTurn. */
+  --pull: 0;
 
   /* The light menu, for a guest by a window at lunch. Same rules as above:
      cool neutrals with no brown in them, one accent, and every ink held to
@@ -644,6 +646,10 @@ html.plt-android .screen.active {
 .stack {
   height: calc(100dvh - 116px - env(safe-area-inset-top));
   overflow-y: auto;
+  /* The page turn owns the pull past either end; without this Android Chrome
+     reloads the page on a pull-down and iOS rubber-bands the whole app. */
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 8px 18px 158px;
   scrollbar-width: none;
 }
@@ -1258,7 +1264,8 @@ html.plt-android .screen.active {
 
 /* Shared-element menu detail used by the current customer app. */
 .stack {
-  transition: opacity var(--dur-slow) var(--ease-out);
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+  transform-origin: 50% 30%;
 }
 
 .dish-card {
@@ -1270,14 +1277,17 @@ html.plt-android .screen.active {
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
+/* The list steps back behind an open dish. Only opacity and transform: a
+   blur here re-rendered the whole list on every frame of the card opening,
+   which is where the stutter on a dish tap came from — on phones as much as
+   on the tablets that already had it turned off. */
 .menu.detail-open .stack {
-  filter: blur(3px);
-  opacity: 0.58;
+  opacity: 0.32;
+  transform: scale(0.985);
   pointer-events: none;
 }
 
 html.plt-android .menu.detail-open .stack {
-  filter: none;
   opacity: 0.24;
 }
 
@@ -1470,6 +1480,14 @@ html.plt-android .menu.detail-open .stack {
   object-fit: cover;
   border-radius: 3px;
   background: var(--bg-2);
+  /* Held back until decoded, then faded in, so a photo never paints in strips
+     over its placeholder. */
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+.dish-media.loaded {
+  opacity: 1;
 }
 
 .ingredients {
@@ -1848,4 +1866,216 @@ html.plt-android .menu.detail-open .stack {
   font-size: 13px;
   line-height: 1.4;
   opacity: 0.75;
+}
+
+/* ---------------------------------------------------------------------------
+   Pages. Each category is a page; pulling past either end of the list turns
+   to the next or previous one. The sheet is what the finger drags (its
+   transform is written by usePageTurn, not by React), the page inside it is
+   what animates in when the turn lands.
+   ------------------------------------------------------------------------ */
+.page-sheet {
+  position: relative;
+  will-change: transform;
+}
+
+.stack-page {
+  transform-origin: 50% 0;
+}
+
+/* A row off screen costs nothing to lay out or paint: 111 rows scroll like 10. */
+.stack-page .dish-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}
+
+.page-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  opacity: var(--pull);
+  pointer-events: none;
+}
+
+.page-hint-prev {
+  bottom: 100%;
+  padding-bottom: 18px;
+}
+
+.page-hint i {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  transform: rotate(calc(var(--pull) * 300deg));
+}
+
+.page-hint-armed,
+.page-sheet[data-armed="true"] .page-hint-idle {
+  display: none;
+}
+
+.page-sheet[data-armed="true"] .page-hint-armed {
+  display: inline;
+}
+
+.page-sheet[data-armed="true"] .page-hint {
+  color: var(--accent);
+}
+
+/* The way to the next page, at the foot of this one: tap it, or keep pulling
+   and watch it fill. */
+.page-next {
+  position: relative;
+  width: 100%;
+  min-height: 64px;
+  margin: 22px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  overflow: hidden;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.page-next-progress {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-wash);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--pull));
+}
+
+.page-next-label {
+  position: relative;
+  display: grid;
+  gap: 2px;
+}
+
+.page-next-label b {
+  font: 500 16px Georgia, "Noto Serif SC", serif;
+}
+
+.page-next-label small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.page-next-arrow {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 16px;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.page-sheet[data-armed="true"] .page-next {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.page-sheet[data-armed="true"] .page-next-arrow {
+  transform: rotate(180deg);
+}
+
+.page-end {
+  margin: 28px 0 0;
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.page-end::before,
+.page-end::after {
+  content: "—";
+  margin: 0 10px;
+}
+
+/* The photo's credit sits under it, as small as a caption can be and still be read. */
+.feature-media {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.photo-credit {
+  color: var(--faint);
+  font-size: 9px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+/* Every control answers a press. The flags, the sun and moon, the close and
+   turn-back buttons had no feedback at all, so a tap looked like it missed. */
+.flag,
+.scheme-toggle,
+.detail-close,
+.flip-back,
+.page-next {
+  transition: transform var(--dur-press) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.flag:active,
+.scheme-toggle:active,
+.flip-back:active,
+.page-next:active {
+  transform: scale(0.94);
+}
+
+.page-next:active {
+  transform: scale(0.985);
+}
+
+.chip {
+  transition: transform var(--dur-press) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+button:focus-visible,
+.title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flag:active,
+  .scheme-toggle:active,
+  .flip-back:active,
+  .page-next:active,
+  .menu.detail-open .stack {
+    transform: none;
+  }
+
+  .page-hint i {
+    transform: none;
+  }
+}
+
+/* The back is a grid, where align-self does not stop a button stretching to
+   the full width — under the close button, where half of it cannot be hit. */
+.detail-back .flip-back {
+  justify-self: start;
+  max-width: calc(100% - 56px);
 }

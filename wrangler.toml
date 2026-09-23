@@ -21,6 +21,10 @@ CORS_ORIGIN = "https://717986230.github.io"
 directory = "dist/web"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+# The API and the pictures kept in D1 are the Worker's, whatever the request
+# looks like: a photo opened in its own tab is a navigation, which would
+# otherwise be answered with the menu's index.html.
+run_worker_first = ["/api/*", "/media/*"]
 
 # The account and database ids identify resources; neither grants access to
 # them, so both belong in the repository. The credential is CLOUDFLARE_API_TOKEN,
