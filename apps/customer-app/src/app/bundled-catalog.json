@@ -7967,5 +7967,393 @@
         "credit": "JIP · CC BY-SA 4.0 · Wikimedia Commons"
       }
     ]
+  },
+  {
+    "id": "set-ramen-for-two",
+    "sku": "SET-1",
+    "kind": "food",
+    "category": "SET",
+    "names": {
+      "zh": "双人拉面套餐",
+      "de": "Ramen-Menü für zwei",
+      "en": "Ramen Set for Two"
+    },
+    "description": "Zwei Ramen nach Wahl des Hauses, Veggie Gyoza zum Teilen und zweimal Miso-Suppe.",
+    "price": 34.9,
+    "vatPercent": 10,
+    "allergens": [
+      "A",
+      "C",
+      "F"
+    ],
+    "details": {
+      "time": "25 min",
+      "people": "2 Personen",
+      "level": "",
+      "ingredients": ""
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "bundleItems": [
+      {
+        "productId": "photo-r1",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-r2",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-v5",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-v14",
+        "quantity": 2
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1000,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "set-sushi",
+    "sku": "SET-2",
+    "kind": "food",
+    "category": "SET",
+    "names": {
+      "zh": "寿司拼盘套餐",
+      "de": "Sushi-Menü",
+      "en": "Sushi Set"
+    },
+    "description": "Nigiri, Sake Maki und eine Rainbow Roll, dazu Miso-Suppe.",
+    "price": 32.9,
+    "vatPercent": 10,
+    "allergens": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "F"
+    ],
+    "details": {
+      "time": "20 min",
+      "people": "1–2 Personen",
+      "level": "",
+      "ingredients": ""
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "bundleItems": [
+      {
+        "productId": "photo-n2-6",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-m2",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-x1",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-v14",
+        "quantity": 1
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1001,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "set-hot-pot-for-two",
+    "sku": "SET-3",
+    "kind": "food",
+    "category": "SET",
+    "names": {
+      "zh": "双人火锅套餐",
+      "de": "Hot-Pot-Menü für zwei",
+      "en": "Hot Pot Set for Two"
+    },
+    "description": "Rind- und Meeresfrüchte-Hot-Pot, Reis und Mochi zum Abschluss.",
+    "price": 59.9,
+    "vatPercent": 10,
+    "allergens": [
+      "A",
+      "B",
+      "E",
+      "G",
+      "N"
+    ],
+    "details": {
+      "time": "35 min",
+      "people": "2 Personen",
+      "level": "",
+      "ingredients": ""
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "bundleItems": [
+      {
+        "productId": "photo-h2",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-h3",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-side-rice",
+        "quantity": 2
+      },
+      {
+        "productId": "photo-d1",
+        "quantity": 2
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1002,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "set-szechuan",
+    "sku": "SET-4",
+    "kind": "food",
+    "category": "SET",
+    "names": {
+      "zh": "川味套餐",
+      "de": "Szechuan-Menü",
+      "en": "Szechuan Set"
+    },
+    "description": "Szechuan-Rind, Mapo Tofu und Chili-Wontons, dazu zweimal Reis.",
+    "price": 33.9,
+    "vatPercent": 10,
+    "allergens": [
+      "A",
+      "B",
+      "C",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "25 min",
+      "people": "2 Personen",
+      "level": "",
+      "ingredients": ""
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "bundleItems": [
+      {
+        "productId": "photo-t1",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-t4",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-v13",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-side-rice",
+        "quantity": 2
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1003,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "set-lunch",
+    "sku": "SET-5",
+    "kind": "food",
+    "category": "SET",
+    "names": {
+      "zh": "午间套餐",
+      "de": "Mittagsmenü",
+      "en": "Lunch Set"
+    },
+    "description": "Bulgogi mit Reis, Edamame und Miso-Suppe.",
+    "price": 19.9,
+    "vatPercent": 10,
+    "allergens": [
+      "A",
+      "F",
+      "N"
+    ],
+    "details": {
+      "time": "15 min",
+      "people": "1 Person",
+      "level": "",
+      "ingredients": ""
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "bundleItems": [
+      {
+        "productId": "photo-b6",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-v1",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-v14",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-side-rice",
+        "quantity": 1
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1004,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "set-family",
+    "sku": "SET-6",
+    "kind": "food",
+    "category": "SET",
+    "names": {
+      "zh": "家庭套餐（4人）",
+      "de": "Familienmenü für vier",
+      "en": "Family Set for Four"
+    },
+    "description": "Vier Hauptgerichte, Frühlingsrollen und Gyoza zum Teilen, Matcha-Tiramisu zum Dessert.",
+    "price": 72.9,
+    "vatPercent": 10,
+    "allergens": [
+      "A",
+      "C",
+      "D",
+      "F",
+      "G",
+      "N"
+    ],
+    "details": {
+      "time": "35 min",
+      "people": "4 Personen",
+      "level": "",
+      "ingredients": ""
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "bundleItems": [
+      {
+        "productId": "photo-b1",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-b8",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-b11",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-u2",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-v4",
+        "quantity": 2
+      },
+      {
+        "productId": "photo-v6",
+        "quantity": 2
+      },
+      {
+        "productId": "photo-d2",
+        "quantity": 2
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1005,
+    "printStation": "kitchen",
+    "media": []
+  },
+  {
+    "id": "set-dessert",
+    "sku": "SET-7",
+    "kind": "food",
+    "category": "SET",
+    "names": {
+      "zh": "甜品三重奏",
+      "de": "Dessert-Trio",
+      "en": "Dessert Trio"
+    },
+    "description": "Mochi, Matcha-Tiramisu und Apfel-Gyoza.",
+    "price": 15.9,
+    "vatPercent": 10,
+    "allergens": [
+      "A",
+      "C",
+      "G"
+    ],
+    "details": {
+      "time": "10 min",
+      "people": "2 Personen",
+      "level": "",
+      "ingredients": ""
+    },
+    "appearance": {
+      "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
+      "pattern": "lines"
+    },
+    "modifiers": [],
+    "bundleItems": [
+      {
+        "productId": "photo-d1",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-d2",
+        "quantity": 1
+      },
+      {
+        "productId": "photo-d3",
+        "quantity": 1
+      }
+    ],
+    "available": true,
+    "published": true,
+    "sortOrder": 1006,
+    "printStation": "kitchen",
+    "media": []
   }
 ]

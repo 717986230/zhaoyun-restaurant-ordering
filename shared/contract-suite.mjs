@@ -18,7 +18,16 @@ export function contractChecks(call, assert) {
 
       const { status, json } = await call("GET", "/api/catalog");
       assert.equal(status, 200);
-      assert.equal(json.products.length, 111);
+      assert.equal(json.products.length, 118, "111 dishes and 7 set menus");
+      // Each set declares every allergen of every dish in it, and nothing else.
+      const byId = new Map(json.products.map((product) => [product.id, product]));
+      const sets = json.products.filter((product) => product.bundleItems?.length);
+      assert.equal(sets.length, 7);
+      for (const set of sets) {
+        const parts = set.bundleItems.map((item) => byId.get(item.productId));
+        assert.ok(parts.every(Boolean), `${set.sku} packs a dish that is not on the menu`);
+        assert.deepEqual([...set.allergens].sort(), [...new Set(parts.flatMap((dish) => dish.allergens))].sort(), `${set.sku} allergens`);
+      }
       const ramen = json.products.find((product) => product.sku === "R1");
       assert.ok(ramen, "R1 is missing from the catalogue");
       assert.equal(ramen.category, "RAMEN");

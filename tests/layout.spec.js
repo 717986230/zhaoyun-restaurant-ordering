@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
  * The other specs use a handful of fixtures; overlaps come from the real data:
  * a drink code twice the width anyone planned for, a German name three words
  * long, a title the owner typed. So this loads the menu the app ships with,
- * all 111 dishes, and measures every row. It is the one spec the iPhone
+ * all 111 dishes and 7 set menus, and measures every row. It is the one spec the iPhone
  * projects run as well (WebKit, the engine of every browser on iOS), so a
  * page that lays out differently on an iPhone fails here.
  */
@@ -26,7 +26,8 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/?table=12");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await expect(page.locator(".dish-card")).toHaveCount(catalog.length);
+  // "All" is the dishes; the set menus have their own page.
+  await expect(page.locator(".dish-card")).toHaveCount(catalog.filter((product) => !product.bundleItems?.length).length);
   // Rows off screen are skipped by the browser until scrolled to; measure them all.
   await page.addStyleTag({ content: ".stack-page .dish-card { content-visibility: visible !important; }" });
 });
@@ -110,7 +111,7 @@ function featuredProblems() {
   const problems = [];
   for (const card of document.querySelectorAll(".featured-card")) {
     const frame = card.getBoundingClientRect();
-    const texts = [...card.querySelectorAll(".featured-caption h3, .featured-caption-price, .featured-name, .featured-second, .featured-description, .featured-contents, .featured-price, .featured-view")]
+    const texts = [...card.querySelectorAll(".featured-caption h3, .featured-caption-price, .featured-name, .featured-second, .featured-description, .set-list li, .featured-price, .featured-view")]
       .filter(visible).map((node) => ({ node, box: node.getBoundingClientRect() }));
     for (const [index, one] of texts.entries()) {
       if (one.box.left < frame.left - 0.5 || one.box.right > frame.right + 0.5) problems.push(`${card.dataset.id}: ${one.node.className} leaves its card`);

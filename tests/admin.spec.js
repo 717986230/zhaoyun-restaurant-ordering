@@ -201,17 +201,23 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
   await page.locator('input[name="nameZh"]').fill("双人套餐");
   await page.locator('input[name="price"]').fill("39.90");
 
-  // Same environment quirk the catalog-load test above works around on
-  // `.product-row`: this Chromium build reports elements on a long form as
-  // momentarily obstructed by a sibling field, though nothing actually
-  // overlaps them — `force` on every field below and on the submit matches
-  // that established workaround rather than chasing it per element.
+  // Dishes go in by search and a tap; each one then shows with its quantity.
   const picker = page.locator(".bundle-picker");
-  await expect(picker).toContainText("黑椒牛柳");
-  await expect(picker).toContainText("红酒");
-  await picker.locator(".bundle-picker-row", { hasText: "黑椒牛柳" }).locator('input[type="checkbox"]').check({ force: true });
-  await picker.locator(".bundle-picker-row", { hasText: "红酒" }).locator('input[type="checkbox"]').check({ force: true });
-  await picker.locator(".bundle-picker-row", { hasText: "红酒" }).locator('input[type="number"]').fill("2", { force: true });
+  await expect(picker.locator(".bundle-chosen")).toHaveCount(0);
+  await picker.locator(".bundle-search").fill("黑椒");
+  await expect(picker.locator(".bundle-option")).toHaveCount(1);
+  await picker.locator(".bundle-option", { hasText: "黑椒牛柳" }).click();
+  await picker.locator(".bundle-search").fill("");
+  await picker.locator(".bundle-option", { hasText: "红酒" }).click();
+  const chosen = picker.locator(".bundle-chosen li");
+  await expect(chosen).toHaveCount(2);
+  await expect(picker.locator(".bundle-option")).toHaveCount(0);
+  await chosen.filter({ hasText: "红酒" }).locator('input[type="number"]').fill("2");
+  // Taken out and put back: still one line per dish.
+  await chosen.filter({ hasText: "红酒" }).getByRole("button", { name: "从套餐移除" }).click();
+  await expect(chosen).toHaveCount(1);
+  await picker.locator(".bundle-option", { hasText: "红酒" }).click();
+  await chosen.filter({ hasText: "红酒" }).locator('input[type="number"]').fill("2");
 
   await page.getByRole("button", { name: "创建菜品" }).click({ force: true });
   await expect.poll(() => posted?.bundleItems).toEqual([
@@ -514,4 +520,35 @@ test("the menu's QR code downloads as a PNG that a phone can scan", async ({ pag
   const table = await scan(() => row.getByRole("button", { name: /二维码/ }).click());
   expect(table.name).toBe("table-12-qr.png");
   expect(table.text).toBe(shown);
+});
+
+test("a set opened for editing shows its dishes, and saving it keeps them", async ({ page }) => {
+  // The console once mapped products without their contents: a set opened
+  // empty, and pressing save wiped what it held.
+  const beef = {
+    id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
+    names: { zh: "黑椒牛柳", de: "Rinderfilet", en: "Beef Fillet" }, description: "",
+    price: 34.5, allergens: ["F"], details: { ingredients: "", time: "", people: "", level: "" },
+    appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: []
+  };
+  const set = { ...beef, id: "set-1", sku: "SET-1", category: "SET", names: { zh: "双人套餐", de: "Menü für zwei", en: "Set for Two" }, price: 39, bundleItems: [{ productId: "80", quantity: 2 }] };
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [beef, set] }) }));
+  let saved;
+  await page.route("**/api/admin/products/set-1", (route) => {
+    saved = route.request().postDataJSON();
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: set }) });
+  });
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+  // A set's thumbnail is its dishes, and "套餐" lists it.
+  await page.locator(".filter-tabs").getByRole("button", { name: "套餐" }).click();
+  await expect(page.locator(".product-row")).toHaveCount(1);
+  await page.locator(".product-row", { hasText: "双人套餐" }).click({ force: true });
+  const chosen = page.locator(".bundle-chosen li");
+  await expect(chosen).toHaveCount(1);
+  await expect(chosen).toContainText("黑椒牛柳");
+  await expect(chosen.locator('input[type="number"]')).toHaveValue("2");
+  await page.getByRole("button", { name: "保存修改" }).click({ force: true });
+  await expect.poll(() => saved?.bundleItems).toEqual([{ productId: "80", quantity: 2 }]);
 });

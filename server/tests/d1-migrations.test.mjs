@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { generate, generatePhotos, committed } from "../../scripts/export-d1-migrations.mjs";
+import { generate, generatePhotos, generateSets, committed, PHOTO_MIGRATION_LAST } from "../../scripts/export-d1-migrations.mjs";
 import { dishPhotos } from "../dish-photos.mjs";
 
 function schemaOf(db) {
@@ -44,6 +44,9 @@ test("the committed migrations match the schema and seed the server creates", ()
   assert.equal(onDisk.schema, generated.schema, "migrations/0001_init.sql is stale — run: npm run d1:migrations");
   assert.equal(onDisk.catalog, generated.catalog, "migrations/0002_seed_catalog.sql is stale — run: npm run d1:migrations");
   assert.deepEqual(onDisk.photos, generatePhotos(), "the dish photo migrations are stale — run: npm run d1:migrations");
+  assert.equal(onDisk.sets, generateSets(), "migrations/0050_set_menus.sql is stale — run: npm run d1:migrations");
+  // The photo parts are numbered from 0005 up; they must never reach the set menus' number.
+  for (const part of onDisk.photos) assert.ok(Number(part.name.slice(0, 4)) <= PHOTO_MIGRATION_LAST, `${part.name} would collide with 0050`);
 });
 
 /**
@@ -106,6 +109,7 @@ test("applying the migrations reproduces the server's database", () => {
     const db = new DatabaseSync(file);
     db.exec(sql.schema);
     db.exec(sql.catalog);
+    db.exec(sql.sets);
     const result = {
       schema: schemaOf(db),
       products: db.prepare("SELECT * FROM products ORDER BY sort_order, id").all()

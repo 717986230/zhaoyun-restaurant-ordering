@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { ALLERGENS } from "../../../../../src/allergens.js";
 import type { BundleItem, ModifierGroup, Product, VatPercent } from "@zhaoyun/domain";
@@ -82,29 +82,61 @@ function readBundleItems(form: FormData): BundleItem[] {
  * It remounts (and its state resets) with the rest of the form whenever the
  * admin switches which product they are editing, via the form's own `key`.
  */
-function BundleFieldset({ product, products }: { product: Product | null; products: Product[] }) {
+/** A dish's picture at list size; a set shows up to four of its dishes. */
+function ProductThumb({ product, byId, mediaUrl }: { product: Product; byId: Map<string, Product>; mediaUrl: (path: string) => string }) {
+  const one = (dish: Product) => {
+    const media = dish.media[0];
+    return media?.type === "image"
+      ? <img key={dish.id} src={mediaUrl(media.url)} alt="" width={42} height={42} loading="lazy" decoding="async" />
+      : <span key={dish.id} className="media-mark">{media?.type === "video" ? "▶" : dish.kind === "drink" ? "杯" : dish.kind === "sushi" ? "鮨" : "菜"}</span>;
+  };
+  const parts = (product.bundleItems ?? []).flatMap((item) => byId.get(item.productId) ?? []).slice(0, 4);
+  return parts.length > 1
+    ? <span className={`product-thumb thumb-collage n${parts.length}`}>{parts.map(one)}</span>
+    : <span className="product-thumb">{one(product)}</span>;
+}
+
+/**
+ * What a set holds: the dishes already in it, each with how many, and a
+ * search to add more. Sets are not offered as contents — a set inside a set
+ * would hide its dishes, and with them their allergens, one level down.
+ */
+function BundleFieldset({ product, products, mediaUrl }: { product: Product | null; products: Product[]; mediaUrl: (path: string) => string }) {
   const { t, language } = useI18n();
   const [items, setItems] = useState<BundleItem[]>(() => (product?.bundleItems ?? []).map((item) => ({ ...item })));
-  const candidates = products.filter((candidate) => candidate.id !== product?.id);
+  const [query, setQuery] = useState("");
+  const byId = new Map(products.map((item) => [item.id, item]));
+  const chosen = items.flatMap((item) => {
+    const dish = byId.get(item.productId);
+    return dish ? [{ item, dish }] : [];
+  });
+  const needle = query.trim().toLowerCase();
+  const candidates = products.filter((candidate) => candidate.id !== product?.id
+    && !candidate.bundleItems?.length
+    && !items.some((item) => item.productId === candidate.id)
+    && (!needle || [candidate.sku, candidate.names.zh, candidate.names.de, candidate.names.en, candidate.category].join(" ").toLowerCase().includes(needle)));
 
-  function toggle(productId: string, checked: boolean) {
-    setItems((current) => checked ? [...current, { productId, quantity: 1 }] : current.filter((item) => item.productId !== productId));
-  }
-  function setQuantity(productId: string, quantity: number) {
-    setItems((current) => current.map((item) => item.productId === productId ? { ...item, quantity: Math.max(1, Math.min(99, quantity)) } : item));
-  }
+  const add = (productId: string) => setItems((current) => [...current, { productId, quantity: 1 }]);
+  const remove = (productId: string) => setItems((current) => current.filter((item) => item.productId !== productId));
+  const setQuantity = (productId: string, quantity: number) => setItems((current) => current.map((item) => item.productId === productId ? { ...item, quantity: Math.max(1, Math.min(99, quantity)) } : item));
 
   return <fieldset className="bundle-picker">
     <legend>{t("bundleLegend")}</legend>
     <input type="hidden" name="bundleItems" value={JSON.stringify(items)} readOnly />
-    <div className="bundle-picker-list">{candidates.length ? candidates.map((candidate) => {
-      const selected = items.find((item) => item.productId === candidate.id);
-      return <label key={candidate.id} className="bundle-picker-row">
-        <input type="checkbox" checked={Boolean(selected)} onChange={(event) => toggle(candidate.id, event.target.checked)} />
-        <span>{nameIn(candidate, language)}</span>
-        {selected && <input type="number" min={1} max={99} value={selected.quantity} onChange={(event) => setQuantity(candidate.id, Number(event.target.value) || 1)} />}
-      </label>;
-    }) : <p className="bundle-picker-empty">{t("bundleEmpty")}</p>}</div>
+    {chosen.length
+      ? <ul className="bundle-chosen">{chosen.map(({ item, dish }) => <li key={dish.id}>
+        <ProductThumb product={dish} byId={byId} mediaUrl={mediaUrl} />
+        <span className="bundle-name">{nameIn(dish, language)}<small>{dish.sku}</small></span>
+        <input type="number" min={1} max={99} aria-label={t("bundleQuantity")} value={item.quantity} onChange={(event) => setQuantity(dish.id, Number(event.target.value) || 1)} />
+        <button type="button" className="bundle-remove" aria-label={t("bundleRemove")} onClick={() => remove(dish.id)}>✕</button>
+      </li>)}</ul>
+      : <p className="bundle-picker-empty">{t("bundleNone")}</p>}
+    <input type="search" className="bundle-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("bundleSearch")} aria-label={t("bundleSearch")} />
+    <div className="bundle-options">{candidates.length ? candidates.map((candidate) => <button type="button" key={candidate.id} className="bundle-option" onClick={() => add(candidate.id)}>
+      <ProductThumb product={candidate} byId={byId} mediaUrl={mediaUrl} />
+      <span className="bundle-name">{nameIn(candidate, language)}<small>{candidate.sku}</small></span>
+      <b aria-hidden="true">＋</b>
+    </button>) : <p className="bundle-picker-empty">{t("bundleEmpty")}</p>}</div>
   </fieldset>;
 }
 
@@ -115,6 +147,7 @@ export function CatalogPanel(props: Props) {
   // this is ignored.
   const [editorOpen, setEditorOpen] = useState(false);
   const [formError, setFormError] = useState("");
+  const productIndex = useMemo(() => new Map(props.products.map((item) => [item.id, item])), [props.products]);
   const rows = props.products.filter((product) => props.filter === "all"
     || (props.filter === "sets" ? Boolean(product.bundleItems?.length) : product.kind === props.filter));
   const kindLabels: Record<Product["kind"], string> = { food: t("kindFood"), drink: t("kindDrink"), sushi: t("kindSushi") };
@@ -186,7 +219,7 @@ export function CatalogPanel(props: Props) {
       <fieldset className="allergen-picker"><legend>{t("fieldAllergens")}</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {language === "zh" ? allergen.zh : allergen.de}</span></label>)}</fieldset>
       <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>{t("fieldMedia")}</b><small>{t("fieldMediaHint")}</small></label>
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
-      <BundleFieldset product={product} products={props.products} />
+      <BundleFieldset product={product} products={props.products} mediaUrl={props.mediaUrl} />
       {/* What a restaurant rarely touches: numbering, printing, tax and the raw
           option groups. Folded away so the form is the dish, not the plumbing. */}
       <details className="form-advanced">
@@ -212,8 +245,7 @@ export function CatalogPanel(props: Props) {
       </header>
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}</div>
       <div className="product-list">{rows.length ? rows.map((row) => {
-        const media = row.media[0];
-        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><span className="product-thumb">{media?.type === "image" ? <img src={props.mediaUrl(media.url)} alt="" width={42} height={42} loading="lazy" decoding="async" /> : <span className="media-mark">{media?.type === "video" ? "▶" : row.kind === "drink" ? "杯" : row.kind === "sushi" ? "鮨" : "菜"}</span>}</span><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
     </section>
   </div></section>;

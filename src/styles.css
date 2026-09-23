@@ -75,6 +75,9 @@
   --dur-fast: 0.18s;
   --dur-base: 0.24s;
   --dur-slow: 0.35s;
+  /* The width of the menu's column on a tablet or desktop. The header, the
+     category row, the search field and the list all use it, so they line up. */
+  --page: 960px;
   /* How far a page turn has been pulled, 0–1; written by usePageTurn. */
   --pull: 0;
   /* A row's place on a freshly turned page, for its cascade; set inline. */
@@ -1461,25 +1464,6 @@ html.plt-android .menu.detail-open .stack {
   color: var(--faint);
 }
 
-/* A combo's card, not a form either: the dishes it packages, listed the way
-   the receipt would show them. */
-.bundle-items-list {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.bundle-items-list li {
-  color: var(--ink);
-}
-
-.bundle-items-list li::before {
-  content: "· ";
-  color: var(--faint);
-}
 
 .modifier-group legend {
   margin-bottom: 8px;
@@ -1580,11 +1564,13 @@ html.plt-android .menu.detail-open .stack {
 }
 
 @media (min-width: 760px) {
+  /* Centred. This used a negative margin taken with min() where max() was
+     meant, which pushed the card to the left edge on any screen past 892px. */
   .dish-detail-card {
-    width: min(820px, calc(100vw - 72px));
-    left: 50%;
-    right: auto;
-    margin-left: min(-410px, calc((100vw - 72px) / -2));
+    width: min(860px, calc(100vw - 72px));
+    left: 0;
+    right: 0;
+    margin: 0 auto;
   }
 
   .dish-detail-card .feature {
@@ -2360,22 +2346,6 @@ button:focus-visible,
   overflow: hidden;
 }
 
-.featured-contents {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.featured-contents span {
-  display: block;
-  margin-bottom: 2px;
-  color: var(--muted);
-  font-size: 10px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-}
-
 .featured-foot {
   display: flex;
   align-items: baseline;
@@ -2404,31 +2374,133 @@ button:focus-visible,
   }
 }
 
-.featured-collage {
-  position: absolute;
-  inset: 0;
+/* A set, drawn as the dishes inside it: up to four in a grid, and "+3" when
+   there are more. The same grid fills a list thumbnail, the detail card and
+   a promotions card; each place only sets its size. */
+.set-collage {
+  position: relative;
   display: grid;
-  gap: 2px;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 2px;
+  width: 100%;
+  overflow: hidden;
+  background: var(--velvet-2);
 }
 
-.featured-collage.n2 {
+.set-collage.n2 {
   grid-template-rows: 1fr;
 }
 
-.featured-collage.n3 > :first-child {
+.set-collage.n3 > :first-child {
   grid-row: span 2;
 }
 
-.featured-collage .dish-media,
-.featured-collage .art {
+.set-collage > :is(.dish-media, .art) {
   position: static;
   width: 100%;
   height: 100%;
   min-height: 0;
-  aspect-ratio: auto;
   max-height: none;
+  aspect-ratio: auto;
   border-radius: 0;
+}
+
+.set-collage-more {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--veil);
+  color: var(--pearl);
+  font: 600 12px/1.4 system-ui, sans-serif;
+}
+
+.set-collage.set-collage-thumb {
+  width: 56px;
+  height: 56px;
+  gap: 1px;
+  border-radius: 8px;
+}
+
+.set-collage-thumb .set-collage-more {
+  right: 2px;
+  bottom: 2px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+.feature-media .set-collage {
+  aspect-ratio: 4 / 3;
+  max-height: 46vh;
+  border-radius: 10px;
+}
+
+.featured-photo .set-collage {
+  position: absolute;
+  inset: 0;
+}
+
+@media (max-width: 380px) {
+  .set-collage.set-collage-thumb {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* What a set holds, one dish to a line with its picture. */
+.set-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.set-list-heading {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.set-list ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.set-list li {
+  display: grid;
+  grid-template-columns: 36px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.set-list-thumb :is(.dish-media, .art) {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+
+.set-list-qty {
+  color: var(--accent);
+  font: 600 13px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.set-list li:not(:has(.set-list-qty)) .set-list-name {
+  grid-column: 2 / -1;
+}
+
+.set-list-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* What every design starts from (the gallery): the name and number live on
@@ -2498,7 +2570,7 @@ button:focus-visible,
   font-size: 17px;
 }
 
-.featured-page[data-template="spotlight"] .featured-card:not(:first-child) :is(.featured-second, .featured-description, .featured-contents, .featured-view) {
+.featured-page[data-template="spotlight"] .featured-card:not(:first-child) :is(.featured-second, .featured-description, .set-list, .featured-view) {
   display: none;
 }
 
@@ -2674,7 +2746,7 @@ button:focus-visible,
   font-size: clamp(30px, 9vw, 46px);
 }
 
-.featured-page[data-template="poster"] :is(.featured-body-number, .featured-second, .featured-description, .featured-contents, .featured-contents span, .featured-view) {
+.featured-page[data-template="poster"] :is(.featured-body-number, .featured-second, .featured-description, .set-list-heading, .set-list li, .featured-view) {
   color: var(--pearl-2);
 }
 
@@ -2788,7 +2860,7 @@ button:focus-visible,
   font-size: 19px;
 }
 
-.featured-page[data-template="minimal"] :is(.featured-description, .featured-contents) {
+.featured-page[data-template="minimal"] .featured-description {
   font-size: 12px;
   -webkit-line-clamp: 1;
 }
@@ -2875,4 +2947,109 @@ button:focus-visible,
   .stack-page .dish-card {
     animation: none;
   }
+}
+
+/* Designs that are about type, not pictures, list a set's dishes without them. */
+.featured-page:is([data-template="tasting"], [data-template="minimal"]) .set-list-thumb {
+  display: none;
+}
+
+.featured-page:is([data-template="tasting"], [data-template="minimal"]) .set-list li {
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.featured-page:is([data-template="tasting"], [data-template="minimal"]) .set-list li:not(:has(.set-list-qty)) .set-list-name {
+  grid-column: 1 / -1;
+}
+
+.featured-page[data-template="tasting"] .set-list {
+  justify-items: center;
+}
+
+/* ---------------------------------------------------------------------------
+   Tablet and desktop: one column for everything on the page, so the header,
+   the categories, the search and the dishes share their left and right edges
+   instead of the bars running to the screen's edges above a narrow list.
+   ------------------------------------------------------------------------ */
+@media (min-width: 720px) {
+  .topbar,
+  .chips,
+  .stack {
+    width: 100%;
+    max-width: var(--page);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .search-box {
+    left: max(18px, calc((100vw - var(--page)) / 2 + 18px));
+    right: max(18px, calc((100vw - var(--page)) / 2 + 18px));
+  }
+
+  /* Categories a tablet can be tapped on and read at arm's length. */
+  .chips {
+    height: 54px;
+    gap: 10px;
+  }
+
+  .chip {
+    padding: 9px 16px;
+    font-size: 12px;
+  }
+
+  .chip.chip-featured,
+  .chip.chip-sets {
+    font-size: 14px;
+  }
+}
+
+/* A wide detail card: the picture on the left, what is on the plate on the right. */
+@media (min-width: 900px) {
+  .dish-detail-card .detail-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-auto-rows: min-content;
+    column-gap: 26px;
+    align-items: start;
+  }
+
+  .dish-detail-card .detail-scroll > * {
+    grid-column: 2;
+  }
+
+  .dish-detail-card .detail-scroll > .feature-media {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+    position: sticky;
+    top: 0;
+  }
+
+  .dish-detail-card .detail-scroll > :nth-child(2) {
+    margin-top: 0;
+  }
+}
+
+/* The "menu card" design centres its text; a set's list of dishes stays a
+   left-aligned list, or the pictures down its side no longer line up. */
+.featured-page[data-template="framed"] .set-list {
+  justify-self: stretch;
+  text-align: left;
+}
+
+/* On the back of a set, its dishes take the place of the ingredients. */
+.detail-back .set-list {
+  margin-top: 0;
+}
+
+@media (max-width: 380px) {
+  .summary h3 {
+    font-size: 17px;
+  }
+}
+
+/* The search field takes the category row's place while it is open; the
+   chips behind it used to show at its edges. */
+.menu.search-open .chips {
+  visibility: hidden;
 }
