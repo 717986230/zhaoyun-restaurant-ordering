@@ -202,6 +202,36 @@ export function contractChecks(call, assert) {
       await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "jade", menuLanguages: ["en", "de"] } });
     }],
 
+    ["the restaurant's name, the menu's title and its look are the owner's to set", async () => {
+      const before = await call("GET", "/api/catalog");
+      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true },
+        "a fresh restaurant ships with these");
+
+      assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
+      for (const body of [{ restaurantName: "   " }, { menuTitle: "x".repeat(25) }, { menuDefaultScheme: "sepia" }, { showTableNumber: "yes" }]) {
+        const refused = await call("PUT", "/api/admin/settings", { admin: true, body });
+        assert.equal(refused.status, 400, `${JSON.stringify(body)} must be refused`);
+      }
+
+      const saved = await call("PUT", "/api/admin/settings", {
+        admin: true,
+        body: { restaurantName: "  Goldener   Drache ", menuTitle: "Speisekarte", menuDefaultScheme: "light", showTableNumber: false }
+      });
+      assert.equal(saved.status, 200);
+      assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu,
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false });
+      assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
+      // A save of one setting leaves the rest where they were.
+      assert.equal(saved.json.menuTheme, "jade");
+      assert.deepEqual(saved.json.menuLanguages, ["en", "de"]);
+
+      await call("PUT", "/api/admin/settings", {
+        admin: true,
+        body: { restaurantName: "赵云", menuTitle: "La Carte", menuDefaultScheme: "dark", showTableNumber: true }
+      });
+    }],
+
     ["a product with a space in its category saves", async () => {
       const saved = await call("POST", "/api/admin/products", {
         admin: true,

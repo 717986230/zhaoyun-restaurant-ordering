@@ -10,7 +10,7 @@ import {
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
-import { ROLE_RANK, resolveStaffRole } from "../shared/rules.mjs";
+import { menuSettingsView, ROLE_RANK, resolveStaffRole } from "../shared/rules.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
@@ -201,8 +201,8 @@ export function registerRoutes(app, { database, realtime, config }) {
   });
 
   app.get("/api/catalog", async () => {
-    const { menuTheme, menuLanguages } = database.getSettings();
-    return { products: database.listProducts(true), theme: menuTheme, languages: menuLanguages };
+    const settings = database.getSettings();
+    return { products: database.listProducts(true), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) };
   });
   app.get("/api/admin/settings", { preHandler: requireAdmin }, async () => database.getSettings());
   app.put("/api/admin/settings", { preHandler: requireAdmin, schema: { body: SettingsBody } }, async (request, reply) => {

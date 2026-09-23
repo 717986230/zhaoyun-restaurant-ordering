@@ -422,14 +422,95 @@ export function parseMenuLanguages(stored) {
   }
 }
 
-/** `languagesValue` is the raw `app_settings` value for `menu_languages`,
- *  or undefined when it has never been set. */
-export function settingsView(row, languagesValue) {
+export const COLOR_SCHEMES = ["dark", "light"];
+
+function flag(label) {
+  return (value) => {
+    if (typeof value !== "boolean") throw new Error(`${label} must be true or false`);
+    return value;
+  };
+}
+
+/** Trimmed text of a bounded length; `label` names it in the error. */
+function boundedText(label, max) {
+  return (value) => {
+    const text = String(value ?? "").trim().replace(/\s+/g, " ");
+    if (!text) throw new Error(`${label} must not be empty`);
+    if (text.length > max) throw new Error(`${label} must be at most ${max} characters`);
+    return text;
+  };
+}
+
+/**
+ * Every setting that lives in `app_settings`, one entry each: the field name
+ * the API uses, the key it is stored under, its default, and how an incoming
+ * value is checked. Adding a setting is adding a line here — the table is a
+ * key/value one precisely so that a new setting needs no migration.
+ *
+ * Values are stored as JSON, and read back leniently: a stored value that no
+ * longer passes its check is the default, never an error on the guest menu.
+ */
+export const APP_SETTINGS = {
+  menuLanguages: { key: "menu_languages", fallback: () => [...DEFAULT_MENU_LANGUAGES], normalize: normalizeMenuLanguages },
+  // The name on the admin console, the browser tab and the printed table card.
+  restaurantName: { key: "restaurant_name", fallback: () => "赵云", normalize: boundedText("Restaurant name", 40) },
+  // The heading of the guest menu.
+  menuTitle: { key: "menu_title", fallback: () => "La Carte", normalize: boundedText("Menu title", 24) },
+  // What a guest sees before they touch the sun/moon; their own pick wins.
+  menuDefaultScheme: {
+    key: "menu_default_scheme",
+    fallback: () => "dark",
+    normalize: (value) => {
+      if (!COLOR_SCHEMES.includes(value)) throw new Error("Default scheme must be dark or light");
+      return value;
+    }
+  },
+  showTableNumber: { key: "show_table_number", fallback: () => true, normalize: flag("showTableNumber") },
+  // Orders, table billing and printers in the admin console. Off while the
+  // menu is view-only: those sections would have nothing to show.
+  showOrdering: { key: "admin_show_ordering", fallback: () => false, normalize: flag("showOrdering") }
+};
+
+function readAppSetting(definition, stored) {
+  if (stored === undefined || stored === null) return definition.fallback();
+  try {
+    return definition.normalize(JSON.parse(stored));
+  } catch {
+    return definition.fallback();
+  }
+}
+
+/**
+ * Checks everything in a save before anything is written, so one bad field
+ * does not leave the others half-applied. Returns the menu style to store (or
+ * undefined) and the `app_settings` rows to upsert.
+ */
+export function normalizeSettingsInput(input) {
+  const menuTheme = input.menuTheme === undefined ? undefined : normalizeMenuTheme(input.menuTheme);
+  const rows = [];
+  for (const [field, definition] of Object.entries(APP_SETTINGS)) {
+    if (input[field] === undefined) continue;
+    rows.push([definition.key, JSON.stringify(definition.normalize(input[field]))]);
+  }
+  return { menuTheme, rows };
+}
+
+/** `appValues` maps `app_settings` keys to their stored JSON. */
+export function settingsView(row, appValues = {}) {
+  const view = { menuTheme: row ? row.menu_theme : DEFAULT_MENU_THEME };
+  for (const [field, definition] of Object.entries(APP_SETTINGS)) {
+    view[field] = readAppSetting(definition, appValues[definition.key]);
+  }
+  return view;
+}
+
+/** The part of the settings the guest menu reads; served with the catalogue. */
+export function menuSettingsView(settings) {
   return {
-    menuTheme: row ? row.menu_theme : DEFAULT_MENU_THEME,
-    menuLanguages: languagesValue === undefined || languagesValue === null
-      ? [...DEFAULT_MENU_LANGUAGES]
-      : parseMenuLanguages(languagesValue)
+    title: settings.menuTitle,
+    restaurantName: settings.restaurantName,
+    defaultScheme: settings.menuDefaultScheme,
+    showTableNumber: settings.showTableNumber
   };
 }
 

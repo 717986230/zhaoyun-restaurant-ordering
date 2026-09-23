@@ -20,7 +20,7 @@ import {
   CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SetPasswordBody, SettingsBody, SignInBody, TableBody, TableLockBody
 } from "../src/contracts.js";
-import { resolveStaffRole, roleAllows } from "../shared/rules.mjs";
+import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 
@@ -239,8 +239,8 @@ async function handle(request, env) {
 
   // /api/catalog
   if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
-    const { menuTheme, menuLanguages } = await store.getSettings();
-    return json({ products: await store.listProducts(true), theme: menuTheme, languages: menuLanguages });
+    const settings = await store.getSettings();
+    return json({ products: await store.listProducts(true), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) });
   }
 
   // /api/orders and /api/orders/:id/status

@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import type { RestaurantTable } from "@zhaoyun/api-client";
 import QRCode from "qrcode";
+import type { MenuLanguage } from "@zhaoyun/contracts";
+import { useI18n } from "../../app/i18n";
+
+/** What the card says to a guest, in each language the menu offers — the
+ *  card is read by guests, not by whoever printed it. */
+const CARD_COPY: Record<MenuLanguage, { table: string; scan: string }> = {
+  zh: { table: "桌", scan: "扫码看菜单" },
+  de: { table: "Tisch", scan: "Speisekarte scannen" },
+  en: { table: "Table", scan: "Scan for the menu" }
+};
 
 /**
  * Printable table cards.
@@ -15,7 +25,20 @@ import QRCode from "qrcode";
  * whatever size the card is printed, and error correction is set high because
  * these live on a restaurant table and will be smudged, scratched and rained on.
  */
-export function TableCards({ tables, entryUrl, onClose }: { tables: RestaurantTable[]; entryUrl: (table: RestaurantTable) => string; onClose: () => void }) {
+export function TableCards({ tables, restaurantName, menuLanguages, entryUrl, onClose }: {
+  tables: RestaurantTable[];
+  restaurantName: string;
+  menuLanguages: MenuLanguage[];
+  entryUrl: (table: RestaurantTable) => string;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  // The URLs, not the function that builds them, are what the codes depend
+  // on. The function is a new one on every render of the settings page, and
+  // with it as the dependency every render redrew every code, whose state
+  // update rendered again — a loop that kept the phone busy for as long as
+  // the cards were open.
+  const urls = tables.map((table) => `${table.table}\n${entryUrl(table)}`).join("\n");
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState<string[]>([]);
 
@@ -42,29 +65,29 @@ export function TableCards({ tables, entryUrl, onClose }: { tables: RestaurantTa
     };
     void render();
     return () => { cancelled = true; };
-  }, [tables, entryUrl]);
+  }, [urls]);
 
-  return <div className="table-cards" role="dialog" aria-label="桌卡">
+  return <div className="table-cards" role="dialog" aria-label={t("cardsTitle")}>
     <div className="table-cards-bar">
       <div>
-        <b>桌卡</b>
-        <small>打印后贴在桌上。客人用手机扫码即可进入点餐，桌号自动带上。</small>
+        <b>{t("cardsTitle")}</b>
+        <small>{t("cardsLead")}</small>
       </div>
       <div className="table-cards-actions">
-        <button className="primary-action" onClick={() => window.print()}>打印</button>
-        <button className="ghost-action" onClick={onClose}>关闭</button>
+        <button className="primary-action" onClick={() => window.print()}>{t("print")}</button>
+        <button className="ghost-action" onClick={onClose}>{t("close")}</button>
       </div>
     </div>
 
-    {failed.length > 0 && <p className="table-cards-warning">这些桌的二维码生成失败，请检查入口地址：{failed.join("、")}</p>}
+    {failed.length > 0 && <p className="table-cards-warning">{t("cardsFailed", { tables: failed.join(", ") })}</p>}
 
     <div className="table-cards-sheet">{tables.map((table) => <article className="table-card" key={table.table}>
-      <div className="table-card-brand"><small>ZHAO YUN</small><b>赵云</b></div>
-      <div className="table-card-qr" aria-label={`桌 ${table.table} 的二维码`} dangerouslySetInnerHTML={{ __html: codes[table.table] || "" }} />
+      {restaurantName && <div className="table-card-brand"><b>{restaurantName}</b></div>}
+      <div className="table-card-qr" aria-label={t("cardQr", { table: table.table })} dangerouslySetInnerHTML={{ __html: codes[table.table] || "" }} />
       <div className="table-card-foot">
-        <b>桌 {table.table}</b>
+        <b>{menuLanguages.map((language) => CARD_COPY[language].table).join(" · ")} {table.table}</b>
         {table.label && <small>{table.label}</small>}
-        <small className="table-card-hint">扫码点餐 · Scannen zum Bestellen</small>
+        <small className="table-card-hint">{menuLanguages.map((language) => CARD_COPY[language].scan).join(" · ")}</small>
       </div>
     </article>)}</div>
   </div>;

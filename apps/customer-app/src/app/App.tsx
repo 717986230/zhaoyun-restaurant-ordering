@@ -28,7 +28,12 @@ export function App() {
   const { data: catalog } = useCatalog();
   const queryClient = useQueryClient();
   const handleAdminTap = useKiosk();
-  const [scheme, toggleScheme] = useColorScheme();
+  const [scheme, toggleScheme] = useColorScheme(catalog.menu?.defaultScheme);
+  const menuTitle = catalog.menu?.title || "La Carte";
+  useEffect(() => {
+    const name = catalog.menu?.restaurantName;
+    document.title = name ? `${name} · ${menuTitle}` : menuTitle;
+  }, [catalog.menu?.restaurantName, menuTitle]);
   useMenuTheme(catalog.theme, scheme);
 
   // The flags the restaurant switched on in 连接设置, and the one of them this
@@ -48,6 +53,8 @@ export function App() {
       dispatch={dispatch}
       products={catalog.products}
       languages={languages}
+      title={menuTitle}
+      showTableNumber={catalog.menu?.showTableNumber ?? true}
       scheme={scheme}
       onToggleScheme={toggleScheme}
       onAdminTap={handleAdminTap}

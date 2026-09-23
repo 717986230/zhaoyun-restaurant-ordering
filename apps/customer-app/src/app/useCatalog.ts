@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ApiCatalogProduct, MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, ApiMenuSettings, MenuLanguage, MenuThemeId } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
 import { mapApiProduct, restaurantApi } from "./api";
@@ -12,6 +12,19 @@ interface Catalog {
   theme: MenuThemeId;
   /** Absent in a catalogue cached before the setting existed. */
   languages?: MenuLanguage[];
+  /** Title, name and look the owner set; absent before it has been fetched. */
+  menu?: ApiMenuSettings;
+}
+
+/** The menu settings from the last catalogue this phone saw, read before the
+ *  first render so a restaurant whose default is light does not flash dark. */
+export function cachedMenuSettings(): ApiMenuSettings | undefined {
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null") as Catalog | null;
+    return cached?.menu;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -41,11 +54,12 @@ export function useCatalog() {
   const query = useQuery({
     queryKey: ["catalog"],
     queryFn: async (): Promise<Catalog> => {
-      const { products, theme, languages } = await restaurantApi.catalog();
-      const catalog = {
+      const { products, theme, languages, menu } = await restaurantApi.catalog();
+      const catalog: Catalog = {
         products: products.map(mapApiProduct),
         theme: theme ?? DEFAULT_MENU_THEME,
-        languages: languages?.length ? languages : DEFAULT_MENU_LANGUAGES
+        languages: languages?.length ? languages : DEFAULT_MENU_LANGUAGES,
+        ...(menu ? { menu } : {})
       };
       localStorage.setItem(cacheKey, JSON.stringify(catalog));
       return catalog;

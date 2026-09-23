@@ -15,6 +15,9 @@ interface Props {
   products: Product[];
   /** The languages the restaurant switched on, in flag order. */
   languages: MenuLanguage[];
+  /** The heading the owner set; "La Carte" until they set one. */
+  title: string;
+  showTableNumber: boolean;
   scheme: ColorScheme;
   onToggleScheme: () => void;
   /** Counts taps on the title; the seventh within four seconds opens the admin console. */
@@ -189,7 +192,7 @@ function ProductDetail({ product, products, state, dispatch }: { product: Produc
   </motion.div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, languages, scheme, onToggleScheme, onAdminTap }: Props) {
+export function CatalogScreen({ state, dispatch, products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap }: Props) {
   const query = state.query.trim().toLowerCase();
   const visible = products.filter((product) => {
     const categoryMatch = state.category === "ALLE" || product.category === state.category;
@@ -207,7 +210,7 @@ export function CatalogScreen({ state, dispatch, products, languages, scheme, on
           seconds. On the web it opens admin.html, which asks for the password;
           in the Android kiosk shell it asks for the kiosk PIN first. */}
       <div className="title" role="button" tabIndex={0} onClick={() => void onAdminTap()} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") void onAdminTap(); }}>
-        <strong>La Carte</strong>{table && <small>{t(state.language, "tableLabel").replace("{table}", table)}</small>}
+        <strong>{title}</strong>{showTableNumber && table && <small>{t(state.language, "tableLabel").replace("{table}", table)}</small>}
       </div>
       <div className="topbar-end">
         {/* A flag per language the restaurant switched on, and none when there

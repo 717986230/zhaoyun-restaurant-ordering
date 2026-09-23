@@ -10,6 +10,9 @@ import { expect, test } from "@playwright/test";
 
 const OK = { status: 200, contentType: "application/json" };
 
+// The admin follows the browser's language; these tests read the Chinese copy.
+test.use({ locale: "zh-CN" });
+
 /** The console loads its catalogue, printers and settings the moment it is
  *  through the door; these keep that from erroring past the assertion. */
 async function stubConsole(page) {
@@ -53,7 +56,7 @@ test("the first person through the door sets the password", async ({ page }) => 
   await expect.poll(() => submitted?.password).toBe("kueche-2026");
   // Setting it is not signing in, so the console spends it on a session at
   // once rather than asking for the same password twice in a row.
-  await expect(page.getByRole("button", { name: "商品与媒体" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "菜品", exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("zy_admin_token"))).toBe("session-token");
 });
 
@@ -71,7 +74,7 @@ test("everyone after types it, and a wrong one says so", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "管理台" })).toBeVisible();
   // Nothing behind the door is drawn, not even the tabs: a tab that 403s is
   // not access control, and a tab that is merely hidden is not either.
-  await expect(page.getByRole("button", { name: "商品与媒体" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "菜品", exact: true })).toHaveCount(0);
   await expect(page.locator("input[name='admin-password-repeat']")).toHaveCount(0);
 
   await page.locator("input[name='admin-password']").fill("falsches-passwort");
@@ -80,5 +83,5 @@ test("everyone after types it, and a wrong one says so", async ({ page }) => {
 
   await page.locator("input[name='admin-password']").fill("kueche-passwort");
   await page.getByRole("button", { name: "进入管理台" }).click();
-  await expect(page.getByRole("button", { name: "商品与媒体" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "菜品", exact: true })).toBeVisible();
 });

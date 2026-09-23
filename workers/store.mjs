@@ -11,7 +11,7 @@
 import {
   adminGateView, assertOrderTransition, assertPassword, assertRequestTransition, auditView,
   billView, bool, boundedLimit, hashPassword, hashSessionToken, mapProduct, newSessionToken,
-  normalizeMenuLanguages, normalizeMenuTheme, normalizePrinter, normalizeProduct, normalizeTableNo, now,
+  normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
   printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
   verifyPassword
@@ -312,14 +312,14 @@ export function createStore(db) {
   }
 
   async function getSettings() {
-    const languages = await first("SELECT value FROM app_settings WHERE key = 'menu_languages'");
-    return settingsView(await first("SELECT * FROM restaurant_settings WHERE id = 1"), languages?.value);
+    const values = Object.fromEntries((await all("SELECT key, value FROM app_settings")).map((row) => [row.key, row.value]));
+    return settingsView(await first("SELECT * FROM restaurant_settings WHERE id = 1"), values);
   }
 
-  /** Either setting may come alone; the one left out keeps its value. */
+  /** Any subset of the settings may come; the ones left out keep their value.
+   *  All of it is checked before any of it is written. */
   async function saveSettings(input) {
-    const menuTheme = input.menuTheme === undefined ? undefined : normalizeMenuTheme(input.menuTheme);
-    const menuLanguages = input.menuLanguages === undefined ? undefined : normalizeMenuLanguages(input.menuLanguages);
+    const { menuTheme, rows } = normalizeSettingsInput(input);
     const timestamp = now();
     if (menuTheme !== undefined) {
       await run(
@@ -328,11 +328,11 @@ export function createStore(db) {
         menuTheme, timestamp
       );
     }
-    if (menuLanguages !== undefined) {
+    for (const [key, value] of rows) {
       await run(
-        `INSERT INTO app_settings (key, value, updated_at) VALUES ('menu_languages', ?, ?)
+        `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-        JSON.stringify(menuLanguages), timestamp
+        key, value, timestamp
       );
     }
     return getSettings();

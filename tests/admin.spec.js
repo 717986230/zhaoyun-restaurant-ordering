@@ -7,12 +7,19 @@ let orderStatus;
 let requestStatus;
 let menuTheme;
 let menuLanguages;
+let appSettings;
+
+// The admin follows the browser's language; these tests read the Chinese copy.
+test.use({ locale: "zh-CN" });
 
 test.beforeEach(async ({ page }) => {
   orderStatus = "new";
   requestStatus = "open";
   menuTheme = "jade";
   menuLanguages = ["en", "de"];
+  // Orders, tables and printers are behind the ordering module, which a
+  // restaurant turns on once guests can order; these tests run with it on.
+  appSettings = { restaurantName: "赵云", menuTitle: "La Carte", menuDefaultScheme: "dark", showTableNumber: true, showOrdering: true };
   await page.addInitScript(() => sessionStorage.setItem("zy_admin_token", "test-admin"));
   await page.route("**/api/health", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
   await page.route("**/api/admin/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ role: "manager" }) }));
@@ -22,8 +29,9 @@ test.beforeEach(async ({ page }) => {
       // As both backends do: either setting may come alone, stored in flag order.
       if (body.menuTheme) menuTheme = body.menuTheme;
       if (body.menuLanguages) menuLanguages = ["zh", "en", "de"].filter((language) => body.menuLanguages.includes(language));
+      for (const key of Object.keys(appSettings)) if (key in body) appSettings[key] = body[key];
     }
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ menuTheme, menuLanguages }) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ menuTheme, menuLanguages, ...appSettings }) });
   });
   await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [{
     id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
@@ -55,7 +63,7 @@ test("orders board renders server orders and advances their status", async ({ pa
       items: [{ id: "80", name: "黑椒牛柳", qty: 2 }], createdAt: new Date().toISOString()
     } }) });
   });
-  await page.getByRole("button", { name: "订单看板" }).click();
+  await page.getByRole("button", { name: "订单", exact: true }).click();
   const order = page.locator(".board-column").first().locator(".board-card");
   await expect(order).toContainText("桌 12");
   await expect(order).toContainText("黑椒牛柳");
@@ -79,7 +87,7 @@ test("service call is acknowledged from the orders board", async ({ page }) => {
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
     } }) });
   });
-  await page.getByRole("button", { name: "订单看板" }).click();
+  await page.getByRole("button", { name: "订单", exact: true }).click();
   // Service calls sit in the floor column; the failed-print cards share the
   // compact card class, so exclude them rather than matching by position.
   const request = page.locator(".board-card.compact:not(.failed)");
@@ -91,19 +99,20 @@ test("service call is acknowledged from the orders board", async ({ page }) => {
 });
 
 test("admin workspace loads catalog and printer modules", async ({ page }) => {
-  await expect(page.getByText("服务器在线")).toBeVisible();
-  await page.getByRole("button", { name: "商品与媒体" }).click();
+  await expect(page.locator(".admin-status.online")).toBeVisible();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-list")).toContainText("黑椒牛柳");
   await page.locator(".product-row").click({ force: true });
   await expect(page.locator('textarea[name="modifiers"]')).toHaveValue(/"spice"/);
-  await page.getByRole("button", { name: "打印机" }).click();
+  await page.getByRole("button", { name: "打印", exact: true }).click();
   await expect(page.locator(".printer-list")).toContainText("厨房打印机");
-  await page.getByRole("button", { name: /搜索周围打印机/ }).click();
-  await expect(page.getByRole("status")).toContainText("Android App");
+  // Searching the room and test prints need the Android shell; a browser has
+  // no radio to search with, so it is not offered a button that cannot work.
+  await expect(page.getByRole("button", { name: /搜索周围打印机/ })).toHaveCount(0);
 });
 
 test("a manager picks a menu style, and the choice is saved", async ({ page }) => {
-  await page.getByRole("button", { name: "连接设置" }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   const picker = page.locator(".theme-picker");
   await expect(picker).toBeVisible();
   await expect(picker.locator(".theme-swatch.selected")).toContainText("墨玉");
@@ -114,7 +123,7 @@ test("a manager picks a menu style, and the choice is saved", async ({ page }) =
 });
 
 test("a manager chooses the menu's languages, and cannot switch off the last one", async ({ page }) => {
-  await page.getByRole("button", { name: "连接设置" }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   const languages = page.getByRole("group", { name: "菜单语言" });
   const toggle = (name) => languages.getByRole("button", { name });
   // English and German are on out of the box; Chinese is one tap away.
@@ -175,8 +184,10 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
     } }) });
   });
 
-  await page.getByRole("button", { name: "商品与媒体" }).click();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-list")).toContainText("黑椒牛柳");
+  // On a phone the list and the form take turns; the button opens a blank one.
+  await page.getByRole("button", { name: "＋ 新增菜品" }).click();
 
   await page.locator('input[name="category"]').fill("SET");
   await page.locator('input[name="nameZh"]').fill("双人套餐");
@@ -194,7 +205,7 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
   await picker.locator(".bundle-picker-row", { hasText: "红酒" }).locator('input[type="checkbox"]').check({ force: true });
   await picker.locator(".bundle-picker-row", { hasText: "红酒" }).locator('input[type="number"]').fill("2", { force: true });
 
-  await page.getByRole("button", { name: "创建商品" }).click({ force: true });
+  await page.getByRole("button", { name: "创建菜品" }).click({ force: true });
   await expect.poll(() => posted?.bundleItems).toEqual([
     { productId: "80", quantity: 1 },
     { productId: "81", quantity: 2 }
@@ -203,8 +214,11 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
 
 test("admin controls remain usable in the responsive matrix", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: "管理模块" })).toBeInViewport();
-  await page.getByRole("button", { name: "连接设置" }).click();
-  await expect(page.getByRole("button", { name: "测试并保存连接" })).toBeVisible();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  // Only a separately installed tablet needs a server address, so the form
+  // stays folded until someone asks for it.
+  await page.getByText("服务器连接").click();
+  await expect(page.getByRole("button", { name: "测试并保存" })).toBeVisible();
 });
 
 test("a waiter tablet only gets the board, never the catalog", async ({ page }) => {
@@ -219,10 +233,10 @@ test("a waiter tablet only gets the board, never the catalog", async ({ page }) 
   await expect(page.getByText("服务员")).toBeVisible();
   // A waiter runs the floor, so the board and the room are theirs; the menu,
   // the printers and the table tokens are not.
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单看板桌位");
-  await expect(page.getByRole("button", { name: "商品与媒体" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "打印机" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "连接设置" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单桌位");
+  await expect(page.getByRole("button", { name: "菜品", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "打印", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
   await expect(page.locator("#boardPanel")).toBeVisible();
 });
 
@@ -252,12 +266,15 @@ test("a table card carries the entry link a guest phone will scan", async ({ pag
     { table: "07", label: "", token: "tok-07-secret", enabled: true }
   ] }) }));
   await page.goto("/admin.html");
-  await page.getByRole("button", { name: "连接设置" }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: /生成桌卡/ }).click();
 
   const cards = page.locator(".table-card");
   await expect(cards).toHaveCount(2);
-  await expect(cards.first()).toContainText("桌 12");
+  // The card speaks the menu's languages (English and German here), not the
+  // language the admin happens to be reading in.
+  await expect(cards.first()).toContainText("Table · Tisch 12");
+  await expect(cards.first()).toContainText("Scan for the menu · Speisekarte scannen");
   await expect(cards.first()).toContainText("窗边");
 
   // The picture has to encode the link, not merely exist. Decoding a QR in a
@@ -297,13 +314,13 @@ test("the table page shows what is on each table, and locking stops it ordering"
   await expect(seven.locator(".status").first()).toHaveText("用餐中");
   await expect(seven).toContainText("蔬菜拉面");
   await expect(seven).toContainText("加面");
-  await expect(seven).toContainText("EUR 27.40");
+  await expect(seven).toContainText("€27.40");
   await expect(page.locator(".table-tile", { hasText: "桌 08" }).locator(".status").first()).toHaveText("空闲");
   await expect(page.locator(".table-tile", { hasText: "桌 09" }).locator(".status").first()).toHaveText("已锁定");
   // A table already locked offers the way back, not a second lock.
   await expect(page.locator(".table-tile", { hasText: "桌 09" }).getByRole("button", { name: "解除锁定" })).toBeVisible();
 
-  await seven.getByRole("button", { name: "锁定桌号" }).click();
+  await seven.getByRole("button", { name: "锁定", exact: true }).click();
   await expect.poll(() => lockedWith).toEqual({ locked: true });
 });
 
@@ -334,9 +351,56 @@ test("settling a table releases it, and the guest is told why the table refused"
   await page.locator(".table-tile", { hasText: "桌 07" }).getByRole("button", { name: "结账" }).click();
 
   const bill = page.getByRole("dialog", { name: "账单" });
-  await expect(bill).toContainText("EUR 12.50");
+  await expect(bill).toContainText("€12.50");
   await expect(bill).toContainText("结账后这桌会自动解除锁定");
   await bill.getByRole("button", { name: "打印账单并结账" }).click();
   await expect.poll(() => settled).toBe(true);
   await expect(page.getByRole("status")).toContainText("桌位已释放");
+});
+
+test("the console says Admin, and switches its own language without touching the menu's", async ({ page }) => {
+  const head = page.locator(".admin-head");
+  await expect(head).toContainText("赵云");
+  await expect(head).not.toContainText("经理");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("菜品订单桌位打印设置");
+
+  const picker = page.getByRole("group", { name: "界面语言" });
+  await picker.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.getByRole("navigation", { name: "Bereiche" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Einstellungen", exact: true })).toBeVisible();
+  await expect(page).toHaveTitle("赵云 · Admin");
+
+  // A device's choice, kept across reloads; the menu languages are untouched.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Einstellungen", exact: true })).toBeVisible();
+  expect(menuLanguages).toEqual(["en", "de"]);
+
+  await page.getByRole("group", { name: "Sprache der Oberfläche" }).getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
+});
+
+test("the restaurant's name and the menu title are the owner's to change", async ({ page }) => {
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.locator('input[name="restaurantName"]').fill("Goldener Drache");
+  await page.locator('input[name="menuTitle"]').fill("Speisekarte");
+  await page.locator('input[name="restaurantName"]').press("Enter");
+  await expect.poll(() => appSettings.restaurantName).toBe("Goldener Drache");
+  expect(appSettings.menuTitle).toBe("Speisekarte");
+  await expect(page.locator(".admin-head")).toContainText("Goldener Drache");
+  await expect(page).toHaveTitle("Goldener Drache · Admin");
+
+  await page.getByRole("group", { name: "默认明暗" }).getByRole("button", { name: /浅色/ }).click();
+  await expect.poll(() => appSettings.menuDefaultScheme).toBe("light");
+});
+
+test("orders, tables and printers stay out of the way until ordering is switched on", async ({ page }) => {
+  appSettings.showOrdering = false;
+  await page.reload();
+  const nav = page.getByRole("navigation", { name: "管理模块" });
+  await expect(nav).toHaveText("菜品设置");
+
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
+  await expect.poll(() => appSettings.showOrdering).toBe(true);
+  await expect(nav).toHaveText("菜品订单桌位打印设置");
 });

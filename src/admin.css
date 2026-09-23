@@ -95,76 +95,146 @@ button {
   background: var(--a-shell);
 }
 
+/* The header: whose console this is on the left, and on the right the three
+   things that apply everywhere — language, the guest menu, signing out. One
+   line on every screen, which is why the actions are icons on a phone. */
 .admin-head {
-  height: 68px;
-  padding: 0 clamp(18px, 4vw, 48px);
+  min-height: 60px;
+  padding: 8px clamp(14px, 4vw, 48px);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   color: var(--a-head-ink);
   background: var(--a-head);
 }
 
-.admin-head strong {
-  display: block;
+.admin-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-brand strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font: 600 18px Georgia, "Noto Serif SC", serif;
 }
 
-.admin-head small {
-  display: block;
-  margin-top: 4px;
-  color: var(--a-head-muted);
-  font-size: 9px;
-  letter-spacing: .16em;
-}
-
-.connection {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--a-head-ink-2);
-  font-size: 12px;
-}
-
-.admin-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-.admin-head-actions > button {
+.admin-role {
+  flex-shrink: 0;
+  padding: 3px 8px;
   border: 1px solid var(--a-head-line);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--a-head-ink);
-  padding: 7px 10px;
-  font-size: 12px;
+  border-radius: 999px;
+  color: var(--a-head-ink-2);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .06em;
 }
 
-.connection i,
+.admin-status,
 .product-row > i,
 .printer-row > i {
+  flex-shrink: 0;
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: var(--a-idle);
 }
 
-.connection i.online,
+.admin-status.online,
 .product-row > i.live,
 .printer-row > i.live {
   background: var(--a-ok);
   box-shadow: 0 0 0 3px var(--a-ok-ring);
 }
 
-.admin-tabs {
-  height: 54px;
+.admin-head-actions {
+  flex-shrink: 0;
   display: flex;
-  gap: 26px;
-  align-items: end;
-  padding: 0 clamp(18px, 4vw, 48px);
+  align-items: center;
+  gap: 8px;
+}
+
+.head-action {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--a-head-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--a-head-ink);
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.head-action em {
+  font-style: normal;
+}
+
+/* The console's own language, as the guest menu's flag capsule. */
+.admin-languages {
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--a-head-line);
+  border-radius: 999px;
+}
+
+.admin-languages button {
+  width: 36px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.admin-languages button.on {
+  background: var(--a-head-2);
+}
+
+.admin-languages img {
+  width: 22px;
+  height: 15px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+/* On the password screen the capsule sits on the light page, not the header. */
+.gate-languages {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.gate-languages .admin-languages {
+  border-color: var(--a-line-2);
+  background: var(--a-card);
+}
+
+.gate-languages .admin-languages button.on {
+  background: var(--a-accent-wash);
+}
+
+/* The sections, on one line that scrolls sideways rather than wrapping. */
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 clamp(10px, 4vw, 48px);
   border-bottom: 1px solid var(--a-line);
   background: var(--a-card);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .admin-tabs button,
@@ -175,15 +245,27 @@ button {
 }
 
 .admin-tabs button {
-  height: 54px;
-  padding: 0 2px;
+  flex-shrink: 0;
+  height: 50px;
+  padding: 0 14px;
   border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  font-size: 15px;
 }
 
 .admin-tabs button.active {
   color: var(--a-head);
   border-color: var(--a-accent);
   font-weight: 700;
+}
+
+.admin-banner {
+  margin: 0;
+  padding: 10px clamp(14px, 4vw, 48px);
+  background: var(--a-danger-wash);
+  color: var(--a-danger);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .admin-panel {
@@ -1115,12 +1197,17 @@ h2 {
 
   .editor-pane {
     border-right: 0;
-    border-bottom: 1px solid var(--a-line);
   }
 
-  .admin-tabs {
-    gap: 16px;
-    overflow-x: auto;
+  /* One at a time on a narrow screen: the list, or the dish being edited —
+     not a long form to scroll past before the list begins. */
+  .catalog-layout:not(.editor-open) .editor-pane,
+  .catalog-layout.editor-open .list-pane {
+    display: none;
+  }
+
+  .editor-back {
+    display: inline-flex;
   }
 
   .product-row {
@@ -1138,15 +1225,21 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .admin-head {
-    padding: 0 16px;
+  /* Icons only: the words would push the restaurant's name off the line. */
+  .head-action {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
   }
 
-  .connection span {
-    max-width: 110px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .head-action em {
+    display: none;
+  }
+
+  /* On a phone the owner knows who they are; a waiter's or the kitchen's
+     chip stays, since it explains why tabs are missing. */
+  .admin-role.manager {
+    display: none;
   }
 }
 
@@ -1284,9 +1377,10 @@ h2 {
 /* The password gate. It is the whole page before anyone is through it, so it
    centres rather than sitting in the console's grid. */
 .gate-shell {
+  position: relative;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 64px 24px 24px;
 }
 
 .gate-pane {
@@ -1360,4 +1454,192 @@ h2 {
 .language-toggle.selected img {
   opacity: 1;
   filter: none;
+}
+
+/* "Back to list" is only for the narrow layout, where the form replaces it. */
+.editor-back {
+  display: none;
+  white-space: nowrap;
+}
+
+.list-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-head-actions .primary-action {
+  white-space: nowrap;
+}
+
+/* The rarely-touched part of a dish: numbering, station, tax, raw options. */
+.form-advanced {
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--a-shell);
+}
+
+.form-advanced summary {
+  cursor: pointer;
+  color: var(--a-muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.form-advanced[open] {
+  display: grid;
+  gap: 14px;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--a-danger);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* Settings: one card per group, two columns where there is room. */
+.settings-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px clamp(14px, 4vw, 40px) 48px;
+  display: grid;
+  gap: 16px;
+}
+
+.settings-title {
+  margin: 0;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.settings-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-card);
+}
+
+.settings-card h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.settings-hint {
+  margin: 0;
+  color: var(--a-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-card .editor-form small {
+  color: var(--a-faint);
+  font-size: 12px;
+}
+
+.settings-label {
+  margin: 4px 0 0;
+  color: var(--a-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.settings-card .theme-picker,
+.settings-card .language-picker {
+  margin: 0;
+}
+
+/* Dark / light: two halves of one control, as the guest menu's capsule. */
+.scheme-picker {
+  display: inline-flex;
+  justify-self: start;
+  padding: 3px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+}
+
+.scheme-picker button {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--a-muted);
+  font-size: 13px;
+}
+
+.scheme-picker button.on {
+  background: var(--a-accent);
+  color: var(--a-on-accent);
+  font-weight: 650;
+}
+
+.settings-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.settings-switch input {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--a-line-2);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.settings-switch input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--a-card);
+  box-shadow: 0 1px 3px var(--a-focus-ring);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.settings-switch input:checked {
+  background: var(--a-accent);
+}
+
+.settings-switch input:checked::after {
+  transform: translateX(18px);
+}
+
+.settings-switch input:focus-visible {
+  outline: 3px solid var(--a-focus-ring);
+  outline-offset: 2px;
+}
+
+.settings-switch span {
+  flex: 1;
+}
+
+.settings-cards-button {
+  justify-self: start;
+}
+
+.settings-fold summary {
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 700;
 }
