@@ -30,8 +30,6 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
   // "All" is the dishes; the set menus have their own page.
   await expect(page.locator(".dish-card")).toHaveCount(catalog.filter((product) => !product.bundleItems?.length).length);
-  // Rows off screen are skipped by the browser until scrolled to; measure them all.
-  await page.addStyleTag({ content: ".stack-page .dish-card { content-visibility: visible !important; }" });
 });
 
 /** Every pair of the given parts of every row that share a pixel, as text. */

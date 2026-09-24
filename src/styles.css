@@ -725,9 +725,10 @@ html.plt-android .screen.active {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  /* The page turn owns the pull past either end; without this Android Chrome
-     reloads the page on a pull-down and iOS rubber-bands the whole app. */
-  overscroll-behavior-y: contain;
+  /* The page turn owns the pull past either end: no bounce, glow or
+     pull-to-reload of the browser's own (usePageTurn listens passively and
+     cancels nothing, so this is what keeps them out). */
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
   padding: 8px 18px 158px;
   scrollbar-width: none;
@@ -1939,8 +1940,14 @@ html.plt-android .menu.detail-open .stack {
    ------------------------------------------------------------------------ */
 .page-sheet {
   position: relative;
-  will-change: transform;
   perspective: 1400px;
+}
+
+/* Its own layer only while a finger pulls it: kept for good, the whole
+   list was one texture as tall as the page, which a phone could not redraw
+   as fast as a fling — tiles came up empty, and the bars above with them. */
+.page-sheet:is([data-pull="next"], [data-pull="prev"]) {
+  will-change: transform;
 }
 
 .stack-page {
@@ -1965,11 +1972,13 @@ html.plt-android .menu.detail-open .stack {
   }
 }
 
-/* A row off screen costs nothing to lay out or paint: 111 rows scroll like 10. */
-.stack-page .dish-card {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 72px;
-}
+/* Every row is laid out and painted before it is scrolled to. Rows skipped
+   until they came near the screen (content-visibility) were drawn during a
+   fast fling, a frame late: they flashed in blank, and with them the page
+   height changed under the finger. A hundred plain rows are cheap to draw
+   once; the photos in them still load lazily. And no row fades in as it
+   scrolls into view: at the speed of a fling that was a flicker, not a
+   flourish. */
 
 .page-hint {
   position: absolute;
@@ -2950,25 +2959,6 @@ button:focus-visible,
 
 .featured-page[data-template="monochrome"] .featured-price {
   font: 700 20px/1 system-ui, -apple-system, sans-serif;
-}
-
-/* Rows rise into place as they scroll into view — the scroll drives it, no
-   script runs per frame, and a browser that cannot do it shows them as
-   before. The first twelve rows of a page are left to the page-turn cascade. */
-@supports (animation-timeline: view()) {
-  .stack-page .dish-card:not([style]),
-  .stack-page:not(.turned) .dish-card[style] {
-    animation: menu-row-in linear backwards;
-    animation-timeline: view();
-    animation-range: entry 0% entry 80%;
-  }
-
-  @keyframes menu-row-in {
-    from {
-      opacity: 0;
-      transform: translateY(24px) scale(0.97);
-    }
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

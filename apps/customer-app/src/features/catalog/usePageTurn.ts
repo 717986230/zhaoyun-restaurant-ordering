@@ -16,6 +16,13 @@ import type { RefObject } from "react";
  * Only a gesture that *starts* at an end turns a page. A fling that runs into
  * the end of the list stops there as it always has; turning the page then
  * takes a second, deliberate pull.
+ *
+ * Every listener is passive, so the browser scrolls the list on its own,
+ * without waiting on this script for each move of the finger — a blocking
+ * touchmove made a fast fling stutter and flash. Nothing needs cancelling:
+ * past an end there is nothing left to scroll, and the list's
+ * `overscroll-behavior: none` keeps the browser's own bounce, glow and
+ * pull-to-reload out of the way.
  */
 export type TurnDirection = "next" | "prev";
 
@@ -103,8 +110,6 @@ export function usePageTurn({ scroller, sheet, canTurn, onTurn }: Options) {
       }
       const along = direction === "next" ? -dy : dy;
       if (along <= 0) { distance = 0; show(0, false); return; }
-      // Ours from here: the browser would otherwise scroll, bounce, or reload.
-      if (event.cancelable) event.preventDefault();
       distance = resist(along);
       show(direction === "next" ? -distance : distance, distance >= TURN_THRESHOLD_PX);
     }
@@ -140,7 +145,7 @@ export function usePageTurn({ scroller, sheet, canTurn, onTurn }: Options) {
     }
 
     list.addEventListener("touchstart", start, { passive: true });
-    list.addEventListener("touchmove", move, { passive: false });
+    list.addEventListener("touchmove", move, { passive: true });
     list.addEventListener("touchend", end);
     list.addEventListener("touchcancel", end);
     list.addEventListener("wheel", wheel, { passive: true });
