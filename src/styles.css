@@ -2223,9 +2223,12 @@ button:focus-visible,
    ------------------------------------------------------------------------ */
 /* The whole screen, not just the list's column: on a tablet the list is
    centred, and a velvet strip down the middle read as a mistake. */
+/* The page's own design leads here: the festive pattern stays around the
+   edges, without the header's stronger band, and clears from behind the
+   page's title. */
 .menu.on-featured {
   background:
-    var(--theme-band) 0 0 / 120px 240px repeat-x,
+    radial-gradient(75% 30% at 50% 26%, var(--velvet) 40%, transparent 100%),
     var(--theme-pattern) 0 0 / 120px 120px,
     radial-gradient(120% 60% at 50% 0, var(--velvet-2), transparent 70%),
     var(--velvet);

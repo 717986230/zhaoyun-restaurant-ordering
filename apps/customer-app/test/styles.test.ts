@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MENU_THEMES, themePattern } from "@zhaoyun/domain";
+import { MENU_THEMES, themeGarland, themePattern } from "@zhaoyun/domain";
 
 /**
  * The palette, as assertions.
@@ -197,6 +197,13 @@ describe("menu styles", () => {
     expect(new Set(patterns).size).toBe(8);
     for (const pattern of patterns) expect(pattern).toMatch(/^url\("data:image\/svg\+xml,/);
     expect(themePattern(MENU_THEMES.jade, MENU_THEMES.jade.accent)).toBe("none");
+  });
+
+  it("hangs a garland of its own for each festive set, and none for an everyday style", () => {
+    const garlands = festive.map((theme) => themeGarland(theme, theme.accent));
+    expect(new Set(garlands).size).toBe(8);
+    for (const garland of garlands) expect(garland).toMatch(/^url\("data:image\/svg\+xml,/);
+    expect(themeGarland(MENU_THEMES.jade, MENU_THEMES.jade.accent)).toBe("none");
   });
 });
 

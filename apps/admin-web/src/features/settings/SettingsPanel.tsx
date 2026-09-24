@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themePattern } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themePattern } from "@zhaoyun/domain";
 import { useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
@@ -232,7 +232,11 @@ export function SettingsPanel(props: Props) {
     aria-pressed={settings?.menuTheme === theme.id}
     style={{ "--swatch": theme.accent, backgroundImage: themePattern(theme, theme.accent) } as React.CSSProperties}
     onClick={() => void props.onSaveSettings({ menuTheme: theme.id }, "menuStyleSaved")}
-  ><i /><span>{themeName(theme)}</span></button>;
+  >
+    {/* A festive set shows the garland it hangs on the menu, so each is known at a glance. */}
+    {theme.festive && <b className="swatch-garland" aria-hidden="true" style={{ backgroundImage: themeGarland(theme, theme.accent) }} />}
+    <i /><span>{themeName(theme)}</span>
+  </button>;
   const offered = settings?.menuLanguages ?? DEFAULT_MENU_LANGUAGES;
 
   return <section id="systemPanel" className="admin-panel active"><div className="settings-page">

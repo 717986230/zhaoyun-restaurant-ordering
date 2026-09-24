@@ -46,7 +46,7 @@ const MOTIF = {
   snowflake: '<g fill="none" stroke="{c}"><path d="M0-10v20M-8.7-5l17.4 10M-8.7 5l17.4-10M-2.5-7.5L0-5l2.5-2.5M-2.5 7.5L0 5l2.5 2.5"/></g>',
   tree: '<path fill="{c}" d="M0-11l7 9H3l6 8H-9l6-8h-4zM-1.5 6h3v4h-3z"/>',
   pumpkin: '<g fill="none" stroke="{c}"><path d="M0-5c-11-1-11 14 0 13 11 1 11-14 0-13zM0-5c-4 2-4 11 0 13M0-5c4 2 4 11 0 13M0-5c0-3 1-5 3-6"/></g>',
-  bat: '<path fill="{c}" d="M0-1c-2-3-5-3-7-1-1-2-4-2-6 0 2 1 2 3 2 5 2-2 4-2 5 0 2-2 4-2 6 0 2-2 4-2 6 0 1-2 3-2 5 0 0-2 0-4 2-5-2-2-5-2-6 0-2-2-5-2-7 1z"/>'
+  bat: '<path fill="{c}" transform="scale(1.05)" d="M0-1.5C-.7-3.6-1.9-4-2.6-3l-.6 2C-5-3.2-8.2-3.4-10.5-1.2c2 .1 3 1.2 3.2 3.3C-5.3.9-3.3 1-2 2.9L0 4.6l2-1.7C3.3 1 5.3.9 7.3 2.1c.2-2.1 1.2-3.2 3.2-3.3C8.2-3.4 5-3.2 3.2-1l-.6-2C1.9-4 .7-3.6 0-1.5z"/>'
 };
 
 /**
@@ -62,7 +62,7 @@ const ORNAMENT = {
   pennant: '<path fill="{c}" d="M-6.5 0h13L0 13z"/>',
   starFlag: '<path fill="{c}" d="M-7 0h14v11L0 16l-7-5z"/>',
   bulb: '<g fill="{c}"><rect x="-2" y="0" width="4" height="3"/><ellipse cy="8" rx="3.6" ry="5.4"/></g>',
-  bat: '<path fill="{c}" transform="translate(0 6) scale(.7)" d="M0-1c-2-3-5-3-7-1-1-2-4-2-6 0 2 1 2 3 2 5 2-2 4-2 5 0 2-2 4-2 6 0 2-2 4-2 6 0 1-2 3-2 5 0 0-2 0-4 2-5-2-2-5-2-6 0-2-2-5-2-7 1z"/>'
+  bat: '<path fill="{c}" transform="translate(0 6) scale(.8)" d="M0-1.5C-.7-3.6-1.9-4-2.6-3l-.6 2C-5-3.2-8.2-3.4-10.5-1.2c2 .1 3 1.2 3.2 3.3C-5.3.9-3.3 1-2 2.9L0 4.6l2-1.7C3.3 1 5.3.9 7.3 2.1c.2-2.1 1.2-3.2 3.2-3.3C8.2-3.4 5-3.2 3.2-1l-.6-2C1.9-4 .7-3.6 0-1.5z"/>'
 };
 
 const festive = (first: string, second: string, garland: string) => ({ motifs: [first, second] as [string, string], garland });
