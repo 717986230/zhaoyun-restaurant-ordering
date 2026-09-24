@@ -28,6 +28,8 @@
   --theme-pattern: none;
   /* The same pattern, stronger across the header and fading down the page. */
   --theme-band: none;
+  /* A festive style's garland under the categories: none, and no height, otherwise. */
+  --theme-garland: none;
 
   /* Hairlines and washes. A border is a change in light, not a gold rule. */
   --line-soft: rgba(233, 238, 240, 0.08);
@@ -241,6 +243,20 @@ button {
   flex: none;
 }
 
+/* A festive style's string of lanterns, lights or flags, hung between the
+   categories and the list: nothing, and no room taken, for an everyday one. */
+.festive-garland {
+  flex: none;
+  height: 32px;
+  margin: -6px 0 -8px;
+  background: var(--theme-garland) 0 0 / 56px 32px repeat-x;
+  pointer-events: none;
+}
+
+:root:not([data-festive]) .festive-garland {
+  display: none;
+}
+
 html.plt-android .screen.active {
   animation: none;
 }
@@ -270,7 +286,7 @@ html.plt-android .screen.active {
 .panel-head small,
 .home-btn small,
 .service small {
-  font: 10px Georgia, serif;
+  font: 12px Georgia, serif;
   letter-spacing: 0.18em;
   color: var(--accent);
 }
@@ -710,9 +726,11 @@ html.plt-android .screen.active {
   border-radius: 999px;
   background: var(--field);
   color: var(--muted);
-  padding: 7px 13px;
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  padding: 8px 14px;
+  /* The categories are what a guest reaches for first: readable at a
+     glance, not a caption. */
+  font-size: 13px;
+  letter-spacing: 0.08em;
 }
 
 .chip.on {
@@ -792,9 +810,10 @@ html.plt-android .screen.active {
 }
 
 
+/* The price is scanned down a page as often as the names: its own weight. */
 .row-price {
-  font: 15px Georgia, serif;
-  color: var(--ink-2);
+  font: 600 17px Georgia, serif;
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -830,7 +849,7 @@ html.plt-android .screen.active {
 .order small {
   margin: 3px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2191,7 +2210,7 @@ button:focus-visible,
   display: block;
   margin-bottom: 3px;
   color: var(--faint);
-  font: 600 10px/1.2 system-ui, sans-serif;
+  font: 600 11px/1.2 system-ui, sans-serif;
   letter-spacing: 0.12em;
   overflow-wrap: anywhere;
 }
@@ -2217,8 +2236,8 @@ button:focus-visible,
   border-color: var(--line-strong);
   font-family: Georgia, "Noto Serif SC", serif;
   font-style: italic;
-  font-size: 12px;
-  letter-spacing: 0.06em;
+  font-size: 14px;
+  letter-spacing: 0.04em;
   color: var(--ink);
 }
 
@@ -3013,12 +3032,12 @@ button:focus-visible,
 
   .chip {
     padding: 9px 16px;
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .chip.chip-featured,
   .chip.chip-sets {
-    font-size: 14px;
+    font-size: 16px;
   }
 }
 
@@ -3331,7 +3350,7 @@ button:focus-visible,
 
   .topbar .title small {
     margin-top: 1px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .chips {

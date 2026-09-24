@@ -21,7 +21,7 @@ export interface MenuTheme {
   /** A festive set: two motifs, repeated faintly over the whole menu in the
    *  accent, and the room's glow in the same colour. The rest of the palette
    *  is the one every style shares, so a guest can still read every line. */
-  festive?: { motifs: [string, string] };
+  festive?: { motifs: [string, string]; garland: string };
 }
 
 /**
@@ -49,7 +49,23 @@ const MOTIF = {
   bat: '<path fill="{c}" d="M0-1c-2-3-5-3-7-1-1-2-4-2-6 0 2 1 2 3 2 5 2-2 4-2 5 0 2-2 4-2 6 0 2-2 4-2 6 0 1-2 3-2 5 0 0-2 0-4 2-5-2-2-5-2-6 0-2-2-5-2-7 1z"/>'
 };
 
-const festive = (first: string, second: string) => ({ motifs: [first, second] as [string, string] });
+/**
+ * What hangs on a festive set's garland — the string of ornaments strung
+ * under the categories, the way a restaurant hangs lanterns for the new year
+ * or lights for Christmas. Drawn around 0,0, hanging down from it.
+ */
+const ORNAMENT = {
+  lantern: '<g fill="{c}"><rect x="-2.5" y="-1" width="5" height="2"/><ellipse cy="7.5" rx="6.5" ry="6.5"/><rect x="-2.5" y="13.5" width="5" height="2"/></g><path fill="none" stroke="{c}" d="M0 15.5v5M-4 7.5h8"/>',
+  moonLantern: '<circle fill="{c}" cy="7" r="6"/><path fill="none" stroke="{c}" d="M0 13v6"/>',
+  heart: '<path fill="{c}" transform="translate(0 7) scale(.62)" d="M0 7C-9 0-10-7-5-9c3-1 5 1 5 3 0-2 2-4 5-3 5 2 4 9-5 16z"/>',
+  egg: '<ellipse fill="{c}" cy="7" rx="4.6" ry="6.2"/>',
+  pennant: '<path fill="{c}" d="M-6.5 0h13L0 13z"/>',
+  starFlag: '<path fill="{c}" d="M-7 0h14v11L0 16l-7-5z"/>',
+  bulb: '<g fill="{c}"><rect x="-2" y="0" width="4" height="3"/><ellipse cy="8" rx="3.6" ry="5.4"/></g>',
+  bat: '<path fill="{c}" transform="translate(0 6) scale(.7)" d="M0-1c-2-3-5-3-7-1-1-2-4-2-6 0 2 1 2 3 2 5 2-2 4-2 5 0 2-2 4-2 6 0 2-2 4-2 6 0 1-2 3-2 5 0 0-2 0-4 2-5-2-2-5-2-6 0-2-2-5-2-7 1z"/>'
+};
+
+const festive = (first: string, second: string, garland: string) => ({ motifs: [first, second] as [string, string], garland });
 
 /**
  * What a menu style change is allowed to touch: the accent, and for a
@@ -90,56 +106,56 @@ export const MENU_THEMES: Record<MenuThemeId, MenuTheme> = {
     accent: "#ec7a63", accentStrong: "#f49c89", accentInk: "#1a0906",
     accentLine: "rgba(236, 122, 99, 0.45)", accentWash: "rgba(236, 122, 99, 0.14)",
     light: { accent: "#b52a1c", accentStrong: "#962216", accentInk: "#ffffff", accentLine: "rgba(181, 42, 28, 0.4)", accentWash: "rgba(181, 42, 28, 0.1)" },
-    festive: festive(MOTIF.lantern, MOTIF.blossom)
+    festive: festive(MOTIF.lantern, MOTIF.blossom, ORNAMENT.lantern)
   },
   valentine: {
     id: "valentine", nameZh: "情人节", nameDe: "Valentinstag", nameEn: "Valentine's Day",
     accent: "#ec8fae", accentStrong: "#f3b0c6", accentInk: "#1c080f",
     accentLine: "rgba(236, 143, 174, 0.45)", accentWash: "rgba(236, 143, 174, 0.14)",
     light: { accent: "#b02d5c", accentStrong: "#92244b", accentInk: "#ffffff", accentLine: "rgba(176, 45, 92, 0.4)", accentWash: "rgba(176, 45, 92, 0.1)" },
-    festive: festive(MOTIF.heart, MOTIF.heartLine)
+    festive: festive(MOTIF.heart, MOTIF.heartLine, ORNAMENT.heart)
   },
   easter: {
     id: "easter", nameZh: "复活节", nameDe: "Ostern", nameEn: "Easter",
     accent: "#b8a2e0", accentStrong: "#cfc0ec", accentInk: "#120c1c",
     accentLine: "rgba(184, 162, 224, 0.45)", accentWash: "rgba(184, 162, 224, 0.14)",
     light: { accent: "#6b4aa3", accentStrong: "#583c88", accentInk: "#ffffff", accentLine: "rgba(107, 74, 163, 0.4)", accentWash: "rgba(107, 74, 163, 0.1)" },
-    festive: festive(MOTIF.egg, MOTIF.dots)
+    festive: festive(MOTIF.egg, MOTIF.dots, ORNAMENT.egg)
   },
   "back-to-school": {
     id: "back-to-school", nameZh: "开学季", nameDe: "Schulbeginn", nameEn: "Back to School",
     accent: "#80aee6", accentStrong: "#a3c6ef", accentInk: "#08101c",
     accentLine: "rgba(128, 174, 230, 0.45)", accentWash: "rgba(128, 174, 230, 0.14)",
     light: { accent: "#2957a3", accentStrong: "#204687", accentInk: "#ffffff", accentLine: "rgba(41, 87, 163, 0.4)", accentWash: "rgba(41, 87, 163, 0.1)" },
-    festive: festive(MOTIF.pencil, MOTIF.apple)
+    festive: festive(MOTIF.pencil, MOTIF.apple, ORNAMENT.pennant)
   },
   "mid-autumn": {
     id: "mid-autumn", nameZh: "中秋节", nameDe: "Mondfest", nameEn: "Mid-Autumn",
     accent: "#a8b6de", accentStrong: "#c4cee9", accentInk: "#0b0e18",
     accentLine: "rgba(168, 182, 222, 0.45)", accentWash: "rgba(168, 182, 222, 0.14)",
     light: { accent: "#3e4f8c", accentStrong: "#324073", accentInk: "#ffffff", accentLine: "rgba(62, 79, 140, 0.4)", accentWash: "rgba(62, 79, 140, 0.1)" },
-    festive: festive(MOTIF.moon, MOTIF.cloud)
+    festive: festive(MOTIF.moon, MOTIF.cloud, ORNAMENT.moonLantern)
   },
   "national-day": {
     id: "national-day", nameZh: "国庆节", nameDe: "Nationalfeiertag", nameEn: "National Day",
     accent: "#ee6f78", accentStrong: "#f49399", accentInk: "#1c0708",
     accentLine: "rgba(238, 111, 120, 0.45)", accentWash: "rgba(238, 111, 120, 0.14)",
     light: { accent: "#b8202e", accentStrong: "#991a26", accentInk: "#ffffff", accentLine: "rgba(184, 32, 46, 0.4)", accentWash: "rgba(184, 32, 46, 0.1)" },
-    festive: festive(MOTIF.star, MOTIF.starSmall)
+    festive: festive(MOTIF.star, MOTIF.starSmall, ORNAMENT.starFlag)
   },
   christmas: {
     id: "christmas", nameZh: "圣诞节", nameDe: "Weihnachten", nameEn: "Christmas",
     accent: "#7cc49b", accentStrong: "#9fd6b7", accentInk: "#07120c",
     accentLine: "rgba(124, 196, 155, 0.45)", accentWash: "rgba(124, 196, 155, 0.14)",
     light: { accent: "#1d6b42", accentStrong: "#175636", accentInk: "#ffffff", accentLine: "rgba(29, 107, 66, 0.4)", accentWash: "rgba(29, 107, 66, 0.1)" },
-    festive: festive(MOTIF.snowflake, MOTIF.tree)
+    festive: festive(MOTIF.snowflake, MOTIF.tree, ORNAMENT.bulb)
   },
   halloween: {
     id: "halloween", nameZh: "万圣节", nameDe: "Halloween", nameEn: "Halloween",
     accent: "#ec8c4c", accentStrong: "#f2a978", accentInk: "#1a0c04",
     accentLine: "rgba(236, 140, 76, 0.45)", accentWash: "rgba(236, 140, 76, 0.14)",
     light: { accent: "#a84b12", accentStrong: "#8c3e0f", accentInk: "#ffffff", accentLine: "rgba(168, 75, 18, 0.4)", accentWash: "rgba(168, 75, 18, 0.1)" },
-    festive: festive(MOTIF.pumpkin, MOTIF.bat)
+    festive: festive(MOTIF.pumpkin, MOTIF.bat, ORNAMENT.bat)
   }
 };
 
@@ -156,6 +172,20 @@ export const DEFAULT_MENU_THEME: MenuThemeId = "jade";
  * faint one on the same grid, the header wears the season and the list stays
  * quiet.
  */
+/**
+ * A festive set's garland as a CSS image, `none` for an everyday style: a
+ * 56px length of string sagging between two points, one ornament hung from
+ * the middle of it, repeated across the screen.
+ */
+export function themeGarland(theme: MenuTheme, colour: string): string {
+  if (!theme.festive) return "none";
+  const ornament = theme.festive.garland.replaceAll("{c}", colour);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="32" viewBox="0 0 56 32">`
+    + `<path d="M0 3Q28 13 56 3" fill="none" stroke="${colour}" stroke-width="1.2" opacity="0.5"/>`
+    + `<g transform="translate(28 8)" opacity="0.85" stroke-width="1.2" stroke-linecap="round"><path d="M0 0v3" stroke="${colour}"/><g transform="translate(0 3)">${ornament}</g></g></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
 export function themePattern(theme: MenuTheme, colour: string, kind: "tile" | "band" = "tile"): string {
   if (!theme.festive) return "none";
   const [first, second] = theme.festive.motifs.map((motif) => motif.replaceAll("{c}", colour));
