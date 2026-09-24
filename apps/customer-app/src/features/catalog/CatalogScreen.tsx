@@ -459,9 +459,19 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     // The rest once the page has turned, as a transition: React builds it in
     // slices between frames, so a tap or a scroll still goes first. A timer,
     // not animation frames — those are held back in a tab not on screen, and
-    // the rows must still arrive.
-    const timer = window.setTimeout(() => startTransition(() => setRows({ key: pageKey, limit: Number.POSITIVE_INFINITY })), reduceMotion ? 0 : DURATION.page * 1000);
-    return () => window.clearTimeout(timer);
+    // the rows must still arrive. Or at once, when the guest starts
+    // scrolling before that: a fling must not run into the end of the first
+    // screenful and see the rest pop in under it.
+    const rest = () => startTransition(() => setRows({ key: pageKey, limit: Number.POSITIVE_INFINITY }));
+    const timer = window.setTimeout(rest, reduceMotion ? 0 : DURATION.page * 1000);
+    const stack = stackRef.current;
+    // Not the turn's own return to the top of the page: a scroll by the guest.
+    const onScroll = () => { if (stack && stack.scrollTop > 0) rest(); };
+    stack?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      stack?.removeEventListener("scroll", onScroll);
+    };
   }, [pageKey, complete, reduceMotion]);
 
   // Back to the top in one tap, from the menu's bottom-right corner, as soon
