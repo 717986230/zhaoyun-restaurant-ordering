@@ -139,8 +139,8 @@ export interface ApiSettings {
   /** When the promotions page and the set menus page are on; null: always. */
   featuredSchedule: ApiSchedule | null;
   setsSchedule: ApiSchedule | null;
-  /** The guest menu's second and third tabs: "__featured__", "ALLE" or a
-   *  category. The set menus' tab is always first. */
+  /** The guest menu's first three tabs, in order: "__sets__", "__featured__",
+   *  "ALLE" or a category. The rest follow in their usual order. */
   navPinned: string[];
 }
 
@@ -154,7 +154,7 @@ export interface ApiMenuSettings {
   timeZone?: string;
   /** When the set menus page is on; null or absent: always. */
   setsSchedule?: ApiSchedule | null;
-  /** The tabs the owner put second and third; absent from an older server. */
+  /** The tabs the owner put first to third; absent from an older server. */
   navPinned?: string[];
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */

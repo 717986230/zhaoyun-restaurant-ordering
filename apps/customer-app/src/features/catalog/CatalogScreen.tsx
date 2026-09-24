@@ -31,7 +31,7 @@ interface Props {
   onAdminTap: () => Promise<void>;
   /** The promotions page, when the owner switched it on and chose dishes. */
   featured: { title: string; products: Product[]; template: FeaturedTemplateId } | null;
-  /** The tabs the owner put second and third; the set menus are always first. */
+  /** The tabs the owner put first to third; the rest keep their usual order. */
   navPinned?: string[];
 }
 
@@ -395,8 +395,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category].join(" ").toLowerCase();
     return categoryMatch && (!query || text.includes(query));
   });
-  // The promotions page, when there is one, is the first page of the menu.
-  // The set menus first, the owner's two next, the rest in their usual order.
+  // The owner's three first, the rest in their usual order: the promotions
+  // page, the set menus, everything, then the categories.
   const categories = orderNavTabs([...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))], navPinned);
   const activeProduct = state.activeProductId ? byId.get(state.activeProductId) : undefined;
   const table = assignedTableNo();

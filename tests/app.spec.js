@@ -418,8 +418,8 @@ test.describe("the promotions page", () => {
     test.beforeEach(withFeatured({ title: "", productIds: ["combo-1", "80", "gone-from-the-menu"] }));
 
     test("is the first page a guest sees, in its own design", async ({ page }) => {
-      // The set menus' tab leads the row; the guest lands on the promotions.
-      await expect(page.locator(".chip").first()).toHaveText("套餐");
+      // Its tab leads the row, and the guest lands on it.
+      await expect(page.locator(".chip").first()).toHaveText("✦ 精选推荐");
       await expect(page.locator(".chip.on")).toHaveText("✦ 精选推荐");
       await expect(page.locator(".menu.on-featured")).toBeVisible();
       await expect(page.locator(".featured-hero h2")).toHaveText("精选推荐");
@@ -444,13 +444,12 @@ test.describe("the promotions page", () => {
       await page.locator(".featured-card").nth(1).click();
       await expect(page.locator(".dish-detail-card")).toContainText("黑椒牛柳");
       await page.getByRole("button", { name: "关闭详情" }).click();
-      // The set menus come first, the promotions next, then everything else.
+      // The promotions come first, the set menus next, then everything else.
+      await page.locator(".page-next").click();
+      await expect(page.locator(".chip.on")).toHaveText("套餐");
       await page.locator(".page-next").click();
       await expect(page.locator(".chip.on")).toHaveText("全部");
       await expect(page.locator(".menu.on-featured")).toHaveCount(0);
-      await page.locator(".chip-sets").click();
-      await page.locator(".page-next").click();
-      await expect(page.locator(".chip.on")).toHaveText("✦ 精选推荐");
     });
 
     test("a guest who moved on is not sent back to it on every reload", async ({ page }) => {
@@ -732,22 +731,22 @@ test("a search that finds nothing says what was looked for, and one tap goes bac
   await expect(page.locator(".dish-card").first()).toBeVisible();
 });
 
-test("the owner's second and third tabs come right after the set menus, and the rest keep their order", async ({ page }) => {
+test("the owner's first three tabs lead, and the rest keep their order", async ({ page }) => {
   await page.unroute("**/api/catalog");
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
     products, theme: "jade", languages: ["zh", "en", "de"],
     menu: { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true,
       featured: { title: "", productIds: ["80"], template: "gallery" },
       // A category since emptied is skipped, and the next one moves up.
-      navPinned: ["GONE", "RAMEN"] }
+      navPinned: ["RAMEN", "GONE", "__sets__", "ALLE"] }
   }) }));
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
-  await expect(page.locator(".chip")).toHaveText(["套餐", "RAMEN", "✦ 精选推荐", "全部", "MAIN", "SUSHI"]);
+  await expect(page.locator(".chip")).toHaveText(["RAMEN", "套餐", "全部", "✦ 精选推荐", "MAIN", "SUSHI"]);
   // Pages turn in the same order.
-  await page.locator(".chip-sets").click();
+  await page.getByRole("button", { name: "RAMEN", exact: true }).click();
   await page.locator(".page-next").click();
-  await expect(page.locator(".chip.on")).toHaveText("RAMEN");
+  await expect(page.locator(".chip.on")).toHaveText("套餐");
 });
 
 test.describe("the promotions and set menus pages keep their hours", () => {

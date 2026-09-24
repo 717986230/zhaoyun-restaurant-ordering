@@ -699,8 +699,10 @@ test("on a computer, a long set's editor keeps its save button on screen", async
   await expect(page.getByRole("button", { name: "保存修改" })).toBeInViewport();
 });
 
-test("the second and third tabs are chosen in settings, and cannot be the same", async ({ page }) => {
+test("the first three tabs are chosen in settings, none fixed, and cannot repeat", async ({ page }) => {
   appSettings.navPinned = [];
+  appSettings.featuredEnabled = true;
+  appSettings.featuredTitle = "今日推荐";
   const dish = (id, category) => ({ id, sku: id, kind: "food", category, names: { zh: id, de: id, en: id }, description: "", price: 9, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: [] });
   await page.unroute("**/api/admin/products");
   await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [
@@ -709,21 +711,29 @@ test("the second and third tabs are chosen in settings, and cannot be the same",
   await page.reload();
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
   const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "导航标签顺序", exact: true }) });
-  const second = card.getByLabel("第 2 个");
-  const third = card.getByLabel("第 3 个");
-  await expect(card.locator(".nav-order-fixed")).toContainText("套餐");
-  // The third opens once the second is set.
+  const [first, second, third] = [card.getByLabel("第 1 个"), card.getByLabel("第 2 个"), card.getByLabel("第 3 个")];
+  // Nothing chosen: the usual order, promotions first.
+  await expect(card.locator(".nav-order-preview li")).toHaveText(["✦ 今日推荐", "套餐", "全部", "RAMEN", "SUSHI"]);
+  // Each place opens once the one before it is set.
+  await expect(second).toBeDisabled();
   await expect(third).toBeDisabled();
-  await second.selectOption("SUSHI");
+  // Any tab may lead — a category included.
+  await first.selectOption("SUSHI");
   await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI"]);
-  await expect(third).toBeEnabled();
-  // What is second cannot also be third.
-  await expect(third.locator('option[value="SUSHI"]')).toHaveJSProperty("disabled", true);
+  await expect(second).toBeEnabled();
+  await expect(second.locator('option[value="SUSHI"]')).toHaveJSProperty("disabled", true);
+  await second.selectOption("__sets__");
+  await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI", "__sets__"]);
   await third.selectOption("ALLE");
-  await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI", "ALLE"]);
-  await expect(second.locator('option[value="ALLE"]')).toHaveJSProperty("disabled", true);
+  await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI", "__sets__", "ALLE"]);
+  // What one place holds is greyed out in the other two.
+  await expect(first.locator('option[value="ALLE"]')).toHaveJSProperty("disabled", true);
+  await expect(third.locator('option[value="__sets__"]')).toHaveJSProperty("disabled", true);
   // The preview is the order a guest gets.
-  await expect(card.locator(".nav-order-preview li")).toHaveText(["套餐", "SUSHI", "全部", "RAMEN"]);
+  await expect(card.locator(".nav-order-preview li")).toHaveText(["SUSHI", "套餐", "全部", "✦ 今日推荐", "RAMEN"]);
+  // Back to the usual order for the first: the others move up.
+  await first.selectOption("");
+  await expect.poll(() => appSettings.navPinned).toEqual(["__sets__", "ALLE"]);
 });
 
 test("the console can be installed as a desktop app", async ({ page, request }) => {

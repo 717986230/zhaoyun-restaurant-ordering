@@ -110,43 +110,48 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
 }
 
 /**
- * The guest menu's tab order: the set menus first, always; the second and
- * third chosen here; the rest in their usual order behind. A tab chosen for
- * one place is greyed out in the other, and the third opens once the second
- * is set, so there is no order that contradicts itself. The preview is the
- * same function the menu uses (orderNavTabs).
+ * The guest menu's tab order: the first three chosen here, the rest in their
+ * usual order behind. A tab chosen for one place is greyed out in the others,
+ * and each place opens once the one before it is set, so there is no order
+ * that contradicts itself. The preview is the same function the menu uses
+ * (orderNavTabs).
  */
+/** The places the owner fills, one per chosen tab (NAV_PINNED_MAX of them). */
+const NAV_PLACES = ["navFirst", "navSecond", "navThird"] as const;
+
 function NavOrder({ settings, products, onSave }: { settings: ApiSettings; products: Product[]; onSave: (navPinned: string[]) => void }) {
   const { t } = useI18n();
+  const label = navLabel(settings, t);
   const hasSets = products.some((product) => product.bundleItems?.length);
   const categories = [...new Set(products.filter((product) => !product.bundleItems?.length).map((product) => product.category))];
-  const label = (tab: string) => tab === NAV_SETS ? t("navSets")
-    : tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
-    : tab === NAV_ALL ? t("navAll") : tab;
-  const options = [NAV_FEATURED, NAV_ALL, ...categories];
-  // A choice whose tab has since gone (an emptied category) is shown as unset.
-  const [second = "", third = ""] = settings.navPinned.filter((tab) => options.includes(tab));
-  const choose = (position: 0 | 1, value: string) => {
-    const next = [second, third];
+  // In the menu's usual order, which is also the order the rest keep.
+  const options = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
+  // A choice whose tab has since gone (an emptied category, a page switched off) is shown as unset.
+  const chosen = settings.navPinned.filter((tab) => options.includes(tab)).slice(0, NAV_PLACES.length);
+  const places = NAV_PLACES.map((_, index) => chosen[index] ?? "");
+  const choose = (position: number, value: string) => {
+    const next = [...places];
     next[position] = value;
     onSave(next.filter(Boolean));
   };
-  const available = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
-  const select = (position: 0 | 1, value: string, other: string, disabled = false) => <select
-    aria-label={t(position === 0 ? "navSecond" : "navThird")} value={value} disabled={disabled} onChange={(event) => choose(position, event.target.value)}
-  >
-    <option value="">{t("navDefault")}</option>
-    {options.map((tab) => <option key={tab} value={tab} disabled={tab === other}>{label(tab)}</option>)}
-  </select>;
   return <div className="nav-order">
-    <div className="nav-order-slots">
-      <label><span>{t("navFirst")}</span><span className="nav-order-fixed">{t("navSets")} · {t("navFixed")}</span></label>
-      <label><span>{t("navSecond")}</span>{select(0, second, third)}</label>
-      <label><span>{t("navThird")}</span>{select(1, third, second, !second)}</label>
-    </div>
+    <div className="nav-order-slots">{NAV_PLACES.map((name, position) => <label key={name}>
+      <span>{t(name)}</span>
+      <select aria-label={t(name)} value={places[position]} disabled={position > 0 && !places[position - 1]} onChange={(event) => choose(position, event.target.value)}>
+        <option value="">{t("navDefault")}</option>
+        {options.map((tab) => <option key={tab} value={tab} disabled={tab !== places[position] && places.includes(tab)}>{label(tab)}</option>)}
+      </select>
+    </label>)}</div>
     <p className="settings-label">{t("navPreview")}</p>
-    <ol className="nav-order-preview">{orderNavTabs(available, [second, third].filter(Boolean)).map((tab) => <li key={tab} className={tab === second || tab === third || tab === NAV_SETS ? "set" : ""}>{label(tab)}</li>)}</ol>
+    <ol className="nav-order-preview">{orderNavTabs(options, chosen).map((tab) => <li key={tab} className={chosen.includes(tab) ? "set" : ""}>{label(tab)}</li>)}</ol>
   </div>;
+}
+
+/** A tab's name as the owner knows it: the promotions page by its title. */
+function navLabel(settings: ApiSettings, t: ReturnType<typeof useI18n>["t"]) {
+  return (tab: string) => tab === NAV_SETS ? t("navSets")
+    : tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
+    : tab === NAV_ALL ? t("navAll") : tab;
 }
 
 const INSTALL_STEPS: Record<InstallPlatform, CopyKey> = {
@@ -303,7 +308,7 @@ export function SettingsPanel(props: Props) {
 
       {/* The biggest card: across the page, what the page is on the left and
           how it looks and what is on it on the right. */}
-      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={orderNavTabs([NAV_SETS, ...settings.navPinned], settings.navPinned).slice(0, 3).map((tab) => tab === NAV_SETS ? t("navSets") : tab === NAV_FEATURED ? t("navFeatured") : tab === NAV_ALL ? t("navAll") : tab).join(" · ")}>
+      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t)).join(" · ") : t("navDefault")}>
         <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
       </Section>
 

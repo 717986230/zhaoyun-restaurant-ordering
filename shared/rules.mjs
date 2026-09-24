@@ -464,11 +464,11 @@ export const MAX_FEATURED_PRODUCTS = 40;
 export const FEATURED_TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];
 export const DEFAULT_FEATURED_TEMPLATE = "gallery";
 
-export const MAX_NAV_PINNED = 2;
+export const MAX_NAV_PINNED = 3;
 
 /**
- * The tabs the owner puts second and third on the guest menu (the set menus
- * are always first): "__featured__", "ALLE" or a category. At most two, no
+ * The tabs the owner puts first, second and third on the guest menu:
+ * "__sets__", "__featured__", "ALLE" or a category. At most three, no
  * repeats; one that is not on the menu is skipped there, never an error.
  */
 function normalizeNavPinned(value) {

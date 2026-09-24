@@ -621,16 +621,16 @@ export function contractChecks(call, assert) {
       assert.equal(reset.json.setsSchedule, null);
     }],
 
-    ["the owner picks the guest menu's second and third tabs, without conflicts", async () => {
+    ["the owner picks the guest menu's first three tabs, without conflicts", async () => {
       const settings = (body) => call("PUT", "/api/admin/settings", { admin: true, body });
       assert.deepEqual((await call("GET", "/api/admin/settings", { admin: true })).json.navPinned, []);
       assert.deepEqual((await settings({ navPinned: [" RAMEN ", "RAMEN"] })).json.navPinned, ["RAMEN"], "trimmed, once each");
-      assert.deepEqual((await settings({ navPinned: ["", "SUSHI"] })).json.navPinned, ["SUSHI"], "a blank second leaves the third to move up");
-      const saved = await settings({ navPinned: ["RAMEN", "__featured__"] });
+      assert.deepEqual((await settings({ navPinned: ["", "SUSHI"] })).json.navPinned, ["SUSHI"], "a blank place leaves the next to move up");
+      const saved = await settings({ navPinned: ["RAMEN", "__featured__", "__sets__"] });
       assert.equal(saved.status, 200);
-      assert.deepEqual(saved.json.navPinned, ["RAMEN", "__featured__"]);
-      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.navPinned, ["RAMEN", "__featured__"]);
-      assert.equal((await settings({ navPinned: ["RAMEN", "SUSHI", "ALLE"] })).status, 400, "the second and third, no more");
+      assert.deepEqual(saved.json.navPinned, ["RAMEN", "__featured__", "__sets__"]);
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.navPinned, ["RAMEN", "__featured__", "__sets__"]);
+      assert.equal((await settings({ navPinned: ["RAMEN", "SUSHI", "ALLE", "__sets__"] })).status, 400, "the first three, no more");
       assert.deepEqual((await settings({ navPinned: [] })).json.navPinned, []);
     }],
 
