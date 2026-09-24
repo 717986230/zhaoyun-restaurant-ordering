@@ -117,13 +117,23 @@ test("admin workspace loads catalog and printer modules", async ({ page }) => {
 
 test("a manager picks a menu style, and the choice is saved", async ({ page }) => {
   await page.getByRole("button", { name: "设置", exact: true }).click();
-  const picker = page.locator(".theme-picker");
+  const picker = page.locator(".theme-picker").first();
   await expect(picker).toBeVisible();
   await expect(picker.locator(".theme-swatch.selected")).toContainText("墨玉");
 
   await picker.locator(".theme-swatch", { hasText: "赤陶" }).click();
   await expect.poll(() => menuTheme).toBe("terracotta");
   await expect(picker.locator(".theme-swatch.selected")).toContainText("赤陶");
+
+  // Eight festive sets, each button wearing its pattern; one tap puts one on.
+  const festive = page.locator(".theme-picker.festive .theme-swatch");
+  await expect(festive).toHaveText(["春节", "情人节", "复活节", "开学季", "中秋节", "国庆节", "圣诞节", "万圣节"]);
+  for (const swatch of await festive.all()) {
+    expect(await swatch.evaluate((node) => getComputedStyle(node).backgroundImage)).toContain("data:image/svg+xml");
+  }
+  await festive.filter({ hasText: "中秋节" }).click();
+  await expect.poll(() => menuTheme).toBe("mid-autumn");
+  await expect(page.locator(".theme-swatch.selected")).toHaveText("中秋节");
 });
 
 test("a manager chooses the menu's languages, and cannot switch off the last one", async ({ page }) => {
@@ -529,6 +539,10 @@ test("the header and tabs stay on screen, and a long page goes back to its top i
   await expect(page.locator(".back-to-top")).not.toHaveClass(/\bon\b/);
   await page.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight / 2));
   await expect(toTop).toBeVisible();
+  // In the window's bottom-right corner.
+  const corner = await toTop.boundingBox();
+  expect(corner.x + corner.width).toBeGreaterThan(390 - 70);
+  expect(corner.y + corner.height).toBeGreaterThan(844 - 70);
   expect((await page.locator(".admin-head").boundingBox()).y).toBe(0);
   await expect(tabs).toBeInViewport();
   await toTop.click();
@@ -699,8 +713,10 @@ test("on a computer, a long set's editor keeps its save button on screen", async
   await expect(page.getByRole("button", { name: "保存修改" })).toBeInViewport();
 });
 
-test("the second and third tabs are chosen in settings, and cannot be the same", async ({ page }) => {
+test("the first three tabs are chosen in settings, none fixed, and cannot repeat", async ({ page }) => {
   appSettings.navPinned = [];
+  appSettings.featuredEnabled = true;
+  appSettings.featuredTitle = "今日推荐";
   const dish = (id, category) => ({ id, sku: id, kind: "food", category, names: { zh: id, de: id, en: id }, description: "", price: 9, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: [] });
   await page.unroute("**/api/admin/products");
   await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [
@@ -709,63 +725,36 @@ test("the second and third tabs are chosen in settings, and cannot be the same",
   await page.reload();
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
   const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "导航标签顺序", exact: true }) });
-  const second = card.getByLabel("第 2 个");
-  const third = card.getByLabel("第 3 个");
-  await expect(card.locator(".nav-order-fixed")).toContainText("套餐");
-  // The third opens once the second is set.
+  const [first, second, third] = [card.getByLabel("第 1 个"), card.getByLabel("第 2 个"), card.getByLabel("第 3 个")];
+  // Nothing chosen: the usual order, promotions first.
+  await expect(card.locator(".nav-order-preview li")).toHaveText(["✦ 今日推荐", "套餐", "全部", "RAMEN", "SUSHI"]);
+  // Each place opens once the one before it is set.
+  await expect(second).toBeDisabled();
   await expect(third).toBeDisabled();
-  await second.selectOption("SUSHI");
+  // Any tab may lead — a category included.
+  await first.selectOption("SUSHI");
   await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI"]);
-  await expect(third).toBeEnabled();
-  // What is second cannot also be third.
-  await expect(third.locator('option[value="SUSHI"]')).toHaveJSProperty("disabled", true);
+  await expect(second).toBeEnabled();
+  await expect(second.locator('option[value="SUSHI"]')).toHaveJSProperty("disabled", true);
+  await second.selectOption("__sets__");
+  await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI", "__sets__"]);
   await third.selectOption("ALLE");
-  await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI", "ALLE"]);
-  await expect(second.locator('option[value="ALLE"]')).toHaveJSProperty("disabled", true);
+  await expect.poll(() => appSettings.navPinned).toEqual(["SUSHI", "__sets__", "ALLE"]);
+  // What one place holds is greyed out in the other two.
+  await expect(first.locator('option[value="ALLE"]')).toHaveJSProperty("disabled", true);
+  await expect(third.locator('option[value="__sets__"]')).toHaveJSProperty("disabled", true);
   // The preview is the order a guest gets.
-  await expect(card.locator(".nav-order-preview li")).toHaveText(["套餐", "SUSHI", "全部", "RAMEN"]);
+  await expect(card.locator(".nav-order-preview li")).toHaveText(["SUSHI", "套餐", "全部", "✦ 今日推荐", "RAMEN"]);
+  // Back to the usual order for the first: the others move up.
+  await first.selectOption("");
+  await expect.poll(() => appSettings.navPinned).toEqual(["__sets__", "ALLE"]);
 });
 
-test("the console can be installed as a desktop app", async ({ page, request }) => {
-  // What a browser reads before it offers to install: the manifest and its icons.
-  const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
-  const manifest = await (await request.get(manifestHref)).json();
-  expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toBe("admin.html");
-  for (const icon of manifest.icons) {
-    const response = await request.get(new URL(icon.src, new URL(manifestHref, "http://127.0.0.1:5173/")).pathname);
-    expect(response.status(), icon.src).toBe(200);
-  }
-  expect(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable")).toBe(true);
-
-  // No offer from the browser: Settings says how, for the browser in use.
+test("the console installs nothing of its own: the menu is what installs", async ({ page }) => {
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
-  const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "桌面版", exact: true }) });
-  // Chrome on a computer is pointed at the address bar; an Android phone at its menu.
-  await expect(card.locator(".install-steps")).toContainText(/「安装」|「安装应用」/);
-  await expect(page.locator(".head-install")).toHaveCount(0);
-
-  // The browser offers it (Chrome, Edge): one tap in the header asks, and once
-  // it is installed the button goes.
-  await page.evaluate(() => {
-    const offer = new Event("beforeinstallprompt", { cancelable: true });
-    window.__prompted = false;
-    Object.assign(offer, { prompt: async () => { window.__prompted = true; }, userChoice: Promise.resolve({ outcome: "accepted" }) });
-    window.dispatchEvent(offer);
-  });
-  const header = page.locator(".head-install");
-  if ((page.viewportSize()?.width ?? 0) > 520) {
-    await header.click();
-    await expect.poll(() => page.evaluate(() => window.__prompted)).toBe(true);
-    await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
-    await expect(header).toHaveCount(0);
-    await expect(card.locator(".install-state")).toBeVisible();
-  } else {
-    // A phone keeps its header to three buttons; Settings has the install.
-    await expect(header).toBeHidden();
-    await card.getByRole("button", { name: /安装桌面版/ }).click();
-    await expect.poll(() => page.evaluate(() => window.__prompted)).toBe(true);
-  }
+  await expect(page.getByRole("heading", { name: "桌面版", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /安装/ })).toHaveCount(0);
 });
 
 test("the restaurant's time zone is chosen in settings", async ({ page }) => {

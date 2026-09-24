@@ -262,6 +262,33 @@ test("the menu style the server picked changes only the accent, at load", async 
   expect(bg).toBe("#0f1113");
 });
 
+test("a festive set puts its colour and pattern across the menu, on the dark menu and the light", async ({ page }) => {
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "valentine" }) }));
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  const root = (name) => page.evaluate((token) => getComputedStyle(document.documentElement).getPropertyValue(token).trim(), name);
+  expect(await root("--accent")).toBe("#ec8fae");
+  // The pattern is drawn in the accent, behind everything, over the whole room.
+  const pattern = await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage);
+  expect(pattern).toContain("data:image/svg+xml");
+  expect(pattern).toContain(encodeURIComponent("#ec8fae"));
+  // The palette a guest reads by stays the same.
+  expect(await root("--bg")).toBe("#0f1113");
+  // On the light menu, the darker shade of the same set, in the pattern too.
+  await page.locator(".scheme-toggle").click();
+  expect(await root("--accent")).toBe("#b02d5c");
+  expect(await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage)).toContain(encodeURIComponent("#b02d5c"));
+});
+
+test("an everyday style has no pattern", async ({ page }) => {
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  const pattern = await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage);
+  expect(pattern).not.toContain("data:image/svg+xml");
+});
+
 test("the owner's title, table-number choice and default look reach the guest", async ({ page }) => {
   await page.unroute("**/api/catalog");
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
@@ -418,8 +445,8 @@ test.describe("the promotions page", () => {
     test.beforeEach(withFeatured({ title: "", productIds: ["combo-1", "80", "gone-from-the-menu"] }));
 
     test("is the first page a guest sees, in its own design", async ({ page }) => {
-      // The set menus' tab leads the row; the guest lands on the promotions.
-      await expect(page.locator(".chip").first()).toHaveText("套餐");
+      // Its tab leads the row, and the guest lands on it.
+      await expect(page.locator(".chip").first()).toHaveText("✦ 精选推荐");
       await expect(page.locator(".chip.on")).toHaveText("✦ 精选推荐");
       await expect(page.locator(".menu.on-featured")).toBeVisible();
       await expect(page.locator(".featured-hero h2")).toHaveText("精选推荐");
@@ -444,13 +471,12 @@ test.describe("the promotions page", () => {
       await page.locator(".featured-card").nth(1).click();
       await expect(page.locator(".dish-detail-card")).toContainText("黑椒牛柳");
       await page.getByRole("button", { name: "关闭详情" }).click();
-      // The set menus come first, the promotions next, then everything else.
+      // The promotions come first, the set menus next, then everything else.
+      await page.locator(".page-next").click();
+      await expect(page.locator(".chip.on")).toHaveText("套餐");
       await page.locator(".page-next").click();
       await expect(page.locator(".chip.on")).toHaveText("全部");
       await expect(page.locator(".menu.on-featured")).toHaveCount(0);
-      await page.locator(".chip-sets").click();
-      await page.locator(".page-next").click();
-      await expect(page.locator(".chip.on")).toHaveText("✦ 精选推荐");
     });
 
     test("a guest who moved on is not sent back to it on every reload", async ({ page }) => {
@@ -732,22 +758,22 @@ test("a search that finds nothing says what was looked for, and one tap goes bac
   await expect(page.locator(".dish-card").first()).toBeVisible();
 });
 
-test("the owner's second and third tabs come right after the set menus, and the rest keep their order", async ({ page }) => {
+test("the owner's first three tabs lead, and the rest keep their order", async ({ page }) => {
   await page.unroute("**/api/catalog");
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
     products, theme: "jade", languages: ["zh", "en", "de"],
     menu: { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true,
       featured: { title: "", productIds: ["80"], template: "gallery" },
       // A category since emptied is skipped, and the next one moves up.
-      navPinned: ["GONE", "RAMEN"] }
+      navPinned: ["RAMEN", "GONE", "__sets__", "ALLE"] }
   }) }));
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
-  await expect(page.locator(".chip")).toHaveText(["套餐", "RAMEN", "✦ 精选推荐", "全部", "MAIN", "SUSHI"]);
+  await expect(page.locator(".chip")).toHaveText(["RAMEN", "套餐", "全部", "✦ 精选推荐", "MAIN", "SUSHI"]);
   // Pages turn in the same order.
-  await page.locator(".chip-sets").click();
+  await page.getByRole("button", { name: "RAMEN", exact: true }).click();
   await page.locator(".page-next").click();
-  await expect(page.locator(".chip.on")).toHaveText("RAMEN");
+  await expect(page.locator(".chip.on")).toHaveText("套餐");
 });
 
 test.describe("the promotions and set menus pages keep their hours", () => {
@@ -802,5 +828,70 @@ test.describe("the promotions and set menus pages keep their hours", () => {
     await expect(page.locator(".chip-featured")).toHaveCount(0);
     await page.locator(".chip-sets").click();
     await expect(page.locator(".featured-card", { hasText: "双人套餐" })).toBeVisible();
+  });
+});
+
+test.describe("the menu installs as an app", () => {
+  const offerInstall = (page) => page.evaluate(() => {
+    const offer = new Event("beforeinstallprompt", { cancelable: true });
+    window.__prompted = false;
+    Object.assign(offer, { prompt: async () => { window.__prompted = true; }, userChoice: Promise.resolve({ outcome: "accepted" }) });
+    window.dispatchEvent(offer);
+  });
+
+  test("it links a manifest a browser can install from, opening where it was installed from", async ({ page, request }) => {
+    const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
+    const manifest = await (await request.get(manifestHref)).json();
+    expect(manifest.display).toBe("standalone");
+    // No start_url: the app opens at the address it was installed from, table and all.
+    expect(manifest.start_url).toBeUndefined();
+    for (const icon of manifest.icons) {
+      const response = await request.get(new URL(icon.src, new URL(manifestHref, "http://127.0.0.1:5173/")).pathname);
+      expect(response.status(), icon.src).toBe(200);
+    }
+    expect(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable")).toBe(true);
+    const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+    expect((await request.get(touch)).status()).toBe(200);
+  });
+
+  test("on a first visit it offers itself, one tap installs, and it does not ask again", async ({ page }) => {
+    await offerInstall(page);
+    const offer = page.getByRole("dialog", { name: "把菜单装到桌面" });
+    await expect(offer).toBeVisible();
+    await offer.getByRole("button", { name: "安装" }).click();
+    await expect.poll(() => page.evaluate(() => window.__prompted)).toBe(true);
+    await expect(offer).toHaveCount(0);
+    await page.reload();
+    await offerInstall(page);
+    await page.waitForTimeout(1600);
+    await expect(offer).toHaveCount(0);
+  });
+
+  test("closed, it stays closed", async ({ page }) => {
+    await offerInstall(page);
+    const offer = page.getByRole("dialog", { name: "把菜单装到桌面" });
+    await offer.getByRole("button", { name: "以后再说" }).click();
+    await expect(offer).toHaveCount(0);
+    await page.reload();
+    await offerInstall(page);
+    await page.waitForTimeout(1600);
+    await expect(offer).toHaveCount(0);
+  });
+
+  test("with nothing to install from, it asks nothing", async ({ page }) => {
+    await page.waitForTimeout(1600);
+    await expect(page.locator(".install-offer")).toHaveCount(0);
+  });
+
+  test.describe("on an iPhone", () => {
+    test.use({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1" });
+
+    test("it says how, since Safari cannot ask", async ({ page }) => {
+      const offer = page.getByRole("dialog", { name: "把菜单装到桌面" });
+      await expect(offer).toContainText("添加到主屏幕");
+      await expect(offer.getByRole("button", { name: "安装" })).toHaveCount(0);
+      await offer.getByRole("button", { name: "以后再说" }).click();
+      await expect(offer).toHaveCount(0);
+    });
   });
 });

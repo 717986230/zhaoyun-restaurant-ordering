@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
 /**
- * One button, at the end of the pinned tab bar where it covers nothing, that
- * takes whatever long thing is scrolled back to its top: the
+ * One button, fixed in the window's bottom-right corner, that takes
+ * whatever long thing is scrolled back to its top: the
  * page on a phone or the settings, and on a computer the dish list or the
  * editor, which scroll inside their own boxes. It listens for scrolling
  * anywhere (scroll events do not bubble, but they can be caught on the way

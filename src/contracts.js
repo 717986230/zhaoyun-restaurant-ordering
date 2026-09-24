@@ -54,7 +54,7 @@ export const PRINT_JOB_STATUSES = ["queued", "claimed", "printing", "printed", "
 export const VAT_PERCENTS = [10, 13, 20];
 // The colour hexes for each id live in packages/domain/src/themes.ts, next to
 // the guest app that renders them; the wire contract only needs the ids.
-export const MENU_THEMES = ["jade", "teal", "terracotta"];
+export const MENU_THEMES = ["jade", "teal", "terracotta", "spring-festival", "valentine", "easter", "back-to-school", "mid-autumn", "national-day", "christmas", "halloween"];
 
 const literals = (values) => Type.Union(values.map((value) => Type.Literal(value)));
 
@@ -144,7 +144,7 @@ export const SettingsBody = Type.Object({
   featuredSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
   setsSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
   // The guest menu's second and third tabs; the set menus are always first.
-  navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 2 }))
+  navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 3 }))
 }, { minProperties: 1, additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces

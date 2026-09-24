@@ -22,7 +22,7 @@ export const PRINTER_TRANSPORTS = new Set(["lan", "bluetooth", "usb"]);
 // The colour hexes themselves live in packages/domain/src/themes.ts, next to
 // the guest app that renders them; the backend only ever needs to know which
 // ids are valid to store.
-export const MENU_THEME_IDS = new Set(["jade", "teal", "terracotta"]);
+export const MENU_THEME_IDS = new Set(["jade", "teal", "terracotta", "spring-festival", "valentine", "easter", "back-to-school", "mid-autumn", "national-day", "christmas", "halloween"]);
 export const DEFAULT_MENU_THEME = "jade";
 
 /**
@@ -464,11 +464,11 @@ export const MAX_FEATURED_PRODUCTS = 40;
 export const FEATURED_TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];
 export const DEFAULT_FEATURED_TEMPLATE = "gallery";
 
-export const MAX_NAV_PINNED = 2;
+export const MAX_NAV_PINNED = 3;
 
 /**
- * The tabs the owner puts second and third on the guest menu (the set menus
- * are always first): "__featured__", "ALLE" or a category. At most two, no
+ * The tabs the owner puts first, second and third on the guest menu:
+ * "__sets__", "__featured__", "ALLE" or a category. At most three, no
  * repeats; one that is not on the menu is skipped there, never an error.
  */
 function normalizeNavPinned(value) {

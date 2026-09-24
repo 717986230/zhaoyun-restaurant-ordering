@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "Speisekarte · Menu · 菜单",
+  "short_name": "Menu",
+  "description": "Die Speisekarte des Restaurants — the restaurant's menu — 餐厅菜单",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1113",
+  "theme_color": "#0f1113",
+  "icons": [
+    { "src": "icons/menu-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/menu-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/menu-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/menu.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

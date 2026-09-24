@@ -3,14 +3,12 @@ import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themePattern } from "@zhaoyun/domain";
 import { useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { downloadQrCard } from "../qr/qrCard";
 import { describeSchedule, ScheduleEditor } from "./ScheduleEditor";
-import { useInstall } from "../../app/install";
-import type { InstallPlatform } from "../../app/install";
 
 // The time zones on offer: where a restaurant like this one is. A short list
 // on purpose — the server takes any real zone, so one saved from elsewhere is
@@ -110,65 +108,48 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
 }
 
 /**
- * The guest menu's tab order: the set menus first, always; the second and
- * third chosen here; the rest in their usual order behind. A tab chosen for
- * one place is greyed out in the other, and the third opens once the second
- * is set, so there is no order that contradicts itself. The preview is the
- * same function the menu uses (orderNavTabs).
+ * The guest menu's tab order: the first three chosen here, the rest in their
+ * usual order behind. A tab chosen for one place is greyed out in the others,
+ * and each place opens once the one before it is set, so there is no order
+ * that contradicts itself. The preview is the same function the menu uses
+ * (orderNavTabs).
  */
+/** The places the owner fills, one per chosen tab (NAV_PINNED_MAX of them). */
+const NAV_PLACES = ["navFirst", "navSecond", "navThird"] as const;
+
 function NavOrder({ settings, products, onSave }: { settings: ApiSettings; products: Product[]; onSave: (navPinned: string[]) => void }) {
   const { t } = useI18n();
+  const label = navLabel(settings, t);
   const hasSets = products.some((product) => product.bundleItems?.length);
   const categories = [...new Set(products.filter((product) => !product.bundleItems?.length).map((product) => product.category))];
-  const label = (tab: string) => tab === NAV_SETS ? t("navSets")
-    : tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
-    : tab === NAV_ALL ? t("navAll") : tab;
-  const options = [NAV_FEATURED, NAV_ALL, ...categories];
-  // A choice whose tab has since gone (an emptied category) is shown as unset.
-  const [second = "", third = ""] = settings.navPinned.filter((tab) => options.includes(tab));
-  const choose = (position: 0 | 1, value: string) => {
-    const next = [second, third];
+  // In the menu's usual order, which is also the order the rest keep.
+  const options = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
+  // A choice whose tab has since gone (an emptied category, a page switched off) is shown as unset.
+  const chosen = settings.navPinned.filter((tab) => options.includes(tab)).slice(0, NAV_PLACES.length);
+  const places = NAV_PLACES.map((_, index) => chosen[index] ?? "");
+  const choose = (position: number, value: string) => {
+    const next = [...places];
     next[position] = value;
     onSave(next.filter(Boolean));
   };
-  const available = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
-  const select = (position: 0 | 1, value: string, other: string, disabled = false) => <select
-    aria-label={t(position === 0 ? "navSecond" : "navThird")} value={value} disabled={disabled} onChange={(event) => choose(position, event.target.value)}
-  >
-    <option value="">{t("navDefault")}</option>
-    {options.map((tab) => <option key={tab} value={tab} disabled={tab === other}>{label(tab)}</option>)}
-  </select>;
   return <div className="nav-order">
-    <div className="nav-order-slots">
-      <label><span>{t("navFirst")}</span><span className="nav-order-fixed">{t("navSets")} · {t("navFixed")}</span></label>
-      <label><span>{t("navSecond")}</span>{select(0, second, third)}</label>
-      <label><span>{t("navThird")}</span>{select(1, third, second, !second)}</label>
-    </div>
+    <div className="nav-order-slots">{NAV_PLACES.map((name, position) => <label key={name}>
+      <span>{t(name)}</span>
+      <select aria-label={t(name)} value={places[position]} disabled={position > 0 && !places[position - 1]} onChange={(event) => choose(position, event.target.value)}>
+        <option value="">{t("navDefault")}</option>
+        {options.map((tab) => <option key={tab} value={tab} disabled={tab !== places[position] && places.includes(tab)}>{label(tab)}</option>)}
+      </select>
+    </label>)}</div>
     <p className="settings-label">{t("navPreview")}</p>
-    <ol className="nav-order-preview">{orderNavTabs(available, [second, third].filter(Boolean)).map((tab) => <li key={tab} className={tab === second || tab === third || tab === NAV_SETS ? "set" : ""}>{label(tab)}</li>)}</ol>
+    <ol className="nav-order-preview">{orderNavTabs(options, chosen).map((tab) => <li key={tab} className={chosen.includes(tab) ? "set" : ""}>{label(tab)}</li>)}</ol>
   </div>;
 }
 
-const INSTALL_STEPS: Record<InstallPlatform, CopyKey> = {
-  chromium: "installStepsChromium",
-  safari: "installStepsSafari",
-  ios: "installStepsIos",
-  android: "installStepsAndroid",
-  unsupported: "installStepsUnsupported"
-};
-
-/** The console as a desktop app: one tap where the browser offers it, the steps where it does not. */
-function DesktopApp() {
-  const { t } = useI18n();
-  const installer = useInstall();
-  const [steps, setSteps] = useState(false);
-  if (installer.installed) return <p className="install-state">✓ {t("installDone")}</p>;
-  return <div className="install-card">
-    <button type="button" className="primary-action" onClick={async () => {
-      if (!(installer.canPrompt && await installer.install())) setSteps(true);
-    }}>⬇ {t("installApp")}</button>
-    {(steps || !installer.canPrompt) && <p className="install-steps" role="status">{t(INSTALL_STEPS[installer.platform])}</p>}
-  </div>;
+/** A tab's name as the owner knows it: the promotions page by its title. */
+function navLabel(settings: ApiSettings, t: ReturnType<typeof useI18n>["t"]) {
+  return (tab: string) => tab === NAV_SETS ? t("navSets")
+    : tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
+    : tab === NAV_ALL ? t("navAll") : tab;
 }
 
 /** The promotions page's dishes, in the order a guest sees them. */
@@ -244,6 +225,14 @@ export function SettingsPanel(props: Props) {
 
   const themeName = (theme: (typeof MENU_THEMES)[keyof typeof MENU_THEMES]) =>
     language === "zh" ? theme.nameZh : language === "de" ? theme.nameDe : theme.nameEn;
+  const themeButton = (theme: (typeof MENU_THEMES)[keyof typeof MENU_THEMES]) => <button
+    key={theme.id}
+    type="button"
+    className={`theme-swatch ${settings?.menuTheme === theme.id ? "selected" : ""}`}
+    aria-pressed={settings?.menuTheme === theme.id}
+    style={{ "--swatch": theme.accent, backgroundImage: themePattern(theme, theme.accent) } as React.CSSProperties}
+    onClick={() => void props.onSaveSettings({ menuTheme: theme.id }, "menuStyleSaved")}
+  ><i /><span>{themeName(theme)}</span></button>;
   const offered = settings?.menuLanguages ?? DEFAULT_MENU_LANGUAGES;
 
   return <section id="systemPanel" className="admin-panel active"><div className="settings-page">
@@ -263,14 +252,12 @@ export function SettingsPanel(props: Props) {
 
       <Section id="appearance" title={t("sectionAppearance")} summary={`${themeName(MENU_THEMES[settings.menuTheme] ?? MENU_THEMES.jade)} · ${t(settings.menuDefaultScheme === "dark" ? "schemeDark" : "schemeLight")}`}>
         <p className="settings-label">{t("menuStyle")}</p>
-        <div className="theme-picker">{Object.values(MENU_THEMES).map((theme) => <button
-          key={theme.id}
-          type="button"
-          className={`theme-swatch ${settings.menuTheme === theme.id ? "selected" : ""}`}
-          aria-pressed={settings.menuTheme === theme.id}
-          style={{ "--swatch": theme.accent } as React.CSSProperties}
-          onClick={() => void props.onSaveSettings({ menuTheme: theme.id }, "menuStyleSaved")}
-        ><i /><span>{themeName(theme)}</span></button>)}</div>
+        <div className="theme-picker">{Object.values(MENU_THEMES).filter((theme) => !theme.festive).map(themeButton)}</div>
+        {/* The festive sets: colour and pattern for the season, one tap to put
+            on and one to take off again. Each button wears its own pattern. */}
+        <p className="settings-label">{t("festiveThemes")}</p>
+        <div className="theme-picker festive">{Object.values(MENU_THEMES).filter((theme) => theme.festive).map(themeButton)}</div>
+        <small className="settings-hint">{t("festiveThemesHint")}</small>
         <p className="settings-label">{t("defaultScheme")}</p>
         <div className="scheme-picker" role="group" aria-label={t("defaultScheme")}>{(["dark", "light"] as ColorScheme[]).map((scheme) => <button
           key={scheme}
@@ -303,7 +290,7 @@ export function SettingsPanel(props: Props) {
 
       {/* The biggest card: across the page, what the page is on the left and
           how it looks and what is on it on the right. */}
-      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={orderNavTabs([NAV_SETS, ...settings.navPinned], settings.navPinned).slice(0, 3).map((tab) => tab === NAV_SETS ? t("navSets") : tab === NAV_FEATURED ? t("navFeatured") : tab === NAV_ALL ? t("navAll") : tab).join(" · ")}>
+      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t)).join(" · ") : t("navDefault")}>
         <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
       </Section>
 
@@ -348,10 +335,6 @@ export function SettingsPanel(props: Props) {
       <Section id="sets" title={t("sectionSets")} hint={t("setsHint")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>
         <ScheduleEditor key={JSON.stringify(settings.setsSchedule)} value={settings.setsSchedule} timeZone={settings.timeZone} onSave={(setsSchedule) => props.onSaveSettings({ setsSchedule }, "setsSaved")} />
-      </Section>
-
-      <Section id="desktop" title={t("sectionDesktop")} hint={t("desktopHint")}>
-        <DesktopApp />
       </Section>
 
       <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
