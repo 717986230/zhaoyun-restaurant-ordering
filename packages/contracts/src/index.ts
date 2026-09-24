@@ -139,6 +139,9 @@ export interface ApiSettings {
   /** When the promotions page and the set menus page are on; null: always. */
   featuredSchedule: ApiSchedule | null;
   setsSchedule: ApiSchedule | null;
+  /** The guest menu's second and third tabs: "__featured__", "ALLE" or a
+   *  category. The set menus' tab is always first. */
+  navPinned: string[];
 }
 
 /** The part of the settings the guest menu reads, served with the catalogue. */
@@ -151,6 +154,8 @@ export interface ApiMenuSettings {
   timeZone?: string;
   /** When the set menus page is on; null or absent: always. */
   setsSchedule?: ApiSchedule | null;
+  /** The tabs the owner put second and third; absent from an older server. */
+  navPinned?: string[];
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */
   featured?: { title: string; productIds: string[]; template: FeaturedTemplateId; schedule?: ApiSchedule | null } | null;

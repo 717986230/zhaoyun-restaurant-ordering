@@ -2428,3 +2428,116 @@ h2 {
 .editor-actions .form-error {
   margin: 0;
 }
+
+/* The tab order: three places, the first fixed, and the order a guest gets. */
+.nav-order {
+  display: grid;
+  gap: 12px;
+}
+
+.nav-order-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nav-order-slots label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--a-ink-2);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.nav-order-slots select,
+.nav-order-fixed {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.nav-order-fixed {
+  display: flex;
+  align-items: center;
+  background: var(--a-sunken);
+  color: var(--a-muted);
+}
+
+.nav-order-slots select:disabled {
+  background: var(--a-sunken);
+  color: var(--a-faint);
+}
+
+.nav-order-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: tab;
+}
+
+.nav-order-preview li {
+  padding: 5px 12px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  color: var(--a-muted);
+  font-size: 13px;
+  counter-increment: tab;
+}
+
+.nav-order-preview li::before {
+  content: counter(tab) " ";
+  color: var(--a-faint);
+  font-size: 11px;
+}
+
+.nav-order-preview li.set {
+  border-color: var(--a-accent);
+  color: var(--a-accent-ink);
+  background: var(--a-accent-wash);
+}
+
+@media (max-width: 520px) {
+  .nav-order-slots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Settings → desktop app. */
+.install-card {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.install-steps,
+.install-state {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--a-sunken);
+  color: var(--a-ink-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.install-state {
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+/* The header's install button is for a computer; a phone has Settings. */
+@media (max-width: 520px) {
+  .head-install {
+    display: none;
+  }
+}

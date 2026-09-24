@@ -89,6 +89,7 @@ export function App() {
       onToggleScheme={toggleScheme}
       onAdminTap={handleAdminTap}
       featured={featured}
+      navPinned={catalog.menu?.navPinned ?? []}
     />
   </main>;
 }

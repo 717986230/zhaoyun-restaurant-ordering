@@ -3,12 +3,14 @@ import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { downloadQrCard } from "../qr/qrCard";
 import { describeSchedule, ScheduleEditor } from "./ScheduleEditor";
+import { useInstall } from "../../app/install";
+import type { InstallPlatform } from "../../app/install";
 
 // The time zones on offer: where a restaurant like this one is. A short list
 // on purpose — the server takes any real zone, so one saved from elsewhere is
@@ -105,6 +107,68 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
     <input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     <span>{label}</span>
   </label>;
+}
+
+/**
+ * The guest menu's tab order: the set menus first, always; the second and
+ * third chosen here; the rest in their usual order behind. A tab chosen for
+ * one place is greyed out in the other, and the third opens once the second
+ * is set, so there is no order that contradicts itself. The preview is the
+ * same function the menu uses (orderNavTabs).
+ */
+function NavOrder({ settings, products, onSave }: { settings: ApiSettings; products: Product[]; onSave: (navPinned: string[]) => void }) {
+  const { t } = useI18n();
+  const hasSets = products.some((product) => product.bundleItems?.length);
+  const categories = [...new Set(products.filter((product) => !product.bundleItems?.length).map((product) => product.category))];
+  const label = (tab: string) => tab === NAV_SETS ? t("navSets")
+    : tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
+    : tab === NAV_ALL ? t("navAll") : tab;
+  const options = [NAV_FEATURED, NAV_ALL, ...categories];
+  // A choice whose tab has since gone (an emptied category) is shown as unset.
+  const [second = "", third = ""] = settings.navPinned.filter((tab) => options.includes(tab));
+  const choose = (position: 0 | 1, value: string) => {
+    const next = [second, third];
+    next[position] = value;
+    onSave(next.filter(Boolean));
+  };
+  const available = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
+  const select = (position: 0 | 1, value: string, other: string, disabled = false) => <select
+    aria-label={t(position === 0 ? "navSecond" : "navThird")} value={value} disabled={disabled} onChange={(event) => choose(position, event.target.value)}
+  >
+    <option value="">{t("navDefault")}</option>
+    {options.map((tab) => <option key={tab} value={tab} disabled={tab === other}>{label(tab)}</option>)}
+  </select>;
+  return <div className="nav-order">
+    <div className="nav-order-slots">
+      <label><span>{t("navFirst")}</span><span className="nav-order-fixed">{t("navSets")} · {t("navFixed")}</span></label>
+      <label><span>{t("navSecond")}</span>{select(0, second, third)}</label>
+      <label><span>{t("navThird")}</span>{select(1, third, second, !second)}</label>
+    </div>
+    <p className="settings-label">{t("navPreview")}</p>
+    <ol className="nav-order-preview">{orderNavTabs(available, [second, third].filter(Boolean)).map((tab) => <li key={tab} className={tab === second || tab === third || tab === NAV_SETS ? "set" : ""}>{label(tab)}</li>)}</ol>
+  </div>;
+}
+
+const INSTALL_STEPS: Record<InstallPlatform, CopyKey> = {
+  chromium: "installStepsChromium",
+  safari: "installStepsSafari",
+  ios: "installStepsIos",
+  android: "installStepsAndroid",
+  unsupported: "installStepsUnsupported"
+};
+
+/** The console as a desktop app: one tap where the browser offers it, the steps where it does not. */
+function DesktopApp() {
+  const { t } = useI18n();
+  const installer = useInstall();
+  const [steps, setSteps] = useState(false);
+  if (installer.installed) return <p className="install-state">✓ {t("installDone")}</p>;
+  return <div className="install-card">
+    <button type="button" className="primary-action" onClick={async () => {
+      if (!(installer.canPrompt && await installer.install())) setSteps(true);
+    }}>⬇ {t("installApp")}</button>
+    {(steps || !installer.canPrompt) && <p className="install-steps" role="status">{t(INSTALL_STEPS[installer.platform])}</p>}
+  </div>;
 }
 
 /** The promotions page's dishes, in the order a guest sees them. */
@@ -239,6 +303,10 @@ export function SettingsPanel(props: Props) {
 
       {/* The biggest card: across the page, what the page is on the left and
           how it looks and what is on it on the right. */}
+      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={orderNavTabs([NAV_SETS, ...settings.navPinned], settings.navPinned).slice(0, 3).map((tab) => tab === NAV_SETS ? t("navSets") : tab === NAV_FEATURED ? t("navFeatured") : tab === NAV_ALL ? t("navAll") : tab).join(" · ")}>
+        <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
+      </Section>
+
       <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")} wide summary={settings.featuredEnabled
         ? [t("foldOn"), FEATURED_TEMPLATES.find((template) => template.id === settings.featuredTemplate)?.names[language], t("dishCount", { count: settings.featuredProductIds.length }), settings.featuredSchedule ? describeSchedule(settings.featuredSchedule, t, language) : ""].filter(Boolean).join(" · ")
         : t("foldOff")}>
@@ -280,6 +348,10 @@ export function SettingsPanel(props: Props) {
       <Section id="sets" title={t("sectionSets")} hint={t("setsHint")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>
         <ScheduleEditor key={JSON.stringify(settings.setsSchedule)} value={settings.setsSchedule} timeZone={settings.timeZone} onSave={(setsSchedule) => props.onSaveSettings({ setsSchedule }, "setsSaved")} />
+      </Section>
+
+      <Section id="desktop" title={t("sectionDesktop")} hint={t("desktopHint")}>
+        <DesktopApp />
       </Section>
 
       <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>

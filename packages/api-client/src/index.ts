@@ -3,6 +3,7 @@ import type {
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
+import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
 
 /**
  * A product as the server sends it, as the apps work with it. One function
@@ -29,6 +30,35 @@ export function toProduct(product: ApiCatalogProduct): Product {
     published: product.published ?? true,
     printStation: product.printStation ?? (product.kind === "drink" ? "bar" : product.kind === "sushi" ? "sushi" : "kitchen")
   };
+}
+
+/**
+ * Settings as the console works with them: every field there, whatever the
+ * server sent. A console is deployed a moment before or after its server,
+ * and one newer than the server it talks to would otherwise meet a setting
+ * the server has never heard of as `undefined` — and a settings page that
+ * lists it would not render. The defaults are the servers' own
+ * (shared/rules.mjs, APP_SETTINGS).
+ */
+export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings {
+  return {
+    menuTheme: DEFAULT_MENU_THEME,
+    menuLanguages: [...DEFAULT_MENU_LANGUAGES],
+    restaurantName: "",
+    menuTitle: "La Carte",
+    menuDefaultScheme: "dark",
+    showTableNumber: true,
+    showOrdering: false,
+    featuredEnabled: false,
+    featuredTitle: "",
+    featuredProductIds: [],
+    featuredTemplate: DEFAULT_FEATURED_TEMPLATE,
+    timeZone: "Europe/Vienna",
+    featuredSchedule: null,
+    setsSchedule: null,
+    navPinned: [],
+    ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
+  } as ApiSettings;
 }
 
 export interface RestaurantApiOptions {
@@ -210,9 +240,9 @@ export class AdminApi {
   createPrinter(profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request("/api/admin/printers", { method: "POST", body: JSON.stringify(profile) }); }
   updatePrinter(id: string, profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(profile) }); }
   retryPrintJob(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }
-  settings(): Promise<ApiSettings> { return this.#request("/api/admin/settings"); }
+  settings(): Promise<ApiSettings> { return this.#request<Partial<ApiSettings>>("/api/admin/settings").then(withSettingDefaults); }
   /** Either setting may be saved alone; the one left out keeps its value. */
-  updateSettings(settings: Partial<ApiSettings>): Promise<ApiSettings> { return this.#request("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) }); }
+  updateSettings(settings: Partial<ApiSettings>): Promise<ApiSettings> { return this.#request<Partial<ApiSettings>>("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) }).then(withSettingDefaults); }
 
   connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
     const base = this.storage.baseUrl.replace(/^http/, "ws");

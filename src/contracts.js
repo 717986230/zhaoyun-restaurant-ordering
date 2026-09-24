@@ -142,7 +142,9 @@ export const SettingsBody = Type.Object({
   timeZone: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
   // The promotions and set menus pages' hours; null: always on.
   featuredSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
-  setsSchedule: Type.Optional(Type.Union([Schedule, Type.Null()]))
+  setsSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
+  // The guest menu's second and third tabs; the set menus are always first.
+  navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 2 }))
 }, { minProperties: 1, additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces

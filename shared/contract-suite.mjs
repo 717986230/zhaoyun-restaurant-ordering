@@ -303,7 +303,7 @@ export function contractChecks(call, assert) {
 
     ["the restaurant's name, the menu's title and its look are the owner's to set", async () => {
       const before = await call("GET", "/api/catalog");
-      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, featured: null },
+      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], featured: null },
         "a fresh restaurant ships with these");
 
       assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
@@ -319,7 +319,7 @@ export function contractChecks(call, assert) {
       assert.equal(saved.status, 200);
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
       assert.deepEqual((await call("GET", "/api/catalog")).json.menu,
-        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, featured: null });
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], featured: null });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
       // A save of one setting leaves the rest where they were.
       assert.equal(saved.json.menuTheme, "jade");
@@ -619,6 +619,19 @@ export function contractChecks(call, assert) {
       const reset = await settings({ timeZone: "Europe/Vienna", featuredSchedule: null, setsSchedule: null, featuredEnabled: false, featuredProductIds: [] });
       assert.equal(reset.json.featuredSchedule, null, "null takes the hours away: always on");
       assert.equal(reset.json.setsSchedule, null);
+    }],
+
+    ["the owner picks the guest menu's second and third tabs, without conflicts", async () => {
+      const settings = (body) => call("PUT", "/api/admin/settings", { admin: true, body });
+      assert.deepEqual((await call("GET", "/api/admin/settings", { admin: true })).json.navPinned, []);
+      assert.deepEqual((await settings({ navPinned: [" RAMEN ", "RAMEN"] })).json.navPinned, ["RAMEN"], "trimmed, once each");
+      assert.deepEqual((await settings({ navPinned: ["", "SUSHI"] })).json.navPinned, ["SUSHI"], "a blank second leaves the third to move up");
+      const saved = await settings({ navPinned: ["RAMEN", "__featured__"] });
+      assert.equal(saved.status, 200);
+      assert.deepEqual(saved.json.navPinned, ["RAMEN", "__featured__"]);
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.navPinned, ["RAMEN", "__featured__"]);
+      assert.equal((await settings({ navPinned: ["RAMEN", "SUSHI", "ALLE"] })).status, 400, "the second and third, no more");
+      assert.deepEqual((await settings({ navPinned: [] })).json.navPinned, []);
     }],
 
     ["an unknown API route is a JSON 404, not the web app", async () => {

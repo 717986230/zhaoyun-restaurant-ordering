@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { deconstruct, LANGUAGE_INFO } from "@zhaoyun/domain";
+import { deconstruct, LANGUAGE_INFO, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product } from "@zhaoyun/domain";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
@@ -31,12 +31,14 @@ interface Props {
   onAdminTap: () => Promise<void>;
   /** The promotions page, when the owner switched it on and chose dishes. */
   featured: { title: string; products: Product[]; template: FeaturedTemplateId } | null;
+  /** The tabs the owner put second and third; the set menus are always first. */
+  navPinned?: string[];
 }
 
 /** The promotions page's place among the categories; no real category is called this. */
-export const FEATURED_PAGE = "__featured__";
+export const FEATURED_PAGE = NAV_FEATURED;
 /** The set menus' page: every dish that packages others, whatever its category. */
-export const SETS_PAGE = "__sets__";
+export const SETS_PAGE = NAV_SETS;
 
 /** A set menu is a dish made of other dishes; nothing else marks one. */
 export function isSet(product: Product): boolean {
@@ -50,11 +52,10 @@ export function isSet(product: Product): boolean {
  */
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 const DURATION = { backdrop: 0.2, card: 0.32, page: 0.46 };
-// A page's rows arrive in steps: a screenful with the page, the rest in
-// batches once it has turned. "All" is 111 dishes, and building every row at
-// once froze a phone for a third of a second mid-turn.
+// A page's rows arrive in two steps: a screenful with the page, the rest the
+// moment it has finished turning. "All" is 111 dishes, and building every row
+// at once froze a phone for a third of a second in the middle of the turn.
 const FIRST_ROWS = 14;
-const ROW_BATCH = 24;
 /** The card turns like a card: quick off the mark, settling without a wobble. */
 const FLIP_SPRING = { type: "spring", stiffness: 150, damping: 22, mass: 1 } as const;
 
@@ -378,7 +379,7 @@ function FeaturedPage({ title, eyebrow, template, products, byId, language, onOp
   </div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured }: Props) {
+export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [] }: Props) {
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
@@ -395,7 +396,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     return categoryMatch && (!query || text.includes(query));
   });
   // The promotions page, when there is one, is the first page of the menu.
-  const categories = [...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))];
+  // The set menus first, the owner's two next, the rest in their usual order.
+  const categories = orderNavTabs([...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))], navPinned);
   const activeProduct = state.activeProductId ? byId.get(state.activeProductId) : undefined;
   const table = assignedTableNo();
   const reduceMotion = useReducedMotion();
@@ -453,14 +455,13 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const complete = rowLimit >= visible.length || onFeatured || onSets;
   useEffect(() => {
     if (complete) return;
-    let frame = 0;
-    // The first batch waits for the page to finish turning; each after it
-    // takes the next frame, as a transition, so a tap still goes first.
-    const timer = window.setTimeout(() => {
-      frame = requestAnimationFrame(() => startTransition(() => setRows({ key: pageKey, limit: rowLimit + ROW_BATCH })));
-    }, rowLimit === FIRST_ROWS && !reduceMotion ? DURATION.page * 1000 : 0);
-    return () => { window.clearTimeout(timer); cancelAnimationFrame(frame); };
-  }, [pageKey, rowLimit, complete, reduceMotion]);
+    // The rest once the page has turned, as a transition: React builds it in
+    // slices between frames, so a tap or a scroll still goes first. A timer,
+    // not animation frames — those are held back in a tab not on screen, and
+    // the rows must still arrive.
+    const timer = window.setTimeout(() => startTransition(() => setRows({ key: pageKey, limit: Number.POSITIVE_INFINITY })), reduceMotion ? 0 : DURATION.page * 1000);
+    return () => window.clearTimeout(timer);
+  }, [pageKey, complete, reduceMotion]);
 
   // Back to the top of a long page in one tap, once the guest is more than a
   // screen and a bit down it. Watched on the list's own scroller — the

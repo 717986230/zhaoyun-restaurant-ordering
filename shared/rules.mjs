@@ -464,6 +464,27 @@ export const MAX_FEATURED_PRODUCTS = 40;
 export const FEATURED_TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];
 export const DEFAULT_FEATURED_TEMPLATE = "gallery";
 
+export const MAX_NAV_PINNED = 2;
+
+/**
+ * The tabs the owner puts second and third on the guest menu (the set menus
+ * are always first): "__featured__", "ALLE" or a category. At most two, no
+ * repeats; one that is not on the menu is skipped there, never an error.
+ */
+function normalizeNavPinned(value) {
+  if (!Array.isArray(value)) throw new Error("Pinned tabs must be a list");
+  // Counted as sent, as the request schema counts them, so both backends agree.
+  if (value.length > MAX_NAV_PINNED) throw new Error(`At most ${MAX_NAV_PINNED} pinned tabs`);
+  const tabs = [];
+  for (const item of value) {
+    const tab = String(item ?? "").trim();
+    if (!tab) continue;
+    if (tab.length > 64) throw new Error("A pinned tab is at most 64 characters");
+    if (!tabs.includes(tab)) tabs.push(tab);
+  }
+  return tabs;
+}
+
 /** The dishes on the promotions page, in the order the owner put them; no repeats. */
 function normalizeFeaturedIds(value) {
   if (!Array.isArray(value)) throw new Error("Featured products must be a list");
@@ -518,6 +539,8 @@ export const APP_SETTINGS = {
   // rules are src/schedule.js. Outside them the page and its tab are gone.
   featuredSchedule: { key: "featured_schedule", fallback: () => null, normalize: normalizeSchedule },
   setsSchedule: { key: "sets_schedule", fallback: () => null, normalize: normalizeSchedule },
+  // Which tabs come second and third on the guest menu (packages/domain/src/navigation.ts).
+  navPinned: { key: "nav_pinned", fallback: () => [], normalize: normalizeNavPinned },
   featuredTemplate: {
     key: "featured_template",
     fallback: () => DEFAULT_FEATURED_TEMPLATE,
@@ -570,6 +593,7 @@ export function menuSettingsView(settings) {
     showTableNumber: settings.showTableNumber,
     timeZone: settings.timeZone,
     setsSchedule: settings.setsSchedule,
+    navPinned: settings.navPinned,
     // Only when switched on: a guest has no use for a list of ids otherwise.
     featured: settings.featuredEnabled
       ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate, schedule: settings.featuredSchedule }
