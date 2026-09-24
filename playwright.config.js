@@ -44,8 +44,9 @@ export default defineConfig({
 // WebKit; a machine without it sets NO_WEBKIT=1.
 function iphone(name, device) {
   if (process.env.NO_WEBKIT) return null;
-  // At most two WebKits at once: four on a four-core runner starved each
-  // other of animation frames, and a dish card still settling after seconds
-  // kept its close button from ever being clickable.
-  return { name, testMatch: /layout\.spec\.js/, workers: ci ? 2 : undefined, use: { ...device } };
+  // CI's WebKit draws in software, several times slower than Chromium: a
+  // test that opens and closes three 3D dish cards takes 8s in Chromium and
+  // ran past 30s there. So twice the time, and at most two WebKits at once
+  // on a four-core runner.
+  return { name, testMatch: /layout\.spec\.js/, workers: ci ? 2 : undefined, timeout: 60000, use: { ...device } };
 }
