@@ -450,7 +450,7 @@ test("a dish goes onto the promotions page from its editor, and the page is swit
   await expect(page.locator(".product-row .feature-mark")).toHaveCount(1);
 
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
-  const card = page.locator("#featured-title").locator("xpath=..");
+  const card = page.locator(".settings-card", { has: page.locator("#featured-title") });
   await expect(card.locator(".featured-list li")).toContainText(["黑椒牛柳"]);
   await card.getByRole("switch", { name: "在菜单上显示活动页" }).click();
   await expect.poll(() => appSettings.featuredEnabled).toBe(true);
@@ -669,6 +669,34 @@ test("the promotions and set menus pages are given hours in settings, and have t
   await featured.getByText("只在设定的时间段显示").click();
   await featured.getByRole("button", { name: "保存时间段" }).click();
   await expect.poll(() => saves.at(-1)?.featuredSchedule).toEqual({ days: [1, 2, 3, 4, 5], from: "11:00", to: "14:30" });
+});
+
+test("a settings card folds to its title and what is set in it, and stays folded", async ({ page }) => {
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "餐厅", exact: true }) });
+  await expect(card.getByLabel("餐厅名称")).toBeVisible();
+  await card.locator("summary").click();
+  await expect(card.getByLabel("餐厅名称")).toBeHidden();
+  await expect(card.locator(".settings-summary")).toHaveText("赵云 · La Carte");
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  await expect(card.getByLabel("餐厅名称")).toBeHidden();
+  await card.locator("summary").click();
+  await expect(card.getByLabel("餐厅名称")).toBeVisible();
+});
+
+test("on a computer, a long set's editor keeps its save button on screen", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  const dishes = Array.from({ length: 12 }, (_, index) => ({
+    id: `d${index}`, sku: `D${index}`, kind: "food", category: "MAIN", names: { zh: `菜 ${index}`, de: `Gericht ${index}`, en: `Dish ${index}` },
+    description: "", price: 10, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: []
+  }));
+  const set = { ...dishes[0], id: "set", sku: "SET", names: { zh: "大套餐", de: "Großes Menü", en: "Big Set" }, bundleItems: dishes.map((dish) => ({ productId: dish.id, quantity: 1 })) };
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [...dishes, set] }) }));
+  await page.reload();
+  await page.locator(".product-row", { hasText: "大套餐" }).click();
+  await expect(page.getByRole("button", { name: "保存修改" })).toBeInViewport();
 });
 
 test("the restaurant's time zone is chosen in settings", async ({ page }) => {

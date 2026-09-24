@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, LANGUAGE_INFO } from "@zhaoyun/domain";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product } from "@zhaoyun/domain";
@@ -50,6 +50,11 @@ export function isSet(product: Product): boolean {
  */
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 const DURATION = { backdrop: 0.2, card: 0.32, page: 0.46 };
+// A page's rows arrive in steps: a screenful with the page, the rest in
+// batches once it has turned. "All" is 111 dishes, and building every row at
+// once froze a phone for a third of a second mid-turn.
+const FIRST_ROWS = 14;
+const ROW_BATCH = 24;
 /** The card turns like a card: quick off the mark, settling without a wobble. */
 const FLIP_SPRING = { type: "spring", stiffness: 150, damping: 22, mass: 1 } as const;
 
@@ -436,8 +441,26 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     const target = categories.indexOf(category);
     turn.current.direction = target > pageIndex ? 1 : target < pageIndex ? -1 : 0;
     turn.current.atEnd = atEnd;
+    // Landing at the end needs the whole page there to land on.
+    if (atEnd) setRows({ key: `${category}|${query}`, limit: Number.POSITIVE_INFINITY });
     if (category !== state.category) dispatch({ type: "category", category });
   }
+
+  const pageKey = `${state.category}|${query}`;
+  const [rows, setRows] = useState({ key: pageKey, limit: FIRST_ROWS });
+  const rowLimit = rows.key === pageKey ? rows.limit : FIRST_ROWS;
+  // The promotions and set menus pages show cards, not these rows: nothing to build.
+  const complete = rowLimit >= visible.length || onFeatured || onSets;
+  useEffect(() => {
+    if (complete) return;
+    let frame = 0;
+    // The first batch waits for the page to finish turning; each after it
+    // takes the next frame, as a transition, so a tap still goes first.
+    const timer = window.setTimeout(() => {
+      frame = requestAnimationFrame(() => startTransition(() => setRows({ key: pageKey, limit: rowLimit + ROW_BATCH })));
+    }, rowLimit === FIRST_ROWS && !reduceMotion ? DURATION.page * 1000 : 0);
+    return () => { window.clearTimeout(timer); cancelAnimationFrame(frame); };
+  }, [pageKey, rowLimit, complete, reduceMotion]);
 
   // Back to the top of a long page in one tap, once the guest is more than a
   // screen and a bit down it. Watched on the list's own scroller — the
@@ -447,7 +470,13 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     const stack = stackRef.current;
     if (!stack) return;
     let frame = 0;
-    const check = () => { frame = 0; setFarDown(stack.scrollTop > stack.clientHeight * 1.2); };
+    const check = () => {
+      frame = 0;
+      // Not over the end of the page either, where the way on — the next-page
+      // bar and its arrow — sits in the same corner.
+      const nearEnd = stack.scrollTop + stack.clientHeight > stack.scrollHeight - 190;
+      setFarDown(stack.scrollTop > stack.clientHeight * 1.2 && !nearEnd);
+    };
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(check); };
     stack.addEventListener("scroll", onScroll, { passive: true });
     check();
@@ -457,7 +486,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   usePageTurn({
     scroller: stackRef,
     sheet: sheetRef,
-    canTurn: (direction: TurnDirection) => Boolean(direction === "next" ? nextPage : prevPage),
+    // On to the next page only from the real end of this one, every row in.
+    canTurn: (direction: TurnDirection) => Boolean(direction === "next" ? nextPage && complete : prevPage),
     onTurn: (direction: TurnDirection) => {
       const target = direction === "next" ? nextPage : prevPage;
       if (target) turnTo(target, direction === "prev");
@@ -519,7 +549,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
           {onFeatured && featured ? <FeaturedPage title={featured.title || t(state.language, "featuredDefault")} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
-            : visible.length ? visible.map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
+            : visible.length ? visible.slice(0, rowLimit).map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
             <div className="summary">
               <DishPicture product={product} byId={byId} size="thumb" />
               {/* The code sits on its own small line above the name: drink
@@ -533,13 +563,20 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
               {/* A menu without prices sends a guest into every dish to find one. */}
               <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
             </div>
-          </article>) : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}
-          {nextPage && <button type="button" className="page-next" onClick={() => turnTo(nextPage)}>
+          </article>) : query && products.length
+            // A search that found nothing says what was looked for and offers the way back.
+            ? <div className="empty search-empty">
+              <strong>{t(state.language, "noResults").replace("{query}", state.query.trim())}</strong>
+              <span>{t(state.language, "noResultsHint")}</span>
+              <button type="button" className="secondary" onClick={() => dispatch({ type: "toggle-search" })}>{t(state.language, "showAll")}</button>
+            </div>
+            : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}
+          {nextPage && complete && <button type="button" className="page-next" onClick={() => turnTo(nextPage)}>
             <i className="page-next-progress" aria-hidden="true" />
             <span className="page-next-label"><b>{t(state.language, "nextPage")} · {pageName(nextPage)}</b><small className="page-hint-idle">{t(state.language, "pullForNext")}</small><small className="page-hint-armed">{t(state.language, "releaseToTurn")}</small></span>
             <span className="page-next-arrow" aria-hidden="true">→</span>
           </button>}
-          {paging && !nextPage && visible.length > 0 && <p className="page-end">{t(state.language, "endOfMenu")}</p>}
+          {paging && !nextPage && complete && visible.length > 0 && <p className="page-end">{t(state.language, "endOfMenu")}</p>}
         </motion.div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import { useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { downloadQrCard } from "../qr/qrCard";
-import { ScheduleEditor } from "./ScheduleEditor";
+import { describeSchedule, ScheduleEditor } from "./ScheduleEditor";
 
 // The time zones on offer: where a restaurant like this one is. A short list
 // on purpose — the server takes any real zone, so one saved from elsewhere is
@@ -61,12 +61,41 @@ function entryUrl(baseUrl: string, table: RestaurantTable): string {
 }
 
 /** One group of settings, as a card with its heading and one line of why. */
-function Section({ title, hint, children, id }: { title: string; hint?: string; children: ReactNode; id: string }) {
-  return <section className="settings-card" aria-labelledby={`${id}-title`}>
-    <h2 id={`${id}-title`}>{title}</h2>
-    {hint && <p className="settings-hint">{hint}</p>}
-    {children}
-  </section>;
+const FOLDS_KEY = "zy_admin_folded";
+
+function readFolded(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FOLDS_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored.filter((id) => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * A settings card that folds away to its title and a one-line summary of
+ * what is set in it. Open until the owner folds it; which cards are folded
+ * is remembered on this device, so the page opens the way they left it.
+ */
+function Section({ title, hint, children, id, wide = false, summary }: { title: string; hint?: string; children: ReactNode; id: string; wide?: boolean; summary?: string }) {
+  const [open, setOpen] = useState(() => !readFolded().includes(id));
+  function toggle(next: boolean) {
+    setOpen(next);
+    try {
+      const folded = readFolded().filter((item) => item !== id);
+      localStorage.setItem(FOLDS_KEY, JSON.stringify(next ? folded : [...folded, id]));
+    } catch { /* storage refused: it folds for this visit only */ }
+  }
+  return <details className={`settings-card settings-section ${wide ? "wide" : ""}`} open={open} onToggle={(event) => { if (event.currentTarget.open !== open) toggle(event.currentTarget.open); }}>
+    <summary>
+      <h2 id={`${id}-title`}>{title}</h2>
+      {summary && <span className="settings-summary">{summary}</span>}
+    </summary>
+    <div className="settings-body" role="group" aria-labelledby={`${id}-title`}>
+      {hint && <p className="settings-hint">{hint}</p>}
+      {children}
+    </div>
+  </details>;
 }
 
 /** A switch that saves on change: the setting is on screen the moment it is
@@ -157,7 +186,7 @@ export function SettingsPanel(props: Props) {
     <h1 className="settings-title">{t("settingsTitle")}</h1>
 
     {settings && <div className="settings-grid">
-      <Section id="restaurant" title={t("sectionRestaurant")}>
+      <Section id="restaurant" title={t("sectionRestaurant")} summary={`${settings.restaurantName} · ${settings.menuTitle}`}>
         {/* Keyed on the saved values so the fields show what the server kept
             (trimmed, spaces collapsed) once a save comes back. */}
         <form key={`${settings.restaurantName}|${settings.menuTitle}|${settings.timeZone}`} className="editor-form" onSubmit={saveRestaurant}>
@@ -168,7 +197,7 @@ export function SettingsPanel(props: Props) {
         </form>
       </Section>
 
-      <Section id="appearance" title={t("sectionAppearance")}>
+      <Section id="appearance" title={t("sectionAppearance")} summary={`${themeName(MENU_THEMES[settings.menuTheme] ?? MENU_THEMES.jade)} · ${t(settings.menuDefaultScheme === "dark" ? "schemeDark" : "schemeLight")}`}>
         <p className="settings-label">{t("menuStyle")}</p>
         <div className="theme-picker">{Object.values(MENU_THEMES).map((theme) => <button
           key={theme.id}
@@ -190,7 +219,7 @@ export function SettingsPanel(props: Props) {
         <Toggle checked={settings.showTableNumber} label={t("showTableNumber")} onChange={(showTableNumber) => void props.onSaveSettings({ showTableNumber }, "appearanceSaved")} />
       </Section>
 
-      <Section id="languages" title={t("sectionLanguages")} hint={t("languagesHint")}>
+      <Section id="languages" title={t("sectionLanguages")} hint={t("languagesHint")} summary={offered.map((option) => LANGUAGE_INFO[option].name).join(" · ")}>
         <div className="language-picker" role="group" aria-label={t("sectionLanguages")}>{MENU_LANGUAGES.map((option) => {
           const on = offered.includes(option);
           // The last one cannot be switched off: a menu has to be in something.
@@ -208,47 +237,58 @@ export function SettingsPanel(props: Props) {
         })}</div>
       </Section>
 
-      <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")}>
-        <Toggle checked={settings.featuredEnabled} label={t("featuredEnable")} onChange={(featuredEnabled) => void props.onSaveSettings({ featuredEnabled }, "featuredSaved")} />
-        <p className="settings-label">{t("pageHours")}</p>
-        <ScheduleEditor key={JSON.stringify(settings.featuredSchedule)} value={settings.featuredSchedule} timeZone={settings.timeZone} onSave={(featuredSchedule) => props.onSaveSettings({ featuredSchedule }, "featuredSaved")} />
-        <form key={settings.featuredTitle} className="editor-form" onSubmit={(event) => {
-          event.preventDefault();
-          void props.onSaveSettings({ featuredTitle: String(new FormData(event.currentTarget).get("featuredTitle") || "") }, "featuredSaved");
-        }}>
-          <label><span>{t("featuredTitleLabel")}</span><input name="featuredTitle" maxLength={32} defaultValue={settings.featuredTitle} placeholder={t("featuredTitlePlaceholder")} /></label>
-          <button className="ghost-action" type="submit">{t("save")}</button>
-        </form>
-        <p className="settings-label">{t("featuredTemplateLabel")}</p>
-        {/* Each sketch is drawn by CSS from the same id the menu uses, so the
-            picker and the page cannot describe different designs. */}
-        <div className="template-picker" role="radiogroup" aria-label={t("featuredTemplateLabel")}>{FEATURED_TEMPLATES.map((template) => <button
-          key={template.id}
-          type="button"
-          role="radio"
-          aria-checked={settings.featuredTemplate === template.id}
-          className={settings.featuredTemplate === template.id ? "on" : ""}
-          onClick={() => void props.onSaveSettings({ featuredTemplate: template.id }, "featuredSaved")}
-        >
-          <span className="template-thumb" data-template={template.id} aria-hidden="true"><i /><i /><i /><i /></span>
-          <b>{template.names[language]}</b>
-          <small>{template.hints[language]}</small>
-        </button>)}</div>
-        <FeaturedList ids={settings.featuredProductIds} products={props.products} onChange={(featuredProductIds) => void props.onSaveSettings({ featuredProductIds }, "featuredSaved")} />
+      {/* The biggest card: across the page, what the page is on the left and
+          how it looks and what is on it on the right. */}
+      <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")} wide summary={settings.featuredEnabled
+        ? [t("foldOn"), FEATURED_TEMPLATES.find((template) => template.id === settings.featuredTemplate)?.names[language], t("dishCount", { count: settings.featuredProductIds.length }), settings.featuredSchedule ? describeSchedule(settings.featuredSchedule, t, language) : ""].filter(Boolean).join(" · ")
+        : t("foldOff")}>
+        <div className="featured-settings">
+          <div>
+            <Toggle checked={settings.featuredEnabled} label={t("featuredEnable")} onChange={(featuredEnabled) => void props.onSaveSettings({ featuredEnabled }, "featuredSaved")} />
+            <form key={settings.featuredTitle} className="editor-form" onSubmit={(event) => {
+              event.preventDefault();
+              void props.onSaveSettings({ featuredTitle: String(new FormData(event.currentTarget).get("featuredTitle") || "") }, "featuredSaved");
+            }}>
+              <label><span>{t("featuredTitleLabel")}</span><input name="featuredTitle" maxLength={32} defaultValue={settings.featuredTitle} placeholder={t("featuredTitlePlaceholder")} /></label>
+              <button className="ghost-action" type="submit">{t("save")}</button>
+            </form>
+            <p className="settings-label">{t("pageHours")}</p>
+            <ScheduleEditor key={JSON.stringify(settings.featuredSchedule)} value={settings.featuredSchedule} timeZone={settings.timeZone} onSave={(featuredSchedule) => props.onSaveSettings({ featuredSchedule }, "featuredSaved")} />
+          </div>
+          <div>
+            <p className="settings-label">{t("featuredTemplateLabel")}</p>
+            {/* Each sketch is drawn by CSS from the same id the menu uses, so the
+                picker and the page cannot describe different designs. */}
+            <div className="template-picker" role="radiogroup" aria-label={t("featuredTemplateLabel")}>{FEATURED_TEMPLATES.map((template) => <button
+              key={template.id}
+              type="button"
+              role="radio"
+              aria-checked={settings.featuredTemplate === template.id}
+              className={settings.featuredTemplate === template.id ? "on" : ""}
+              onClick={() => void props.onSaveSettings({ featuredTemplate: template.id }, "featuredSaved")}
+            >
+              <span className="template-thumb" data-template={template.id} aria-hidden="true"><i /><i /><i /><i /></span>
+              <b>{template.names[language]}</b>
+              <small>{template.hints[language]}</small>
+            </button>)}</div>
+            <p className="settings-label">{t("featuredDishes")}</p>
+            <FeaturedList ids={settings.featuredProductIds} products={props.products} onChange={(featuredProductIds) => void props.onSaveSettings({ featuredProductIds }, "featuredSaved")} />
+          </div>
+        </div>
       </Section>
 
-      <Section id="sets" title={t("sectionSets")} hint={t("setsHint")}>
+      <Section id="sets" title={t("sectionSets")} hint={t("setsHint")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>
         <ScheduleEditor key={JSON.stringify(settings.setsSchedule)} value={settings.setsSchedule} timeZone={settings.timeZone} onSave={(setsSchedule) => props.onSaveSettings({ setsSchedule }, "setsSaved")} />
       </Section>
 
-      <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")}>
+      <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
         <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
       </Section>
     </div>}
 
     <div className="settings-grid">
-      <Section id="tables" title={t("sectionTables")} hint={t("tablesHint")}>
+      <Section id="tables" title={t("sectionTables")} hint={t("tablesHint")} summary={t("tableCount", { count: props.tables.length })}>
         <form className="editor-form" onSubmit={(event) => void addTable(event)}>
           <div className="field-grid">
             <label><span>{t("tableNumber")}</span><input name="table" required maxLength={8} placeholder="12 / T-3" /></label>

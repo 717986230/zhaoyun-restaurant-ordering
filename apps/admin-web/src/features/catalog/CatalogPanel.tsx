@@ -231,9 +231,13 @@ export function CatalogPanel(props: Props) {
         </div>
         <label><span>{t("fieldModifiers")}</span><textarea name="modifiers" rows={8} spellCheck={false} defaultValue={JSON.stringify(product?.modifiers ?? [], null, 2)} placeholder={'[{"id":"spice","names":{"zh":"辣度","de":"Scharf","en":"Spice"},"selection":"single","options":[]}]'} /><small>{t("fieldModifiersHint")}</small></label>
       </details>
-      {formError && <p className="form-error" role="alert">{formError}</p>}
-      <button className="primary-action" type="submit">{product ? t("saveProduct") : t("createProduct")}</button>
       {product && <button type="button" className="danger-action" onClick={() => { if (window.confirm(t("confirmDelete"))) void props.onDelete(product.id).then(() => setEditorOpen(false)); }}>{t("deleteProduct")}</button>}
+      {/* Save stays in reach at the foot of the form, however long a set's
+          editor runs; delete is at the end of the form, out of the way. */}
+      <div className="editor-actions">
+        {formError && <p className="form-error" role="alert">{formError}</p>}
+        <button className="primary-action" type="submit">{product ? t("saveProduct") : t("createProduct")}</button>
+      </div>
     </form></aside>
     <section className="list-pane">
       <header className="list-head">

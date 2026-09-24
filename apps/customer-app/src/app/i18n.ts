@@ -7,7 +7,7 @@ export type Language = CustomerState["language"];
 const copy = {
   zh: {
     start: "开始点餐", orders: "订单状态", service: "呼叫服务员", staff: "员工看板",
-    menu: "菜单", cart: "购物车", search: "搜索菜品", clear: "清除", empty: "没有找到商品", unavailable: "菜单暂时不可用，请呼叫服务员",
+    menu: "菜单", cart: "购物车", search: "搜索菜品", clear: "清除", empty: "没有找到商品", noResults: "没有找到「{query}」", noResultsHint: "换个词试试，或者看看全部菜品", showAll: "查看全部", unavailable: "菜单暂时不可用，请呼叫服务员",
     add: "加入购物车", customize: "口味与加料", bundleIncludes: "套餐包含", close: "关闭详情", flip: "点击卡片翻转查看详情", back: "返回正面",
     ingredients: "主要食材", allergens: "过敏原", time: "制作时间", portion: "份量 / 难度",
     submit: "确认下单", total: "合计", note: "订单备注", emptyCart: "购物车还是空的",
@@ -43,7 +43,7 @@ const copy = {
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
-    menu: "Speisekarte", cart: "Warenkorb", search: "Gericht suchen", clear: "Löschen", empty: "Keine Gerichte gefunden", unavailable: "Speisekarte nicht verfügbar, bitte Service rufen",
+    menu: "Speisekarte", cart: "Warenkorb", search: "Gericht suchen", clear: "Löschen", empty: "Keine Gerichte gefunden", noResults: "Nichts gefunden für „{query}“", noResultsHint: "Ein anderes Wort versuchen oder die ganze Karte ansehen", showAll: "Ganze Karte", unavailable: "Speisekarte nicht verfügbar, bitte Service rufen",
     add: "In den Warenkorb", customize: "Geschmack & Extras", bundleIncludes: "Im Set enthalten", close: "Details schließen", flip: "Karte für Details antippen", back: "Vorderseite",
     ingredients: "Zutaten", allergens: "Allergene", time: "Zubereitungszeit", portion: "Portion / Schärfe",
     submit: "Bestellung bestätigen", total: "Gesamt", note: "Bestellnotiz", emptyCart: "Der Warenkorb ist leer",
@@ -79,7 +79,7 @@ const copy = {
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
-    menu: "Menu", cart: "Cart", search: "Search dishes", clear: "Clear", empty: "No dishes found", unavailable: "Menu unavailable, please call service",
+    menu: "Menu", cart: "Cart", search: "Search dishes", clear: "Clear", empty: "No dishes found", noResults: "Nothing found for “{query}”", noResultsHint: "Try another word, or browse the whole menu", showAll: "Whole menu", unavailable: "Menu unavailable, please call service",
     add: "Add to cart", customize: "Flavors & extras", bundleIncludes: "Included in this set", close: "Close details", flip: "Tap card to see details", back: "Front side",
     ingredients: "Ingredients", allergens: "Allergens", time: "Preparation time", portion: "Portion / level",
     submit: "Place order", total: "Total", note: "Order note", emptyCart: "Your cart is empty",

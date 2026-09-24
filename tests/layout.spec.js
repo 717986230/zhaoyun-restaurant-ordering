@@ -141,8 +141,9 @@ test("far down a long page, one tap goes back to the top; the header and categor
   await stack.evaluate((node) => { node.scrollTop = node.scrollHeight / 2; });
   await expect(toTop).toBeVisible();
   const [topbarAfter, chipsAfter] = await header();
-  expect(topbarAfter.y).toBe(topbarBefore.y);
-  expect(chipsAfter.y).toBe(chipsBefore.y);
+  // Within a pixel: WebKit lands a box on hundredths of one.
+  expect(Math.abs(topbarAfter.y - topbarBefore.y)).toBeLessThan(1);
+  expect(Math.abs(chipsAfter.y - chipsBefore.y)).toBeLessThan(1);
   // In the corner, inside the screen, clear of the header.
   const button = await page.locator(".to-top").boundingBox();
   const viewport = page.viewportSize();
@@ -152,6 +153,30 @@ test("far down a long page, one tap goes back to the top; the header and categor
 
   await toTop.click();
   await expect.poll(() => stack.evaluate((node) => node.scrollTop)).toBe(0);
+  await expect(page.locator(".to-top")).not.toHaveClass(/\bon\b/);
+});
+
+test("opening and closing a dish leaves the header where it was, on every phone and in every direction", async ({ page }) => {
+  const top = () => page.locator(".topbar").boundingBox().then((box) => box.y);
+  const before = await top();
+  await page.locator(".dish-card").nth(2).click();
+  await expect(page.locator(".dish-detail-card")).toBeVisible();
+  // The card sits inside the screen, its price included.
+  const [card, price] = await Promise.all([page.locator(".dish-detail-card").boundingBox(), page.locator(".detail-buy").boundingBox()]);
+  expect(card.y + card.height).toBeLessThanOrEqual(page.viewportSize().height + 1);
+  expect(price.y + price.height).toBeLessThanOrEqual(card.y + card.height + 1);
+  await page.getByRole("button", { name: "关闭详情" }).click();
+  await expect(page.locator(".dish-detail-card")).toHaveCount(0);
+  expect(Math.abs((await top()) - before)).toBeLessThan(1);
+  // Nothing outside the list scrolls, whatever was tapped.
+  expect(await page.evaluate(() => document.querySelector(".app-shell").scrollTop)).toBe(0);
+});
+
+test("at the end of a page the back-to-top button makes way for the next-page bar", async ({ page }) => {
+  const stack = page.locator("#stack");
+  await expect(page.locator(".page-next")).toBeVisible();
+  await stack.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+  await expect(page.locator(".page-next")).toBeInViewport();
   await expect(page.locator(".to-top")).not.toHaveClass(/\bon\b/);
 });
 

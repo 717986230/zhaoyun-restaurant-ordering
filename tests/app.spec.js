@@ -298,7 +298,8 @@ test("a tablet that has never reached the server shows the menu the app ships wi
   await page.reload();
 
   await expect(page.locator(".dish-card").first()).toBeVisible();
-  expect(await page.locator(".dish-card").count()).toBeGreaterThan(100);
+  // The rows arrive in batches after the first screenful.
+  await expect.poll(() => page.locator(".dish-card").count()).toBeGreaterThan(100);
   await expect(page.locator(".dish-card .number").first()).toHaveText("R1");
   // Having never reached the server, it has not heard that this restaurant
   // switched Chinese on either, so it offers the default two — and a Chinese
@@ -705,6 +706,28 @@ test.describe("a restaurant that has not switched Chinese on", () => {
       await expect(page.getByRole("button", { name: "Helles Design" })).toBeVisible();
     });
   });
+});
+
+test("closing the search ends it, so no page is left filtered by it", async ({ page }) => {
+  await page.locator("#searchBtn").click();
+  await page.locator("#searchInput").fill("拉面");
+  await expect(page.locator(".dish-card")).toHaveCount(1);
+  await page.locator("#searchBtn").click();
+  // Every category shows its own dishes again, not what the search found.
+  await page.getByRole("button", { name: "MAIN", exact: true }).click();
+  await expect(page.locator(".dish-card")).toHaveCount(1);
+  await expect(page.locator(".dish-card")).toContainText("黑椒牛柳");
+  await page.locator("#searchBtn").click();
+  await expect(page.locator("#searchInput")).toHaveValue("");
+});
+
+test("a search that finds nothing says what was looked for, and one tap goes back to the menu", async ({ page }) => {
+  await page.locator("#searchBtn").click();
+  await page.locator("#searchInput").fill("xyz");
+  await expect(page.locator(".search-empty strong")).toHaveText("没有找到「xyz」");
+  await page.getByRole("button", { name: "查看全部" }).click();
+  await expect(page.locator("#searchInput")).not.toBeVisible();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
 });
 
 test.describe("the promotions and set menus pages keep their hours", () => {
