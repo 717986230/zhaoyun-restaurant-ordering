@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 
 /**
- * "安装桌面版": the console installed as an app of its own — its own window,
- * its own icon on the desktop, the Start menu or the Dock — from the
- * manifest admin.html links (public/admin.webmanifest). Nothing to download
- * and keep up to date: it is this same site, so every deploy reaches it.
+ * The menu installed as an app — its own icon on a phone's home screen or a
+ * computer's desktop, its own window — from the manifest index.html links
+ * (public/menu.webmanifest). Nothing to download and keep up to date: it is
+ * this same site, so every deploy reaches it.
  *
- * Chrome and Edge offer the install through `beforeinstallprompt`, which can
- * fire before React has mounted, so it is caught here, when this module
- * loads. Where there is no such offer (Safari, an iPhone, a prompt the owner
- * dismissed earlier), the console says how, for the browser in use.
+ * Chrome, Edge and Android offer the install through `beforeinstallprompt`,
+ * which can fire before React has mounted, so it is caught here, when this
+ * module loads. Where there is no such offer (an iPhone, Safari), the menu
+ * says how, for the browser in use.
  */
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;

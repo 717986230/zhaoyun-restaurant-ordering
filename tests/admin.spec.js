@@ -539,6 +539,10 @@ test("the header and tabs stay on screen, and a long page goes back to its top i
   await expect(page.locator(".back-to-top")).not.toHaveClass(/\bon\b/);
   await page.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight / 2));
   await expect(toTop).toBeVisible();
+  // In the window's bottom-right corner.
+  const corner = await toTop.boundingBox();
+  expect(corner.x + corner.width).toBeGreaterThan(390 - 70);
+  expect(corner.y + corner.height).toBeGreaterThan(844 - 70);
   expect((await page.locator(".admin-head").boundingBox()).y).toBe(0);
   await expect(tabs).toBeInViewport();
   await toTop.click();
@@ -746,46 +750,11 @@ test("the first three tabs are chosen in settings, none fixed, and cannot repeat
   await expect.poll(() => appSettings.navPinned).toEqual(["__sets__", "ALLE"]);
 });
 
-test("the console can be installed as a desktop app", async ({ page, request }) => {
-  // What a browser reads before it offers to install: the manifest and its icons.
-  const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
-  const manifest = await (await request.get(manifestHref)).json();
-  expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toBe("admin.html");
-  for (const icon of manifest.icons) {
-    const response = await request.get(new URL(icon.src, new URL(manifestHref, "http://127.0.0.1:5173/")).pathname);
-    expect(response.status(), icon.src).toBe(200);
-  }
-  expect(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable")).toBe(true);
-
-  // No offer from the browser: Settings says how, for the browser in use.
+test("the console installs nothing of its own: the menu is what installs", async ({ page }) => {
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
-  const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "桌面版", exact: true }) });
-  // Chrome on a computer is pointed at the address bar; an Android phone at its menu.
-  await expect(card.locator(".install-steps")).toContainText(/「安装」|「安装应用」/);
-  await expect(page.locator(".head-install")).toHaveCount(0);
-
-  // The browser offers it (Chrome, Edge): one tap in the header asks, and once
-  // it is installed the button goes.
-  await page.evaluate(() => {
-    const offer = new Event("beforeinstallprompt", { cancelable: true });
-    window.__prompted = false;
-    Object.assign(offer, { prompt: async () => { window.__prompted = true; }, userChoice: Promise.resolve({ outcome: "accepted" }) });
-    window.dispatchEvent(offer);
-  });
-  const header = page.locator(".head-install");
-  if ((page.viewportSize()?.width ?? 0) > 520) {
-    await header.click();
-    await expect.poll(() => page.evaluate(() => window.__prompted)).toBe(true);
-    await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
-    await expect(header).toHaveCount(0);
-    await expect(card.locator(".install-state")).toBeVisible();
-  } else {
-    // A phone keeps its header to three buttons; Settings has the install.
-    await expect(header).toBeHidden();
-    await card.getByRole("button", { name: /安装桌面版/ }).click();
-    await expect.poll(() => page.evaluate(() => window.__prompted)).toBe(true);
-  }
+  await expect(page.getByRole("heading", { name: "桌面版", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /安装/ })).toHaveCount(0);
 });
 
 test("the restaurant's time zone is chosen in settings", async ({ page }) => {

@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, LANGUAGE_INFO, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
+import { InstallOffer } from "./InstallOffer";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product } from "@zhaoyun/domain";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
@@ -463,8 +464,9 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     return () => window.clearTimeout(timer);
   }, [pageKey, complete, reduceMotion]);
 
-  // Back to the top of a long page in one tap, once the guest is more than a
-  // screen and a bit down it. Watched on the list's own scroller — the
+  // Back to the top in one tap, from the menu's bottom-right corner, as soon
+  // as the guest is most of a screen down the page, and there it stays until
+  // they are back at the top. Watched on the list's own scroller — the
   // header and the category bar never scroll, so they need no help.
   const [farDown, setFarDown] = useState(false);
   useEffect(() => {
@@ -473,10 +475,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     let frame = 0;
     const check = () => {
       frame = 0;
-      // Not over the end of the page either, where the way on — the next-page
-      // bar and its arrow — sits in the same corner.
-      const nearEnd = stack.scrollTop + stack.clientHeight > stack.scrollHeight - 190;
-      setFarDown(stack.scrollTop > stack.clientHeight * 1.2 && !nearEnd);
+      setFarDown(stack.scrollTop > stack.clientHeight * 0.8);
     };
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(check); };
     stack.addEventListener("scroll", onScroll, { passive: true });
@@ -581,6 +580,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
         </motion.div>
       </div>
     </div>
+    <InstallOffer language={state.language} />
     {/* Outside the list: the list is transformed while a page turns, and a
         fixed button inside it would move with the page. */}
     <button

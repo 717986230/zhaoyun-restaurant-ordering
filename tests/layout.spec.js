@@ -17,6 +17,8 @@ const catalog = JSON.parse(readFileSync(new URL("../apps/customer-app/src/app/bu
 test.use({ locale: "zh-CN" });
 
 test.beforeEach(async ({ page }) => {
+  // An iPhone is offered the install steps on a first visit; measured here is the menu.
+  await page.addInitScript(() => { try { localStorage.setItem("zy_install_offer", "1"); } catch { /* none */ } });
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
     products: catalog, theme: "jade", languages: ["zh", "en", "de"],
     menu: { title: "Chiri Kitchen", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true }
@@ -172,12 +174,18 @@ test("opening and closing a dish leaves the header where it was, on every phone 
   expect(await page.evaluate(() => document.querySelector(".app-shell").scrollTop)).toBe(0);
 });
 
-test("at the end of a page the back-to-top button makes way for the next-page bar", async ({ page }) => {
+test("at the end of a page the back-to-top button keeps its corner, clear of the next-page bar", async ({ page }) => {
   const stack = page.locator("#stack");
   await expect(page.locator(".page-next")).toBeVisible();
   await stack.evaluate((node) => { node.scrollTop = node.scrollHeight; });
   await expect(page.locator(".page-next")).toBeInViewport();
-  await expect(page.locator(".to-top")).not.toHaveClass(/\bon\b/);
+  await expect(page.locator(".to-top")).toHaveClass(/\bon\b/);
+  const [button, bar] = await Promise.all([page.locator(".to-top").boundingBox(), page.locator(".page-next").boundingBox()]);
+  const viewport = page.viewportSize();
+  // Bottom right, and not on the bar.
+  expect(button.x + button.width).toBeGreaterThan(viewport.width - 80);
+  expect(button.y + button.height).toBeGreaterThan(viewport.height - 110);
+  expect(button.y >= bar.y + bar.height || button.y + button.height <= bar.y || button.x >= bar.x + bar.width).toBe(true);
 });
 
 const TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];

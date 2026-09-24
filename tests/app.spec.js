@@ -830,3 +830,68 @@ test.describe("the promotions and set menus pages keep their hours", () => {
     await expect(page.locator(".featured-card", { hasText: "双人套餐" })).toBeVisible();
   });
 });
+
+test.describe("the menu installs as an app", () => {
+  const offerInstall = (page) => page.evaluate(() => {
+    const offer = new Event("beforeinstallprompt", { cancelable: true });
+    window.__prompted = false;
+    Object.assign(offer, { prompt: async () => { window.__prompted = true; }, userChoice: Promise.resolve({ outcome: "accepted" }) });
+    window.dispatchEvent(offer);
+  });
+
+  test("it links a manifest a browser can install from, opening where it was installed from", async ({ page, request }) => {
+    const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
+    const manifest = await (await request.get(manifestHref)).json();
+    expect(manifest.display).toBe("standalone");
+    // No start_url: the app opens at the address it was installed from, table and all.
+    expect(manifest.start_url).toBeUndefined();
+    for (const icon of manifest.icons) {
+      const response = await request.get(new URL(icon.src, new URL(manifestHref, "http://127.0.0.1:5173/")).pathname);
+      expect(response.status(), icon.src).toBe(200);
+    }
+    expect(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable")).toBe(true);
+    const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+    expect((await request.get(touch)).status()).toBe(200);
+  });
+
+  test("on a first visit it offers itself, one tap installs, and it does not ask again", async ({ page }) => {
+    await offerInstall(page);
+    const offer = page.getByRole("dialog", { name: "把菜单装到桌面" });
+    await expect(offer).toBeVisible();
+    await offer.getByRole("button", { name: "安装" }).click();
+    await expect.poll(() => page.evaluate(() => window.__prompted)).toBe(true);
+    await expect(offer).toHaveCount(0);
+    await page.reload();
+    await offerInstall(page);
+    await page.waitForTimeout(1600);
+    await expect(offer).toHaveCount(0);
+  });
+
+  test("closed, it stays closed", async ({ page }) => {
+    await offerInstall(page);
+    const offer = page.getByRole("dialog", { name: "把菜单装到桌面" });
+    await offer.getByRole("button", { name: "以后再说" }).click();
+    await expect(offer).toHaveCount(0);
+    await page.reload();
+    await offerInstall(page);
+    await page.waitForTimeout(1600);
+    await expect(offer).toHaveCount(0);
+  });
+
+  test("with nothing to install from, it asks nothing", async ({ page }) => {
+    await page.waitForTimeout(1600);
+    await expect(page.locator(".install-offer")).toHaveCount(0);
+  });
+
+  test.describe("on an iPhone", () => {
+    test.use({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1" });
+
+    test("it says how, since Safari cannot ask", async ({ page }) => {
+      const offer = page.getByRole("dialog", { name: "把菜单装到桌面" });
+      await expect(offer).toContainText("添加到主屏幕");
+      await expect(offer.getByRole("button", { name: "安装" })).toHaveCount(0);
+      await offer.getByRole("button", { name: "以后再说" }).click();
+      await expect(offer).toHaveCount(0);
+    });
+  });
+});

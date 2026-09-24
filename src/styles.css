@@ -3162,6 +3162,94 @@ button:focus-visible,
   }
 }
 
+/* The first visit's offer to install the menu as an app: a card along the
+   foot of the screen, over the list, until it is answered. The back-to-top
+   button steps up above it rather than under it. */
+.install-offer {
+  position: fixed;
+  z-index: 46;
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: calc(12px + env(safe-area-inset-left));
+  max-width: 560px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px 12px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--panel-glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: var(--shadow-3);
+  animation: offer-in var(--dur-slow) var(--ease-out) both;
+}
+
+.install-offer img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.install-offer-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.install-offer-text strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.install-offer-text span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.install-offer-go {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.install-offer-close {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+}
+
+.install-offer ~ .to-top {
+  bottom: calc(104px + env(safe-area-inset-bottom));
+}
+
+@keyframes offer-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-offer {
+    animation: none;
+  }
+}
+
 /* The dish card is as tall as the front of it — no band of empty card
    between a short dish and its price — from a sensible minimum up to the
    room the screen has; past that the middle of the face scrolls. The front

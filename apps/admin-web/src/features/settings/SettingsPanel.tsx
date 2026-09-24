@@ -9,8 +9,6 @@ import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { downloadQrCard } from "../qr/qrCard";
 import { describeSchedule, ScheduleEditor } from "./ScheduleEditor";
-import { useInstall } from "../../app/install";
-import type { InstallPlatform } from "../../app/install";
 
 // The time zones on offer: where a restaurant like this one is. A short list
 // on purpose — the server takes any real zone, so one saved from elsewhere is
@@ -152,28 +150,6 @@ function navLabel(settings: ApiSettings, t: ReturnType<typeof useI18n>["t"]) {
   return (tab: string) => tab === NAV_SETS ? t("navSets")
     : tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
     : tab === NAV_ALL ? t("navAll") : tab;
-}
-
-const INSTALL_STEPS: Record<InstallPlatform, CopyKey> = {
-  chromium: "installStepsChromium",
-  safari: "installStepsSafari",
-  ios: "installStepsIos",
-  android: "installStepsAndroid",
-  unsupported: "installStepsUnsupported"
-};
-
-/** The console as a desktop app: one tap where the browser offers it, the steps where it does not. */
-function DesktopApp() {
-  const { t } = useI18n();
-  const installer = useInstall();
-  const [steps, setSteps] = useState(false);
-  if (installer.installed) return <p className="install-state">✓ {t("installDone")}</p>;
-  return <div className="install-card">
-    <button type="button" className="primary-action" onClick={async () => {
-      if (!(installer.canPrompt && await installer.install())) setSteps(true);
-    }}>⬇ {t("installApp")}</button>
-    {(steps || !installer.canPrompt) && <p className="install-steps" role="status">{t(INSTALL_STEPS[installer.platform])}</p>}
-  </div>;
 }
 
 /** The promotions page's dishes, in the order a guest sees them. */
@@ -359,10 +335,6 @@ export function SettingsPanel(props: Props) {
       <Section id="sets" title={t("sectionSets")} hint={t("setsHint")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>
         <ScheduleEditor key={JSON.stringify(settings.setsSchedule)} value={settings.setsSchedule} timeZone={settings.timeZone} onSave={(setsSchedule) => props.onSaveSettings({ setsSchedule }, "setsSaved")} />
-      </Section>
-
-      <Section id="desktop" title={t("sectionDesktop")} hint={t("desktopHint")}>
-        <DesktopApp />
       </Section>
 
       <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>

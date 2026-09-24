@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>La Carte</title>
+    <!-- The menu installs as an app (on the home screen or the desktop). No
+         start_url in the manifest: it opens where it was installed from, so a
+         table card's link keeps its table. -->
+    <link rel="manifest" href="/menu.webmanifest" />
+    <meta name="theme-color" content="#0f1113" />
+    <link rel="icon" type="image/svg+xml" href="/icons/menu.svg" />
+    <link rel="apple-touch-icon" href="/icons/menu-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Menu" />
   </head>
   <body>
     <div id="app"></div>
