@@ -51,8 +51,6 @@ export interface ApiCatalogProduct {
     options: Array<{ id: string; names: { zh: string; de: string; en: string }; priceCents: number }>;
   }>;
   bundleItems?: Array<{ productId: string; quantity: number }>;
-  /** When it is on the menu (src/schedule.js); null or absent: always. */
-  schedule?: ApiSchedule | null;
   media?: Array<{ id?: string; type: "image" | "video"; url: string; posterUrl?: string | null; sortOrder?: number; credit?: string | null }>;
   available?: boolean;
   published?: boolean;
@@ -136,8 +134,14 @@ export interface ApiSettings {
   featuredTitle: string;
   featuredProductIds: string[];
   featuredTemplate: FeaturedTemplateId;
-  /** The restaurant's clock ("Europe/Vienna"), which dish hours follow. */
+  /** The restaurant's clock ("Europe/Vienna"), which the pages' hours follow. */
   timeZone: string;
+  /** When the promotions page and the set menus page are on; null: always. */
+  featuredSchedule: ApiSchedule | null;
+  setsSchedule: ApiSchedule | null;
+  /** The guest menu's second and third tabs: "__featured__", "ALLE" or a
+   *  category. The set menus' tab is always first. */
+  navPinned: string[];
 }
 
 /** The part of the settings the guest menu reads, served with the catalogue. */
@@ -146,11 +150,15 @@ export interface ApiMenuSettings {
   restaurantName: string;
   defaultScheme: ColorScheme;
   showTableNumber: boolean;
-  /** The restaurant's clock; absent from a server older than dish hours. */
+  /** The restaurant's clock; absent from a server older than page hours. */
   timeZone?: string;
+  /** When the set menus page is on; null or absent: always. */
+  setsSchedule?: ApiSchedule | null;
+  /** The tabs the owner put second and third; absent from an older server. */
+  navPinned?: string[];
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */
-  featured?: { title: string; productIds: string[]; template: FeaturedTemplateId } | null;
+  featured?: { title: string; productIds: string[]; template: FeaturedTemplateId; schedule?: ApiSchedule | null } | null;
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

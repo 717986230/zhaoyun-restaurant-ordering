@@ -15,7 +15,7 @@ import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { BackToTop } from "./BackToTop";
-import { DEFAULT_TIME_ZONE } from "../../../../src/schedule.js";
+import { useInstall } from "./install";
 
 const adminApi = new AdminApi();
 
@@ -25,6 +25,10 @@ const adminApi = new AdminApi();
  */
 function OpenIcon() {
   return <svg className="head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
+}
+
+function InstallIcon() {
+  return <svg className="head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>;
 }
 
 function SignOutIcon() {
@@ -66,6 +70,7 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
 
 export function App() {
+  const installer = useInstall();
   const { t, language, setLanguage } = useI18n();
   const [state, setState] = useState(initialState);
   // The board polls on an interval; keeping the role in a ref avoids rebuilding
@@ -454,6 +459,8 @@ export function App() {
       </div>
       <div className="admin-head-actions">
         {languagePicker}
+        {/* Only when the browser offers it; Settings → 桌面版 says how otherwise. */}
+        {installer.canPrompt && !installer.installed && <button className="head-action head-install" onClick={() => void installer.install()} aria-label={t("installApp")} title={t("installApp")}><InstallIcon /><em>{t("installApp")}</em></button>}
         <button className="head-action" onClick={() => void openMenu()} aria-label={t("openMenu")} title={t("openMenu")}><OpenIcon /><em>{t("openMenu")}</em></button>
         {state.role && <button className="head-action" onClick={() => void signOut()} aria-label={t("signOut")} title={t("signOut")}><SignOutIcon /><em>{t("signOut")}</em></button>}
       </div>
@@ -462,7 +469,7 @@ export function App() {
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     </div>
     <main>
-      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} timeZone={state.settings?.timeZone ?? DEFAULT_TIME_ZONE} onRefresh={async () => { await connect(); }} />}
+      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel
         orders={state.orders}
         requests={state.requests}

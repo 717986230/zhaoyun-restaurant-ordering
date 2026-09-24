@@ -12,7 +12,7 @@
  * Nothing here may import `node:` anything, so it runs unchanged on Workers.
  */
 
-import { DEFAULT_TIME_ZONE, isOnSchedule, normalizeSchedule, normalizeTimeZone, readSchedule } from "../src/schedule.js";
+import { DEFAULT_TIME_ZONE, isOnSchedule, normalizeSchedule, normalizeTimeZone } from "../src/schedule.js";
 
 export const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 export const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
@@ -298,7 +298,6 @@ export function mapProduct(row, media = []) {
     },
     modifiers: parseJson(row.modifiers_json, []),
     bundleItems: parseJson(row.bundle_items_json, []),
-    schedule: readSchedule(row.schedule_json),
     available: Boolean(row.available),
     published: Boolean(row.published),
     sortOrder: row.sort_order,
@@ -344,8 +343,6 @@ export function normalizeProduct(input, current = {}) {
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
     modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
     bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
-    // undefined: leave it as it is; null: always on. See writeScheduleSql.
-    schedule: input.schedule === undefined ? undefined : normalizeSchedule(input.schedule),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
     sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
@@ -467,6 +464,27 @@ export const MAX_FEATURED_PRODUCTS = 40;
 export const FEATURED_TEMPLATES = ["gallery", "spotlight", "editorial", "tasting", "framed", "poster", "carousel", "bento", "minimal", "monochrome"];
 export const DEFAULT_FEATURED_TEMPLATE = "gallery";
 
+export const MAX_NAV_PINNED = 2;
+
+/**
+ * The tabs the owner puts second and third on the guest menu (the set menus
+ * are always first): "__featured__", "ALLE" or a category. At most two, no
+ * repeats; one that is not on the menu is skipped there, never an error.
+ */
+function normalizeNavPinned(value) {
+  if (!Array.isArray(value)) throw new Error("Pinned tabs must be a list");
+  // Counted as sent, as the request schema counts them, so both backends agree.
+  if (value.length > MAX_NAV_PINNED) throw new Error(`At most ${MAX_NAV_PINNED} pinned tabs`);
+  const tabs = [];
+  for (const item of value) {
+    const tab = String(item ?? "").trim();
+    if (!tab) continue;
+    if (tab.length > 64) throw new Error("A pinned tab is at most 64 characters");
+    if (!tabs.includes(tab)) tabs.push(tab);
+  }
+  return tabs;
+}
+
 /** The dishes on the promotions page, in the order the owner put them; no repeats. */
 function normalizeFeaturedIds(value) {
   if (!Array.isArray(value)) throw new Error("Featured products must be a list");
@@ -514,8 +532,15 @@ export const APP_SETTINGS = {
   featuredEnabled: { key: "featured_enabled", fallback: () => false, normalize: flag("featuredEnabled") },
   featuredTitle: { key: "featured_title", fallback: () => "", normalize: optionalText("Featured title", 32) },
   featuredProductIds: { key: "featured_products", fallback: () => [], normalize: normalizeFeaturedIds },
-  // The restaurant's clock, which dishes with hours of their own follow.
+  // The restaurant's clock, which the pages' hours below follow.
   timeZone: { key: "time_zone", fallback: () => DEFAULT_TIME_ZONE, normalize: normalizeTimeZone },
+  // When the promotions page and the set menus page are on the menu, each as
+  // a whole — "Mon–Fri 11:00–14:30" for a lunch offer; null is always. The
+  // rules are src/schedule.js. Outside them the page and its tab are gone.
+  featuredSchedule: { key: "featured_schedule", fallback: () => null, normalize: normalizeSchedule },
+  setsSchedule: { key: "sets_schedule", fallback: () => null, normalize: normalizeSchedule },
+  // Which tabs come second and third on the guest menu (packages/domain/src/navigation.ts).
+  navPinned: { key: "nav_pinned", fallback: () => [], normalize: normalizeNavPinned },
   featuredTemplate: {
     key: "featured_template",
     fallback: () => DEFAULT_FEATURED_TEMPLATE,
@@ -567,9 +592,11 @@ export function menuSettingsView(settings) {
     defaultScheme: settings.menuDefaultScheme,
     showTableNumber: settings.showTableNumber,
     timeZone: settings.timeZone,
+    setsSchedule: settings.setsSchedule,
+    navPinned: settings.navPinned,
     // Only when switched on: a guest has no use for a list of ids otherwise.
     featured: settings.featuredEnabled
-      ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate }
+      ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate, schedule: settings.featuredSchedule }
       : null
   };
 }
@@ -594,7 +621,6 @@ export function duplicateInput(product) {
     appearance: product.appearance,
     modifiers: product.modifiers,
     bundleItems: product.bundleItems,
-    schedule: product.schedule ?? null,
     available: product.available,
     published: false,
     sortOrder: product.sortOrder,
@@ -670,31 +696,13 @@ export function resolveModifiers(productRow, requested = []) {
 /** The ids of the products an order command refers to, so a driver can fetch
  *  them in whatever way it has before the rules run over the rows. */
 /**
- * Every read of a product row goes through this, so a row always carries its
- * hours (`schedule_json`, null for "always"). They live in a table of their
- * own — see product_schedules in server/database.mjs.
+ * A set menu (a product that packages others) is served only in the set
+ * menus page's hours; ordinary dishes have none. Checked for an order sent
+ * from a menu left open past them as much as for anyone.
  */
-export const PRODUCT_SELECT = "SELECT products.*, product_schedules.schedule_json FROM products LEFT JOIN product_schedules ON product_schedules.product_id = products.id";
-
-/**
- * The statement that brings a product's hours in line with a save, or none
- * when the save did not mention them. As [sql, params], for a synchronous
- * statement on the Node server and a D1 batch alike.
- */
-export function writeScheduleSql(productId, schedule, timestamp) {
-  if (schedule === undefined) return null;
-  if (schedule === null) return ["DELETE FROM product_schedules WHERE product_id = ?", [productId]];
-  return [
-    "INSERT INTO product_schedules (product_id, schedule_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(product_id) DO UPDATE SET schedule_json = excluded.schedule_json, updated_at = excluded.updated_at",
-    [productId, JSON.stringify(schedule), timestamp]
-  ];
-}
-
-/** A dish outside its hours is off the menu, for an order sent from a menu left open as much as for anyone. */
-export function assertOnSchedule(productRow, timeZone = DEFAULT_TIME_ZONE, at = new Date()) {
-  if (!isOnSchedule(readSchedule(productRow.schedule_json), at, timeZone)) {
-    throw new Error(`Product ${productRow.id} is not served at this time`);
-  }
+export function assertSetServed(productRow, { timeZone = DEFAULT_TIME_ZONE, setsSchedule = null, at = new Date() } = {}) {
+  if (!parseJson(productRow.bundle_items_json, []).length) return;
+  if (!isOnSchedule(setsSchedule, at, timeZone)) throw new Error(`Product ${productRow.id} is not served at this time`);
 }
 
 export function orderProductIds(input) {
@@ -707,7 +715,7 @@ export function orderProductIds(input) {
  * money happen here, so a synchronous transaction and a D1 batch write the same
  * thing.
  */
-export function planOrder(input, productRows, { timeZone = DEFAULT_TIME_ZONE, at = new Date() } = {}) {
+export function planOrder(input, productRows, hours = {}) {
   const clientRequestId = String(input.clientRequestId || uuid());
   const table = String(input.table || "").trim();
   if (!table) throw new Error("Order requires a table number");
@@ -717,7 +725,7 @@ export function planOrder(input, productRows, { timeZone = DEFAULT_TIME_ZONE, at
     const product = productRows.get(String(item.id));
     const quantity = Number(item.qty);
     if (!product || !product.published || !product.available) throw new Error(`Product ${item.id} is unavailable`);
-    assertOnSchedule(product, timeZone, at);
+    assertSetServed(product, hours);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error("Invalid item quantity");
     const modifiers = resolveModifiers(product, item.modifiers);
     const modifierTotalCents = modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);

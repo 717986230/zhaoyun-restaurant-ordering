@@ -97,7 +97,9 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     case "navigate": return { ...state, screen: action.screen, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "category": return { ...state, category: action.category };
     case "query": return { ...state, query: action.query };
-    case "toggle-search": return { ...state, searchOpen: !state.searchOpen };
+    // Closing the search ends it: a query left behind would go on filtering
+    // every page, invisibly, under a category tab that says otherwise.
+    case "toggle-search": return { ...state, searchOpen: !state.searchOpen, query: state.searchOpen ? "" : state.query };
     case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: 1, detailModifiers: [] };
     case "close-product": return { ...state, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "toggle-product-flip": return { ...state, productFlipped: !state.productFlipped };

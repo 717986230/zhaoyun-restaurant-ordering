@@ -82,6 +82,8 @@
   --pull: 0;
   /* A row's place on a freshly turned page, for its cascade; set inline. */
   --row: 0;
+  /* How tall a dish card may grow; set per screen on the card itself. */
+  --detail-max: 70vh;
 
   /* The light menu, for a guest by a window at lunch. Same rules as above:
      cool neutrals with no brown in them, one accent, and every ink held to
@@ -199,6 +201,8 @@ button {
   margin: 0 auto;
   position: relative;
   overflow: hidden;
+  /* Not even a focus or a tap may scroll it: only the list inside scrolls. */
+  overflow: clip;
   background:
     radial-gradient(circle at 70% 0, var(--room-glow), transparent 34%),
     linear-gradient(145deg, var(--bg-2), var(--bg-deep) 62%);
@@ -215,6 +219,19 @@ button {
 .screen.active {
   display: block;
   animation: fade 0.22s ease both;
+}
+
+/* The menu is a column the height of the screen: the header and the
+   categories take what they need, however tall a landscape phone or a
+   tablet makes them, and the list gets exactly the rest. */
+.screen.menu.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.screen.menu > .topbar,
+.screen.menu > .chips {
+  flex: none;
 }
 
 html.plt-android .screen.active {
@@ -698,7 +715,8 @@ html.plt-android .screen.active {
 }
 
 .stack {
-  height: calc(100dvh - 116px - env(safe-area-inset-top));
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   /* The page turn owns the pull past either end; without this Android Chrome
      reloads the page on a pull-down and iOS rubber-bands the whole app. */
@@ -1922,20 +1940,21 @@ html.plt-android .menu.detail-open .stack {
   transform-origin: 50% 0;
 }
 
-/* After a turn the rows land one after another, each tipping forward into
-   place — the first twelve, which is all a screen holds. `backwards`, not
-   `both`: once landed, a row's transform is its own again, so a press still
-   presses it. */
+/* After a turn the rows land one after another — the first twelve, which is
+   all a screen holds. Flat: the page itself turns in 3D, and a dozen rows
+   each tipping in their own 3D at the same moment was a dozen more layers
+   for a phone to draw every frame of the turn, and it stuttered.
+   `backwards`, not `both`: once landed, a row's transform is its own again,
+   so a press still presses it. */
 .stack-page.turned .dish-card[style] {
-  animation: row-in 0.5s var(--ease-out) backwards;
-  animation-delay: calc(var(--row) * 38ms + 90ms);
-  transform-origin: 50% 0;
+  animation: row-in 0.42s var(--ease-out) backwards;
+  animation-delay: calc(var(--row) * 30ms + 120ms);
 }
 
 @keyframes row-in {
   from {
     opacity: 0;
-    transform: translateY(22px) rotateX(-22deg);
+    transform: translateY(16px);
   }
 }
 
@@ -3131,5 +3150,131 @@ button:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   .to-top {
     transition: none;
+  }
+}
+
+/* The dish card is as tall as the front of it — no band of empty card
+   between a short dish and its price — from a sensible minimum up to the
+   room the screen has; past that the middle of the face scrolls. The front
+   is in the flow and sets the height; the back fills the same card. */
+.dish-detail-card {
+  --detail-max: calc(100dvh - 116px - 86px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  bottom: auto;
+}
+
+.detail-flip-inner {
+  position: relative;
+  inset: auto;
+}
+
+.detail-face.detail-front {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: min(380px, var(--detail-max));
+  max-height: var(--detail-max);
+}
+
+.detail-front > .detail-heading,
+.detail-front > .detail-buy {
+  flex: none;
+}
+
+.detail-front > .detail-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: 18px;
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .dish-detail-card {
+    --detail-max: calc(100dvh - 24px);
+    bottom: auto;
+  }
+
+  .detail-face.detail-front {
+    min-height: min(300px, var(--detail-max));
+  }
+
+  .detail-front > .detail-scroll {
+    padding-bottom: 12px;
+  }
+}
+
+/* A search that found nothing: what was looked for, and the way back. */
+.search-empty {
+  align-content: center;
+  gap: 10px;
+  padding: 0 24px;
+}
+
+.search-empty strong {
+  color: var(--ink);
+  font: 400 20px Georgia, "Noto Serif SC", serif;
+  overflow-wrap: anywhere;
+}
+
+.search-empty span {
+  font-size: 14px;
+}
+
+.search-empty .secondary {
+  min-height: 42px;
+  margin-top: 6px;
+  padding: 0 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+/* A phone on its side has some 360px of height: the header, the categories
+   and a page's title took most of it, and not one dish showed until the
+   guest scrolled. Everything above the list is tighter there. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .topbar {
+    height: 54px;
+  }
+
+  .title strong {
+    font-size: 30px;
+  }
+
+  .topbar .title small {
+    margin-top: 1px;
+    font-size: 10px;
+  }
+
+  .chips {
+    height: 42px;
+    padding-bottom: 6px;
+  }
+
+  .chip {
+    padding: 6px 14px;
+  }
+
+  .search-box {
+    top: calc(54px + env(safe-area-inset-top));
+  }
+
+  .featured-hero {
+    margin: 0 0 14px;
+  }
+
+  .featured-hero h2 {
+    margin-top: 4px;
+    font-size: 28px;
+  }
+
+  .featured-rule {
+    margin-top: 8px;
+  }
+
+  .dish-detail-card {
+    --detail-max: calc(100dvh - 16px);
+    top: 8px;
   }
 }

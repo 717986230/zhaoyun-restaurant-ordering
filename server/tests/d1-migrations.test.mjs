@@ -33,8 +33,14 @@ const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), ".
 const incremental = [
   { file: "0003_admin_password_gate.sql", drop: "DROP INDEX idx_admin_sessions_expiry; DROP TABLE admin_sessions; DROP TABLE admin_gate;" },
   { file: "0004_app_settings.sql", drop: "DROP TABLE app_settings;" },
-  { file: "0051_product_schedules.sql", drop: "DROP TABLE product_schedules;" }
-].map((migration) => ({ ...migration, sql: readFileSync(path.join(migrationsDir, migration.file), "utf8") }))
+  // 0051 added a table 0052 takes away again: a database from before either
+  // goes through both, and one that applied 0051 gets only 0052.
+  { file: "0051_product_schedules.sql", then: "0052_drop_product_schedules.sql", drop: "" },
+  { file: "0052_drop_product_schedules.sql", drop: readFileSync(path.join(migrationsDir, "0051_product_schedules.sql"), "utf8") }
+].map((migration) => ({
+  ...migration,
+  sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")
+}))
   // The photo parts each create media_files, so each has to stand alone on a
   // database deployed before that table existed.
   .concat(committed().photos.map((part) => ({ file: part.name, drop: "DROP TABLE media_files;", sql: part.sql })));
