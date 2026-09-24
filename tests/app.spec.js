@@ -262,6 +262,33 @@ test("the menu style the server picked changes only the accent, at load", async 
   expect(bg).toBe("#0f1113");
 });
 
+test("a festive set puts its colour and pattern across the menu, on the dark menu and the light", async ({ page }) => {
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "valentine" }) }));
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  const root = (name) => page.evaluate((token) => getComputedStyle(document.documentElement).getPropertyValue(token).trim(), name);
+  expect(await root("--accent")).toBe("#ec8fae");
+  // The pattern is drawn in the accent, behind everything, over the whole room.
+  const pattern = await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage);
+  expect(pattern).toContain("data:image/svg+xml");
+  expect(pattern).toContain(encodeURIComponent("#ec8fae"));
+  // The palette a guest reads by stays the same.
+  expect(await root("--bg")).toBe("#0f1113");
+  // On the light menu, the darker shade of the same set, in the pattern too.
+  await page.locator(".scheme-toggle").click();
+  expect(await root("--accent")).toBe("#b02d5c");
+  expect(await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage)).toContain(encodeURIComponent("#b02d5c"));
+});
+
+test("an everyday style has no pattern", async ({ page }) => {
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  const pattern = await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage);
+  expect(pattern).not.toContain("data:image/svg+xml");
+});
+
 test("the owner's title, table-number choice and default look reach the guest", async ({ page }) => {
   await page.unroute("**/api/catalog");
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({

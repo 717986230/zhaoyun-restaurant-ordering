@@ -107,7 +107,10 @@ export interface ApiServiceRequest {
   updatedAt: string;
 }
 
-export type MenuThemeId = "jade" | "teal" | "terracotta";
+export type MenuThemeId =
+  | "jade" | "teal" | "terracotta"
+  | "spring-festival" | "valentine" | "easter" | "back-to-school"
+  | "mid-autumn" | "national-day" | "christmas" | "halloween";
 
 /** The languages a guest can switch the menu into, in flag order. */
 export type MenuLanguage = "zh" | "en" | "de";

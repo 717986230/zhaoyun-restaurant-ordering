@@ -117,13 +117,23 @@ test("admin workspace loads catalog and printer modules", async ({ page }) => {
 
 test("a manager picks a menu style, and the choice is saved", async ({ page }) => {
   await page.getByRole("button", { name: "设置", exact: true }).click();
-  const picker = page.locator(".theme-picker");
+  const picker = page.locator(".theme-picker").first();
   await expect(picker).toBeVisible();
   await expect(picker.locator(".theme-swatch.selected")).toContainText("墨玉");
 
   await picker.locator(".theme-swatch", { hasText: "赤陶" }).click();
   await expect.poll(() => menuTheme).toBe("terracotta");
   await expect(picker.locator(".theme-swatch.selected")).toContainText("赤陶");
+
+  // Eight festive sets, each button wearing its pattern; one tap puts one on.
+  const festive = page.locator(".theme-picker.festive .theme-swatch");
+  await expect(festive).toHaveText(["春节", "情人节", "复活节", "开学季", "中秋节", "国庆节", "圣诞节", "万圣节"]);
+  for (const swatch of await festive.all()) {
+    expect(await swatch.evaluate((node) => getComputedStyle(node).backgroundImage)).toContain("data:image/svg+xml");
+  }
+  await festive.filter({ hasText: "中秋节" }).click();
+  await expect.poll(() => menuTheme).toBe("mid-autumn");
+  await expect(page.locator(".theme-swatch.selected")).toHaveText("中秋节");
 });
 
 test("a manager chooses the menu's languages, and cannot switch off the last one", async ({ page }) => {

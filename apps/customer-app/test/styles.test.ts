@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MENU_THEMES } from "@zhaoyun/domain";
+import { MENU_THEMES, themePattern } from "@zhaoyun/domain";
 
 /**
  * The palette, as assertions.
@@ -172,9 +172,31 @@ describe("menu styles", () => {
     expect(contrast(theme.accentInk, theme.accent)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it.each(Object.values(MENU_THEMES))("$id ($nameZh) stays out of gold", (theme) => {
+  // The everyday styles keep to the palette's two bands; a festive set may
+  // take its season's colour — rose, lilac, blue, red — but never gold.
+  const everyday = Object.values(MENU_THEMES).filter((theme) => !theme.festive);
+  const festive = Object.values(MENU_THEMES).filter((theme) => theme.festive);
+  const gold = (colour: string) => {
+    const { hue, saturation } = hsl(colour);
+    return saturation > 0.15 && hue > 25 && hue < 66;
+  };
+
+  it.each(everyday)("$id ($nameZh) stays in the palette's bands", (theme) => {
     const { hue, saturation } = hsl(theme.accent);
     expect(saturation > 0.15 && !(hue >= 130 && hue <= 180) && !(hue >= 5 && hue <= 25)).toBe(false);
+  });
+
+  it.each(festive)("$id ($nameZh) is festive without gold, on the dark menu and the light", (theme) => {
+    expect(gold(theme.accent)).toBe(false);
+    expect(gold(theme.light.accent)).toBe(false);
+  });
+
+  it("offers eight festive sets, each with a pattern of its own", () => {
+    expect(festive).toHaveLength(8);
+    const patterns = festive.map((theme) => themePattern(theme, theme.accent));
+    expect(new Set(patterns).size).toBe(8);
+    for (const pattern of patterns) expect(pattern).toMatch(/^url\("data:image\/svg\+xml,/);
+    expect(themePattern(MENU_THEMES.jade, MENU_THEMES.jade.accent)).toBe("none");
   });
 });
 
@@ -214,6 +236,7 @@ describe("the light menu", () => {
   it.each(Object.values(MENU_THEMES))("$id ($nameZh) has a light accent that clears the same floor", (theme) => {
     expect(contrast(theme.light.accent, light("panel"))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(theme.light.accentInk, theme.light.accent)).toBeGreaterThanOrEqual(4.5);
+    if (theme.festive) return;
     const { hue, saturation } = hsl(theme.light.accent);
     expect(saturation > 0.15 && !(hue >= 130 && hue <= 180) && !(hue >= 5 && hue <= 25)).toBe(false);
   });

@@ -1313,6 +1313,14 @@ h2 {
   box-shadow: 0 0 0 1px var(--swatch);
 }
 
+/* A festive set's button wears its pattern (set inline, from the same
+   function the menu uses), at half the menu's scale so a motif shows. */
+.theme-picker.festive .theme-swatch {
+  min-width: 132px;
+  padding-block: 12px;
+  background-size: 60px 60px;
+}
+
 /* Table cards. The sheet is laid out for A4 and the print rules drop everything
    else, so "print" from the dialog gives a page of cards and nothing else. */
 .table-cards-launch {

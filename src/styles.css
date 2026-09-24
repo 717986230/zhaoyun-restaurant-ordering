@@ -23,6 +23,11 @@
   --fade-1: rgba(10, 11, 12, 0.96);
   --fade-2: rgba(10, 11, 12, 0.86);
   --room-glow: rgba(143, 176, 163, 0.07);
+  /* A festive menu style's pattern, repeated faintly over the room; set by
+     the menu (useMenuTheme), in the accent. None for an everyday style. */
+  --theme-pattern: none;
+  /* The same pattern, stronger across the header and fading down the page. */
+  --theme-band: none;
 
   /* Hairlines and washes. A border is a change in light, not a gold rule. */
   --line-soft: rgba(233, 238, 240, 0.08);
@@ -204,6 +209,8 @@ button {
   /* Not even a focus or a tap may scroll it: only the list inside scrolls. */
   overflow: clip;
   background:
+    var(--theme-band) 0 0 / 120px 240px repeat-x,
+    var(--theme-pattern) 0 0 / 120px 120px,
     radial-gradient(circle at 70% 0, var(--room-glow), transparent 34%),
     linear-gradient(145deg, var(--bg-2), var(--bg-deep) 62%);
 }
@@ -2190,6 +2197,8 @@ button:focus-visible,
    centred, and a velvet strip down the middle read as a mistake. */
 .menu.on-featured {
   background:
+    var(--theme-band) 0 0 / 120px 240px repeat-x,
+    var(--theme-pattern) 0 0 / 120px 120px,
     radial-gradient(120% 60% at 50% 0, var(--velvet-2), transparent 70%),
     var(--velvet);
 }

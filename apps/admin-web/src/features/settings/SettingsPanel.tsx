@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themePattern } from "@zhaoyun/domain";
 import { useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
@@ -249,6 +249,14 @@ export function SettingsPanel(props: Props) {
 
   const themeName = (theme: (typeof MENU_THEMES)[keyof typeof MENU_THEMES]) =>
     language === "zh" ? theme.nameZh : language === "de" ? theme.nameDe : theme.nameEn;
+  const themeButton = (theme: (typeof MENU_THEMES)[keyof typeof MENU_THEMES]) => <button
+    key={theme.id}
+    type="button"
+    className={`theme-swatch ${settings?.menuTheme === theme.id ? "selected" : ""}`}
+    aria-pressed={settings?.menuTheme === theme.id}
+    style={{ "--swatch": theme.accent, backgroundImage: themePattern(theme, theme.accent) } as React.CSSProperties}
+    onClick={() => void props.onSaveSettings({ menuTheme: theme.id }, "menuStyleSaved")}
+  ><i /><span>{themeName(theme)}</span></button>;
   const offered = settings?.menuLanguages ?? DEFAULT_MENU_LANGUAGES;
 
   return <section id="systemPanel" className="admin-panel active"><div className="settings-page">
@@ -268,14 +276,12 @@ export function SettingsPanel(props: Props) {
 
       <Section id="appearance" title={t("sectionAppearance")} summary={`${themeName(MENU_THEMES[settings.menuTheme] ?? MENU_THEMES.jade)} · ${t(settings.menuDefaultScheme === "dark" ? "schemeDark" : "schemeLight")}`}>
         <p className="settings-label">{t("menuStyle")}</p>
-        <div className="theme-picker">{Object.values(MENU_THEMES).map((theme) => <button
-          key={theme.id}
-          type="button"
-          className={`theme-swatch ${settings.menuTheme === theme.id ? "selected" : ""}`}
-          aria-pressed={settings.menuTheme === theme.id}
-          style={{ "--swatch": theme.accent } as React.CSSProperties}
-          onClick={() => void props.onSaveSettings({ menuTheme: theme.id }, "menuStyleSaved")}
-        ><i /><span>{themeName(theme)}</span></button>)}</div>
+        <div className="theme-picker">{Object.values(MENU_THEMES).filter((theme) => !theme.festive).map(themeButton)}</div>
+        {/* The festive sets: colour and pattern for the season, one tap to put
+            on and one to take off again. Each button wears its own pattern. */}
+        <p className="settings-label">{t("festiveThemes")}</p>
+        <div className="theme-picker festive">{Object.values(MENU_THEMES).filter((theme) => theme.festive).map(themeButton)}</div>
+        <small className="settings-hint">{t("festiveThemesHint")}</small>
         <p className="settings-label">{t("defaultScheme")}</p>
         <div className="scheme-picker" role="group" aria-label={t("defaultScheme")}>{(["dark", "light"] as ColorScheme[]).map((scheme) => <button
           key={scheme}

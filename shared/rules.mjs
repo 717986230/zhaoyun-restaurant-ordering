@@ -22,7 +22,7 @@ export const PRINTER_TRANSPORTS = new Set(["lan", "bluetooth", "usb"]);
 // The colour hexes themselves live in packages/domain/src/themes.ts, next to
 // the guest app that renders them; the backend only ever needs to know which
 // ids are valid to store.
-export const MENU_THEME_IDS = new Set(["jade", "teal", "terracotta"]);
+export const MENU_THEME_IDS = new Set(["jade", "teal", "terracotta", "spring-festival", "valentine", "easter", "back-to-school", "mid-autumn", "national-day", "christmas", "halloween"]);
 export const DEFAULT_MENU_THEME = "jade";
 
 /**
