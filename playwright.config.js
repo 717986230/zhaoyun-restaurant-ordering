@@ -11,6 +11,9 @@ export default defineConfig({
   testDir: "./tests",
   timeout: 30000,
   workers: ci ? 4 : undefined,
+  // Tests, not whole files, are shared out between workers and between CI's
+  // shards: by file, every iPhone project landed on the same shard.
+  fullyParallel: true,
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "retain-on-failure",
@@ -22,19 +25,27 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120000
   },
+  // Each iPhone follows an Android project, so each of CI's shards — which
+  // take the list in order — gets one iPhone rather than the last one all three.
   projects: [
     { name: "android-phone-portrait", use: { ...devices["Pixel 7"] } },
+    iphone("iphone-15", devices["iPhone 15"]),
     { name: "android-phone-landscape", use: { ...devices["Pixel 7 landscape"] } },
+    iphone("iphone-se", devices["iPhone SE"]),
     { name: "android-tablet-portrait", use: { viewport: { width: 800, height: 1280 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
-    { name: "android-tablet-landscape", use: { viewport: { width: 1280, height: 800 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
-    // iPhones, in WebKit — the engine every browser on iOS uses, so what a
-    // guest scanning the table card with an iPhone gets. They run the layout
-    // spec: the promise that nothing on the menu overlaps, whatever the phone.
-    // CI installs WebKit; a machine without it sets NO_WEBKIT=1.
-    ...(process.env.NO_WEBKIT ? [] : [
-      { name: "iphone-15", testMatch: /layout\.spec\.js/, use: { ...devices["iPhone 15"] } },
-      { name: "iphone-se", testMatch: /layout\.spec\.js/, use: { ...devices["iPhone SE"] } },
-      { name: "iphone-15-pro-max-landscape", testMatch: /layout\.spec\.js/, use: { ...devices["iPhone 15 Pro Max landscape"] } }
-    ])
-  ]
+    iphone("iphone-15-pro-max-landscape", devices["iPhone 15 Pro Max landscape"]),
+    { name: "android-tablet-landscape", use: { viewport: { width: 1280, height: 800 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } }
+  ].filter(Boolean)
 });
+
+// iPhones, in WebKit — the engine every browser on iOS uses, so what a guest
+// scanning the table card with an iPhone gets. They run the layout spec: the
+// promise that nothing on the menu overlaps, whatever the phone. CI installs
+// WebKit; a machine without it sets NO_WEBKIT=1.
+function iphone(name, device) {
+  if (process.env.NO_WEBKIT) return null;
+  // At most two WebKits at once: four on a four-core runner starved each
+  // other of animation frames, and a dish card still settling after seconds
+  // kept its close button from ever being clickable.
+  return { name, testMatch: /layout\.spec\.js/, workers: ci ? 2 : undefined, use: { ...device } };
+}
