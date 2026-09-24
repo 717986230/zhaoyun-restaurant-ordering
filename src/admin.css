@@ -1313,12 +1313,27 @@ h2 {
   box-shadow: 0 0 0 1px var(--swatch);
 }
 
-/* A festive set's button wears its pattern (set inline, from the same
-   function the menu uses), at half the menu's scale so a motif shows. */
+/* A festive set's button is a small card: the garland it hangs on the menu
+   across its top, over its colour and name, on a faint ground of its
+   pattern (both set inline, from the functions the menu uses). */
 .theme-picker.festive .theme-swatch {
   min-width: 132px;
-  padding-block: 12px;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  row-gap: 2px;
+  padding: 0 14px 10px 10px;
+  overflow: hidden;
+  border-radius: 14px;
   background-size: 60px 60px;
+}
+
+.swatch-garland {
+  flex: 0 0 calc(100% + 24px);
+  height: 26px;
+  margin: 0 -14px 0 -10px;
+  background-repeat: repeat-x;
+  background-size: 46px 26px;
+  background-position: 4px -2px;
 }
 
 /* Table cards. The sheet is laid out for A4 and the print rules drop everything

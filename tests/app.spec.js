@@ -281,12 +281,21 @@ test("a festive set puts its colour and pattern across the menu, on the dark men
   await page.locator(".scheme-toggle").click();
   expect(await root("--accent")).toBe("#b02d5c");
   expect(await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage)).toContain(encodeURIComponent("#b02d5c"));
+  // Its garland hangs between the categories and the list, over no dish.
+  const garland = page.locator(".festive-garland");
+  await expect(garland).toBeVisible();
+  expect(await garland.evaluate((node) => getComputedStyle(node).backgroundImage)).toContain("data:image/svg+xml");
+  const [chips, list] = await Promise.all([page.locator("#chips").boundingBox(), page.locator(".dish-card").first().boundingBox()]);
+  const box = await garland.boundingBox();
+  expect(box.y).toBeGreaterThanOrEqual(chips.y + chips.height - 8);
+  expect(box.y + box.height).toBeLessThanOrEqual(list.y + 1);
 });
 
-test("an everyday style has no pattern", async ({ page }) => {
+test("an everyday style has no pattern, and no garland taking room", async ({ page }) => {
   await expect(page.locator(".dish-card").first()).toBeVisible();
   const pattern = await page.locator(".app-shell").evaluate((node) => getComputedStyle(node).backgroundImage);
   expect(pattern).not.toContain("data:image/svg+xml");
+  await expect(page.locator(".festive-garland")).toBeHidden();
 });
 
 test("the owner's title, table-number choice and default look reach the guest", async ({ page }) => {

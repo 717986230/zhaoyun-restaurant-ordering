@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import type { MenuThemeId } from "@zhaoyun/contracts";
-import { DEFAULT_MENU_THEME, MENU_THEMES, themePattern } from "@zhaoyun/domain";
+import { DEFAULT_MENU_THEME, MENU_THEMES, themeGarland, themePattern } from "@zhaoyun/domain";
 import type { ColorScheme } from "./useColorScheme";
 
 /**
  * What 菜单样式 changes: the accent group `src/styles.css` declares on
- * `:root`, and for a festive set its pattern, the header's band of it and the room's glow. An inline
+ * `:root`, and for a festive set its pattern, the header's band of it, the garland under
+ * the categories and the room's glow. An inline
  * custom property on the root element wins the cascade over the
  * stylesheet's own default without touching a single class name, so every
  * component that already reads `var(--accent)` picks the new one up for free
@@ -28,12 +29,15 @@ export function useMenuTheme(themeId: MenuThemeId | undefined, scheme: ColorSche
     if (theme.festive) {
       root.setProperty("--theme-pattern", themePattern(theme, accent.accent));
       root.setProperty("--theme-band", themePattern(theme, accent.accent, "band"));
+      root.setProperty("--theme-garland", themeGarland(theme, accent.accent));
       root.setProperty("--room-glow", accent.accentWash);
     } else {
       root.removeProperty("--theme-pattern");
       root.removeProperty("--theme-band");
+      root.removeProperty("--theme-garland");
       root.removeProperty("--room-glow");
     }
     document.documentElement.dataset.menuTheme = theme.id;
+    document.documentElement.toggleAttribute("data-festive", Boolean(theme.festive));
   }, [themeId, scheme]);
 }
