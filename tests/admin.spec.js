@@ -257,13 +257,24 @@ test("a waiter tablet only gets the board, never the catalog", async ({ page }) 
   await page.goto("/admin.html");
 
   await expect(page.getByText("服务员")).toBeVisible();
-  // A waiter runs the floor, so the board and the room are theirs; the menu,
-  // the printers and the table tokens are not.
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单桌位");
+  // A waiter runs the floor, so the board, the room and taking payment are
+  // theirs; the menu, the printers and the table tokens are not.
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单桌位收银");
   await expect(page.getByRole("button", { name: "菜品", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打印", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
   await expect(page.locator("#boardPanel")).toBeVisible();
+
+  // At the register a waiter takes payment, but a storno, the day's closing
+  // and the journal are the manager's.
+  await page.route("**/api/admin/receipts?**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ receipts: [{
+    id: "r-1", receiptNo: 1, cashRegisterId: "KASSE-1", type: "sale", table: "02", lines: [], vat: [], totalCents: 900, payments: [{ type: "cash", amountCents: 900 }],
+    refersTo: null, refersToNo: null, reason: null, cancelledBy: null, fiscalStatus: "unsigned", staffRole: "staff", createdAt: new Date().toISOString()
+  }] }) }));
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "收银" }).click();
+  await expect(page.locator('.receipt-list li[data-receipt="1"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "冲销" })).toHaveCount(0);
+  await expect(page.locator(".cashier-office")).toHaveCount(0);
 });
 
 test("a kitchen screen sees orders without billing or service calls", async ({ page }) => {
