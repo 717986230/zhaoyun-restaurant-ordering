@@ -681,6 +681,66 @@ export function contractChecks(call, assert) {
       assert.deepEqual((await settings({ navPinned: [] })).json.navPinned, []);
     }],
 
+    ["each dish keeps its VAT rate, a set is split over its dishes' rates, and a category is set at once", async () => {
+      const dish = async (body) => {
+        const saved = await call("POST", "/api/admin/products", { admin: true, body: { names: { zh: body.sku, de: body.sku, en: body.sku }, published: true, available: true, ...body } });
+        assert.equal(saved.status, 201, JSON.stringify(saved.json));
+        return saved.json.product;
+      };
+      // A drink starts at 20%, food at 10%, and a rate the owner picks is kept.
+      const soup = await dish({ sku: "VAT-F", kind: "food", category: "VATTEST", price: 10, printStation: "kitchen" });
+      const cola = await dish({ sku: "VAT-D", kind: "drink", category: "VATDRINKS", price: 5, printStation: "bar" });
+      assert.equal(soup.vatPercent, 10);
+      assert.equal(cola.vatPercent, 20);
+      const juice = await dish({ sku: "VAT-J", kind: "drink", category: "VATDRINKS", price: 4, printStation: "bar", vatPercent: 13 });
+      assert.equal(juice.vatPercent, 13, "the rate the owner sets is the one saved");
+      const edited = await call("PUT", `/api/admin/products/${juice.id}`, { admin: true, body: { ...juice, vatPercent: 20 } });
+      assert.equal(edited.json.product.vatPercent, 20, "and an edit keeps it too");
+      assert.equal((await call("POST", "/api/admin/products", { admin: true, body: { sku: "VAT-X", kind: "food", category: "VATTEST", names: { zh: "x", de: "x", en: "x" }, price: 1, vatPercent: 15 } })).status, 400);
+
+      // A set of the soup and the drink, sold for 12: its price divides in the
+      // proportion of 10 to 5, so 8 at 10% and 4 at 20%.
+      const set = await dish({ sku: "VAT-S", kind: "food", category: "VATSETS", price: 12, printStation: "kitchen", bundleItems: [{ productId: soup.id, quantity: 1 }, { productId: cola.id, quantity: 1 }] });
+
+      const table = await call("POST", "/api/admin/tables", { admin: true, body: { table: "V1" } });
+      const ordered = await call("POST", "/api/orders", {
+        tableToken: table.json.table.token,
+        body: { clientRequestId: "contract-vat", table: "V1", note: "", items: [{ id: cola.id, qty: 2 }, { id: set.id, qty: 1 }] }
+      });
+      assert.equal(ordered.status, 201, JSON.stringify(ordered.json));
+      const bill = (await call("GET", "/api/admin/tables/V1/bill", { role: "staff" })).json.bill;
+      assert.equal(bill.total, 22);
+      assert.deepEqual(bill.vatBreakdown, [
+        { percent: 10, gross: 8, net: 7.27, vat: 0.73 },
+        { percent: 20, gross: 14, net: 11.67, vat: 2.33 }
+      ], "two drinks and the set's drink share at 20%, the set's soup share at 10%");
+      const setLine = bill.items.find((item) => item.name === "VAT-S");
+      assert.deepEqual(setLine.vatSplit, [{ percent: 10, amount: 8 }, { percent: 20, amount: 4 }]);
+      assert.equal(bill.items.find((item) => item.name === "VAT-D").vatSplit, undefined, "a dish at one rate is just that rate");
+
+      // What the kitchen and the bar get has no price on it.
+      const jobs = (await call("GET", "/api/admin/print-jobs?status=queued&limit=50", { role: "staff" })).json.jobs
+        .filter((job) => job.orderId === ordered.json.order.id);
+      assert.deepEqual(jobs.map((job) => job.printerRole).sort(), ["bar", "kitchen"]);
+      for (const job of jobs) assert.ok(!JSON.stringify(job.payload).includes("price"), `the ${job.printerRole} ticket carries no price`);
+
+      // A whole category at once; set menus keep their split.
+      const moved = await call("POST", "/api/admin/categories/vat", { admin: true, body: { category: " vatdrinks ", vatPercent: 13 } });
+      assert.equal(moved.status, 200, JSON.stringify(moved.json));
+      assert.deepEqual(moved.json, { updated: 2, category: "VATDRINKS", vatPercent: 13 });
+      assert.equal((await call("POST", "/api/admin/categories/vat", { admin: true, body: { category: "VATSETS", vatPercent: 20 } })).status, 404, "a category of set menus has nothing to set");
+      assert.equal((await call("POST", "/api/admin/categories/vat", { admin: true, body: { category: "NOSUCH", vatPercent: 20 } })).status, 404);
+      assert.equal((await call("POST", "/api/admin/categories/vat", { admin: true, body: { category: "VATDRINKS", vatPercent: 7 } })).status, 400);
+      assert.equal((await call("POST", "/api/admin/categories/vat", { role: "staff", body: { category: "VATDRINKS", vatPercent: 20 } })).status, 403, "rates are the owner's");
+      // The order already written keeps the rates it was written with.
+      assert.deepEqual((await call("GET", "/api/admin/tables/V1/bill", { role: "staff" })).json.bill.vatBreakdown.map((group) => group.percent), [10, 20]);
+
+      await call("POST", "/api/admin/tables/V1/lock", { role: "staff", body: { locked: true } });
+      assert.equal((await call("POST", "/api/admin/tables/V1/bill/settle", { role: "staff" })).status, 200);
+      for (const product of [soup, cola, juice, set]) await call("DELETE", `/api/admin/products/${product.id}`, { admin: true });
+      await call("DELETE", "/api/admin/tables/V1", { admin: true });
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

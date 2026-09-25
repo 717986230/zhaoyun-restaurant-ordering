@@ -167,6 +167,10 @@ export const SettingsBody = Type.Object({
 const Category = Type.String({ minLength: 1, maxLength: 80 });
 export const CategoryRenameBody = Type.Object({ from: Category, to: Category }, { additionalProperties: false });
 
+// Every dish of a category at one VAT rate. The rate itself is checked by the
+// shared rule (normalizeVatPercent), so both backends refuse the same way.
+export const CategoryVatBody = Type.Object({ category: Category, vatPercent: Type.Number() }, { additionalProperties: false });
+
 // The console's password gate. The floor is the one `assertPassword` enforces
 // — stated twice on purpose, so a too-short password is refused at the edge
 // with a 400 rather than turning into a 500 further in. There is no username:

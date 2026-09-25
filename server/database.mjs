@@ -2,14 +2,14 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { normalizeAllergens } from "../src/allergens.js";
 import { photoMenuDishes } from "./photo-menu.mjs";
 import { dishPhotos } from "./dish-photos.mjs";
 import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
   adminGateView, assertPassword, assertSetServed, auditView, billView, hashPassword,
-  duplicateInput, hashSessionToken, newSessionToken, normalizeBundleItems, normalizeCategoryName, normalizeSettingsInput,
+  duplicateInput, hashSessionToken, newSessionToken, normalizeCategoryName, normalizeSettingsInput,
+  mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT, ORDER_ITEMS_SQL,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
   renamedCategorySettings, tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
@@ -21,14 +21,9 @@ const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
 const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
-const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
 const SCHEMA_VERSION = 9;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
-const VAT_PERCENTS = new Set([10, 13, 20]);
-// Austrian gastronomy defaults: food is reduced rate, drinks are standard rate.
-// The operator can override per product; confirm the rates with a tax advisor.
-const DEFAULT_VAT_PERCENT = { food: 10, sushi: 10, drink: 20 };
 const ORDER_TRANSITIONS = new Map([
   ["new", new Set(["preparing", "cancelled"])],
   ["preparing", new Set(["ready", "cancelled"])],
@@ -52,96 +47,12 @@ function bool(value, fallback = true) {
   return value ? 1 : 0;
 }
 
-function priceToCents(value) {
-  const cents = Math.round(Number(value) * 100);
-  if (!Number.isFinite(cents) || cents < 0) throw new Error("Price must be a positive number");
-  return cents;
-}
-
 function parseJson(value, fallback) {
   try {
     return value ? JSON.parse(value) : fallback;
   } catch {
     return fallback;
   }
-}
-
-function mapProduct(row, media = []) {
-  return {
-    id: row.id,
-    sku: row.sku,
-    kind: row.kind,
-    category: row.category,
-    names: { zh: row.name_zh, de: row.name_de, en: row.name_en },
-    description: row.description,
-    price: row.price_cents / 100,
-    vatPercent: row.vat_percent,
-    allergens: parseJson(row.allergens_json, []),
-    details: {
-      time: row.prep_time,
-      people: row.portion,
-      level: row.level,
-      ingredients: row.ingredients
-    },
-    appearance: {
-      art: row.art,
-      pattern: row.pattern
-    },
-    modifiers: parseJson(row.modifiers_json, []),
-    bundleItems: parseJson(row.bundle_items_json, []),
-    available: Boolean(row.available),
-    published: Boolean(row.published),
-    sortOrder: row.sort_order,
-    printStation: row.print_station,
-    media: media.map((item) => ({
-      id: item.id,
-      type: item.type,
-      url: item.url,
-      posterUrl: item.poster_url,
-      sortOrder: item.sort_order,
-      credit: item.credit ?? null
-    })),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function normalizeProduct(input, current = {}) {
-  const names = input.names || {};
-  const details = input.details || {};
-  const appearance = input.appearance || {};
-  const kind = input.kind || current.kind || "food";
-  const printStation = input.printStation || current.print_station || (kind === "drink" ? "bar" : kind === "sushi" ? "sushi" : "kitchen");
-  if (!PRODUCT_KINDS.has(kind)) throw new Error("Unsupported product kind");
-  if (!PRINT_STATIONS.has(printStation)) throw new Error("Unsupported print station");
-  const vatPercent = Number(input.vatPercent ?? current.vat_percent ?? DEFAULT_VAT_PERCENT[kind]);
-  if (!VAT_PERCENTS.has(vatPercent)) throw new Error("Unsupported VAT percentage");
-
-  return {
-    id: String(input.id || current.id || randomUUID()),
-    sku: String(input.sku || current.sku || "").trim(),
-    kind,
-    category: String(input.category || current.category || "OTHER").trim().replace(/\s+/g, " ").toUpperCase(),
-    nameZh: String(names.zh ?? input.nameZh ?? current.name_zh ?? "").trim(),
-    nameDe: String(names.de ?? input.nameDe ?? current.name_de ?? "").trim(),
-    nameEn: String(names.en ?? input.nameEn ?? current.name_en ?? "").trim(),
-    description: String(input.description ?? current.description ?? "").trim(),
-    priceCents: input.price === undefined ? current.price_cents ?? 0 : priceToCents(input.price),
-    vatPercent,
-    allergensJson: JSON.stringify(normalizeAllergens(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, []))),
-    prepTime: String(details.time ?? current.prep_time ?? "").trim(),
-    portion: String(details.people ?? current.portion ?? "").trim(),
-    level: String(details.level ?? current.level ?? "").trim(),
-    ingredients: String(details.ingredients ?? current.ingredients ?? "").trim(),
-    art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#2d3a35,#121416 78%)"),
-    pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
-    modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
-    bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
-    available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
-    published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
-    sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
-    printStation
-  };
 }
 
 export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS } = {}) {
@@ -216,6 +127,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       print_station TEXT NOT NULL,
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10
+    );
+
+    CREATE TABLE IF NOT EXISTS order_item_vat_splits (
+      order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      split_json TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS service_requests (
@@ -404,7 +320,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deleteMedia: db.prepare("DELETE FROM product_media WHERE id = ?"),
     orderByClientId: db.prepare("SELECT * FROM orders WHERE client_request_id = ?"),
     orderById: db.prepare("SELECT * FROM orders WHERE id = ?"),
-    orderItems: db.prepare("SELECT * FROM order_items WHERE order_id = ?"),
+    orderItems: db.prepare(ORDER_ITEMS_SQL),
+    insertVatSplit: db.prepare("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)"),
     listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC, rowid DESC LIMIT ?"),
     openBillOrders: db.prepare("SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at"),
     openBillTables: db.prepare("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"),
@@ -620,51 +537,31 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     };
   }
 
-  function resolveModifiers(product, requested = []) {
-    const groups = parseJson(product.modifiers_json, []);
-    const options = new Map(groups.flatMap((group) => group.options.map((option) => [option.id, { ...option, groupId: group.id, selection: group.selection }] )));
-    const selected = [];
-    const selectedGroups = new Map();
-    for (const request of Array.isArray(requested) ? requested : []) {
-      const option = options.get(String(request.id));
-      if (!option) throw new Error(`Modifier ${request.id} is not available for ${product.sku}`);
-      const count = (selectedGroups.get(option.groupId) || 0) + 1;
-      if (option.selection === "single" && count > 1) throw new Error(`Only one modifier is allowed for ${option.groupId}`);
-      if (selected.some((item) => item.id === option.id)) throw new Error(`Duplicate modifier ${option.id}`);
-      selectedGroups.set(option.groupId, count);
-      selected.push({ id: option.id, name: option.names.zh, names: option.names, priceCents: Number(option.priceCents) || 0 });
-    }
-    return selected;
-  }
-
+  /**
+   * The order rules are shared/rules.mjs's (planOrder), so this server and
+   * the Worker write the same rows — VAT split and kitchen tickets included.
+   * What is left here is reading the products and writing in one transaction.
+   */
   function createOrder(input) {
     const requestId = String(input.clientRequestId || randomUUID());
     const existing = statements.orderByClientId.get(requestId);
     if (existing) return orderView(existing);
-    if (!Array.isArray(input.items) || !input.items.length) throw new Error("Order requires at least one item");
 
-    const hours = getSettings();
-    const resolvedItems = input.items.map((item) => {
-      const product = statements.productById.get(String(item.id));
-      const quantity = Number(item.qty);
-      if (!product || !product.published || !product.available) throw new Error(`Product ${item.id} is unavailable`);
-      assertSetServed(product, hours);
-      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) throw new Error("Invalid item quantity");
-      const modifiers = resolveModifiers(product, item.modifiers);
-      const modifierTotalCents = modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);
-      return { product, quantity, modifiers, unitPriceCents: product.price_cents + modifierTotalCents };
-    });
-    const totalCents = resolvedItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
-    const id = randomUUID();
-    const timestamp = now();
-    const orderNo = `${timestamp.slice(2, 10).replaceAll("-", "")}-${id.slice(0, 5).toUpperCase()}`;
+    const products = new Map();
+    const load = (id) => {
+      const row = statements.productById.get(String(id));
+      if (row) products.set(String(row.id), row);
+    };
+    for (const item of Array.isArray(input.items) ? input.items : []) load(item.id);
+    // The dishes inside a set, for its VAT split.
+    for (const id of bundleComponentIds(products.values())) if (!products.has(id)) load(id);
+    const plan = planOrder({ ...input, clientRequestId: requestId }, products, getSettings());
+    const { id, orderNo, table, note, totalCents, timestamp } = plan.order;
 
-    const tableNo = String(input.table ?? "").trim();
-    if (!tableNo) throw new Error("Order requires a table number");
     // A locked table is one whose bill is being settled. Refusing here is the
     // whole point of the lock: an order that lands mid-settle is either missing
     // from the bill the guest just paid or reopens a table that was released.
-    const tableRow = statements.tableByNo.get(tableNo.toUpperCase());
+    const tableRow = statements.tableByNo.get(table.toUpperCase());
     if (tableRow?.locked_at) {
       const error = new Error("This table is locked; please ask a waiter");
       error.code = "TABLE_LOCKED";
@@ -677,24 +574,30 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         db.exec("COMMIT");
         return orderView(committed);
       }
-      statements.insertOrder.run(id, orderNo, requestId, tableNo, String(input.note || "").trim(), totalCents, timestamp, timestamp);
-      const jobs = new Map();
-      for (const { product, quantity, modifiers, unitPriceCents } of resolvedItems) {
-        const productName = product.name_zh || product.name_de || product.name_en;
-        statements.insertOrderItem.run(randomUUID(), id, product.id, productName, quantity, unitPriceCents, product.print_station, JSON.stringify(modifiers), product.vat_percent);
-        const stationItems = jobs.get(product.print_station) || [];
-        stationItems.push({ sku: product.sku, name: productName, names: { zh: product.name_zh, de: product.name_de, en: product.name_en }, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names, price: modifier.priceCents / 100 })) });
-        jobs.set(product.print_station, stationItems);
+      statements.insertOrder.run(id, orderNo, requestId, table, note, totalCents, timestamp, timestamp);
+      for (const item of plan.items) {
+        statements.insertOrderItem.run(item.id, id, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson, item.vatPercent);
+        if (item.vatSplitJson) statements.insertVatSplit.run(item.id, item.vatSplitJson);
       }
-      for (const [station, items] of jobs) {
-        statements.insertPrintJob.run(randomUUID(), id, station, JSON.stringify({ orderNo, table: tableNo, note: String(input.note || ""), items }), timestamp, timestamp);
-      }
+      for (const job of plan.printJobs) statements.insertPrintJob.run(job.id, id, job.printerRole, job.payloadJson, timestamp, timestamp);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
       throw error;
     }
     return orderView(statements.orderById.get(id));
+  }
+
+  /**
+   * Every dish of one category at one VAT rate. Set menus are left alone:
+   * their rate is their dishes' (vatSplit). Null when the category has no
+   * dish this applies to.
+   */
+  function setCategoryVat(categoryInput, percentInput) {
+    const category = normalizeCategoryName(categoryInput);
+    const vatPercent = normalizeVatPercent(percentInput);
+    const { changes } = db.prepare("UPDATE products SET vat_percent = ?, updated_at = ? WHERE category = ? AND bundle_items_json IN ('', '[]')").run(vatPercent, now(), category);
+    return changes ? { updated: Number(changes), category, vatPercent } : null;
   }
 
   /**
@@ -1012,6 +915,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     addMedia,
     duplicateProduct,
     renameCategory,
+    setCategoryVat,
     getMediaFile,
     deleteMedia: (id) => statements.deleteMedia.run(String(id)).changes > 0,
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),

@@ -4,7 +4,7 @@ import { PRINT_JOB_STATUSES } from "../src/contracts.js";
 // Request bodies are the shared wire contract; only the route-shaped schemas
 // below are server-local.
 export {
-  CategoryRenameBody, CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody,
+  CategoryRenameBody, CategoryVatBody, CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody,
   ServiceStatusBody, SetPasswordBody, SettingsBody, SignInBody, TableBody, TableLockBody
 } from "../src/contracts.js";
 

@@ -223,6 +223,8 @@ export class AdminApi {
   /** Moves every dish of one category to another, new or existing, and
    *  carries the category's tab settings along. */
   renameCategory(from: string, to: string): Promise<{ renamed: number; category: string; settings: ApiSettings }> { return this.#request("/api/admin/categories/rename", { method: "POST", body: JSON.stringify({ from, to }) }); }
+  /** Every dish of a category at one VAT rate; set menus keep their split. */
+  setCategoryVat(category: string, vatPercent: VatPercent): Promise<{ updated: number; category: string; vatPercent: VatPercent }> { return this.#request("/api/admin/categories/vat", { method: "POST", body: JSON.stringify({ category, vatPercent }) }); }
   session(): Promise<{ role: StaffRole }> { return this.#request("/api/admin/session"); }
   audit(limit = 100): Promise<{ entries: AuditEntry[] }> { return this.#request(`/api/admin/audit?limit=${limit}`); }
   orders(limit = 100): Promise<{ orders: ApiOrder[] }> { return this.#request(`/api/orders?limit=${limit}`); }

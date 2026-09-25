@@ -182,7 +182,8 @@ export function CatalogPanel(props: Props) {
       price: Number(data.get("price")),
       details: { ingredients: readText(data, "ingredients"), time: readText(data, "time"), people: readText(data, "people"), level: readText(data, "level") },
       allergens: data.getAll("allergens").map((value) => String(value)),
-      vatPercent: (Number(data.get("vatPercent")) || 10) as VatPercent,
+      // Empty: a new dish takes its type's rate (food 10%, drinks 20%).
+      ...(data.get("vatPercent") ? { vatPercent: Number(data.get("vatPercent")) as VatPercent } : {}),
       modifiers,
       bundleItems: readBundleItems(data),
       printStation: readText(data, "printStation") as AdminProductInput["printStation"],
@@ -209,10 +210,17 @@ export function CatalogPanel(props: Props) {
       <label><span>{t("fieldNameZh")}</span><input name="nameZh" defaultValue={product?.names.zh ?? ""} /></label>
       <label><span>{t("fieldNameDe")}</span><input name="nameDe" defaultValue={product?.names.de ?? ""} /></label>
       <label><span>{t("fieldNameEn")}</span><input name="nameEn" defaultValue={product?.names.en ?? ""} /></label>
-      <div className="field-grid">
+      <div className="field-grid three">
         <label><span>{t("fieldPrice")}</span><input name="price" required type="number" min="0" step="0.01" inputMode="decimal" defaultValue={product ? product.priceCents / 100 : ""} /></label>
+        {/* The rate is on the form, not under "advanced": every dish has to
+            be at the right one. A new dish may leave it to its type. */}
+        <label><span>{t("fieldVat")}</span><select name="vatPercent" defaultValue={product ? String(product.vatPercent) : ""}>
+          {!product && <option value="">{t("vatByKind")}</option>}
+          {[["10", t("vatFood")], ["13", "13%"], ["20", t("vatDrink")]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select></label>
         <label><span>{t("fieldCategory")}</span><input name="category" required defaultValue={product?.category ?? ""} placeholder="RAMEN / BAO / WINE" /></label>
       </div>
+      {product?.bundleItems?.length ? <small className="settings-hint">{t("vatSetHint")}</small> : null}
       <label><span>{t("fieldDescription")}</span><textarea name="description" rows={3} defaultValue={product?.description ?? ""} /></label>
       <label><span>{t("fieldIngredients")}</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
       <div className="field-grid three"><label><span>{t("fieldTime")}</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>{t("fieldPortion")}</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>{t("fieldLevel")}</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
@@ -227,7 +235,6 @@ export function CatalogPanel(props: Props) {
         <div className="field-grid three">
           <label><span>{t("fieldSku")}</span><input name="sku" defaultValue={product?.sku ?? ""} placeholder={t("fieldSkuHint")} /></label>
           <label><span>{t("fieldStation")}</span><select name="printStation" defaultValue={product?.printStation ?? "kitchen"}>{stationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label><span>{t("fieldVat")}</span><select name="vatPercent" defaultValue={String(product?.vatPercent ?? 10)}>{[["10", t("vatFood")], ["13", "13%"], ["20", t("vatDrink")]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>
         <label><span>{t("fieldModifiers")}</span><textarea name="modifiers" rows={8} spellCheck={false} defaultValue={JSON.stringify(product?.modifiers ?? [], null, 2)} placeholder={'[{"id":"spice","names":{"zh":"辣度","de":"Scharf","en":"Spice"},"selection":"single","options":[]}]'} /><small>{t("fieldModifiersHint")}</small></label>
       </details>
@@ -249,7 +256,7 @@ export function CatalogPanel(props: Props) {
       </header>
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}</div>
       <div className="product-list">{rows.length ? rows.map((row) => {
-        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
     </section>
   </div></section>;

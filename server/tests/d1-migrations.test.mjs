@@ -36,7 +36,8 @@ const incremental = [
   // 0051 added a table 0052 takes away again: a database from before either
   // goes through both, and one that applied 0051 gets only 0052.
   { file: "0051_product_schedules.sql", then: "0052_drop_product_schedules.sql", drop: "" },
-  { file: "0052_drop_product_schedules.sql", drop: readFileSync(path.join(migrationsDir, "0051_product_schedules.sql"), "utf8") }
+  { file: "0052_drop_product_schedules.sql", drop: readFileSync(path.join(migrationsDir, "0051_product_schedules.sql"), "utf8") },
+  { file: "0053_order_item_vat_split.sql", drop: "DROP TABLE order_item_vat_splits;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")
@@ -191,4 +192,34 @@ test("the incremental migrations are no-ops on a fresh database and bring a depl
     });
     assert.deepEqual(deployed, expected, `${migration.file} must give an already-deployed database what it adds`);
   }
+});
+
+/**
+ * 0053 puts right what the Worker got wrong before it: drinks it saved at 10%
+ * go to 20%, and the open bills' lines take their dish's rate — while a bill
+ * already settled stays exactly as it was.
+ */
+test("0053 moves drinks to 20% and fixes open bills, never settled ones", () => {
+  const sql = committed();
+  const result = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    db.exec("DROP TABLE order_item_vat_splits;");
+    const at = "2026-09-01T00:00:00.000Z";
+    db.exec(`INSERT INTO products (id, sku, kind, category, name_zh, name_de, name_en, price_cents, vat_percent, created_at, updated_at)
+      VALUES ('cola', 'D-1', 'drink', 'DRINKS', 'x', 'x', 'x', 400, 10, '${at}', '${at}'),
+             ('tea13', 'D-2', 'drink', 'DRINKS', 'x', 'x', 'x', 400, 13, '${at}', '${at}')`);
+    db.exec(`INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at, billed_at)
+      VALUES ('open', 'A', 'a', '1', 'new', '', 400, '${at}', '${at}', NULL), ('paid', 'B', 'b', '2', 'new', '', 400, '${at}', '${at}', '${at}')`);
+    db.exec(`INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station)
+      VALUES ('i-open', 'open', 'cola', 'x', 1, 400, 'bar'), ('i-paid', 'paid', 'cola', 'x', 1, 400, 'bar')`);
+    db.exec(readFileSync(path.join(migrationsDir, "0053_order_item_vat_split.sql"), "utf8"));
+    const rates = Object.fromEntries(db.prepare("SELECT id, vat_percent FROM products WHERE id IN ('cola', 'tea13')").all().map((row) => [row.id, row.vat_percent]));
+    const lines = Object.fromEntries(db.prepare("SELECT id, vat_percent FROM order_items WHERE id IN ('i-open', 'i-paid')").all().map((row) => [row.id, row.vat_percent]));
+    db.close();
+    return { rates, lines };
+  });
+  assert.deepEqual(result.rates, { cola: 20, tea13: 13 }, "a drink at 10% goes to 20%; a rate the owner chose stays");
+  assert.deepEqual(result.lines, { "i-open": 20, "i-paid": 10 }, "the open bill is put right, the settled one is history");
 });

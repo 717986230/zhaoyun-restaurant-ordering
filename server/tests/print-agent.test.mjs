@@ -60,3 +60,23 @@ test("receipt selects the configured printer language and encoding", () => {
   const chinese = renderReceipt(payload, { capabilities: { printLanguage: "zh", encoding: "gb18030" } });
   assert.ok(chinese.includes(Buffer.from([0xBC, 0xD3, 0xC3, 0xE6])));
 });
+
+test("a kitchen ticket says it is no receipt and carries no price, even from an old payload", () => {
+  // A payload queued before prices left kitchen tickets still has one.
+  const payload = { orderNo: "A", table: "08", items: [{ quantity: 2, name: "Ramen", modifiers: [{ name: "Extra", names: { de: "Extra Nudeln" }, price: 2.5 }] }] };
+  const ticket = renderReceipt(payload, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(ticket, /KÜCHENBON – KEIN BELEG/);
+  assert.match(ticket, /Extra Nudeln/);
+  assert.doesNotMatch(ticket, /2\.50/);
+});
+
+test("a bill line of a set menu split over two rates shows both", () => {
+  const bill = {
+    kind: "bill", table: "08", total: 12,
+    items: [{ qty: 1, name: "Menü", lineTotal: 12, vatPercent: 10, vatSplit: [{ percent: 10, amount: 8 }, { percent: 20, amount: 4 }] }],
+    vatBreakdown: [{ percent: 10, gross: 8, net: 7.27, vat: 0.73 }, { percent: 20, gross: 4, net: 3.33, vat: 0.67 }]
+  };
+  const printed = renderReceipt(bill, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(printed, /12\.00 {2}10%\/20%/);
+  assert.match(printed, /Satz 20% {2}Netto 3\.33 {2}MwSt 0\.67/);
+});

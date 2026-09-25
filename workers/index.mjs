@@ -17,7 +17,7 @@
 import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
-  CategoryRenameBody, CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
+  CategoryRenameBody, CategoryVatBody, CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SetPasswordBody, SettingsBody, SignInBody, TableBody, TableLockBody
 } from "../src/contracts.js";
 import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
@@ -482,6 +482,18 @@ async function handle(request, env) {
         const { value, invalid } = await body(request, CategoryRenameBody);
         if (invalid) return invalid;
         const result = await store.renameCategory(value.from, value.to);
+        return result ? json(result) : fail("No dish is in that category", 404);
+      } catch (error) {
+        return fail(error.message);
+      }
+    }
+
+    // /api/admin/categories/vat: every dish of a category at one rate.
+    if (path.length === 4 && path[2] === "categories" && path[3] === "vat" && method === "POST") {
+      try {
+        const { value, invalid } = await body(request, CategoryVatBody);
+        if (invalid) return invalid;
+        const result = await store.setCategoryVat(value.category, value.vatPercent);
         return result ? json(result) : fail("No dish is in that category", 404);
       } catch (error) {
         return fail(error.message);

@@ -93,7 +93,7 @@ export function TablesPanel(props: Props) {
     {props.bill && <div className="bill-sheet" role="dialog" aria-label={t("billDialog")}>
       <div className="board-card-head"><b>{t("billTitle", { table: props.bill.table })}</b><button className="ghost-action" onClick={props.onCloseBill}>{t("close")}</button></div>
       {props.bill.items.length ? <>
-        <ul className="bill-items">{props.bill.items.map((item, index) => <li key={`${item.orderNo}-${index}`}><span>{item.qty} × {item.name}</span><span>{item.lineTotal.toFixed(2)} · {item.vatPercent}%</span></li>)}</ul>
+        <ul className="bill-items">{props.bill.items.map((item, index) => <li key={`${item.orderNo}-${index}`}><span>{item.qty} × {item.name}</span><span>{item.lineTotal.toFixed(2)} · {item.vatSplit ? item.vatSplit.map((part) => `${part.percent}%`).join("/") : `${item.vatPercent}%`}</span></li>)}</ul>
         <div className="bill-total"><span>{t("billTotal")}</span><b>{formatMoney(euro(props.bill.total), language)}</b></div>
         <table className="bill-vat"><thead><tr><th>{t("billRate")}</th><th>{t("billNet")}</th><th>{t("billVat")}</th><th>{t("billGross")}</th></tr></thead><tbody>{props.bill.vatBreakdown.map((group) => <tr key={group.percent}><td>{group.percent}%</td><td>{group.net.toFixed(2)}</td><td>{group.vat.toFixed(2)}</td><td>{group.gross.toFixed(2)}</td></tr>)}</tbody></table>
         <p className="bill-disclaimer">{t("billDisclaimer")}</p>

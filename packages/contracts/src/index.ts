@@ -88,6 +88,8 @@ export interface ApiBill {
     unitPrice: number;
     lineTotal: number;
     vatPercent: VatPercent;
+    /** A set menu over more than one rate: how its line divides. */
+    vatSplit?: Array<{ percent: VatPercent; amount: number }>;
     modifiers?: Array<{ name: string }>;
   }>;
   vatBreakdown: Array<{ percent: VatPercent; gross: number; net: number; vat: number }>;

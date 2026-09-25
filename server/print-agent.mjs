@@ -13,17 +13,20 @@ const labels = {
   zh: {
     title: "赵云餐厅", order: "订单", table: "桌号", note: "备注",
     bill: "账单", total: "合计", net: "净额", vat: "增值税", rate: "税率",
-    disclaimer: "内部账单，不是税务收据"
+    disclaimer: "内部账单，不是税务收据",
+    kitchen: "后厨单 · 不是收据"
   },
   de: {
     title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz",
     bill: "Rechnung", total: "Gesamt", net: "Netto", vat: "MwSt", rate: "Satz",
-    disclaimer: "Interne Rechnung, kein Kassenbeleg"
+    disclaimer: "Interne Rechnung, kein Kassenbeleg",
+    kitchen: "KÜCHENBON – KEIN BELEG"
   },
   en: {
     title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note",
     bill: "Bill", total: "Total", net: "Net", vat: "VAT", rate: "Rate",
-    disclaimer: "Internal bill, not a fiscal receipt"
+    disclaimer: "Internal bill, not a fiscal receipt",
+    kitchen: "Kitchen ticket – not a receipt"
   }
 };
 
@@ -33,15 +36,18 @@ function money(value) {
   return Number(value || 0).toFixed(2);
 }
 
+/** A kitchen ticket: what to cook, for which table. No price and no tax —
+ *  it is not a receipt, and says so on its first line. */
 function orderLines(payload, copy, language) {
   const lines = [
+    copy.kitchen,
     copy.title,
     `${copy.order} ${payload.orderNo || ""}  ${copy.table} ${payload.table || ""}`,
     RULE
   ];
   for (const item of payload.items || []) {
     lines.push(`${item.quantity} x ${item.names?.[language] || item.name || item.sku || "Item"}`);
-    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}${modifier.price ? ` (+${money(modifier.price)})` : ""}`);
+    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}`);
   }
   if (payload.note) lines.push(`${copy.note}: ${payload.note}`);
   lines.push(RULE, "\n");
@@ -58,7 +64,9 @@ function billLines(payload, copy, language) {
   for (const item of payload.items || []) {
     lines.push(`${item.qty} x ${item.names?.[language] || item.name || "Item"}`);
     for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}`);
-    lines.push(`      ${money(item.lineTotal)}  ${item.vatPercent}%`);
+    // A set menu over two rates shows both.
+    const rates = item.vatSplit ? item.vatSplit.map((part) => `${part.percent}%`).join("/") : `${item.vatPercent}%`;
+    lines.push(`      ${money(item.lineTotal)}  ${rates}`);
   }
   lines.push(RULE, `${copy.total}: EUR ${money(payload.total)}`);
   for (const group of payload.vatBreakdown || []) {

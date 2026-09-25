@@ -14,7 +14,7 @@ import {
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
   printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
-  verifyPassword, normalizeCategoryName, renamedCategorySettings
+  verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent, ORDER_ITEMS_SQL
 } from "../shared/rules.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
@@ -24,7 +24,7 @@ const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 const PRODUCT_COLUMNS = [
   "id", "sku", "kind", "category", "name_zh", "name_de", "name_en", "description", "price_cents",
   "allergens_json", "prep_time", "portion", "level", "ingredients", "art", "pattern", "available",
-  "published", "sort_order", "print_station", "modifiers_json", "bundle_items_json", "created_at", "updated_at"
+  "published", "sort_order", "print_station", "modifiers_json", "vat_percent", "bundle_items_json", "created_at", "updated_at"
 ];
 
 export function createStore(db) {
@@ -89,12 +89,12 @@ export function createStore(db) {
            name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
            portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
            published = ?, sort_order = ?, print_station = ?, modifiers_json = ?,
-           bundle_items_json = ?, updated_at = ? WHERE id = ?`,
+           vat_percent = ?, bundle_items_json = ?, updated_at = ? WHERE id = ?`,
         product.sku, product.kind, product.category, product.nameZh, product.nameDe,
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
         product.pattern, product.available, product.published, product.sortOrder,
-        product.printStation, product.modifiersJson, product.bundleItemsJson, timestamp, product.id
+        product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, product.id
       );
     } else {
       await run(
@@ -103,7 +103,7 @@ export function createStore(db) {
         product.nameDe, product.nameEn, product.description, product.priceCents,
         product.allergensJson, product.prepTime, product.portion, product.level,
         product.ingredients, product.art, product.pattern, product.available,
-        product.published, product.sortOrder, product.printStation, product.modifiersJson, product.bundleItemsJson, timestamp, timestamp
+        product.published, product.sortOrder, product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, timestamp
       );
     }
     return getProduct(product.id);
@@ -132,6 +132,21 @@ export function createStore(db) {
       ).bind(key, value, timestamp))
     ]);
     return { renamed: Number(moved.meta?.changes ?? 0), category: to, settings: await getSettings() };
+  }
+
+  /**
+   * Every dish of one category at one VAT rate. Set menus are left alone:
+   * their rate is their dishes' (vatSplit). Null when the category has no
+   * dish this applies to.
+   */
+  async function setCategoryVat(categoryInput, percentInput) {
+    const category = normalizeCategoryName(categoryInput);
+    const vatPercent = normalizeVatPercent(percentInput);
+    const updated = await run(
+      "UPDATE products SET vat_percent = ?, updated_at = ? WHERE category = ? AND bundle_items_json IN ('', '[]')",
+      vatPercent, now(), category
+    );
+    return updated ? { updated, category, vatPercent } : null;
   }
 
   /** A new, unpublished dish with everything the original had, photos included. */
@@ -176,7 +191,7 @@ export function createStore(db) {
 
   async function viewOrder(row) {
     if (!row) return null;
-    return orderView(row, await all("SELECT * FROM order_items WHERE order_id = ?", row.id));
+    return orderView(row, await all(ORDER_ITEMS_SQL, row.id));
   }
 
   /**
@@ -192,7 +207,7 @@ export function createStore(db) {
     const itemsByOrderId = new Map();
     const productIds = new Set();
     for (const order of orders) {
-      const rows = await all("SELECT * FROM order_items WHERE order_id = ?", order.id);
+      const rows = await all(ORDER_ITEMS_SQL, order.id);
       itemsByOrderId.set(order.id, rows);
       for (const row of rows) productIds.add(String(row.product_id));
     }
@@ -214,6 +229,9 @@ export function createStore(db) {
     for (const row of await selectByIds("SELECT * FROM products WHERE id IN (?)", ids)) {
       products.set(String(row.id), row);
     }
+    // The dishes inside a set, for its VAT split.
+    const parts = bundleComponentIds(products.values()).filter((partId) => !products.has(partId));
+    if (parts.length) for (const row of await selectByIds("SELECT * FROM products WHERE id IN (?)", parts)) products.set(String(row.id), row);
     const { timeZone, setsSchedule } = await getSettings();
     const plan = planOrder(input, products, { timeZone, setsSchedule });
     const { id, orderNo, clientRequestId, table, note, totalCents, timestamp } = plan.order;
@@ -235,8 +253,10 @@ export function createStore(db) {
     const statements = [
       db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)")
         .bind(id, orderNo, clientRequestId, table, note, totalCents, timestamp, timestamp),
-      ...plan.items.map((item) => db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(item.id, item.orderId, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson)),
+      ...plan.items.map((item) => db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(item.id, item.orderId, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson, item.vatPercent)),
+      ...plan.items.filter((item) => item.vatSplitJson).map((item) => db.prepare("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)")
+        .bind(item.id, item.vatSplitJson)),
       ...plan.printJobs.map((job) => db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)")
         .bind(job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp))
     ];
@@ -404,6 +424,7 @@ export function createStore(db) {
     addMedia,
     duplicateProduct,
     renameCategory,
+    setCategoryVat,
     getMediaFile,
     storeMedia,
     listOrders: async (limit = 100) => {

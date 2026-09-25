@@ -4,7 +4,7 @@ import path from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
-  CategoryRenameBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
+  CategoryRenameBody, CategoryVatBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
   ProductBody, ServiceRequestBody, ServiceStatusBody, SetPasswordBody, SettingsBody,
   SignInBody, TableBody, TableLockBody, TableParams
 } from "./schemas.mjs";
@@ -258,6 +258,17 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/categories/rename", { preHandler: requireAdmin, schema: { body: CategoryRenameBody } }, async (request, reply) => {
     try {
       const result = database.renameCategory(request.body.from, request.body.to);
+      if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
+      realtime.broadcast("catalog.changed", { category: result.category });
+      return result;
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+
+  app.post("/api/admin/categories/vat", { preHandler: requireAdmin, schema: { body: CategoryVatBody } }, async (request, reply) => {
+    try {
+      const result = database.setCategoryVat(request.body.category, request.body.vatPercent);
       if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
       realtime.broadcast("catalog.changed", { category: result.category });
       return result;
