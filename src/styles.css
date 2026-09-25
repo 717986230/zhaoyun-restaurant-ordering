@@ -190,6 +190,11 @@ body,
   min-width: 320px;
   height: 100%;
   overflow: hidden;
+  /* The list's own `overscroll-behavior` holds only while it can scroll: a
+     page shorter than the screen hands a pull straight to the window, where
+     Chrome would reload and Safari bounce. usePageTurn cancels nothing, so
+     this is what keeps a pull on a short page a page turn. */
+  overscroll-behavior: none;
   background: var(--bg);
 }
 

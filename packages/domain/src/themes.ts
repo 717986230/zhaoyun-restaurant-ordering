@@ -159,19 +159,10 @@ export const MENU_THEMES: Record<MenuThemeId, MenuTheme> = {
   }
 };
 
-
 export const MENU_THEME_IDS = Object.keys(MENU_THEMES) as MenuThemeId[];
 
 export const DEFAULT_MENU_THEME: MenuThemeId = "jade";
 
-/**
- * A festive set's pattern as a CSS image, `none` for an everyday style: one
- * 120px tile, the two motifs staggered across it, drawn in `colour` — faint,
- * to sit behind the whole menu. The `band` is the same pattern two tiles
- * tall, stronger at the top and fading out, for the header: laid over the
- * faint one on the same grid, the header wears the season and the list stays
- * quiet.
- */
 /**
  * A festive set's garland as a CSS image, `none` for an everyday style: a
  * 56px length of string sagging between two points, one ornament hung from
@@ -186,6 +177,14 @@ export function themeGarland(theme: MenuTheme, colour: string): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
+/**
+ * A festive set's pattern as a CSS image, `none` for an everyday style: one
+ * 120px tile, the two motifs staggered across it, drawn in `colour` — faint,
+ * to sit behind the whole menu. The `band` is the same pattern two tiles
+ * tall, stronger at the top and fading out, for the header: laid over the
+ * faint one on the same grid, the header wears the season and the list stays
+ * quiet.
+ */
 export function themePattern(theme: MenuTheme, colour: string, kind: "tile" | "band" = "tile"): string {
   if (!theme.festive) return "none";
   const [first, second] = theme.festive.motifs.map((motif) => motif.replaceAll("{c}", colour));

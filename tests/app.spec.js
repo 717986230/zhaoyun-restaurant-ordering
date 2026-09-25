@@ -779,8 +779,9 @@ test("the owner's first three tabs lead, and the rest keep their order", async (
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
   await expect(page.locator(".chip")).toHaveText(["RAMEN", "套餐", "全部", "✦ 精选推荐", "MAIN", "SUSHI"]);
+  // A first visit opens on the owner's first tab, not on the promotions page.
+  await expect(page.locator(".chip.on")).toHaveText("RAMEN");
   // Pages turn in the same order.
-  await page.getByRole("button", { name: "RAMEN", exact: true }).click();
   await page.locator(".page-next").click();
   await expect(page.locator(".chip.on")).toHaveText("套餐");
 });

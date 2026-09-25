@@ -85,7 +85,10 @@ function hydrate(): CustomerState {
     return {
       ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {},
       orders: (stored.orders || []).slice(0, maxStoredOrders),
-      table: tableNo(), screen: "menu", activeProductId: null, productFlipped: false, detailModifiers: [], toast: ""
+      table: tableNo(), screen: "menu", activeProductId: null, productFlipped: false, detailModifiers: [], toast: "",
+      // The search box opens closed, so a search left behind would filter the
+      // menu invisibly: a visit starts without one.
+      query: ""
     };
   } catch {
     return initialState;

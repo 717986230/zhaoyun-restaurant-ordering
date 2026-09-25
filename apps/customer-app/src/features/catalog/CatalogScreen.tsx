@@ -413,17 +413,20 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     : category === SETS_PAGE ? t(state.language, "setsPage")
     : category === "ALLE" ? t(state.language, "allCategories") : category);
 
-  // A guest's first look this visit is the promotions page, when there is one.
-  // Once per session: after that the menu stays where they left it.
+  // A guest's first look this visit is the menu's first tab: the one the
+  // owner put first, or the promotions page when they chose none and there
+  // is one; otherwise everything, as it opens. Once per session: after that
+  // the menu stays where they left it.
+  const firstTab = navPinned.length || featured ? categories[0] : "ALLE";
   useEffect(() => {
-    if (!featured) return;
+    if (!firstTab || firstTab === "ALLE") return;
     try {
-      if (sessionStorage.getItem("zy_featured_seen")) return;
-      sessionStorage.setItem("zy_featured_seen", "1");
+      if (sessionStorage.getItem("zy_first_look")) return;
+      sessionStorage.setItem("zy_first_look", "1");
     } catch { /* storage refused: show it anyway, once per load */ }
-    if (state.category === "ALLE") dispatch({ type: "category", category: FEATURED_PAGE });
+    if (state.category === "ALLE") dispatch({ type: "category", category: firstTab });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [Boolean(featured)]);
+  }, [firstTab]);
   // Switched off while a guest was on it: back to everything.
   useEffect(() => {
     if (!categories.includes(state.category)) dispatch({ type: "category", category: "ALLE" });
@@ -577,9 +580,9 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           </article>) : query && products.length
             // A search that found nothing says what was looked for and offers the way back.
             ? <div className="empty search-empty">
-              <strong>{t(state.language, "noResults").replace("{query}", state.query.trim())}</strong>
+              <strong>{t(state.language, "noResults").replace("{query}", () => state.query.trim())}</strong>
               <span>{t(state.language, "noResultsHint")}</span>
-              <button type="button" className="secondary" onClick={() => dispatch({ type: "toggle-search" })}>{t(state.language, "showAll")}</button>
+              <button type="button" className="secondary" onClick={() => { if (state.searchOpen) dispatch({ type: "toggle-search" }); else dispatch({ type: "query", query: "" }); }}>{t(state.language, "showAll")}</button>
             </div>
             : <div className="empty">{t(state.language, products.length ? "empty" : "unavailable")}</div>}
           {nextPage && complete && <button type="button" className="page-next" onClick={() => turnTo(nextPage)}>
