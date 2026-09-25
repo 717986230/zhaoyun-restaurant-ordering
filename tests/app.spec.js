@@ -786,6 +786,30 @@ test("the owner's first three tabs lead, and the rest keep their order", async (
   await expect(page.locator(".chip.on")).toHaveText("套餐");
 });
 
+test("the owner's names for the tabs are what a guest reads, in the guest's language", async ({ page }) => {
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+    products, theme: "jade", languages: ["zh", "en", "de"],
+    menu: { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true,
+      // A language without a name keeps the menu's own wording.
+      navLabels: { MAIN: { zh: "主菜", en: "Mains" }, ALLE: { zh: "全部菜品" }, __sets__: { en: "Combos" }, RAMEN: { zh: "拉面" } } }
+  }) }));
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(page.locator(".chip")).toHaveText(["套餐", "全部菜品", "主菜", "SUSHI", "拉面"]);
+  // The dish card says which page it is on by the same name.
+  await page.locator(".dish-card", { hasText: "黑椒牛柳" }).click();
+  await expect(page.locator(".detail-front .cat")).toHaveText("主菜");
+  await page.locator(".detail-close").click();
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.locator(".chip")).toHaveText(["Combos", "All", "Mains", "SUSHI", "RAMEN"]);
+  // A search finds a dish by the name of its tab, too.
+  await page.locator("#searchBtn").click();
+  await page.locator("#searchInput").fill("mains");
+  await expect(page.locator(".dish-card")).toHaveCount(1);
+  await expect(page.locator(".dish-card")).toContainText("Black Pepper Beef Fillet");
+});
+
 test.describe("the promotions and set menus pages keep their hours", () => {
   // A phone set to Shanghai time at a restaurant in Vienna: the restaurant's
   // clock is the one that counts.

@@ -485,6 +485,63 @@ function normalizeNavPinned(value) {
   return tabs;
 }
 
+export const MAX_NAV_LABELS = 80;
+export const MAX_NAV_LABEL_LENGTH = 24;
+
+/**
+ * The names the owner gives the guest menu's tabs, per language: "全部" /
+ * "Alle" / "All" under "ALLE", the set menus page under "__sets__", and
+ * each category under its own code ("RAMEN" -> 拉面 / Ramen / Ramen). A
+ * language left out keeps the menu's own wording, or the category's code.
+ */
+function normalizeNavLabels(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Tab names must be given per tab");
+  const entries = Object.entries(value);
+  if (entries.length > MAX_NAV_LABELS) throw new Error(`At most ${MAX_NAV_LABELS} tabs can be named`);
+  const labels = {};
+  for (const [rawTab, names] of entries) {
+    const tab = String(rawTab).trim();
+    if (!tab || tab.length > 64) throw new Error("A tab is 1 to 64 characters");
+    if (!names || typeof names !== "object" || Array.isArray(names)) throw new Error("A tab's names must be given per language");
+    const clean = {};
+    for (const [language, name] of Object.entries(names)) {
+      if (!MENU_LANGUAGES.includes(language)) throw new Error("Tab names are in zh, en or de");
+      const text = String(name ?? "").trim().replace(/\s+/g, " ");
+      if (text.length > MAX_NAV_LABEL_LENGTH) throw new Error(`A tab name is at most ${MAX_NAV_LABEL_LENGTH} characters`);
+      if (text) clean[language] = text;
+    }
+    if (Object.keys(clean).length) labels[tab] = clean;
+  }
+  return labels;
+}
+
+/** A category as dishes store it: trimmed, single-spaced, upper case. */
+export function normalizeCategoryName(value) {
+  const category = String(value ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+  if (!category || category.length > 64 || !/^[A-Z0-9][A-Z0-9 _-]*$/.test(category)) {
+    throw new Error("A category is 1 to 64 letters, digits, spaces, - or _");
+  }
+  // The "all" tab's id; a category of that name would share its tab.
+  if (category === "ALLE") throw new Error("ALLE is the all-dishes tab, not a category");
+  return category;
+}
+
+/**
+ * What renaming a category does to the settings that name it: its place
+ * among the owner's first tabs, and its names, move with it. Renamed onto a
+ * category that already has names, that one's names stay — two categories
+ * made one.
+ */
+export function renamedCategorySettings(settings, from, to) {
+  const navPinned = [...new Set(settings.navPinned.map((tab) => (tab === from ? to : tab)))];
+  const navLabels = { ...settings.navLabels };
+  if (navLabels[from]) {
+    if (!navLabels[to]) navLabels[to] = navLabels[from];
+    delete navLabels[from];
+  }
+  return { navPinned, navLabels };
+}
+
 /** The dishes on the promotions page, in the order the owner put them; no repeats. */
 function normalizeFeaturedIds(value) {
   if (!Array.isArray(value)) throw new Error("Featured products must be a list");
@@ -541,6 +598,8 @@ export const APP_SETTINGS = {
   setsSchedule: { key: "sets_schedule", fallback: () => null, normalize: normalizeSchedule },
   // Which tabs come first, second and third on the guest menu (packages/domain/src/navigation.ts).
   navPinned: { key: "nav_pinned", fallback: () => [], normalize: normalizeNavPinned },
+  // What the tabs are called, per language (normalizeNavLabels).
+  navLabels: { key: "nav_labels", fallback: () => ({}), normalize: normalizeNavLabels },
   featuredTemplate: {
     key: "featured_template",
     fallback: () => DEFAULT_FEATURED_TEMPLATE,
@@ -594,6 +653,7 @@ export function menuSettingsView(settings) {
     timeZone: settings.timeZone,
     setsSchedule: settings.setsSchedule,
     navPinned: settings.navPinned,
+    navLabels: settings.navLabels,
     // Only when switched on: a guest has no use for a list of ids otherwise.
     featured: settings.featuredEnabled
       ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate, schedule: settings.featuredSchedule }

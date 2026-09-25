@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, LANGUAGE_INFO, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product } from "@zhaoyun/domain";
+import type { NavLabels } from "@zhaoyun/contracts";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
@@ -34,6 +35,9 @@ interface Props {
   featured: { title: string; products: Product[]; template: FeaturedTemplateId } | null;
   /** The tabs the owner put first to third; the rest keep their usual order. */
   navPinned?: string[];
+  /** The owner's names for the tabs, per language; a tab without one keeps
+   *  the menu's own wording. */
+  navLabels?: NavLabels;
 }
 
 /** The promotions page's place among the categories; no real category is called this. */
@@ -260,7 +264,7 @@ function DishOptions({ product, language }: { product: Product; language: Custom
   </div>;
 }
 
-function ProductDetail({ product, byId, state, dispatch }: { product: Product; byId: ProductIndex; state: CustomerState; dispatch: CustomerDispatch }) {
+function ProductDetail({ product, categoryName, byId, state, dispatch }: { product: Product; categoryName: string; byId: ProductIndex; state: CustomerState; dispatch: CustomerDispatch }) {
   const reduceMotion = useReducedMotion();
   const seconds = (value: number) => (reduceMotion ? 0 : value);
 
@@ -287,7 +291,7 @@ function ProductDetail({ product, byId, state, dispatch }: { product: Product; b
         transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP_SPRING, scale: { duration: 0.62, times: [0, 0.45, 1], ease: EASE } }}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
-            <span className="number">{product.sku}</span><span className="cat">{product.category}</span>
+            <span className="number">{product.sku}</span><span className="cat">{categoryName}</span>
             <h3>{productName(product, state.language)}</h3>{secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}
           </div>
           <div className="detail-scroll">
@@ -380,7 +384,7 @@ function FeaturedPage({ title, eyebrow, template, products, byId, language, onOp
   </div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [] }: Props) {
+export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {} }: Props) {
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
@@ -393,7 +397,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   // A search looks through everything, sets included; a page shows its own.
   const visible = (query ? products : dishes).filter((product) => {
     const categoryMatch = query || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE || product.category === state.category;
-    const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category].join(" ").toLowerCase();
+    const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category, ...Object.values(navLabels[product.category] ?? {})].join(" ").toLowerCase();
     return categoryMatch && (!query || text.includes(query));
   });
   // The owner's three first, the rest in their usual order: the promotions
@@ -410,8 +414,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const prevPage = paging && pageIndex > 0 ? categories[pageIndex - 1] : undefined;
   const pageName = (category: string) => (category === FEATURED_PAGE
     ? `✦ ${featured?.title || t(state.language, "featuredDefault")}`
-    : category === SETS_PAGE ? t(state.language, "setsPage")
-    : category === "ALLE" ? t(state.language, "allCategories") : category);
+    : navLabels[category]?.[state.language]
+      || (category === SETS_PAGE ? t(state.language, "setsPage") : category === "ALLE" ? t(state.language, "allCategories") : category));
 
   // A guest's first look this visit is the menu's first tab: the one the
   // owner put first, or the promotions page when they chose none and there
@@ -606,6 +610,6 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
       tabIndex={farDown && !activeProduct ? 0 : -1}
       onClick={() => stackRef.current?.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })}
     ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" /></svg></button>
-    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} byId={byId} state={state} dispatch={dispatch} />}</AnimatePresence>
+    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} categoryName={pageName(activeProduct.category)} byId={byId} state={state} dispatch={dispatch} />}</AnimatePresence>
   </section>;
 }

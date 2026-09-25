@@ -303,7 +303,7 @@ export function contractChecks(call, assert) {
 
     ["the restaurant's name, the menu's title and its look are the owner's to set", async () => {
       const before = await call("GET", "/api/catalog");
-      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], featured: null },
+      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null },
         "a fresh restaurant ships with these");
 
       assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
@@ -319,7 +319,7 @@ export function contractChecks(call, assert) {
       assert.equal(saved.status, 200);
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
       assert.deepEqual((await call("GET", "/api/catalog")).json.menu,
-        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], featured: null });
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
       // A save of one setting leaves the rest where they were.
       assert.equal(saved.json.menuTheme, "jade");
@@ -619,6 +619,53 @@ export function contractChecks(call, assert) {
       const reset = await settings({ timeZone: "Europe/Vienna", featuredSchedule: null, setsSchedule: null, featuredEnabled: false, featuredProductIds: [] });
       assert.equal(reset.json.featuredSchedule, null, "null takes the hours away: always on");
       assert.equal(reset.json.setsSchedule, null);
+    }],
+
+    ["the owner names the tabs per language, and renames or merges a category with its dishes", async () => {
+      const settings = (body) => call("PUT", "/api/admin/settings", { admin: true, body });
+      const rename = (from, to) => call("POST", "/api/admin/categories/rename", { admin: true, body: { from, to } });
+      assert.deepEqual((await call("GET", "/api/admin/settings", { admin: true })).json.navLabels, {});
+
+      // Names per language, trimmed; a blank one keeps the menu's wording, a tab with none is dropped.
+      const named = await settings({ navLabels: { RAMEN: { zh: " 拉面 ", de: "Ramen", en: "" }, ALLE: { zh: "全部菜品" }, SUSHI: { zh: "" } } });
+      assert.equal(named.status, 200);
+      assert.deepEqual(named.json.navLabels, { RAMEN: { zh: "拉面", de: "Ramen" }, ALLE: { zh: "全部菜品" } });
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.navLabels, named.json.navLabels, "the menu gets them");
+      assert.equal((await settings({ navLabels: { RAMEN: { fr: "Ramen" } } })).status, 400, "zh, en and de only");
+      assert.equal((await settings({ navLabels: { RAMEN: { zh: "x".repeat(25) } } })).status, 400, "24 characters at most");
+
+      // A rename moves the dishes, and the category's place and names go with it.
+      await settings({ navPinned: ["RAMEN", "ALLE"] });
+      const ramenCount = (await call("GET", "/api/admin/products", { admin: true })).json.products.filter((dish) => dish.category === "RAMEN").length;
+      const moved = await rename("RAMEN", " noodle  soups ");
+      assert.equal(moved.status, 200);
+      assert.equal(moved.json.renamed, ramenCount);
+      assert.equal(moved.json.category, "NOODLE SOUPS", "stored as dishes store a category");
+      assert.deepEqual(moved.json.settings.navPinned, ["NOODLE SOUPS", "ALLE"]);
+      assert.deepEqual(moved.json.settings.navLabels.RAMEN, undefined);
+      assert.deepEqual(moved.json.settings.navLabels["NOODLE SOUPS"], { zh: "拉面", de: "Ramen" });
+      const products = (await call("GET", "/api/catalog")).json.products;
+      assert.equal(products.filter((dish) => dish.category === "RAMEN").length, 0);
+      assert.equal(products.filter((dish) => dish.category === "NOODLE SOUPS").length, ramenCount);
+
+      // Onto an existing category, the two are one; that one's names stay.
+      const merged = await rename("NOODLE SOUPS", "SPECIALS");
+      assert.equal(merged.status, 200);
+      assert.deepEqual(merged.json.settings.navPinned, ["SPECIALS", "ALLE"]);
+      assert.equal(merged.json.settings.navLabels["NOODLE SOUPS"], undefined);
+
+      assert.equal((await rename("NO SUCH CATEGORY", "X")).status, 404, "nothing to move");
+      assert.equal((await rename("SPECIALS", "SPECIALS")).status, 400, "the same name");
+      assert.equal((await rename("SPECIALS", "ALLE")).status, 400, "not the all-dishes tab's id");
+      assert.equal((await rename("SPECIALS", "拉面")).status, 400, "a category code is Latin letters and digits");
+
+      // Leave the room as it was found: split the merged dishes back apart by their codes.
+      for (const dish of (await call("GET", "/api/admin/products", { admin: true })).json.products) {
+        if (dish.category === "SPECIALS" && /^R\d/.test(dish.sku)) {
+          assert.equal((await call("PUT", `/api/admin/products/${dish.id}`, { admin: true, body: { ...dish, category: "RAMEN" } })).status, 200);
+        }
+      }
+      await settings({ navPinned: [], navLabels: {} });
     }],
 
     ["the owner picks the guest menu's first three tabs, without conflicts", async () => {

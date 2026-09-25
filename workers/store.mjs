@@ -14,7 +14,7 @@ import {
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
   printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
-  verifyPassword
+  verifyPassword, normalizeCategoryName, renamedCategorySettings
 } from "../shared/rules.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
@@ -107,6 +107,31 @@ export function createStore(db) {
       );
     }
     return getProduct(product.id);
+  }
+
+  /**
+   * Every dish in one category moved to another name, and the settings that
+   * name the category with it (its place among the first tabs, its names).
+   * Onto an existing category, the two become one. Null when no dish is in
+   * the category.
+   */
+  async function renameCategory(fromInput, toInput) {
+    const from = normalizeCategoryName(fromInput);
+    const to = normalizeCategoryName(toInput);
+    if (from === to) throw new Error("The new name is the same as the old one");
+    if (!await first("SELECT 1 FROM products WHERE category = ? LIMIT 1", from)) return null;
+    // The dishes and the settings that name the category move in one atomic
+    // batch: never dishes under a new name with pins and names left behind.
+    const { rows } = normalizeSettingsInput(renamedCategorySettings(await getSettings(), from, to));
+    const timestamp = now();
+    const [moved] = await db.batch([
+      db.prepare("UPDATE products SET category = ?, updated_at = ? WHERE category = ?").bind(to, timestamp, from),
+      ...rows.map(([key, value]) => db.prepare(
+        `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+      ).bind(key, value, timestamp))
+    ]);
+    return { renamed: Number(moved.meta?.changes ?? 0), category: to, settings: await getSettings() };
   }
 
   /** A new, unpublished dish with everything the original had, photos included. */
@@ -378,6 +403,7 @@ export function createStore(db) {
     deleteProduct: async (id) => (await run("DELETE FROM products WHERE id = ?", String(id))) > 0,
     addMedia,
     duplicateProduct,
+    renameCategory,
     getMediaFile,
     storeMedia,
     listOrders: async (limit = 100) => {

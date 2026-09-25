@@ -285,6 +285,19 @@ export function App() {
     } catch (error) { failed(error, "saveFailed"); }
   }
 
+  /** Renames a category, or merges it into another; its dishes move with it. */
+  async function renameCategory(from: string, to: string) {
+    try {
+      const { renamed, category } = await adminApi.renameCategory(from, to);
+      await connect();
+      notify(t("categoryRenamed", { count: renamed, category }));
+      return true;
+    } catch (error) {
+      failed(error, "saveFailed");
+      return false;
+    }
+  }
+
   function toggleFeatured(id: string, on: boolean) {
     const current = state.settings?.featuredProductIds ?? [];
     const next = on ? [...current.filter((item) => item !== id), id] : current.filter((item) => item !== id);
@@ -492,6 +505,7 @@ export function App() {
         tables={state.tables}
         auditEntries={state.auditEntries}
         onSaveSettings={saveSettings}
+        onRenameCategory={renameCategory}
         onSaveConnection={saveConnection}
         onSaveTable={saveTable}
         onDeleteTable={deleteTable}
