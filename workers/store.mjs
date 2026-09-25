@@ -7,6 +7,13 @@
  * `node:sqlite` is synchronous and D1 is not, and D1 has no interactive
  * transaction, so the order write that is a BEGIN/COMMIT over there is one
  * atomic `batch()` here.
+ *
+ * What that transaction also gives the Node server — nothing changes between
+ * a read and the write that depends on it — the journal gives here. Every
+ * order, receipt and closing writes the next journal entry, whose number is
+ * the primary key, and reads the last one before anything else. Two writes
+ * that read the same state both claim the same number; the second batch
+ * fails whole, and `retrying` works it out again from what is there now.
  */
 import {
   adminGateView, assertOrderTransition, assertPassword, assertRequestTransition, auditView,
@@ -14,8 +21,14 @@ import {
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
   printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
-  verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent, ORDER_ITEMS_SQL
+  verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent
 } from "../shared/rules.mjs";
+import {
+  CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
+  INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
+  ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, receiptPrintPayload,
+  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
+} from "../shared/register.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
 // console with no password costs the same PBKDF2 work as one with.
@@ -35,6 +48,27 @@ export function createStore(db) {
   // SQLite binds at most 100 variables per statement, and the menu is 111
   // dishes, so an `IN (?, ?, ...)` over a whole catalogue fails outright.
   const BIND_LIMIT = 90;
+
+  /** The last journal entry: read first, so a write that follows it cannot miss what came between. */
+  const lastJournal = () => first("SELECT seq, hash FROM journal ORDER BY seq DESC LIMIT 1");
+
+  async function journalStatement(last, kind, ref, payload, at) {
+    const entry = journalEntry(last ?? null, kind, ref, payload, at);
+    return db.prepare(INSERT_JOURNAL_SQL).bind(entry.seq, entry.at, entry.kind, entry.ref, entry.payloadJson, entry.prevHash, await sha256Hex(journalText(entry)));
+  }
+
+  const TAKEN = /UNIQUE constraint failed: (journal\.seq|receipts\.receipt_no|day_closings\.(closing_no|last_receipt_no))/;
+
+  /** Runs `attempt` again while a concurrent write took its journal entry or number first. */
+  async function retrying(attempt, tries = 6) {
+    for (let round = 1; ; round += 1) {
+      try {
+        return await attempt();
+      } catch (error) {
+        if (round >= tries || !TAKEN.test(String(error?.message ?? error))) throw error;
+      }
+    }
+  }
 
   async function selectByIds(sql, ids) {
     const rows = [];
@@ -224,6 +258,11 @@ export function createStore(db) {
       if (existing) return viewOrder(existing);
     }
 
+    return retrying(() => writeOrder(input));
+  }
+
+  async function writeOrder(input) {
+    const last = await lastJournal();
     const ids = [...new Set(orderProductIds(input))];
     const products = new Map();
     for (const row of await selectByIds("SELECT * FROM products WHERE id IN (?)", ids)) {
@@ -258,7 +297,8 @@ export function createStore(db) {
       ...plan.items.filter((item) => item.vatSplitJson).map((item) => db.prepare("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)")
         .bind(item.id, item.vatSplitJson)),
       ...plan.printJobs.map((job) => db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)")
-        .bind(job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp))
+        .bind(job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp)),
+      await journalStatement(last, "order.created", id, orderJournalPayload(plan), timestamp)
     ];
 
     try {
@@ -272,11 +312,128 @@ export function createStore(db) {
   }
 
   async function updateOrder(id, status) {
-    const current = await first("SELECT * FROM orders WHERE id = ?", String(id));
-    if (!current) return null;
-    assertOrderTransition(current.status, status);
-    await run("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", status, now(), String(id));
-    return viewOrder(await first("SELECT * FROM orders WHERE id = ?", String(id)));
+    return retrying(async () => {
+      const last = await lastJournal();
+      const current = await first("SELECT * FROM orders WHERE id = ?", String(id));
+      if (!current) return null;
+      assertOrderTransition(current.status, status);
+      if (current.status === status) return viewOrder(current);
+      // A paid line stays paid: cancelling it is a storno of its receipt.
+      if (status === "cancelled" && await first(ORDER_PAID_SQL, current.id)) throw new Error("This order is on a receipt; cancel the receipt first");
+      const at = now();
+      await db.batch([
+        db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?").bind(status, at, current.id),
+        await journalStatement(last, "order.status", current.id, { orderId: current.id, orderNo: current.order_no, table: current.table_no, from: current.status, to: status }, at)
+      ]);
+      return viewOrder(await first("SELECT * FROM orders WHERE id = ?", current.id));
+    });
+  }
+
+  async function receiptDetail(row) {
+    if (!row) return null;
+    const storno = await first("SELECT id FROM receipts WHERE refers_to = ?", row.id);
+    const referred = row.refers_to ? await first("SELECT receipt_no FROM receipts WHERE id = ?", row.refers_to) : null;
+    return receiptView(row, { cancelledBy: storno?.id ?? null, referredNo: referred?.receipt_no ?? null });
+  }
+
+  const printStatement = (payload, at) => db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, NULL, 'front', ?, 'queued', ?, ?)")
+    .bind(uuid(), JSON.stringify(payload), at, at);
+
+  /** A sale at the register (planCheckout): the receipt, and the table freed once it is all paid. */
+  async function checkout(input, role) {
+    const requestId = String(input.clientRequestId || uuid());
+    const existing = await first("SELECT * FROM receipts WHERE client_request_id = ?", requestId);
+    if (existing) return receiptDetail(existing);
+    return retrying(async () => {
+      const last = await lastJournal();
+      const ids = [...new Set((Array.isArray(input.items) ? input.items : []).map((item) => String(item.orderItemId)))];
+      const itemRows = ids.length ? await selectByIds(CHECKOUT_ITEMS_SQL, ids) : [];
+      const codes = [...new Set((Array.isArray(input.payments) ? input.payments : []).filter((payment) => payment.type === "voucher").map((payment) => normalizeVoucherCode(payment.voucherCode)))];
+      const voucherRows = codes.length ? await selectByIds("SELECT * FROM vouchers WHERE code IN (?)", codes) : [];
+      const settings = await getSettings();
+      const plan = planCheckout({ ...input, clientRequestId: requestId }, {
+        itemRows, voucherRows, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1, settings, role
+      });
+      const at = plan.receipt.createdAt;
+      const view = plannedReceiptView(plan.receipt);
+      const table = plan.receipt.table;
+      const statements = [
+        db.prepare(INSERT_RECEIPT_SQL).bind(...receiptRow(plan.receipt)),
+        ...plan.receiptItems.map((item) => db.prepare("INSERT INTO receipt_items (receipt_id, order_item_id, quantity) VALUES (?, ?, ?)").bind(plan.receipt.id, item.orderItemId, item.quantity)),
+        ...plan.vouchers.map((voucher) => db.prepare(INSERT_VOUCHER_SQL).bind(voucher.code, voucher.valueCents, voucher.valueCents, plan.receipt.id, at, at)),
+        ...plan.voucherDebits.map((debit) => db.prepare(DEBIT_VOUCHER_SQL).bind(debit.amountCents, at, debit.code)),
+        ...(table ? [
+          db.prepare(SETTLE_PAID_TABLE_SQL).bind(at, at, table, table),
+          db.prepare(UNLOCK_PAID_TABLE_SQL).bind(at, table.toUpperCase(), table)
+        ] : []),
+        printStatement(receiptPrintPayload(view, settings), at),
+        await journalStatement(last, "receipt.issued", plan.receipt.id, view, at)
+      ];
+      try {
+        await db.batch(statements);
+      } catch (error) {
+        const committed = await first("SELECT * FROM receipts WHERE client_request_id = ?", requestId);
+        if (committed) return receiptDetail(committed);
+        throw error;
+      }
+      return receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", plan.receipt.id));
+    });
+  }
+
+  /** Cancels a receipt with a storno receipt (planStorno). Null when there is no such receipt. */
+  async function stornoReceipt(id, reason, role) {
+    return retrying(async () => {
+      const last = await lastJournal();
+      const original = await first("SELECT * FROM receipts WHERE id = ?", String(id));
+      if (!original) return null;
+      if (await first("SELECT id FROM receipts WHERE refers_to = ?", original.id)) throw new Error("This receipt has already been cancelled");
+      const settings = await getSettings();
+      const plan = planStorno(original, {
+        receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1,
+        reason,
+        soldVoucherRows: await all("SELECT * FROM vouchers WHERE sold_receipt_id = ?", original.id),
+        role
+      });
+      const at = plan.receipt.createdAt;
+      const view = plannedReceiptView(plan.receipt, original.receipt_no);
+      await db.batch([
+        db.prepare(INSERT_RECEIPT_SQL).bind(...receiptRow(plan.receipt)),
+        ...plan.refunds.map((refund) => db.prepare(CREDIT_VOUCHER_SQL).bind(refund.amountCents, at, refund.code)),
+        ...plan.voided.map((code) => db.prepare(VOID_VOUCHER_SQL).bind(at, at, code)),
+        db.prepare(REOPEN_ORDERS_SQL).bind(at, original.id),
+        printStatement(receiptPrintPayload(view, settings), at),
+        await journalStatement(last, "receipt.storno", plan.receipt.id, view, at)
+      ]);
+      return receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", plan.receipt.id));
+    });
+  }
+
+  /** The day's closing (Z report) over the receipts since the last one. Null when there are none. */
+  async function closeDay(role) {
+    return retrying(async () => {
+      const last = await lastJournal();
+      const rows = await all(OPEN_RECEIPTS_SQL);
+      if (!rows.length) return null;
+      const totals = closingTotals(rows);
+      const id = uuid();
+      const at = now();
+      const closingNo = ((await first("SELECT MAX(closing_no) AS no FROM day_closings"))?.no ?? 0) + 1;
+      const view = closingView({ id, closing_no: closingNo, totals_json: JSON.stringify(totals), created_at: at });
+      await db.batch([
+        db.prepare("INSERT INTO day_closings (id, closing_no, first_receipt_no, last_receipt_no, totals_json, staff_role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .bind(id, closingNo, totals.firstReceiptNo, totals.lastReceiptNo, JSON.stringify(totals), role, at),
+        printStatement(closingPrintPayload(view, await getSettings()), at),
+        await journalStatement(last, "day.closed", id, view, at)
+      ]);
+      return closingView(await first("SELECT * FROM day_closings WHERE id = ?", id));
+    });
+  }
+
+  /** The journal between two days (from inclusive, to exclusive), checked link by link. */
+  async function exportJournal(from, to) {
+    const rows = await all("SELECT * FROM journal WHERE at >= ? AND at < ? ORDER BY seq", from, to);
+    const before = rows.length && rows[0].seq > 1 ? await first("SELECT * FROM journal WHERE seq = ?", rows[0].seq - 1) : null;
+    return { entries: rows.map(journalView), verification: await verifyJournal(rows, before) };
   }
 
   async function createServiceRequest(input) {
@@ -577,27 +734,33 @@ export function createStore(db) {
      * loser's INSERT matches nothing. That is the same race the order write
      * hands to the UNIQUE index, solved the same way — in the database.
      */
-    settleTableBill: async (tableNo) => {
-      const table = String(tableNo);
-      const bill = await billForTable(table);
-      if (!bill.orderIds.length) return null;
-      const timestamp = now();
+    /**
+     * The table's bill on the front printer: what is still to pay, for the
+     * guest to read. An interim bill, not a receipt — it frees nothing and
+     * marks nothing paid. Paying is a receipt (checkout).
+     */
+    printTableBill: async (tableNo) => {
+      const bill = await billForTable(String(tableNo));
+      if (!bill.items.length) return null;
       const jobId = uuid();
-      const payload = JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp });
-      await db.batch([
-        db.prepare(
-          `INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at)
-           SELECT ?, ?, 'front', ?, 'queued', ?, ?
-           WHERE EXISTS (SELECT 1 FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled')`
-        ).bind(jobId, bill.orderIds[0], payload, timestamp, timestamp, table),
-        db.prepare("UPDATE orders SET billed_at = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'")
-          .bind(timestamp, timestamp, table),
-        // Paying is what frees the table, so the lock a waiter set before
-        // printing the bill does not have to be cleared by hand afterwards.
-        db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?")
-          .bind(timestamp, table.toUpperCase())
-      ]);
+      const timestamp = now();
+      await run(
+        "INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, 'front', ?, 'queued', ?, ?)",
+        jobId, bill.orderIds[0], JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp
+      );
       return { ...bill, issuedAt: timestamp, printJobId: jobId };
+    },
+    checkout,
+    stornoReceipt,
+    closeDay,
+    exportJournal,
+    closingPreview: async () => closingTotals(await all(OPEN_RECEIPTS_SQL)),
+    listClosings: async (limit = 30) => (await all("SELECT * FROM day_closings ORDER BY closing_no DESC LIMIT ?", Math.min(Number(limit) || 30, 366))).map(closingView),
+    listReceipts: async (limit = 50) => Promise.all((await all("SELECT * FROM receipts ORDER BY receipt_no DESC LIMIT ?", boundedLimit(limit, 50))).map(receiptDetail)),
+    getReceipt: async (id) => receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", String(id))),
+    getVoucher: async (code) => {
+      const row = await first("SELECT * FROM vouchers WHERE code = ?", normalizeVoucherCode(code));
+      return row ? { code: row.code, valueCents: row.value_cents, balanceCents: row.balance_cents, voided: Boolean(row.voided_at), createdAt: row.created_at } : null;
     },
 
     // A valid token used beyond its role is worth recording, not just refusing.

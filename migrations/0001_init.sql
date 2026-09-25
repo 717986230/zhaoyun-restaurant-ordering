@@ -64,6 +64,57 @@ CREATE TABLE order_item_vat_splits (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
       split_json TEXT NOT NULL
     );
+CREATE TABLE receipts (
+      id TEXT PRIMARY KEY,
+      receipt_no INTEGER NOT NULL UNIQUE,
+      client_request_id TEXT NOT NULL UNIQUE,
+      cash_register_id TEXT NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('sale','storno')),
+      table_no TEXT,
+      lines_json TEXT NOT NULL,
+      vat_json TEXT NOT NULL,
+      total_cents INTEGER NOT NULL,
+      payments_json TEXT NOT NULL,
+      refers_to TEXT REFERENCES receipts(id),
+      reason TEXT,
+      staff_role TEXT NOT NULL,
+      fiscal_status TEXT NOT NULL DEFAULT 'unsigned',
+      fiscal_json TEXT,
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE receipt_items (
+      receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      order_item_id TEXT NOT NULL REFERENCES order_items(id),
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      PRIMARY KEY (receipt_id, order_item_id)
+    );
+CREATE TABLE vouchers (
+      code TEXT PRIMARY KEY,
+      value_cents INTEGER NOT NULL,
+      balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
+      sold_receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      voided_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE day_closings (
+      id TEXT PRIMARY KEY,
+      closing_no INTEGER NOT NULL UNIQUE,
+      first_receipt_no INTEGER NOT NULL,
+      last_receipt_no INTEGER NOT NULL UNIQUE,
+      totals_json TEXT NOT NULL,
+      staff_role TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE journal (
+      seq INTEGER PRIMARY KEY,
+      at TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      ref TEXT,
+      payload_json TEXT NOT NULL,
+      prev_hash TEXT NOT NULL,
+      hash TEXT NOT NULL
+    );
 CREATE TABLE service_requests (
       id TEXT PRIMARY KEY,
       table_no TEXT NOT NULL,
@@ -147,6 +198,8 @@ CREATE TABLE admin_sessions (
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
+CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
 CREATE INDEX idx_admin_sessions_expiry ON admin_sessions(expires_at);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);

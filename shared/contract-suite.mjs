@@ -553,21 +553,29 @@ export function contractChecks(call, assert) {
       assert.ok(bill.json.bill.items[0].names.de, "a guest reads the bill, so the localized names travel with it");
 
       await call("POST", "/api/admin/tables/L1/lock", { role: "staff", body: { locked: true } });
-      const settled = await call("POST", "/api/admin/tables/L1/bill/settle", { role: "staff" });
-      assert.equal(settled.status, 200);
-      assert.equal(settled.json.bill.total, 25);
-      assert.ok(settled.json.bill.printJobId, "the bill goes to the front printer as a job");
+      // The bill printed for the guest to read is not a payment: it frees nothing.
+      const printed = await call("POST", "/api/admin/tables/L1/bill/print", { role: "staff" });
+      assert.equal(printed.status, 200);
+      assert.equal(printed.json.bill.total, 25);
+      assert.ok(printed.json.bill.printJobId, "the bill goes to the front printer as a job");
+      assert.equal((await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.find((entry) => entry.table === "L1").state, "locked");
+
+      // Paying is a receipt.
+      const paid = await call("POST", "/api/admin/checkout", {
+        role: "staff",
+        body: { table: "L1", items: bill.json.bill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: 25 }] }
+      });
+      assert.equal(paid.status, 201, JSON.stringify(paid.json));
 
       const afterSettle = await call("GET", "/api/admin/tables/overview", { role: "staff" });
       const freed = afterSettle.json.tables.find((entry) => entry.table === "L1");
       assert.equal(freed.state, "free", "paying is what frees the table");
       assert.equal(freed.locked, false, "and it clears the lock the waiter set");
-      assert.equal(freed.orders.length, 0, "settled orders leave the open bill");
+      assert.equal(freed.orders.length, 0, "paid orders leave the open bill");
 
       const emptied = await call("GET", "/api/admin/tables/L1/bill", { role: "staff" });
       assert.equal(emptied.json.bill.total, 0);
-      const again = await call("POST", "/api/admin/tables/L1/bill/settle", { role: "staff" });
-      assert.equal(again.status, 409, "a settled table cannot be settled twice");
+      assert.equal((await call("POST", "/api/admin/tables/L1/bill/print", { role: "staff" })).status, 409, "nothing left to print");
 
       // Leave the room as it was found: a registered table changes how every
       // later order is authenticated.
@@ -735,10 +743,144 @@ export function contractChecks(call, assert) {
       // The order already written keeps the rates it was written with.
       assert.deepEqual((await call("GET", "/api/admin/tables/V1/bill", { role: "staff" })).json.bill.vatBreakdown.map((group) => group.percent), [10, 20]);
 
-      await call("POST", "/api/admin/tables/V1/lock", { role: "staff", body: { locked: true } });
-      assert.equal((await call("POST", "/api/admin/tables/V1/bill/settle", { role: "staff" })).status, 200);
+      const open = (await call("GET", "/api/admin/tables/V1/bill", { role: "staff" })).json.bill;
+      assert.equal((await call("POST", "/api/admin/checkout", {
+        role: "staff", body: { table: "V1", items: open.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "card", amount: open.total }] }
+      })).status, 201);
       for (const product of [soup, cola, juice, set]) await call("DELETE", `/api/admin/products/${product.id}`, { admin: true });
       await call("DELETE", "/api/admin/tables/V1", { admin: true });
+    }],
+
+    ["the register: split receipts, cash change, vouchers, storno, the day's closing and a journal that shows any change", async () => {
+      const staff = { role: "staff" };
+      const checkout = (body, auth = staff) => call("POST", "/api/admin/checkout", { ...auth, body });
+      // Start after a closing, so the day's totals below are this check's alone.
+      await call("POST", "/api/admin/day-closings", { admin: true });
+
+      const dish = async (body) => (await call("POST", "/api/admin/products", { admin: true, body: { names: { zh: body.sku, de: body.sku, en: body.sku }, published: true, available: true, ...body } })).json.product;
+      const noodles = await dish({ sku: "REG-N", kind: "food", category: "REGTEST", price: 10, printStation: "kitchen" });
+      const tea = await dish({ sku: "REG-T", kind: "drink", category: "REGTEST", price: 4, printStation: "bar" });
+      const token = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "K1" } })).json.table.token;
+      const order = async (clientRequestId, items) => (await call("POST", "/api/orders", { tableToken: token, body: { clientRequestId, table: "K1", note: "", items } })).json.order;
+      const placed = await order("contract-register-1", [{ id: noodles.id, qty: 2 }, { id: tea.id, qty: 1 }]);
+      const lines = async () => (await call("GET", "/api/admin/tables/K1/bill", staff)).json.bill.items;
+      const lineOf = async (sku) => (await lines()).find((item) => item.name === sku);
+
+      // One guest pays one bowl by card: a receipt of that line alone.
+      const first = await checkout({ table: "K1", items: [{ orderItemId: (await lineOf("REG-N")).orderItemId, quantity: 1 }], payments: [{ type: "card", amount: 10 }] });
+      assert.equal(first.status, 201, JSON.stringify(first.json));
+      const a = first.json.receipt;
+      assert.equal(a.type, "sale");
+      assert.equal(a.totalCents, 1000);
+      assert.deepEqual(a.vat, [{ percent: 10, grossCents: 1000, netCents: 909, vatCents: 91 }]);
+      assert.equal(a.fiscalStatus, "unsigned", "no signature until fiskaly is connected");
+      assert.equal(a.table, "K1");
+      assert.equal((await lineOf("REG-N")).qty, 1, "the paid bowl is off the bill");
+      assert.equal((await call("GET", "/api/admin/tables/overview", staff)).json.tables.find((entry) => entry.table === "K1").state, "seated", "the table is not paid yet");
+
+      // What does not add up is refused, with a reason a cashier can read.
+      const rest = await lines();
+      const all = rest.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty }));
+      assert.equal((await checkout({ items: [{ orderItemId: all[0].orderItemId, quantity: 5 }], payments: [{ type: "cash", amount: 50 }] })).status, 400, "more than is left");
+      const short = await checkout({ items: all, payments: [{ type: "cash", amount: 13 }] });
+      assert.equal(short.status, 400);
+      assert.match(short.json.error, /13\.00.*14\.00/);
+      assert.equal((await checkout({ items: all, payments: [{ type: "cheque", amount: 14 }] })).status, 400);
+      assert.equal((await checkout({ items: all, payments: [{ type: "cash", amount: 14, tendered: 10 }] })).status, 400, "less handed over than it pays");
+      assert.equal((await checkout({ items: all, payments: [{ type: "cash", amount: 14 }] }, { role: "kitchen" })).status, 403);
+
+      // The rest in cash, with a 20 note: the change is worked out, the table is free.
+      const second = await checkout({ table: "K1", items: all, payments: [{ type: "cash", amount: 14, tendered: 20 }], clientRequestId: "contract-register-b" });
+      assert.equal(second.status, 201, JSON.stringify(second.json));
+      const b = second.json.receipt;
+      assert.equal(b.receiptNo, a.receiptNo + 1, "receipt numbers run on without a gap");
+      assert.deepEqual(b.payments, [{ type: "cash", amountCents: 1400, tenderedCents: 2000, changeCents: 600 }]);
+      assert.deepEqual(b.vat.map((group) => [group.percent, group.grossCents]), [[10, 1000], [20, 400]]);
+      assert.equal((await call("GET", "/api/admin/tables/overview", staff)).json.tables.find((entry) => entry.table === "K1").state, "free");
+      const again = await checkout({ table: "K1", items: all, payments: [{ type: "cash", amount: 14 }], clientRequestId: "contract-register-b" });
+      assert.equal(again.json.receipt.id, b.id, "a retried checkout is the same receipt, not a second one");
+      assert.equal((await checkout({ items: all, payments: [{ type: "cash", amount: 14 }] })).status, 400, "a paid line cannot be paid twice");
+
+      // A value voucher: on the receipt at 0%, its VAT is due when it is spent.
+      const sold = await checkout({ vouchers: [{ amount: 30 }], payments: [{ type: "card", amount: 30 }] });
+      assert.equal(sold.status, 201, JSON.stringify(sold.json));
+      const c = sold.json.receipt;
+      assert.deepEqual(c.vat, [{ percent: 0, grossCents: 3000, netCents: 3000, vatCents: 0 }]);
+      const code = c.lines[0].code;
+      assert.match(code, /^[2-9A-HJ-NP-Z]{5}-[2-9A-HJ-NP-Z]{5}$/);
+      assert.equal((await call("GET", `/api/admin/vouchers/${code.toLowerCase().replace("-", "")}`, staff)).json.voucher.balanceCents, 3000, "a code typed without its dash, in small letters, is found");
+      assert.equal((await checkout({ vouchers: [{ amount: 10 }], payments: [{ type: "voucher", amount: 10, voucherCode: code }] })).status, 400, "a voucher cannot pay for a voucher");
+
+      // Spent in part on the next order, the rest in cash.
+      await order("contract-register-2", [{ id: noodles.id, qty: 2 }]);
+      const next = await lines();
+      assert.equal((await checkout({ items: next.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "voucher", amount: 20, voucherCode: "NOSUCH" }] })).status, 400);
+      const tooMuch = await checkout({ items: next.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "voucher", amount: 31, voucherCode: code }] });
+      assert.equal(tooMuch.status, 400);
+      const spent = await checkout({ table: "K1", items: next.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "voucher", amount: 12, voucherCode: code }, { type: "cash", amount: 8 }] });
+      assert.equal(spent.status, 201, JSON.stringify(spent.json));
+      const d = spent.json.receipt;
+      assert.equal((await call("GET", `/api/admin/vouchers/${code}`, staff)).json.voucher.balanceCents, 1800);
+
+      // A storno: the manager's, with a reason; the same lines negated, under a number of its own.
+      assert.equal((await call("POST", `/api/admin/receipts/${b.id}/storno`, { ...staff, body: { reason: "wrong table" } })).status, 403);
+      assert.equal((await call("POST", `/api/admin/receipts/${b.id}/storno`, { admin: true, body: { reason: "" } })).status, 400);
+      const cancelled = await call("POST", `/api/admin/receipts/${b.id}/storno`, { admin: true, body: { reason: "wrong table" } });
+      assert.equal(cancelled.status, 201, JSON.stringify(cancelled.json));
+      const e = cancelled.json.receipt;
+      assert.equal(e.type, "storno");
+      assert.equal(e.refersTo, b.id);
+      assert.equal(e.refersToNo, b.receiptNo);
+      assert.equal(e.totalCents, -1400);
+      assert.equal(e.reason, "wrong table");
+      assert.deepEqual(e.lines.map((line) => line.quantity), b.lines.map((line) => -line.quantity));
+      assert.equal((await call("GET", `/api/admin/receipts/${b.id}`, staff)).json.receipt.cancelledBy, e.id);
+      assert.equal((await call("POST", `/api/admin/receipts/${b.id}/storno`, { admin: true, body: { reason: "twice" } })).status, 409);
+      assert.equal((await call("POST", `/api/admin/receipts/${e.id}/storno`, { admin: true, body: { reason: "a storno of a storno" } })).status, 400);
+      assert.equal((await call("POST", "/api/admin/receipts/nope/storno", { admin: true, body: { reason: "x" } })).status, 404);
+      // Its lines are open again, and the table with them.
+      assert.equal((await lines()).reduce((sum, item) => sum + item.qty, 0), 2, "one bowl and the tea, to pay again");
+      assert.equal((await call("GET", "/api/admin/tables/overview", staff)).json.tables.find((entry) => entry.table === "K1").state, "seated");
+      // An order on a standing receipt cannot just be cancelled.
+      assert.equal((await call("PATCH", `/api/orders/${placed.id}/status`, { role: "staff", body: { status: "cancelled" } })).status, 400);
+
+      // A voucher partly spent cannot be taken back; the receipt it paid can, and gives the money back to it.
+      assert.equal((await call("POST", `/api/admin/receipts/${c.id}/storno`, { admin: true, body: { reason: "refund" } })).status, 400);
+      assert.equal((await call("POST", `/api/admin/receipts/${d.id}/storno`, { admin: true, body: { reason: "refund" } })).status, 201);
+      assert.equal((await call("GET", `/api/admin/vouchers/${code}`, staff)).json.voucher.balanceCents, 3000);
+
+      // The day's closing: what the receipts since the last one add up to.
+      const preview = (await call("GET", "/api/admin/day-closings/preview", { admin: true })).json.totals;
+      assert.equal(preview.sales, 4);
+      assert.equal(preview.stornos, 2);
+      assert.equal(preview.grossCents, 1000 + 3000, "a cancelled sale adds up to nothing");
+      assert.deepEqual(preview.payments, { cash: 0, card: 4000, voucher: 0 });
+      assert.equal(preview.vouchersSoldCents, 3000);
+      assert.equal((await call("GET", "/api/admin/day-closings/preview", staff)).status, 403);
+      const closed = await call("POST", "/api/admin/day-closings", { admin: true });
+      assert.equal(closed.status, 201);
+      assert.equal(closed.json.closing.totals.lastReceiptNo, preview.lastReceiptNo);
+      assert.equal((await call("POST", "/api/admin/day-closings", { admin: true })).status, 409, "nothing since");
+      assert.equal((await call("GET", "/api/admin/day-closings", { admin: true })).json.closings[0].closingNo, closed.json.closing.closingNo);
+
+      // The journal: everything above, in order, each entry chained to the one before.
+      const today = new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+      const journal = await call("GET", `/api/admin/journal?from=${today}&to=${tomorrow}`, { admin: true });
+      assert.equal(journal.status, 200, JSON.stringify(journal.json));
+      assert.deepEqual(journal.json.verification, { ok: true, brokenAt: null, reason: null });
+      const kinds = journal.json.entries.map((entry) => entry.kind);
+      for (const kind of ["order.created", "receipt.issued", "receipt.storno", "day.closed"]) assert.ok(kinds.includes(kind), kind);
+      const seqs = journal.json.entries.map((entry) => entry.seq);
+      assert.deepEqual(seqs, seqs.map((_, index) => seqs[0] + index), "no gap");
+      const issued = journal.json.entries.find((entry) => entry.kind === "receipt.issued" && entry.ref === b.id);
+      assert.equal(issued.payload.totalCents, 1400, "the journal keeps the whole receipt");
+      assert.equal((await call("GET", `/api/admin/journal?from=${today}`, { admin: true })).status, 400);
+      assert.equal((await call("GET", `/api/admin/journal?from=${today}&to=${tomorrow}`, staff)).status, 403);
+
+      await call("PATCH", `/api/orders/${placed.id}/status`, { role: "staff", body: { status: "preparing" } });
+      await call("DELETE", "/api/admin/tables/K1", { admin: true });
+      for (const product of [noodles, tea]) await call("DELETE", `/api/admin/products/${product.id}`, { admin: true });
     }],
 
     ["an unknown API route is a JSON 404, not the web app", async () => {

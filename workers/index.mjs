@@ -17,7 +17,7 @@
 import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
-  CategoryRenameBody, CategoryVatBody, CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
+  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SetPasswordBody, SettingsBody, SignInBody, TableBody, TableLockBody
 } from "../src/contracts.js";
 import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
@@ -412,12 +412,37 @@ async function handle(request, env) {
       if (path.length === 5 && method === "GET") {
         return json({ bill: await store.billForTable(path[3]) });
       }
-      if (path.length === 6 && path[5] === "settle" && method === "POST") {
-        const bill = await store.settleTableBill(path[3]);
-        // Realtime is a Durable Object this deployment does not have, so the
-        // board finds out by polling rather than by being told.
-        return bill ? json({ bill }) : fail("Table has no open orders to settle", 409);
+      // An interim bill for the guest to read. Paying is a receipt (checkout).
+      if (path.length === 6 && path[5] === "print" && method === "POST") {
+        const bill = await store.printTableBill(path[3]);
+        return bill ? json({ bill }) : fail("Table has nothing left to pay", 409);
       }
+    }
+
+    // The register (shared/register.mjs): a sale, the receipts, vouchers.
+    if (path.length === 3 && path[2] === "checkout" && method === "POST") {
+      const { denied, role } = await gate("staff");
+      if (denied) return denied;
+      try {
+        const { value, invalid } = await body(request, CheckoutBody);
+        if (invalid) return invalid;
+        return json({ receipt: await store.checkout(value, role) }, 201);
+      } catch (error) {
+        return fail(error.message);
+      }
+    }
+    if (path[2] === "receipts" && method === "GET" && path.length <= 4) {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      if (path.length === 3) return json({ receipts: await store.listReceipts(limit) });
+      const receipt = await store.getReceipt(path[3]);
+      return receipt ? json({ receipt }) : fail("Receipt not found", 404);
+    }
+    if (path.length === 4 && path[2] === "vouchers" && method === "GET") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      const voucher = await store.getVoucher(decodeURIComponent(path[3]));
+      return voucher ? json({ voucher }) : fail("Voucher not found", 404);
     }
     if (path[2] === "print-jobs") {
       const { denied } = await gate("staff");
@@ -445,8 +470,34 @@ async function handle(request, env) {
       }
     }
 
-    const { denied } = await gate("manager");
+    const { denied, role } = await gate("manager");
     if (denied) return denied;
+
+    // A storno, the day's closing and the journal are the manager's.
+    if (path.length === 5 && path[2] === "receipts" && path[4] === "storno" && method === "POST") {
+      try {
+        const { value, invalid } = await body(request, StornoBody);
+        if (invalid) return invalid;
+        const receipt = await store.stornoReceipt(path[3], value.reason, role);
+        return receipt ? json({ receipt }, 201) : fail("Receipt not found", 404);
+      } catch (error) {
+        return fail(error.message, /already been cancelled/.test(error.message) ? 409 : 400);
+      }
+    }
+    if (path[2] === "day-closings") {
+      if (path.length === 4 && path[3] === "preview" && method === "GET") return json({ totals: await store.closingPreview() });
+      if (path.length === 3 && method === "GET") return json({ closings: await store.listClosings(limit) });
+      if (path.length === 3 && method === "POST") {
+        const closing = await store.closeDay(role);
+        return closing ? json({ closing }, 201) : fail("No receipts since the last closing", 409);
+      }
+    }
+    if (path.length === 3 && path[2] === "journal" && method === "GET") {
+      const from = url.searchParams.get("from") ?? "";
+      const to = url.searchParams.get("to") ?? "";
+      if (![from, to].every((day) => /^\d{4}-\d{2}-\d{2}$/.test(day))) return fail("from and to are dates (YYYY-MM-DD)");
+      return json(await store.exportJournal(from, to));
+    }
 
     // /api/admin/audit
     if (path.length === 3 && path[2] === "audit" && method === "GET") {

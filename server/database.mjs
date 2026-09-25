@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { photoMenuDishes } from "./photo-menu.mjs";
 import { dishPhotos } from "./dish-photos.mjs";
@@ -9,10 +9,16 @@ import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 import {
   adminGateView, assertPassword, assertSetServed, auditView, billView, hashPassword,
   duplicateInput, hashSessionToken, newSessionToken, normalizeCategoryName, normalizeSettingsInput,
-  mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT, ORDER_ITEMS_SQL,
+  mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
   renamedCategorySettings, tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
+import {
+  CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL, INSERT_RECEIPT_SQL,
+  INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL, ORDER_ITEMS_SQL, ORDER_PAID_SQL,
+  orderJournalPayload, planCheckout, planStorno, plannedReceiptView, receiptPrintPayload, receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL,
+  UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
+} from "../shared/register.mjs";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
 // password yet still spends the same PBKDF2 work as one that does, so the
@@ -132,6 +138,66 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE TABLE IF NOT EXISTS order_item_vat_splits (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
       split_json TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS receipts (
+      id TEXT PRIMARY KEY,
+      receipt_no INTEGER NOT NULL UNIQUE,
+      client_request_id TEXT NOT NULL UNIQUE,
+      cash_register_id TEXT NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('sale','storno')),
+      table_no TEXT,
+      lines_json TEXT NOT NULL,
+      vat_json TEXT NOT NULL,
+      total_cents INTEGER NOT NULL,
+      payments_json TEXT NOT NULL,
+      refers_to TEXT REFERENCES receipts(id),
+      reason TEXT,
+      staff_role TEXT NOT NULL,
+      fiscal_status TEXT NOT NULL DEFAULT 'unsigned',
+      fiscal_json TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS receipt_items (
+      receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      order_item_id TEXT NOT NULL REFERENCES order_items(id),
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      PRIMARY KEY (receipt_id, order_item_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_receipt_items_item ON receipt_items(order_item_id);
+
+    CREATE TABLE IF NOT EXISTS vouchers (
+      code TEXT PRIMARY KEY,
+      value_cents INTEGER NOT NULL,
+      balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
+      sold_receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      voided_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS day_closings (
+      id TEXT PRIMARY KEY,
+      closing_no INTEGER NOT NULL UNIQUE,
+      first_receipt_no INTEGER NOT NULL,
+      last_receipt_no INTEGER NOT NULL UNIQUE,
+      totals_json TEXT NOT NULL,
+      staff_role TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS journal (
+      seq INTEGER PRIMARY KEY,
+      at TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      ref TEXT,
+      payload_json TEXT NOT NULL,
+      prev_hash TEXT NOT NULL,
+      hash TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS service_requests (
@@ -322,10 +388,35 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     orderById: db.prepare("SELECT * FROM orders WHERE id = ?"),
     orderItems: db.prepare(ORDER_ITEMS_SQL),
     insertVatSplit: db.prepare("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)"),
+    lastJournal: db.prepare("SELECT seq, hash FROM journal ORDER BY seq DESC LIMIT 1"),
+    insertJournal: db.prepare(INSERT_JOURNAL_SQL),
+    insertReceipt: db.prepare(INSERT_RECEIPT_SQL),
+    insertReceiptItem: db.prepare("INSERT INTO receipt_items (receipt_id, order_item_id, quantity) VALUES (?, ?, ?)"),
+    receiptById: db.prepare("SELECT * FROM receipts WHERE id = ?"),
+    receiptByRequest: db.prepare("SELECT * FROM receipts WHERE client_request_id = ?"),
+    stornoOf: db.prepare("SELECT * FROM receipts WHERE refers_to = ?"),
+    lastReceiptNo: db.prepare("SELECT MAX(receipt_no) AS no FROM receipts"),
+    recentReceipts: db.prepare("SELECT * FROM receipts ORDER BY receipt_no DESC LIMIT ?"),
+    voucherByCode: db.prepare("SELECT * FROM vouchers WHERE code = ?"),
+    vouchersSoldBy: db.prepare("SELECT * FROM vouchers WHERE sold_receipt_id = ?"),
+    insertVoucher: db.prepare(INSERT_VOUCHER_SQL),
+    debitVoucher: db.prepare(DEBIT_VOUCHER_SQL),
+    creditVoucher: db.prepare(CREDIT_VOUCHER_SQL),
+    voidVoucher: db.prepare(VOID_VOUCHER_SQL),
+    reopenOrders: db.prepare(REOPEN_ORDERS_SQL),
+    settlePaidTable: db.prepare(SETTLE_PAID_TABLE_SQL),
+    unlockPaidTable: db.prepare(UNLOCK_PAID_TABLE_SQL),
+    orderPaid: db.prepare(ORDER_PAID_SQL),
+    openReceipts: db.prepare(OPEN_RECEIPTS_SQL),
+    lastClosingNo: db.prepare("SELECT MAX(closing_no) AS no FROM day_closings"),
+    insertClosing: db.prepare("INSERT INTO day_closings (id, closing_no, first_receipt_no, last_receipt_no, totals_json, staff_role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"),
+    closingById: db.prepare("SELECT * FROM day_closings WHERE id = ?"),
+    recentClosings: db.prepare("SELECT * FROM day_closings ORDER BY closing_no DESC LIMIT ?"),
+    journalBetween: db.prepare("SELECT * FROM journal WHERE at >= ? AND at < ? ORDER BY seq"),
+    journalBySeq: db.prepare("SELECT * FROM journal WHERE seq = ?"),
     listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC, rowid DESC LIMIT ?"),
     openBillOrders: db.prepare("SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at"),
     openBillTables: db.prepare("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"),
-    markOrdersBilled: db.prepare("UPDATE orders SET billed_at = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'"),
     insertOrder: db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)"),
     insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
     updateOrderStatus: db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"),
@@ -353,7 +444,6 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     `),
     deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
-    releaseTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?"),
     openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
     getAdminGate: db.prepare("SELECT * FROM admin_gate WHERE id = 1"),
     setAdminGate: db.prepare(`
@@ -580,6 +670,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         if (item.vatSplitJson) statements.insertVatSplit.run(item.id, item.vatSplitJson);
       }
       for (const job of plan.printJobs) statements.insertPrintJob.run(job.id, id, job.printerRole, job.payloadJson, timestamp, timestamp);
+      journal("order.created", id, orderJournalPayload(plan), timestamp);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
@@ -619,29 +710,141 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return billView(tableNo, orders, itemsByOrderId, productsById);
   }
 
-  function settleTableBill(tableNo) {
-    const table = String(tableNo);
+  /**
+   * The table's bill on the front printer: what is still to pay, for the
+   * guest to read. An interim bill (Zwischenrechnung), not a receipt — it
+   * frees nothing and marks nothing paid. Paying is a receipt (checkout).
+   */
+  function printTableBill(tableNo) {
+    const bill = billForTable(String(tableNo));
+    if (!bill.items.length) return null;
+    const jobId = randomUUID();
+    const timestamp = now();
+    statements.insertPrintJob.run(jobId, bill.orderIds[0], "front", JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp);
+    return { ...bill, issuedAt: timestamp, printJobId: jobId };
+  }
+
+  const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+
+  /**
+   * Adds an entry to the journal, chained to the one before. Only ever
+   * called inside a transaction, so two entries cannot take the same place.
+   */
+  function journal(kind, ref, payload, at = now()) {
+    const entry = journalEntry(statements.lastJournal.get() ?? null, kind, ref, payload, at);
+    statements.insertJournal.run(entry.seq, entry.at, entry.kind, entry.ref, entry.payloadJson, entry.prevHash, sha256(journalText(entry)));
+  }
+
+  function receiptDetail(row) {
+    if (!row) return null;
+    const storno = statements.stornoOf.get(row.id);
+    const referred = row.refers_to ? statements.receiptById.get(row.refers_to) : null;
+    return receiptView(row, { cancelledBy: storno?.id ?? null, referredNo: referred?.receipt_no ?? null });
+  }
+
+  /** A sale at the register (planCheckout): the receipt, and the table freed once it is all paid. */
+  function checkout(input, role) {
+    const requestId = String(input.clientRequestId || randomUUID());
     db.exec("BEGIN IMMEDIATE");
     try {
-      const bill = billForTable(table);
-      if (!bill.orderIds.length) {
+      const existing = statements.receiptByRequest.get(requestId);
+      if (existing) {
         db.exec("COMMIT");
-        return null;
+        return receiptDetail(existing);
       }
-      const timestamp = now();
-      statements.markOrdersBilled.run(timestamp, timestamp, table);
-      // Paying is what frees the table, so the lock a waiter set before
-      // printing the bill does not have to be cleared by hand afterwards.
-      statements.releaseTableLock.run(timestamp, table);
-      const jobId = randomUUID();
-      statements.insertPrintJob.run(jobId, bill.orderIds[0], "front", JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp);
+      const ids = [...new Set((Array.isArray(input.items) ? input.items : []).map((item) => String(item.orderItemId)))];
+      const itemRows = ids.length ? db.prepare(CHECKOUT_ITEMS_SQL.replace("(?)", `(${ids.map(() => "?").join(", ")})`)).all(...ids) : [];
+      const codes = [...new Set((Array.isArray(input.payments) ? input.payments : []).filter((payment) => payment.type === "voucher").map((payment) => normalizeVoucherCode(payment.voucherCode)))];
+      const voucherRows = codes.map((code) => statements.voucherByCode.get(code)).filter(Boolean);
+      const settings = getSettings();
+      const plan = planCheckout({ ...input, clientRequestId: requestId }, {
+        itemRows, voucherRows, receiptNo: (statements.lastReceiptNo.get()?.no ?? 0) + 1, settings, role
+      });
+      const at = plan.receipt.createdAt;
+      statements.insertReceipt.run(...receiptRow(plan.receipt));
+      for (const item of plan.receiptItems) statements.insertReceiptItem.run(plan.receipt.id, item.orderItemId, item.quantity);
+      for (const voucher of plan.vouchers) statements.insertVoucher.run(voucher.code, voucher.valueCents, voucher.valueCents, plan.receipt.id, at, at);
+      for (const debit of plan.voucherDebits) statements.debitVoucher.run(debit.amountCents, at, debit.code);
+      if (plan.receipt.table) {
+        statements.settlePaidTable.run(at, at, plan.receipt.table, plan.receipt.table);
+        statements.unlockPaidTable.run(at, plan.receipt.table.toUpperCase(), plan.receipt.table);
+      }
+      const view = plannedReceiptView(plan.receipt);
+      journal("receipt.issued", plan.receipt.id, view, at);
+      statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, settings)), at, at);
       db.exec("COMMIT");
-      return { ...bill, issuedAt: timestamp, printJobId: jobId };
+      return receiptDetail(statements.receiptById.get(plan.receipt.id));
     } catch (error) {
       db.exec("ROLLBACK");
       throw error;
     }
   }
+
+  /** Cancels a receipt with a storno receipt (planStorno). Null when there is no such receipt. */
+  function stornoReceipt(id, reason, role) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const original = statements.receiptById.get(String(id));
+      if (!original) {
+        db.exec("COMMIT");
+        return null;
+      }
+      if (statements.stornoOf.get(original.id)) throw new Error("This receipt has already been cancelled");
+      const settings = getSettings();
+      const plan = planStorno(original, {
+        receiptNo: (statements.lastReceiptNo.get()?.no ?? 0) + 1, reason, soldVoucherRows: statements.vouchersSoldBy.all(original.id), role
+      });
+      const at = plan.receipt.createdAt;
+      statements.insertReceipt.run(...receiptRow(plan.receipt));
+      for (const refund of plan.refunds) statements.creditVoucher.run(refund.amountCents, at, refund.code);
+      for (const code of plan.voided) statements.voidVoucher.run(at, at, code);
+      statements.reopenOrders.run(at, original.id);
+      const view = plannedReceiptView(plan.receipt, original.receipt_no);
+      journal("receipt.storno", plan.receipt.id, view, at);
+      statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, settings)), at, at);
+      db.exec("COMMIT");
+      return receiptDetail(statements.receiptById.get(plan.receipt.id));
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /** The day's closing (Z report) over the receipts since the last one. Null when there are none. */
+  function closeDay(role) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const rows = statements.openReceipts.all();
+      if (!rows.length) {
+        db.exec("COMMIT");
+        return null;
+      }
+      const totals = closingTotals(rows);
+      const id = randomUUID();
+      const at = now();
+      const closingNo = (statements.lastClosingNo.get()?.no ?? 0) + 1;
+      statements.insertClosing.run(id, closingNo, totals.firstReceiptNo, totals.lastReceiptNo, JSON.stringify(totals), role, at);
+      const view = closingView(statements.closingById.get(id));
+      journal("day.closed", id, view, at);
+      statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(closingPrintPayload(view, getSettings())), at, at);
+      db.exec("COMMIT");
+      return view;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
+   * The journal between two days (from inclusive, to exclusive, as ISO
+   * dates), checked link by link from the entry before the first.
+   */
+  async function exportJournal(from, to) {
+    const rows = statements.journalBetween.all(from, to);
+    const before = rows.length && rows[0].seq > 1 ? statements.journalBySeq.get(rows[0].seq - 1) : null;
+    return { entries: rows.map(journalView), verification: await verifyJournal(rows, before) };
+  }
+
 
   function updateOrder(id, status) {
     if (!ORDER_STATUSES.has(status)) throw new Error("Unsupported order status");
@@ -650,7 +853,19 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     if (current.status !== status && !ORDER_TRANSITIONS.get(current.status)?.has(status)) {
       throw new Error(`Invalid order transition: ${current.status} -> ${status}`);
     }
-    statements.updateOrderStatus.run(status, now(), String(id));
+    if (current.status === status) return orderView(current);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      // A paid line stays paid: cancelling it is a storno of its receipt.
+      if (status === "cancelled" && statements.orderPaid.get(current.id)) throw new Error("This order is on a receipt; cancel the receipt first");
+      const at = now();
+      statements.updateOrderStatus.run(status, at, current.id);
+      journal("order.status", current.id, { orderId: current.id, orderNo: current.order_no, table: current.table_no, from: current.status, to: status }, at);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
     return orderView(statements.orderById.get(String(id)));
   }
 
@@ -922,7 +1137,19 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     createOrder,
     updateOrder,
     billForTable,
-    settleTableBill,
+    printTableBill,
+    checkout,
+    stornoReceipt,
+    closeDay,
+    exportJournal,
+    closingPreview: () => closingTotals(statements.openReceipts.all()),
+    listClosings: (limit = 30) => statements.recentClosings.all(Math.min(Number(limit) || 30, 366)).map(closingView),
+    listReceipts: (limit = 50) => statements.recentReceipts.all(Math.min(Number(limit) || 50, 500)).map(receiptDetail),
+    getReceipt: (id) => receiptDetail(statements.receiptById.get(String(id))),
+    getVoucher: (code) => {
+      const row = statements.voucherByCode.get(normalizeVoucherCode(code));
+      return row ? { code: row.code, valueCents: row.value_cents, balanceCents: row.balance_cents, voided: Boolean(row.voided_at), createdAt: row.created_at } : null;
+    },
     openBillTables: () => statements.openBillTables.all().map((row) => row.table_no),
     listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
     createServiceRequest,

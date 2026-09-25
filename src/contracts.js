@@ -131,6 +131,11 @@ export const SettingsBody = Type.Object({
   menuLanguages: Type.Optional(Type.Array(literals(MENU_LANGUAGES), { minItems: 1, maxItems: MENU_LANGUAGES.length, uniqueItems: true })),
   restaurantName: Type.Optional(Type.String({ minLength: 1, maxLength: 40 })),
   menuTitle: Type.Optional(Type.String({ minLength: 1, maxLength: 24 })),
+  // Who issues the receipts, and the register's id (shared/rules.mjs checks the form).
+  companyName: Type.Optional(Type.String({ maxLength: 80 })),
+  companyAddress: Type.Optional(Type.String({ maxLength: 160 })),
+  companyUid: Type.Optional(Type.String({ maxLength: 16 })),
+  cashRegisterId: Type.Optional(Type.String({ minLength: 1, maxLength: 32 })),
   menuDefaultScheme: Type.Optional(literals(COLOR_SCHEMES)),
   showTableNumber: Type.Optional(Type.Boolean()),
   showOrdering: Type.Optional(Type.Boolean()),
@@ -166,6 +171,30 @@ export const SettingsBody = Type.Object({
 // upper-cases first), so the wire only bounds the length.
 const Category = Type.String({ minLength: 1, maxLength: 80 });
 export const CategoryRenameBody = Type.Object({ from: Category, to: Category }, { additionalProperties: false });
+
+// A sale at the register: which order lines (and how many of each), vouchers
+// sold, and how it is paid. What adds up and what may be paid how is
+// shared/register.mjs's to say (planCheckout); the wire only bounds sizes.
+// Inner objects take no additionalProperties rule: Fastify would strip what
+// the Worker refuses, and the two must answer alike.
+export const CheckoutBody = Type.Object({
+  clientRequestId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  table: Type.Optional(Type.String({ maxLength: 8 })),
+  items: Type.Optional(Type.Array(Type.Object({
+    orderItemId: Type.String({ minLength: 1, maxLength: 128 }),
+    quantity: Type.Integer({ minimum: 1, maximum: 99 })
+  }), { maxItems: 200 })),
+  vouchers: Type.Optional(Type.Array(Type.Object({ amount: Type.Number() }), { maxItems: 10 })),
+  payments: Type.Array(Type.Object({
+    type: Type.String({ maxLength: 16 }),
+    amount: Type.Number(),
+    tendered: Type.Optional(Type.Number()),
+    voucherCode: Type.Optional(Type.String({ maxLength: 32 }))
+  }), { minItems: 1, maxItems: 10 })
+}, { additionalProperties: false });
+
+// A storno always says why.
+export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false });
 
 // Every dish of a category at one VAT rate. The rate itself is checked by the
 // shared rule (normalizeVatPercent), so both backends refuse the same way.

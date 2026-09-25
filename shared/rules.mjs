@@ -582,10 +582,31 @@ function normalizeFeaturedIds(value) {
  * Values are stored as JSON, and read back leniently: a stored value that no
  * longer passes its check is the default, never an error on the guest menu.
  */
+/** An Austrian VAT number: ATU and eight digits, or none. */
+function normalizeUid(value) {
+  const uid = String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  if (uid && !/^ATU\d{8}$/.test(uid)) throw new Error("A VAT number (UID) is ATU and eight digits");
+  return uid;
+}
+
+function normalizeCashRegisterId(value) {
+  const id = String(value ?? "").trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9_-]{0,31}$/.test(id)) throw new Error("A register id is letters, digits, - or _");
+  return id;
+}
+
 export const APP_SETTINGS = {
   menuLanguages: { key: "menu_languages", fallback: () => [...DEFAULT_MENU_LANGUAGES], normalize: normalizeMenuLanguages },
   // The name on the admin console, the browser tab and the printed table card.
   restaurantName: { key: "restaurant_name", fallback: () => "赵云", normalize: boundedText("Restaurant name", 40) },
+  // Who issues the receipts, as the receipt has to say (§ 132a BAO): the
+  // business's legal name and address, and its VAT number (UID) when it has
+  // one. Empty name: the restaurant's name.
+  companyName: { key: "company_name", fallback: () => "", normalize: optionalText("Company name", 80) },
+  companyAddress: { key: "company_address", fallback: () => "", normalize: optionalText("Company address", 160) },
+  companyUid: { key: "company_uid", fallback: () => "", normalize: normalizeUid },
+  // The register's id (Kassen-ID) printed on each receipt; unique per business.
+  cashRegisterId: { key: "cash_register_id", fallback: () => "KASSE-1", normalize: normalizeCashRegisterId },
   // The heading of the guest menu.
   menuTitle: { key: "menu_title", fallback: () => "La Carte", normalize: boundedText("Menu title", 24) },
   // What a guest sees before they touch the sun/moon; their own pick wins.
@@ -830,9 +851,6 @@ function mainVatPercent(split) {
   return split.reduce((main, part) => (part.cents > main.cents ? part : main)).percent;
 }
 
-/** Order lines with the VAT split kept for them, as billView reads them. */
-export const ORDER_ITEMS_SQL = "SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json FROM order_items LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id WHERE order_items.order_id = ?";
-
 /**
  * Turns an order command plus the product rows it names into the exact rows to
  * write: one order, its items, and one print job per station. Validation and
@@ -934,25 +952,29 @@ export function billView(tableNo, orderRows, itemsByOrderId, productsById, issue
 
   for (const order of orderRows) {
     for (const row of itemsByOrderId.get(order.id) ?? []) {
-      const lineCents = row.unit_price_cents * row.quantity;
+      // What receipts have paid for is off the bill; a line paid in full is gone.
+      const quantity = row.quantity - (row.paid_quantity ?? 0);
+      if (quantity <= 0) continue;
+      const lineCents = row.unit_price_cents * quantity;
       const vatPercent = row.vat_percent;
       // A line with no split kept is all at its own rate.
       const split = parseJson(row.vat_split_json, null) ?? [{ percent: vatPercent, cents: row.unit_price_cents }];
       // Guests read the bill: keep the localized names next to the snapshot name.
       const product = productsById.get(row.product_id);
       items.push({
+        orderItemId: row.id,
         orderNo: order.order_no,
         name: row.product_name,
         names: product ? { zh: product.name_zh, de: product.name_de, en: product.name_en } : undefined,
-        qty: row.quantity,
+        qty: quantity,
         unitPrice: row.unit_price_cents / 100,
         lineTotal: lineCents / 100,
         vatPercent,
         // A set menu over more than one rate shows each part.
-        ...(split.length > 1 ? { vatSplit: split.map((part) => ({ percent: part.percent, amount: (part.cents * row.quantity) / 100 })) } : {}),
+        ...(split.length > 1 ? { vatSplit: split.map((part) => ({ percent: part.percent, amount: (part.cents * quantity) / 100 })) } : {}),
         modifiers: parseJson(row.modifiers_json, []).map((modifier) => ({ name: modifier.name, names: modifier.names }))
       });
-      for (const part of split) groups.set(part.percent, (groups.get(part.percent) || 0) + part.cents * row.quantity);
+      for (const part of split) groups.set(part.percent, (groups.get(part.percent) || 0) + part.cents * quantity);
       totalCents += lineCents;
     }
   }

@@ -80,3 +80,28 @@ test("a bill line of a set menu split over two rates shows both", () => {
   assert.match(printed, /12\.00 {2}10%\/20%/);
   assert.match(printed, /Satz 20% {2}Netto 3\.33 {2}MwSt 0\.67/);
 });
+
+test("a receipt prints who issued it, its number, each rate and the change — and says it is unsigned", () => {
+  const receipt = {
+    kind: "receipt",
+    company: { name: "Zhao Yun GmbH", address: "Mariahilfer Straße 1, 1060 Wien", uid: "ATU12345678" },
+    receipt: {
+      receiptNo: 12, cashRegisterId: "KASSE-1", type: "sale", table: "K1", createdAt: "2026-09-25T10:00:00.000Z", fiscalStatus: "unsigned",
+      lines: [{ kind: "item", name: "Ramen", quantity: 2, unitPriceCents: 1000, totalCents: 2000, vatSplit: [{ percent: 10, cents: 2000 }], modifiers: [] }],
+      vat: [{ percent: 10, grossCents: 2000, netCents: 1818, vatCents: 182 }],
+      totalCents: 2000,
+      payments: [{ type: "cash", amountCents: 2000, tenderedCents: 5000, changeCents: 3000 }]
+    }
+  };
+  const printed = renderReceipt(receipt, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(printed, /^\u001b@TESTBELEG – NICHT SIGNIERT/);
+  assert.match(printed, /Zhao Yun GmbH\nMariahilfer Straße 1, 1060 Wien\nUID: ATU12345678/);
+  assert.match(printed, /Beleg 12 {2}Kasse KASSE-1/);
+  assert.match(printed, /2 x Ramen {18}20\.00/);
+  assert.match(printed, /10% Netto 18\.18 MwSt 1\.82 {2}20\.00/);
+  assert.match(printed, /gegeben 50\.00 {2}Rückgeld 30\.00/);
+  for (const line of printed.split("\n")) assert.ok(line.replace(/^\u001b@/, "").replace(/\u001dV\u0000$/, "").length <= 32, `too wide: ${line}`);
+
+  const signed = renderReceipt({ ...receipt, receipt: { ...receipt.receipt, fiscalStatus: "signed" } }, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.doesNotMatch(signed, /NICHT SIGNIERT/);
+});

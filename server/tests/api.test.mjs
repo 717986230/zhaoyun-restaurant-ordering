@@ -386,18 +386,28 @@ test("table bill splits VAT by rate and prints once", async (context) => {
   assert.equal(Number((reduced.net + reduced.vat).toFixed(2)), grossFood);
   assert.equal(reduced.net, Math.round((grossFood * 100) / 1.1) / 100);
 
-  const settled = (await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/settle", headers: adminHeaders })).json().bill;
-  assert.equal(settled.total, expectedTotal);
-  assert.ok(settled.printJobId);
+  const printed = (await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/print", headers: adminHeaders })).json().bill;
+  assert.equal(printed.total, expectedTotal);
+  assert.ok(printed.printJobId);
 
   const jobs = (await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: adminHeaders })).json().jobs;
   const billJob = jobs.find((job) => job.payload.kind === "bill");
   assert.equal(billJob.printerRole, "front");
   assert.equal(billJob.payload.table, "07");
 
+  // Paying is a receipt, on the front printer too.
+  const paid = await app.inject({
+    method: "POST", url: "/api/admin/checkout", headers: adminHeaders,
+    payload: { table: "07", items: preview.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: expectedTotal }] }
+  });
+  assert.equal(paid.statusCode, 201);
+  const receiptJob = (await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: adminHeaders })).json().jobs.find((job) => job.payload.kind === "receipt");
+  assert.equal(receiptJob.printerRole, "front");
+  assert.equal(receiptJob.payload.receipt.totalCents, Math.round(expectedTotal * 100));
+
   const emptied = await app.inject({ method: "GET", url: "/api/admin/tables/07/bill", headers: adminHeaders });
   assert.deepEqual(emptied.json().bill.items, []);
-  const again = await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/settle", headers: adminHeaders });
+  const again = await app.inject({ method: "POST", url: "/api/admin/tables/07/bill/print", headers: adminHeaders });
   assert.equal(again.statusCode, 409);
 
   const orders = (await app.inject({ method: "GET", url: "/api/orders", headers: adminHeaders })).json().orders;
@@ -506,8 +516,8 @@ test("bill tickets carry localized names", async (context) => {
   const bill = (await app.inject({ method: "GET", url: "/api/admin/tables/04/bill", headers: adminHeaders })).json().bill;
   assert.equal(bill.items[0].names.de, dish.names.de);
 
-  const settled = await app.inject({ method: "POST", url: "/api/admin/tables/04/bill/settle", headers: adminHeaders });
-  assert.equal(settled.statusCode, 200);
+  const printed = await app.inject({ method: "POST", url: "/api/admin/tables/04/bill/print", headers: adminHeaders });
+  assert.equal(printed.statusCode, 200);
   const jobs = (await app.inject({ method: "GET", url: "/api/admin/print-jobs?status=queued", headers: adminHeaders })).json().jobs;
   const billJob = jobs.find((job) => job.payload.kind === "bill");
   const ticket = renderReceipt(billJob.payload, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
@@ -516,7 +526,7 @@ test("bill tickets carry localized names", async (context) => {
   assert.match(ticket, /kein Kassenbeleg/);
 });
 
-test("the settle list and table validation do not depend on the recent-order window", async (context) => {
+test("the open-table list and table validation do not depend on the recent-order window", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-open-tables-"));
   const app = await buildServer({
     databasePath: path.join(directory, "restaurant.sqlite"),
@@ -590,7 +600,7 @@ test("roles separate the floor from the office, and writes are recorded", async 
 
   // Staff runs the floor but must not touch prices or the catalog.
   assert.equal((await app.inject({ method: "GET", url: "/api/service-requests", headers: staff })).statusCode, 200);
-  assert.equal((await app.inject({ method: "POST", url: "/api/admin/tables/06/bill/settle", headers: staff })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: "/api/admin/tables/06/bill/print", headers: staff })).statusCode, 200);
   const priceEdit = await app.inject({
     method: "PUT",
     url: `/api/admin/products/${dish.id}`,
@@ -609,7 +619,7 @@ test("roles separate the floor from the office, and writes are recorded", async 
   assert.equal(kitchenAdvance.detail.status, "preparing");
   const refusedEdit = entries.find((row) => row.role === "staff" && row.status === 403 && row.method === "PUT");
   assert.equal(refusedEdit.detail.denied, "manager");
-  assert.ok(entries.some((row) => row.role === "staff" && row.method === "POST" && row.route.includes("settle")));
+  assert.ok(entries.some((row) => row.role === "staff" && row.method === "POST" && row.route.includes("bill/print")));
   // Reads are noise in an audit log; only writes and refusals are kept.
   assert.equal(entries.some((row) => row.method === "GET" && row.status === 200), false);
 });

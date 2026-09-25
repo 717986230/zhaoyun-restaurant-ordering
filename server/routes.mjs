@@ -4,9 +4,9 @@ import path from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
-  CategoryRenameBody, CategoryVatBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
+  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
   ProductBody, ServiceRequestBody, ServiceStatusBody, SetPasswordBody, SettingsBody,
-  SignInBody, TableBody, TableLockBody, TableParams
+  SignInBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
@@ -459,13 +459,55 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/admin/tables/:table/bill", { preHandler: requireFloor, schema: { params: TableParams } }, async (request) => ({
     bill: database.billForTable(request.params.table)
   }));
-  app.post("/api/admin/tables/:table/bill/settle", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
-    const bill = database.settleTableBill(request.params.table);
-    if (!bill) return errorReply(reply, new Error("Table has no open orders to settle"), 409);
-    realtime.broadcast("bill.settled", { table: bill.table, total: bill.total }, bill.table);
+  // An interim bill for the guest to read. Paying is a receipt (checkout).
+  app.post("/api/admin/tables/:table/bill/print", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
+    const bill = database.printTableBill(request.params.table);
+    if (!bill) return errorReply(reply, new Error("Table has nothing left to pay"), 409);
     realtime.broadcast("print.queued", { jobId: bill.printJobId }, bill.table);
     return { bill };
   });
+
+  // The register (shared/register.mjs): receipts, storno, the day's closing, the journal.
+  app.post("/api/admin/checkout", { preHandler: requireFloor, schema: { body: CheckoutBody } }, async (request, reply) => {
+    try {
+      const receipt = database.checkout(request.body, request.staffRole);
+      if (receipt.table) realtime.broadcast("bill.paid", { table: receipt.table, receiptNo: receipt.receiptNo }, receipt.table);
+      return reply.code(201).send({ receipt });
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+  app.get("/api/admin/receipts", { preHandler: requireFloor, schema: { querystring: LimitQuery } }, async (request) => ({
+    receipts: database.listReceipts(request.query.limit)
+  }));
+  app.get("/api/admin/receipts/:id", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => {
+    const receipt = database.getReceipt(request.params.id);
+    return receipt ? { receipt } : errorReply(reply, new Error("Receipt not found"), 404);
+  });
+  app.post("/api/admin/receipts/:id/storno", { preHandler: requireAdmin, schema: { params: IdParams, body: StornoBody } }, async (request, reply) => {
+    try {
+      const receipt = database.stornoReceipt(request.params.id, request.body.reason, request.staffRole);
+      if (!receipt) return errorReply(reply, new Error("Receipt not found"), 404);
+      return reply.code(201).send({ receipt });
+    } catch (error) {
+      return errorReply(reply, error, /already been cancelled/.test(error.message) ? 409 : 400);
+    }
+  });
+  app.get("/api/admin/vouchers/:code", { preHandler: requireFloor, schema: { params: VoucherParams } }, async (request, reply) => {
+    const voucher = database.getVoucher(request.params.code);
+    return voucher ? { voucher } : errorReply(reply, new Error("Voucher not found"), 404);
+  });
+  app.get("/api/admin/day-closings/preview", { preHandler: requireAdmin }, async () => ({ totals: database.closingPreview() }));
+  app.get("/api/admin/day-closings", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
+    closings: database.listClosings(request.query.limit)
+  }));
+  app.post("/api/admin/day-closings", { preHandler: requireAdmin }, async (request, reply) => {
+    const closing = database.closeDay(request.staffRole);
+    if (!closing) return errorReply(reply, new Error("No receipts since the last closing"), 409);
+    return reply.code(201).send({ closing });
+  });
+  app.get("/api/admin/journal", { preHandler: requireAdmin, schema: { querystring: JournalQuery } }, async (request) =>
+    database.exportJournal(request.query.from, request.query.to));
 
   app.get("/api/admin/printers", { preHandler: requireAdmin }, async () => ({ printers: database.listPrinters() }));
   app.post("/api/admin/printers", { preHandler: requireAdmin, schema: { body: PrinterBody } }, async (request, reply) => {
