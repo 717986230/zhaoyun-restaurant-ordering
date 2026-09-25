@@ -12,12 +12,14 @@ let requestStatus;
 let menuTheme;
 let menuLanguages;
 let appSettings;
+let mainCategory;
 
 // The admin follows the browser's language; these tests read the Chinese copy.
 test.use({ locale: "zh-CN" });
 
 test.beforeEach(async ({ page }) => {
   orderStatus = "new";
+  mainCategory = "MAIN";
   requestStatus = "open";
   menuTheme = "jade";
   menuLanguages = ["en", "de"];
@@ -38,7 +40,7 @@ test.beforeEach(async ({ page }) => {
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ menuTheme, menuLanguages, ...appSettings }) });
   });
   await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [{
-    id: "80", sku: "FOOD-80", kind: "food", category: "MAIN",
+    id: "80", sku: "FOOD-80", kind: "food", category: mainCategory,
     names: { zh: "黑椒牛柳", de: "Rinderfilet", en: "Beef Fillet" }, description: "",
     price: 34.5, allergens: ["F"], details: { ingredients: "Rind", time: "35 min", people: "2", level: "Mittel" },
     appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: [{ id: "spice", names: { zh: "辣度", de: "Scharf", en: "Spice" }, selection: "single", options: [] }]
@@ -748,6 +750,44 @@ test("the first three tabs are chosen in settings, none fixed, and cannot repeat
   // Back to the usual order for the first: the others move up.
   await first.selectOption("");
   await expect.poll(() => appSettings.navPinned).toEqual(["__sets__", "ALLE"]);
+});
+
+test("the tabs are named per menu language, and a category is renamed with its dishes", async ({ page }) => {
+  appSettings.navLabels = { ALLE: { de: "Alles" }, MAIN: { zh: "主菜" } };
+  let renamed;
+  await page.route("**/api/admin/categories/rename", async (route) => {
+    renamed = route.request().postDataJSON();
+    // As both backends do: the dishes move, and so do the category's names.
+    mainCategory = renamed.to;
+    appSettings.navLabels = { ...appSettings.navLabels, [renamed.to]: appSettings.navLabels[renamed.from] };
+    delete appSettings.navLabels[renamed.from];
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ renamed: 1, category: renamed.to, settings: appSettings }) });
+  });
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "分类与标签名称", exact: true }) });
+  await expect(card.locator(".tab-names li")).toHaveCount(3);
+  // One field per language the menu is in (English and German here); an
+  // empty one shows the menu's own name.
+  await expect(card.locator('input[name="de|ALLE"]')).toHaveValue("Alles");
+  await expect(card.locator('input[name="en|ALLE"]')).toHaveAttribute("placeholder", "All");
+  await expect(card.locator('input[name="en|MAIN"]')).toHaveAttribute("placeholder", "MAIN");
+  await expect(card.locator('input[name="zh|MAIN"]')).toHaveCount(0);
+  await card.locator('input[name="de|ALLE"]').fill("");
+  await card.locator('input[name="en|MAIN"]').fill("  Mains ");
+  await card.getByRole("button", { name: "保存名称" }).click();
+  // The Chinese name stays, though Chinese is switched off for now.
+  await expect.poll(() => appSettings.navLabels).toEqual({ MAIN: { zh: "主菜", en: "Mains" } });
+
+  const row = card.locator('li[data-tab="MAIN"]');
+  await row.getByRole("button", { name: "改名 / 合并" }).click();
+  await row.getByLabel("新的分类名").fill("main dishes");
+  await expect(row.getByLabel("新的分类名")).toHaveValue("MAIN DISHES");
+  await row.getByRole("button", { name: "改名", exact: true }).click();
+  await expect.poll(() => renamed).toEqual({ from: "MAIN", to: "MAIN DISHES" });
+  await expect(page.locator("#adminToast")).toHaveText("已把 1 道菜移到 MAIN DISHES");
+  await expect(card.locator('li[data-tab="MAIN DISHES"] input[name="en|MAIN DISHES"]')).toHaveValue("Mains");
+  await expect(card.locator('li[data-tab="MAIN"]')).toHaveCount(0);
 });
 
 test("the console installs nothing of its own: the menu is what installs", async ({ page }) => {

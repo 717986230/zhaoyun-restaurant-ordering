@@ -144,8 +144,28 @@ export const SettingsBody = Type.Object({
   featuredSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
   setsSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
   // The guest menu's first three tabs, in order; the rest keep their usual order.
-  navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 3 }))
+  navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 3 })),
+  // What the tabs are called, per language: "ALLE", "__sets__" or a category.
+  navLabels: Type.Optional(Type.Record(
+    Type.String({ minLength: 1, maxLength: 64 }),
+    // A language other than zh, en or de is refused by the settings rule
+    // (shared/rules.mjs), not stripped here: Fastify would drop it quietly
+    // where the Worker refuses it, and the two must answer alike.
+    Type.Object({
+      zh: Type.Optional(Type.String({ maxLength: 24 })),
+      en: Type.Optional(Type.String({ maxLength: 24 })),
+      de: Type.Optional(Type.String({ maxLength: 24 }))
+    }),
+    { maxProperties: 80 }
+  ))
 }, { minProperties: 1, additionalProperties: false });
+
+// Every dish in one category moved to another name — a new one, or an
+// existing one to merge the two.
+// What makes a category is normalizeCategoryName's to say (it trims and
+// upper-cases first), so the wire only bounds the length.
+const Category = Type.String({ minLength: 1, maxLength: 80 });
+export const CategoryRenameBody = Type.Object({ from: Category, to: Category }, { additionalProperties: false });
 
 // The console's password gate. The floor is the one `assertPassword` enforces
 // — stated twice on purpose, so a too-short password is refused at the edge

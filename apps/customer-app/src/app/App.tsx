@@ -90,6 +90,7 @@ export function App() {
       onAdminTap={handleAdminTap}
       featured={featured}
       navPinned={catalog.menu?.navPinned ?? []}
+      navLabels={catalog.menu?.navLabels ?? {}}
     />
   </main>;
 }

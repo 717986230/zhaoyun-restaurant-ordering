@@ -9,9 +9,9 @@ import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
   adminGateView, assertPassword, assertSetServed, auditView, billView, hashPassword,
-  duplicateInput, hashSessionToken, newSessionToken, normalizeBundleItems, normalizeSettingsInput,
+  duplicateInput, hashSessionToken, newSessionToken, normalizeBundleItems, normalizeCategoryName, normalizeSettingsInput,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
-  tableOverviewView, tableView, verifyPassword
+  renamedCategorySettings, tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
@@ -515,6 +515,32 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return rows.map((row) => mapProduct(row, media.get(row.id)));
   }
 
+  /**
+   * Every dish in one category moved to another name, and the settings that
+   * name the category with it (its place among the first tabs, its names).
+   * Onto an existing category, the two become one. Null when no dish is in
+   * the category.
+   */
+  function renameCategory(fromInput, toInput) {
+    const from = normalizeCategoryName(fromInput);
+    const to = normalizeCategoryName(toInput);
+    if (from === to) throw new Error("The new name is the same as the old one");
+    db.exec("BEGIN");
+    try {
+      const { changes } = db.prepare("UPDATE products SET category = ?, updated_at = ? WHERE category = ?").run(to, now(), from);
+      if (!changes) {
+        db.exec("ROLLBACK");
+        return null;
+      }
+      const settings = saveSettings(renamedCategorySettings(getSettings(), from, to));
+      db.exec("COMMIT");
+      return { renamed: Number(changes), category: to, settings };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   /** A new, unpublished dish with everything the original had, photos included. */
   function duplicateProduct(id) {
     const original = getProduct(id);
@@ -985,6 +1011,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deleteProduct: (id) => statements.deleteProduct.run(String(id)).changes > 0,
     addMedia,
     duplicateProduct,
+    renameCategory,
     getMediaFile,
     deleteMedia: (id) => statements.deleteMedia.run(String(id)).changes > 0,
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),

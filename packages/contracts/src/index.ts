@@ -145,7 +145,13 @@ export interface ApiSettings {
   /** The guest menu's first three tabs, in order: "__sets__", "__featured__",
    *  "ALLE" or a category. The rest follow in their usual order. */
   navPinned: string[];
+  /** The owner's own names for the tabs ("ALLE", "__sets__", a category), per
+   *  menu language; a missing name keeps the menu's own wording. */
+  navLabels: NavLabels;
 }
+
+/** Tab → language → the name the guest sees. */
+export type NavLabels = Record<string, Partial<Record<MenuLanguage, string>>>;
 
 /** The part of the settings the guest menu reads, served with the catalogue. */
 export interface ApiMenuSettings {
@@ -159,6 +165,8 @@ export interface ApiMenuSettings {
   setsSchedule?: ApiSchedule | null;
   /** The tabs the owner put first to third; absent from an older server. */
   navPinned?: string[];
+  /** The owner's names for the tabs; absent from an older server. */
+  navLabels?: NavLabels;
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */
   featured?: { title: string; productIds: string[]; template: FeaturedTemplateId; schedule?: ApiSchedule | null } | null;

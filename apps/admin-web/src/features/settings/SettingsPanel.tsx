@@ -1,10 +1,10 @@
 import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
-import type { ApiSettings, ColorScheme, MenuLanguage } from "@zhaoyun/contracts";
+import type { ApiSettings, ColorScheme, MenuLanguage, NavLabels } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themePattern } from "@zhaoyun/domain";
-import { useI18n } from "../../app/i18n";
+import { translate, useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { downloadQrCard } from "../qr/qrCard";
@@ -36,6 +36,8 @@ interface Props {
   tables: RestaurantTable[];
   auditEntries: AuditEntry[];
   onSaveSettings: (change: Partial<ApiSettings>, done: CopyKey) => Promise<void>;
+  /** Moves a category's dishes to a new or existing one; true when it did. */
+  onRenameCategory: (from: string, to: string) => Promise<boolean>;
   onSaveConnection: (storage: AdminStorage) => Promise<void>;
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<boolean>;
   onDeleteTable: (table: string) => Promise<void>;
@@ -118,8 +120,8 @@ const NAV_PLACES = ["navFirst", "navSecond", "navThird"] as const;
  * (orderNavTabs).
  */
 function NavOrder({ settings, products, onSave }: { settings: ApiSettings; products: Product[]; onSave: (navPinned: string[]) => void }) {
-  const { t } = useI18n();
-  const label = navLabel(settings, t);
+  const { t, language } = useI18n();
+  const label = navLabel(settings, t, language);
   // Only what a guest can see makes a tab: a draft or a dish marked
   // unavailable is not on the menu, so neither is a category of nothing else.
   const live = products.filter((product) => product.published && product.available);
@@ -152,11 +154,89 @@ function NavOrder({ settings, products, onSave }: { settings: ApiSettings; produ
   </div>;
 }
 
-/** A tab's name as the owner knows it: the promotions page by its title. */
-function navLabel(settings: ApiSettings, t: ReturnType<typeof useI18n>["t"]) {
-  return (tab: string) => tab === NAV_SETS ? t("navSets")
-    : tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
-    : tab === NAV_ALL ? t("navAll") : tab;
+/** A tab's name as the owner knows it: the promotions page by its title,
+ *  the rest by the name they gave it in this language, else the default. */
+function navLabel(settings: ApiSettings, t: ReturnType<typeof useI18n>["t"], language: AdminLanguage) {
+  return (tab: string) => tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
+    : settings.navLabels[tab]?.[language] || (tab === NAV_SETS ? t("navSets") : tab === NAV_ALL ? t("navAll") : tab);
+}
+
+/** The menu's own name for a tab in a language: what an empty field means. */
+function defaultTabName(tab: string, language: MenuLanguage) {
+  return tab === NAV_ALL ? translate(language, "navAll") : tab === NAV_SETS ? translate(language, "navSets") : tab;
+}
+
+/** How the server will write a category name, so a merge is known before it is sent. */
+const categoryKey = (name: string) => name.trim().replace(/\s+/g, " ").toUpperCase();
+
+/**
+ * What each tab is called on the menu, one field per menu language, and the
+ * categories themselves: renamed, or merged into another, dishes and all.
+ * Every dish counts, drafts included, because a rename moves them all. The
+ * names of a language switched off are kept, and so come back with it; the
+ * names of a category that no longer has a dish are dropped on save.
+ */
+function TabNames({ settings, products, onSave, onRename }: { settings: ApiSettings; products: Product[]; onSave: (navLabels: NavLabels) => void; onRename: (from: string, to: string) => Promise<boolean> }) {
+  const { t } = useI18n();
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [target, setTarget] = useState("");
+  const counts = new Map<string, number>();
+  for (const product of products) counts.set(product.category, (counts.get(product.category) ?? 0) + 1);
+  const tabs = [NAV_ALL, NAV_SETS, ...counts.keys()];
+  const offered = settings.menuLanguages;
+
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const next: NavLabels = {};
+    for (const tab of tabs) {
+      const names = { ...settings.navLabels[tab] };
+      for (const language of offered) {
+        const name = String(data.get(`${language}|${tab}`) ?? "").trim();
+        if (name) names[language] = name; else delete names[language];
+      }
+      if (Object.keys(names).length) next[tab] = names;
+    }
+    onSave(next);
+  }
+
+  const open = (tab: string) => { setRenaming(tab); setTarget(tab); };
+  async function rename(from: string) {
+    const to = categoryKey(target);
+    if (!to || to === from) return setRenaming(null);
+    if (counts.has(to) && !window.confirm(t("mergeConfirm", { from, to, count: counts.get(from) ?? 0 }))) return;
+    if (await onRename(from, to)) setRenaming(null);
+  }
+
+  // Keyed on what is saved, so the fields show what the server kept.
+  return <form key={JSON.stringify([settings.navLabels, tabs])} className="tab-names" onSubmit={save}>
+    <ul>{tabs.map((tab) => {
+      const category = counts.has(tab);
+      const merging = renaming === tab && counts.has(categoryKey(target)) && categoryKey(target) !== tab;
+      return <li key={tab} data-tab={tab}>
+        <div className="tab-names-head">
+          <strong>{tab === NAV_ALL ? t("navAll") : tab === NAV_SETS ? t("navSets") : tab}</strong>
+          {category && <small>{t("dishCount", { count: counts.get(tab) ?? 0 })}</small>}
+          {category && renaming !== tab && <button type="button" className="ghost-action" onClick={() => open(tab)}>{t("renameCategory")}</button>}
+        </div>
+        <div className="tab-names-fields">{offered.map((language) => <label key={language}>
+          <img src={LANGUAGE_INFO[language].flag} alt={LANGUAGE_INFO[language].name} />
+          <input name={`${language}|${tab}`} maxLength={24} defaultValue={settings.navLabels[tab]?.[language] ?? ""} placeholder={defaultTabName(tab, language)} />
+        </label>)}</div>
+        {/* Not a form of its own: forms do not nest, so Enter is caught here. */}
+        {renaming === tab && <div className="tab-rename">
+          <input aria-label={t("categoryNewName")} value={target} maxLength={64} list="categoryNames" autoFocus
+            onChange={(event) => setTarget(event.target.value.toUpperCase())}
+            onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void rename(tab); } }} />
+          <button type="button" className="primary-action" onClick={() => void rename(tab)}>{t(merging ? "doMerge" : "doRename")}</button>
+          <button type="button" className="ghost-action" onClick={() => setRenaming(null)}>{t("cancel")}</button>
+          <small>{t("categoryNameHint")}</small>
+        </div>}
+      </li>;
+    })}</ul>
+    <datalist id="categoryNames">{[...counts.keys()].map((name) => <option key={name} value={name} />)}</datalist>
+    <button className="primary-action" type="submit">{t("tabNamesSave")}</button>
+  </form>;
 }
 
 /** The promotions page's dishes, in the order a guest sees them. */
@@ -299,8 +379,12 @@ export function SettingsPanel(props: Props) {
         })}</div>
       </Section>
 
-      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t)).join(" · ") : t("navDefault")}>
+      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t, language)).join(" · ") : t("navDefault")}>
         <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
+      </Section>
+
+      <Section id="tabNames" title={t("sectionTabNames")} hint={t("tabNamesHint")} summary={t("categoryCount", { count: new Set(props.products.map((product) => product.category)).size })}>
+        <TabNames settings={settings} products={props.products} onSave={(navLabels) => void props.onSaveSettings({ navLabels }, "tabNamesSaved")} onRename={props.onRenameCategory} />
       </Section>
 
       {/* The biggest card: across the page, what the page is on the left and

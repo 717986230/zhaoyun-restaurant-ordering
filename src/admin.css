@@ -2536,3 +2536,116 @@ h2 {
   }
 }
 
+
+/* Categories and tab names: one row per tab, a field per menu language whose
+   placeholder is the menu's own name, and a category's rename under it. */
+.tab-names {
+  display: grid;
+  gap: 12px;
+}
+
+.tab-names ul {
+  display: grid;
+  gap: 8px;
+  max-height: 520px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tab-names li {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--a-line);
+  border-radius: 10px;
+  background: var(--a-sunken);
+}
+
+.tab-names-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.tab-names-head strong {
+  overflow-wrap: anywhere;
+}
+
+.tab-names-head small {
+  color: var(--a-muted);
+}
+
+.tab-names-head .ghost-action {
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.tab-names-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.tab-names-fields label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tab-names-fields img {
+  width: 22px;
+  height: 16px;
+  flex: none;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.tab-names input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.tab-rename {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.tab-rename input {
+  text-transform: uppercase;
+}
+
+.tab-rename small {
+  grid-column: 1 / -1;
+  color: var(--a-muted);
+}
+
+.tab-rename .primary-action,
+.tab-rename .ghost-action {
+  padding: 10px 14px;
+}
+
+@media (max-width: 520px) {
+  .tab-rename {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tab-rename input {
+    grid-column: 1 / -1;
+  }
+}
