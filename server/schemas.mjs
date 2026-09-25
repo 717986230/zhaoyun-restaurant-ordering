@@ -19,8 +19,10 @@ export const PrintJobsQuery = Type.Object({
 
 // A voucher code as printed (ABCDE-FGHJK), or typed without the dash.
 const VoucherParams = Type.Object({ code: Type.String({ minLength: 1, maxLength: 32 }) });
-// The journal between two days: from inclusive, to exclusive (YYYY-MM-DD).
-const IsoDate = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" });
+// The journal between two moments: from inclusive, to exclusive. A day
+// (YYYY-MM-DD, UTC) or an instant (the console sends the restaurant's
+// midnights as ISO times, so a day is its own day, not UTC's).
+const IsoDate = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z)?$" });
 const JournalQuery = Type.Object({ from: IsoDate, to: IsoDate });
 
 export { IdParams, JournalQuery, LimitQuery, TableParams, VoucherParams };

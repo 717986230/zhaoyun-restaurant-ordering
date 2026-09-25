@@ -2754,3 +2754,420 @@ h2 {
     flex: 1;
   }
 }
+
+/* The register: tables | the lines of this receipt | payment. One column on
+   a phone, the payment kept under the lines it pays. */
+#cashierPanel {
+  padding-bottom: 40px;
+}
+
+.cashier-unsigned {
+  margin: 12px clamp(16px, 3vw, 30px) 0;
+  padding: 10px 14px;
+  border: 1px solid var(--a-danger-line);
+  border-radius: 8px;
+  color: var(--a-danger);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.cashier-layout {
+  display: grid;
+  grid-template-columns: minmax(170px, 220px) minmax(0, 1fr) minmax(280px, 340px);
+  align-items: start;
+  gap: 16px;
+  padding: 16px clamp(16px, 3vw, 30px);
+}
+
+.cashier-layout > section,
+.cashier-records,
+.cashier-office > section {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--a-line);
+  border-radius: 12px;
+  background: var(--a-card);
+}
+
+.cashier-layout h2,
+.cashier-records h2,
+.cashier-office h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.cashier-table-list {
+  display: grid;
+  gap: 6px;
+}
+
+.cashier-table-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 8px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  align-items: center;
+  font: inherit;
+  text-align: left;
+}
+
+.cashier-table-list button.on {
+  border-color: var(--a-accent);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.cashier-lines-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.cashier-lines-head .ghost-action {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.cashier-line-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cashier-line-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 78px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-sunken);
+  color: var(--a-muted);
+}
+
+.cashier-line-list li.picked {
+  color: var(--a-ink);
+  border-color: var(--a-line-2);
+  background: var(--a-card);
+}
+
+.cashier-line-name {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cashier-line-name small {
+  color: var(--a-faint);
+}
+
+.cashier-line-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashier-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cashier-stepper button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 8px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font-size: 20px;
+}
+
+.cashier-stepper b {
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashier-voucher-sale {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cashier-voucher-sale label,
+.cashier-payment-list label,
+.journal-range label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--a-ink-2);
+  font-size: 12px;
+}
+
+.cashier-voucher-sale input,
+.cashier-payment-list input,
+.journal-range input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.cashier-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.cashier-total b {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashier-pay-types {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cashier-pay-types .ghost-action {
+  padding: 10px 6px;
+}
+
+.cashier-payment-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cashier-payment-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 6px 8px;
+  padding: 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-sunken);
+}
+
+.cashier-payment-list li > b,
+.cashier-payment-list li > label,
+.cashier-payment-list li > small {
+  grid-column: 1;
+}
+
+.cashier-payment-list li > button {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 6px;
+}
+
+.cashier-change,
+.cashier-remaining {
+  margin: 10px 0 0;
+  font-weight: 700;
+}
+
+.cashier-change {
+  color: var(--a-accent-ink);
+  font-size: 18px;
+}
+
+.cashier-remaining {
+  color: var(--a-danger);
+}
+
+.cashier-issue {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 52px;
+  font-size: 16px;
+}
+
+.cashier-records,
+.cashier-office {
+  margin: 0 clamp(16px, 3vw, 30px) 16px;
+}
+
+.cashier-office {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.receipt-list,
+.closing-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.receipt-list li {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--a-line);
+}
+
+.receipt-list li.cancelled,
+.receipt-list li.storno {
+  color: var(--a-muted);
+}
+
+.receipt-list li.cancelled strong {
+  text-decoration: line-through;
+}
+
+.receipt-meta {
+  display: grid;
+  min-width: 0;
+  color: var(--a-muted);
+  font-size: 13px;
+}
+
+.receipt-meta em {
+  color: var(--a-danger);
+  font-style: normal;
+}
+
+.receipt-list strong,
+.closing-list strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.receipt-list .ghost-action {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.closing-figures {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 10px 0 14px;
+}
+
+.closing-figures dt {
+  color: var(--a-muted);
+}
+
+.closing-figures dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.closing-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--a-line);
+  font-size: 13px;
+}
+
+.journal-range,
+.journal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.journal-status {
+  margin: 10px 0 0;
+  font-weight: 700;
+}
+
+.journal-status.ok {
+  color: var(--a-accent-ink);
+}
+
+.journal-status.broken {
+  color: var(--a-danger);
+}
+
+@media (max-width: 1100px) {
+  .cashier-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  }
+
+  .cashier-tables {
+    grid-column: 1 / -1;
+  }
+
+  .cashier-table-list {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .cashier-layout,
+  .cashier-office {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .receipt-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .receipt-list .receipt-meta {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+#cashierPanel > .list-head {
+  padding: 20px clamp(16px, 3vw, 30px) 0;
+}
+
+.journal-range input {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  /* The name gets the whole width; the stepper and the amount go under it. */
+  .cashier-line-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .cashier-line-name {
+    grid-column: 1 / -1;
+  }
+
+  .receipt-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .receipt-list li > .ghost-action {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .journal-range {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

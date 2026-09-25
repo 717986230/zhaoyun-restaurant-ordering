@@ -1,6 +1,7 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
-  CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
+  CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -58,6 +59,10 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     setsSchedule: null,
     navPinned: [],
     navLabels: {},
+    companyName: "",
+    companyAddress: "",
+    companyUid: "",
+    cashRegisterId: "KASSE-1",
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
   } as ApiSettings;
 }
@@ -233,7 +238,18 @@ export class AdminApi {
   updateServiceRequestStatus(id: string, status: ApiServiceRequest["status"]): Promise<{ request: ApiServiceRequest }> { return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   printJobs(status: PrintJobStatus = "failed", limit = 50): Promise<{ jobs: ApiPrintJob[] }> { return this.#request(`/api/admin/print-jobs?status=${status}&limit=${limit}`); }
   bill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill`); }
-  settleBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/settle`, { method: "POST" }); }
+  /** An interim bill on the front printer; it marks nothing paid. */
+  printBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/print`, { method: "POST" }); }
+  // The register: a sale is a receipt; a mistake is a storno; each day ends in a closing.
+  checkout(command: CheckoutCommand): Promise<{ receipt: ApiReceipt }> { return this.#request("/api/admin/checkout", { method: "POST", body: JSON.stringify(command) }); }
+  receipts(limit = 50): Promise<{ receipts: ApiReceipt[] }> { return this.#request(`/api/admin/receipts?limit=${limit}`); }
+  stornoReceipt(id: string, reason: string): Promise<{ receipt: ApiReceipt }> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/storno`, { method: "POST", body: JSON.stringify({ reason }) }); }
+  voucher(code: string): Promise<{ voucher: ApiVoucher }> { return this.#request(`/api/admin/vouchers/${encodeURIComponent(code)}`); }
+  closingPreview(): Promise<{ totals: ApiClosingTotals }> { return this.#request("/api/admin/day-closings/preview"); }
+  closeDay(): Promise<{ closing: ApiClosing }> { return this.#request("/api/admin/day-closings", { method: "POST" }); }
+  closings(limit = 30): Promise<{ closings: ApiClosing[] }> { return this.#request(`/api/admin/day-closings?limit=${limit}`); }
+  /** The journal from one moment (inclusive) to another (exclusive): YYYY-MM-DD or ISO times. */
+  journal(from: string, to: string): Promise<ApiJournalExport> { return this.#request(`/api/admin/journal?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`); }
   tables(): Promise<{ tables: RestaurantTable[] }> { return this.#request("/api/admin/tables"); }
   openTables(): Promise<{ tables: string[] }> { return this.#request("/api/admin/tables/open"); }
   tableOverview(): Promise<{ tables: TableOverview[] }> { return this.#request("/api/admin/tables/overview"); }

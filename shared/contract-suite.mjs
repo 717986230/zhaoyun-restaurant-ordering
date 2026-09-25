@@ -876,6 +876,9 @@ export function contractChecks(call, assert) {
       const issued = journal.json.entries.find((entry) => entry.kind === "receipt.issued" && entry.ref === b.id);
       assert.equal(issued.payload.totalCents, 1400, "the journal keeps the whole receipt");
       assert.equal((await call("GET", `/api/admin/journal?from=${today}`, { admin: true })).status, 400);
+      const instants = await call("GET", `/api/admin/journal?from=${encodeURIComponent(`${today}T00:00:00.000Z`)}&to=${encodeURIComponent(`${tomorrow}T00:00:00.000Z`)}`, { admin: true });
+      assert.equal(instants.json.entries.length, journal.json.entries.length, "a day as an instant is the same day");
+      assert.equal((await call("GET", "/api/admin/journal?from=yesterday&to=today", { admin: true })).status, 400);
       assert.equal((await call("GET", `/api/admin/journal?from=${today}&to=${tomorrow}`, staff)).status, 403);
 
       await call("PATCH", `/api/orders/${placed.id}/status`, { role: "staff", body: { status: "preparing" } });

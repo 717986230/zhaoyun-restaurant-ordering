@@ -382,6 +382,25 @@ export function SettingsPanel(props: Props) {
         </form>
       </Section>
 
+      {/* Who the receipts say issued them. The console's own fields; the
+          server checks the UID's form and the register id's. */}
+      <Section id="company" title={t("sectionCompany")} hint={t("companyHint")} summary={[settings.companyName || settings.restaurantName, settings.companyUid, settings.cashRegisterId].filter(Boolean).join(" · ")}>
+        <form key={`${settings.companyName}|${settings.companyAddress}|${settings.companyUid}|${settings.cashRegisterId}`} className="editor-form" onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const text = (name: string) => String(data.get(name) || "").trim();
+          void props.onSaveSettings({ companyName: text("companyName"), companyAddress: text("companyAddress"), companyUid: text("companyUid").toUpperCase(), cashRegisterId: text("cashRegisterId").toUpperCase() }, "companySaved");
+        }}>
+          <label><span>{t("companyName")}</span><input name="companyName" maxLength={80} defaultValue={settings.companyName} placeholder={settings.restaurantName} /><small>{t("companyNameHint")}</small></label>
+          <label><span>{t("companyAddress")}</span><input name="companyAddress" maxLength={160} defaultValue={settings.companyAddress} autoComplete="street-address" /></label>
+          <div className="field-grid">
+            <label><span>{t("companyUid")}</span><input name="companyUid" maxLength={16} defaultValue={settings.companyUid} placeholder="ATU12345678" pattern="(ATU|atu)[0-9]{8}" /><small>{t("companyUidHint")}</small></label>
+            <label><span>{t("cashRegisterId")}</span><input name="cashRegisterId" required maxLength={32} defaultValue={settings.cashRegisterId} /></label>
+          </div>
+          <button className="primary-action" type="submit">{t("save")}</button>
+        </form>
+      </Section>
+
       <Section id="appearance" title={t("sectionAppearance")} summary={`${themeName(MENU_THEMES[settings.menuTheme] ?? MENU_THEMES.jade)} · ${t(settings.menuDefaultScheme === "dark" ? "schemeDark" : "schemeLight")}`}>
         <p className="settings-label">{t("menuStyle")}</p>
         <div className="theme-picker">{Object.values(MENU_THEMES).filter((theme) => !theme.festive).map(themeButton)}</div>

@@ -495,7 +495,7 @@ async function handle(request, env) {
     if (path.length === 3 && path[2] === "journal" && method === "GET") {
       const from = url.searchParams.get("from") ?? "";
       const to = url.searchParams.get("to") ?? "";
-      if (![from, to].every((day) => /^\d{4}-\d{2}-\d{2}$/.test(day))) return fail("from and to are dates (YYYY-MM-DD)");
+      if (![from, to].every((day) => /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)?$/.test(day))) return fail("from and to are dates (YYYY-MM-DD) or ISO times");
       return json(await store.exportJournal(from, to));
     }
 

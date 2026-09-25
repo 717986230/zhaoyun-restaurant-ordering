@@ -11,6 +11,7 @@ import type { CopyKey } from "./i18n";
 import { GatePanel } from "../features/gate/GatePanel";
 import { BoardPanel } from "../features/board/BoardPanel";
 import { TablesPanel } from "../features/tables/TablesPanel";
+import { CashierPanel } from "../features/cashier/CashierPanel";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
@@ -35,7 +36,7 @@ const initialState: AdminState = {
   gate: { checking: true, configured: false, busy: false, error: null, reachable: true },
   auditEntries: [],
   connected: false, connectionError: null, products: [], printers: [],
-  orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
+  orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], cashierTable: null, boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", settings: null, toast: null
 };
 
@@ -50,14 +51,15 @@ const BOARD_REFRESH_MS = 5000;
  */
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
-  if (role === "staff") return ["board", "tables"];
-  return showOrdering ? ["catalog", "board", "tables", "printers", "system"] : ["catalog", "system"];
+  if (role === "staff") return ["board", "tables", "cashier"];
+  return showOrdering ? ["catalog", "board", "tables", "cashier", "printers", "system"] : ["catalog", "system"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
   catalog: "tabCatalog",
   board: "tabBoard",
   tables: "tabTables",
+  cashier: "tabCashier",
   printers: "tabPrinters",
   system: "tabSettings"
 };
@@ -217,7 +219,8 @@ export function App() {
   }, [state.tab, loadTables]);
 
   useEffect(() => {
-    if (state.tab !== "board" && state.tab !== "tables") return undefined;
+    // The register lists the tables with something to pay, so it keeps them current too.
+    if (state.tab !== "board" && state.tab !== "tables" && state.tab !== "cashier") return undefined;
     void loadBoard();
     const timer = window.setInterval(() => void loadBoard(true), BOARD_REFRESH_MS);
     return () => window.clearInterval(timer);
@@ -247,18 +250,16 @@ export function App() {
     } catch (error) { failed(error, "billLoadFailed"); }
   }
 
-  async function settleBill(table: string) {
-    setState((current) => ({ ...current, boardBusy: true }));
+  /** The bill on the front printer for the guest to read; paying is at the register. */
+  async function printBill(table: string) {
     try {
-      const { bill } = await adminApi.settleBill(table);
-      setState((current) => ({ ...current, bill: null }));
-      await loadBoard(true);
-      notify(t("billSettled", { table, total: bill.total.toFixed(2) }));
-    } catch (error) {
-      failed(error, "billSettleFailed");
-    } finally {
-      setState((current) => ({ ...current, boardBusy: false }));
-    }
+      await adminApi.printBill(table);
+      notify(t("billPrinted", { table }));
+    } catch (error) { failed(error, "billPrintFailed"); }
+  }
+
+  function takePayment(table: string) {
+    setState((current) => ({ ...current, bill: null, tab: "cashier", cashierTable: table }));
   }
 
   async function saveProduct(input: AdminProductInput, id: string | null, media: File | null): Promise<boolean> {
@@ -504,7 +505,17 @@ export function App() {
         onLock={lockTable}
         onOpenBill={openBill}
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
-        onSettleBill={settleBill}
+        onPrintBill={printBill}
+        onTakePayment={takePayment}
+      />}
+      {state.tab === "cashier" && <CashierPanel
+        api={adminApi}
+        role={state.role}
+        tables={state.tableOverview}
+        initialTable={state.cashierTable}
+        onChanged={() => loadBoard(true)}
+        notify={notify}
+        failed={failed}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "system" && <SettingsPanel

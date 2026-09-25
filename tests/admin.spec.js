@@ -350,7 +350,7 @@ test("the table page shows what is on each table, and locking stops it ordering"
   await expect.poll(() => lockedWith).toEqual({ locked: true });
 });
 
-test("settling a table releases it, and the guest is told why the table refused", async ({ page }) => {
+test("a table is paid at the register: the bill prints for the guest, the receipt shows the change", async ({ page }) => {
   const table = {
     table: "07", label: "", enabled: true, locked: true, lockedAt: new Date().toISOString(), registered: true,
     state: "locked", total: 12.5, since: new Date().toISOString(),
@@ -363,32 +363,123 @@ test("settling a table releases it, and the guest is told why the table refused"
   await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [table] }) }));
   await page.route("**/api/admin/tables/07/bill", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bill: {
     table: "07", orderNos: ["260902-001"], orderIds: ["order-1"],
-    items: [{ orderNo: "260902-001", name: "蔬菜拉面", qty: 1, unitPrice: 12.5, lineTotal: 12.5, vatPercent: 10 }],
+    items: [{ orderItemId: "item-1", orderNo: "260902-001", name: "蔬菜拉面", qty: 1, unitPrice: 12.5, lineTotal: 12.5, vatPercent: 10 }],
     vatBreakdown: [{ percent: 10, gross: 12.5, net: 11.36, vat: 1.14 }],
     total: 12.5, issuedAt: new Date().toISOString(), fiscalReceipt: false
   } }) }));
-  let settled = false;
-  await page.route("**/api/admin/tables/07/bill/settle", (route) => {
-    settled = true;
+  let printed = false;
+  await page.route("**/api/admin/tables/07/bill/print", (route) => {
+    printed = true;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bill: { table: "07", orderNos: [], orderIds: [], items: [], vatBreakdown: [], total: 12.5, issuedAt: new Date().toISOString(), fiscalReceipt: false, printJobId: "job-1" } }) });
   });
+  let checkout;
+  const receipt = {
+    id: "r-1", receiptNo: 1, cashRegisterId: "KASSE-1", type: "sale", table: "07",
+    lines: [{ kind: "item", orderItemId: "item-1", name: "蔬菜拉面", quantity: 1, unitPriceCents: 1250, totalCents: 1250, vatSplit: [{ percent: 10, cents: 1250 }] }],
+    vat: [{ percent: 10, grossCents: 1250, netCents: 1136, vatCents: 114 }], totalCents: 1250,
+    payments: [{ type: "cash", amountCents: 1250, tenderedCents: 2000, changeCents: 750 }],
+    refersTo: null, refersToNo: null, reason: null, cancelledBy: null, fiscalStatus: "unsigned", staffRole: "manager", createdAt: new Date().toISOString()
+  };
+  await page.route("**/api/admin/checkout", (route) => {
+    checkout = route.request().postDataJSON();
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ receipt }) });
+  });
+  await page.route("**/api/admin/receipts?**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ receipts: checkout ? [receipt] : [] }) }));
+  await page.route("**/api/admin/day-closings/preview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ totals: { sales: 0, stornos: 0, firstReceiptNo: null, lastReceiptNo: null, grossCents: 0, vat: [], payments: { cash: 0, card: 0, voucher: 0 }, vouchersSoldCents: 0, cashCents: 0 } }) }));
+  await page.route("**/api/admin/day-closings?**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ closings: [] }) }));
   await page.goto("/admin.html");
   await page.getByRole("button", { name: "桌位" }).click();
   await page.locator(".table-tile", { hasText: "桌 07" }).getByRole("button", { name: "结账" }).click();
 
+  // The bill is for the guest to read; printing it pays nothing.
   const bill = page.getByRole("dialog", { name: "账单" });
   await expect(bill).toContainText("€12.50");
-  await expect(bill).toContainText("结账后这桌会自动解除锁定");
-  await bill.getByRole("button", { name: "打印账单并结账" }).click();
-  await expect.poll(() => settled).toBe(true);
-  await expect(page.getByRole("status")).toContainText("桌位已释放");
+  await expect(bill).toContainText("不是收据");
+  await bill.getByRole("button", { name: "打印账单" }).click();
+  await expect.poll(() => printed).toBe(true);
+
+  // Paying is at the register, with the table already chosen.
+  await bill.getByRole("button", { name: "去收银" }).click();
+  const register = page.locator("#cashierPanel");
+  await expect(register.getByRole("button", { name: /桌 07/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(register.locator(".cashier-line-list li")).toContainText("1/1");
+  await expect(register.locator(".cashier-unsigned")).toContainText("测试小票");
+  await register.getByRole("button", { name: "+ 现金" }).click();
+  await register.getByLabel("收到现金").fill("20");
+  await expect(register.locator(".cashier-change")).toHaveText("找零 €7.50");
+  await register.getByRole("button", { name: "收款并开小票" }).click();
+  await expect.poll(() => checkout).toMatchObject({ table: "07", items: [{ orderItemId: "item-1", quantity: 1 }], payments: [{ type: "cash", amount: 12.5, tendered: 20 }] });
+  expect(checkout.clientRequestId).toBeTruthy();
+  await expect(page.getByRole("status")).toContainText("小票 1 已开出，找零 €7.50");
+  await expect(register.locator('.receipt-list li[data-receipt="1"]')).toContainText("€12.50");
+});
+
+test("the manager cancels a receipt with a reason, closes the day, and exports a journal that checks out", async ({ page }) => {
+  const sale = {
+    id: "r-7", receiptNo: 7, cashRegisterId: "KASSE-1", type: "sale", table: "03",
+    lines: [{ kind: "item", name: "Gyoza", quantity: 2, unitPriceCents: 650, totalCents: 1300, vatSplit: [{ percent: 10, cents: 1300 }] }],
+    vat: [{ percent: 10, grossCents: 1300, netCents: 1182, vatCents: 118 }], totalCents: 1300,
+    payments: [{ type: "card", amountCents: 1300 }], refersTo: null, refersToNo: null, reason: null, cancelledBy: null,
+    fiscalStatus: "unsigned", staffRole: "staff", createdAt: new Date().toISOString()
+  };
+  let receipts = [sale];
+  let stornoBody;
+  let closed = false;
+  await page.route("**/api/admin/receipts?**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ receipts }) }));
+  await page.route("**/api/admin/receipts/r-7/storno", (route) => {
+    stornoBody = route.request().postDataJSON();
+    const storno = { ...sale, id: "r-8", receiptNo: 8, type: "storno", totalCents: -1300, refersTo: "r-7", refersToNo: 7, reason: stornoBody.reason };
+    receipts = [storno, { ...sale, cancelledBy: "r-8" }];
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ receipt: storno }) });
+  });
+  const totals = { sales: 1, stornos: 1, firstReceiptNo: 7, lastReceiptNo: 8, grossCents: 0, vat: [], payments: { cash: 0, card: 0, voucher: 0 }, vouchersSoldCents: 0, cashCents: 0 };
+  await page.route("**/api/admin/day-closings/preview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ totals: closed ? { ...totals, sales: 0, stornos: 0 } : totals }) }));
+  await page.route("**/api/admin/day-closings?**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ closings: closed ? [{ id: "z-1", closingNo: 1, totals, createdAt: new Date().toISOString() }] : [] }) }));
+  await page.route("**/api/admin/day-closings", (route) => {
+    closed = true;
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ closing: { id: "z-1", closingNo: 1, totals, createdAt: new Date().toISOString() } }) });
+  });
+  let journalUrl;
+  await page.route("**/api/admin/journal?**", (route) => {
+    journalUrl = route.request().url();
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [{ seq: 1, at: "x", kind: "receipt.issued", ref: "r-7", payload: {}, prevHash: "0", hash: "a" }, { seq: 2, at: "y", kind: "receipt.storno", ref: "r-8", payload: {}, prevHash: "a", hash: "b" }], verification: { ok: true, brokenAt: null, reason: null } }) });
+  });
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
+    { table: "05", label: "", enabled: true, locked: false, lockedAt: null, registered: true, state: "seated", total: 9.5, since: new Date().toISOString(), orders: [] }
+  ] }) }));
+  await page.goto("/admin.html");
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "收银" }).click();
+  const register = page.locator("#cashierPanel");
+  // Opened straight from the tabs, it still knows which tables have something to pay.
+  await expect(register.getByRole("button", { name: /桌 05/ })).toContainText("€9.50");
+
+  page.once("dialog", (dialog) => dialog.accept("wrong table"));
+  await register.locator('.receipt-list li[data-receipt="7"]').getByRole("button", { name: "冲销" }).click();
+  await expect.poll(() => stornoBody).toEqual({ reason: "wrong table" });
+  await expect(register.locator('.receipt-list li[data-receipt="8"]')).toContainText("冲销小票 7 · wrong table");
+  await expect(register.locator('.receipt-list li[data-receipt="7"]')).toContainText("已冲销");
+  await expect(register.locator('.receipt-list li[data-receipt="7"]').getByRole("button", { name: "冲销" })).toHaveCount(0);
+
+  await expect(register.locator(".cashier-closing")).toContainText("1 笔销售、1 笔冲销，小票 7–8");
+  page.once("dialog", (dialog) => dialog.accept());
+  await register.getByRole("button", { name: "日结并打印" }).click();
+  await expect.poll(() => closed).toBe(true);
+  await expect(register.locator(".closing-list")).toContainText("Z 1");
+
+  const download = page.waitForEvent("download");
+  await register.getByRole("button", { name: "导出 CSV" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^journal-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/);
+  // The restaurant's midnights, as instants.
+  expect(decodeURIComponent(journalUrl)).toMatch(/from=\d{4}-\d{2}-\d{2}T\d{2}:00:00\.000Z&to=\d{4}-\d{2}-\d{2}T\d{2}:00:00\.000Z/);
+  await expect(register.locator(".journal-status")).toHaveText("已校验 2 条，链条完整");
 });
 
 test("the console says Admin, and switches its own language without touching the menu's", async ({ page }) => {
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("菜品订单桌位打印设置");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("菜品订单桌位收银打印设置");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
@@ -428,7 +519,7 @@ test("orders, tables and printers stay out of the way until ordering is switched
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("菜品订单桌位打印设置");
+  await expect(nav).toHaveText("菜品订单桌位收银打印设置");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
