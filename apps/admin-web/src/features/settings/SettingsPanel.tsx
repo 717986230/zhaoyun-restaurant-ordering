@@ -1,7 +1,7 @@
 import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
 import type { AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
-import type { ApiSettings, ColorScheme, MenuLanguage, NavLabels } from "@zhaoyun/contracts";
+import type { ApiSettings, ColorScheme, MenuLanguage, NavLabels, VatPercent } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themePattern } from "@zhaoyun/domain";
 import { translate, useI18n } from "../../app/i18n";
@@ -38,6 +38,8 @@ interface Props {
   onSaveSettings: (change: Partial<ApiSettings>, done: CopyKey) => Promise<void>;
   /** Moves a category's dishes to a new or existing one; true when it did. */
   onRenameCategory: (from: string, to: string) => Promise<boolean>;
+  /** Puts every dish of a category (set menus aside) at one VAT rate. */
+  onSetCategoryVat: (category: string, vatPercent: VatPercent) => Promise<void>;
   onSaveConnection: (storage: AdminStorage) => Promise<void>;
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<boolean>;
   onDeleteTable: (table: string) => Promise<void>;
@@ -239,6 +241,45 @@ function TabNames({ settings, products, onSave, onRename }: { settings: ApiSetti
   </form>;
 }
 
+const VAT_RATES: VatPercent[] = [10, 13, 20];
+
+/**
+ * The VAT rates, kept apart per category: how many dishes of each category
+ * are at 10%, 13% and 20%, a category at more than one marked, and one tap
+ * to put a whole category at a rate. Set menus have no rate of their own —
+ * a set is split over its dishes' rates — so they are counted apart.
+ */
+function VatRates({ products, onSet }: { products: Product[]; onSet: (category: string, vatPercent: VatPercent) => Promise<void> }) {
+  const { t } = useI18n();
+  const rows = new Map<string, { counts: Map<VatPercent, number>; sets: number }>();
+  for (const product of products) {
+    const row = rows.get(product.category) ?? { counts: new Map(), sets: 0 };
+    if (product.bundleItems?.length) row.sets += 1;
+    else row.counts.set(product.vatPercent, (row.counts.get(product.vatPercent) ?? 0) + 1);
+    rows.set(product.category, row);
+  }
+  const put = (category: string, rate: VatPercent, count: number) => {
+    if (window.confirm(t("vatConfirm", { category, count, rate }))) void onSet(category, rate);
+  };
+  return <ul className="vat-rates">{[...rows].map(([category, { counts, sets }]) => {
+    const dishes = [...counts.values()].reduce((sum, count) => sum + count, 0);
+    const only = counts.size === 1 ? [...counts.keys()][0] : undefined;
+    return <li key={category} data-category={category} className={counts.size > 1 ? "mixed" : ""}>
+      <div className="vat-rates-head">
+        <strong>{category}</strong>
+        <span className="vat-rates-counts">
+          {VAT_RATES.filter((rate) => counts.has(rate)).map((rate) => <span key={rate} className={`vat-badge vat-${rate}`}>{rate}% × {counts.get(rate)}</span>)}
+          {sets > 0 && <span className="vat-badge vat-set">{t("vatSetsCount", { count: sets })}</span>}
+          {counts.size > 1 && <em>{t("vatMixed")}</em>}
+        </span>
+      </div>
+      {dishes > 0 && <div className="vat-rates-actions" role="group" aria-label={t("vatSetAll", { category })}>
+        {VAT_RATES.map((rate) => <button key={rate} type="button" className={only === rate ? "on" : ""} aria-pressed={only === rate} disabled={only === rate} onClick={() => put(category, rate, dishes)}>{t("vatAllAt", { rate })}</button>)}
+      </div>}
+    </li>;
+  })}</ul>;
+}
+
 /** The promotions page's dishes, in the order a guest sees them. */
 function FeaturedList({ ids, products, onChange }: { ids: string[]; products: Product[]; onChange: (ids: string[]) => void }) {
   const { t, language } = useI18n();
@@ -381,6 +422,10 @@ export function SettingsPanel(props: Props) {
 
       <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t, language)).join(" · ") : t("navDefault")}>
         <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
+      </Section>
+
+      <Section id="vat" title={t("sectionVat")} hint={t("vatHint")} wide summary={VAT_RATES.map((rate) => `${rate}% × ${props.products.filter((product) => !product.bundleItems?.length && product.vatPercent === rate).length}`).join(" · ")}>
+        <VatRates products={props.products} onSet={props.onSetCategoryVat} />
       </Section>
 
       <Section id="tabNames" title={t("sectionTabNames")} hint={t("tabNamesHint")} summary={t("categoryCount", { count: new Set(props.products.map((product) => product.category)).size })}>

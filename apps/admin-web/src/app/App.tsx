@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminApi, toProduct } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
-import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
+import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings, VatPercent } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { LANGUAGE_INFO } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
@@ -298,6 +298,15 @@ export function App() {
     }
   }
 
+  /** A whole category at one VAT rate; set menus keep their split. */
+  async function setCategoryVat(category: string, vatPercent: VatPercent) {
+    try {
+      const { updated } = await adminApi.setCategoryVat(category, vatPercent);
+      await connect();
+      notify(t("vatSaved", { category, count: updated, rate: vatPercent }));
+    } catch (error) { failed(error, "saveFailed"); }
+  }
+
   function toggleFeatured(id: string, on: boolean) {
     const current = state.settings?.featuredProductIds ?? [];
     const next = on ? [...current.filter((item) => item !== id), id] : current.filter((item) => item !== id);
@@ -506,6 +515,7 @@ export function App() {
         auditEntries={state.auditEntries}
         onSaveSettings={saveSettings}
         onRenameCategory={renameCategory}
+        onSetCategoryVat={setCategoryVat}
         onSaveConnection={saveConnection}
         onSaveTable={saveTable}
         onDeleteTable={deleteTable}

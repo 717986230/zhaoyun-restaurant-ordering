@@ -60,6 +60,10 @@ CREATE TABLE order_items (
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10
     );
+CREATE TABLE order_item_vat_splits (
+      order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      split_json TEXT NOT NULL
+    );
 CREATE TABLE service_requests (
       id TEXT PRIMARY KEY,
       table_no TEXT NOT NULL,

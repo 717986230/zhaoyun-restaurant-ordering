@@ -790,6 +790,52 @@ test("the tabs are named per menu language, and a category is renamed with its d
   await expect(card.locator('li[data-tab="MAIN"]')).toHaveCount(0);
 });
 
+test("VAT is kept per dish and per category: counts, a mixed category marked, a whole category set at once", async ({ page }) => {
+  const dish = (id, category, kind, vatPercent, extra = {}) => ({ id, sku: id, kind, category, names: { zh: id, de: id, en: id }, description: "", price: 9, vatPercent, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", media: [], modifiers: [], ...extra });
+  let products = [dish("f1", "MAIN", "food", 10), dish("d1", "DRINKS", "drink", 20), dish("d2", "DRINKS", "drink", 10),
+    dish("s1", "SET", "food", 10, { bundleItems: [{ productId: "f1", quantity: 1 }, { productId: "d1", quantity: 1 }] })];
+  let sent;
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products }) }));
+  await page.route("**/api/admin/categories/vat", async (route) => {
+    sent = route.request().postDataJSON();
+    products = products.map((product) => (product.category === sent.category && !product.bundleItems ? { ...product, vatPercent: sent.vatPercent } : product));
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ updated: 2, category: sent.category, vatPercent: sent.vatPercent }) });
+  });
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "税率（USt）", exact: true }) });
+  const drinks = card.locator('li[data-category="DRINKS"]');
+  // A drink left at the food rate shows up: the category is mixed.
+  await expect(drinks.locator(".vat-badge")).toHaveText(["10% × 1", "20% × 1"]);
+  await expect(drinks).toContainText("混合税率");
+  // A set menu has no rate of its own and no button to give it one.
+  await expect(card.locator('li[data-category="SET"]')).toContainText("1 个套餐 · 按组成拆分");
+  await expect(card.locator('li[data-category="SET"] button')).toHaveCount(0);
+  // The rate MAIN is already at cannot be pressed again.
+  await expect(card.locator('li[data-category="MAIN"]').getByRole("button", { name: "全部 10%" })).toBeDisabled();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await drinks.getByRole("button", { name: "全部 20%" }).click();
+  await expect.poll(() => sent).toEqual({ category: "DRINKS", vatPercent: 20 });
+  await expect(page.locator("#adminToast")).toHaveText("DRINKS：2 道菜已设为 20%");
+  await expect(drinks.locator(".vat-badge")).toHaveText(["20% × 2"]);
+  await expect(drinks).not.toContainText("混合税率");
+
+  // Down the dishes list every dish shows its rate, a set shows it is split.
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+  await expect(page.locator(".product-row", { hasText: "d2" }).locator(".vat-badge")).toHaveText("20%");
+  await expect(page.locator(".product-row", { hasText: "s1" }).locator(".vat-badge")).toHaveText("拆分");
+  // On one line with the price and the status dot, at any width.
+  const row = page.locator(".product-row", { hasText: "d2" });
+  const [badge, dot] = [await row.locator(".vat-badge").boundingBox(), await row.locator("i").boundingBox()];
+  expect(Math.abs((badge.y + badge.height / 2) - (dot.y + dot.height / 2))).toBeLessThan(12);
+  // The rate is on the dish form itself, not folded away.
+  await page.locator(".product-row", { hasText: "s1" }).click();
+  await expect(page.locator('select[name="vatPercent"]')).toBeVisible();
+  await expect(page.getByText("套餐的税率按里面各道菜的价格比例自动拆分")).toBeVisible();
+});
+
 test("the console installs nothing of its own: the menu is what installs", async ({ page }) => {
   await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();

@@ -1,24 +1,40 @@
 /**
  * Everything the ordering rules decide, with no database attached.
  *
- * This is the Worker's copy. The Node server in server/database.mjs grew its
- * own after the billing and table work landed there, so the two are held
- * together by shared/contract-suite.mjs instead — it runs the same assertions
- * against both and fails when they disagree, which is how the two mismatches
- * this file had (`serviceType` for `type`, and a raw print-job row) were found.
- * Folding the Node server back onto this module is worth doing; it is a change
- * of its own, not a rider on a merge.
+ * Both backends use it. The Node server in server/database.mjs once grew its
+ * own copies, and the two drifted: the Worker ended up saving no VAT rate at
+ * all, so every dish and order line in production stood at 10%, drinks
+ * included. Products, orders, bills and VAT now come from here on both; what
+ * the Node server still keeps of its own is held to this module by
+ * shared/contract-suite.mjs, which runs the same assertions against both.
  *
  * Nothing here may import `node:` anything, so it runs unchanged on Workers.
  */
 
 import { DEFAULT_TIME_ZONE, isOnSchedule, normalizeSchedule, normalizeTimeZone } from "../src/schedule.js";
+import { normalizeAllergens } from "../src/allergens.js";
 
 export const ORDER_STATUSES = new Set(["new", "preparing", "ready", "completed", "cancelled"]);
 export const REQUEST_STATUSES = new Set(["open", "acknowledged", "completed", "cancelled"]);
 export const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
 export const PRINT_STATIONS = new Set(["kitchen", "bar", "sushi", "front"]);
 export const PRINTER_TRANSPORTS = new Set(["lan", "bluetooth", "usb"]);
+
+/**
+ * The Austrian rates a restaurant charges (§ 10 UStG): 10% for food, 20% for
+ * drinks — soft drinks included — and 13% for the few things in between. The
+ * owner sets each dish; these are only what a new one starts with. A set menu
+ * has no rate of its own: it is split over the rates of what is in it (see
+ * vatSplit). Confirm the rates with a tax advisor.
+ */
+export const VAT_PERCENTS = [10, 13, 20];
+export const DEFAULT_VAT_PERCENT = { food: 10, sushi: 10, drink: 20 };
+
+export function normalizeVatPercent(value) {
+  const percent = Number(value);
+  if (!VAT_PERCENTS.includes(percent)) throw new Error("VAT is 10, 13 or 20 percent");
+  return percent;
+}
 // The colour hexes themselves live in packages/domain/src/themes.ts, next to
 // the guest app that renders them; the backend only ever needs to know which
 // ids are valid to store.
@@ -285,6 +301,7 @@ export function mapProduct(row, media = []) {
     names: { zh: row.name_zh, de: row.name_de, en: row.name_en },
     description: row.description,
     price: row.price_cents / 100,
+    vatPercent: row.vat_percent,
     allergens: parseJson(row.allergens_json, []),
     details: {
       time: row.prep_time,
@@ -334,7 +351,8 @@ export function normalizeProduct(input, current = {}) {
     nameEn: String(names.en ?? input.nameEn ?? current.name_en ?? "").trim(),
     description: String(input.description ?? current.description ?? "").trim(),
     priceCents: input.price === undefined ? current.price_cents ?? 0 : priceToCents(input.price),
-    allergensJson: JSON.stringify(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, [])),
+    vatPercent: normalizeVatPercent(input.vatPercent ?? current.vat_percent ?? DEFAULT_VAT_PERCENT[kind]),
+    allergensJson: JSON.stringify(normalizeAllergens(Array.isArray(input.allergens) ? input.allergens : parseJson(current.allergens_json, []))),
     prepTime: String(details.time ?? current.prep_time ?? "").trim(),
     portion: String(details.people ?? current.portion ?? "").trim(),
     level: String(details.level ?? current.level ?? "").trim(),
@@ -769,11 +787,61 @@ export function orderProductIds(input) {
   return (Array.isArray(input.items) ? input.items : []).map((item) => String(item.id));
 }
 
+/** The dishes inside the set menus among these rows, which vatSplit needs to hand. */
+export function bundleComponentIds(rows) {
+  return [...new Set([...rows].flatMap((row) => parseJson(row.bundle_items_json, []).map((part) => String(part.productId))))];
+}
+
+/**
+ * How one unit of an order line divides over the VAT rates, in cents that add
+ * up to its price exactly. A dish is its own rate. A set menu is the rates of
+ * the dishes in it, in proportion to their own menu prices — a set of ramen
+ * and a soft drink is partly 10% and partly 20%, whatever the set says. A set
+ * whose dishes are gone, or all free, keeps its own rate.
+ *
+ * Kept on the order line when it is written, so a later change of price or
+ * rate never rewrites what an old order was.
+ */
+export function vatSplit(productRow, rowsById, unitPriceCents) {
+  const own = [{ percent: productRow.vat_percent, cents: unitPriceCents }];
+  const weights = new Map();
+  for (const part of parseJson(productRow.bundle_items_json, [])) {
+    const row = rowsById.get(String(part.productId));
+    if (row) weights.set(row.vat_percent, (weights.get(row.vat_percent) || 0) + row.price_cents * part.quantity);
+  }
+  const total = [...weights.values()].reduce((sum, weight) => sum + weight, 0);
+  if (!total || unitPriceCents <= 0) return own;
+  const shares = [...weights].sort(([left], [right]) => left - right).map(([percent, weight]) => {
+    const exact = (unitPriceCents * weight) / total;
+    return { percent, cents: Math.floor(exact), rest: exact - Math.floor(exact) };
+  });
+  // Largest remainder: the cents rounding took off go back to the shares that lost most.
+  let left = unitPriceCents - shares.reduce((sum, share) => sum + share.cents, 0);
+  for (const share of [...shares].sort((a, b) => b.rest - a.rest)) {
+    if (left <= 0) break;
+    share.cents += 1;
+    left -= 1;
+  }
+  return shares.filter((share) => share.cents > 0).map(({ percent, cents }) => ({ percent, cents }));
+}
+
+/** The rate an order line is filed under: its largest share. */
+function mainVatPercent(split) {
+  return split.reduce((main, part) => (part.cents > main.cents ? part : main)).percent;
+}
+
+/** Order lines with the VAT split kept for them, as billView reads them. */
+export const ORDER_ITEMS_SQL = "SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json FROM order_items LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id WHERE order_items.order_id = ?";
+
 /**
  * Turns an order command plus the product rows it names into the exact rows to
  * write: one order, its items, and one print job per station. Validation and
  * money happen here, so a synchronous transaction and a D1 batch write the same
- * thing.
+ * thing. `productRows` also holds the dishes inside any set ordered
+ * (bundleComponentIds), for the set's VAT split.
+ *
+ * A kitchen ticket carries no prices and no tax: it is not a receipt, and
+ * says so when printed.
  */
 export function planOrder(input, productRows, hours = {}) {
   const clientRequestId = String(input.clientRequestId || uuid());
@@ -802,6 +870,7 @@ export function planOrder(input, productRows, hours = {}) {
   const stations = new Map();
   for (const { product, quantity, modifiers, unitPriceCents } of resolved) {
     const productName = product.name_zh || product.name_de || product.name_en;
+    const split = vatSplit(product, productRows, unitPriceCents);
     items.push({
       id: uuid(),
       orderId: id,
@@ -810,7 +879,10 @@ export function planOrder(input, productRows, hours = {}) {
       quantity,
       unitPriceCents,
       printStation: product.print_station,
-      modifiersJson: JSON.stringify(modifiers)
+      modifiersJson: JSON.stringify(modifiers),
+      vatPercent: mainVatPercent(split),
+      // Kept only for a line over more than one rate (order_item_vat_splits).
+      vatSplitJson: split.length > 1 ? JSON.stringify(split) : null
     });
     const stationItems = stations.get(product.print_station) || [];
     stationItems.push({
@@ -818,7 +890,7 @@ export function planOrder(input, productRows, hours = {}) {
       name: productName,
       names: { zh: product.name_zh, de: product.name_de, en: product.name_en },
       quantity,
-      modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names, price: modifier.priceCents / 100 }))
+      modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names }))
     });
     stations.set(product.print_station, stationItems);
   }
@@ -864,6 +936,8 @@ export function billView(tableNo, orderRows, itemsByOrderId, productsById, issue
     for (const row of itemsByOrderId.get(order.id) ?? []) {
       const lineCents = row.unit_price_cents * row.quantity;
       const vatPercent = row.vat_percent;
+      // A line with no split kept is all at its own rate.
+      const split = parseJson(row.vat_split_json, null) ?? [{ percent: vatPercent, cents: row.unit_price_cents }];
       // Guests read the bill: keep the localized names next to the snapshot name.
       const product = productsById.get(row.product_id);
       items.push({
@@ -874,9 +948,11 @@ export function billView(tableNo, orderRows, itemsByOrderId, productsById, issue
         unitPrice: row.unit_price_cents / 100,
         lineTotal: lineCents / 100,
         vatPercent,
+        // A set menu over more than one rate shows each part.
+        ...(split.length > 1 ? { vatSplit: split.map((part) => ({ percent: part.percent, amount: (part.cents * row.quantity) / 100 })) } : {}),
         modifiers: parseJson(row.modifiers_json, []).map((modifier) => ({ name: modifier.name, names: modifier.names }))
       });
-      groups.set(vatPercent, (groups.get(vatPercent) || 0) + lineCents);
+      for (const part of split) groups.set(part.percent, (groups.get(part.percent) || 0) + part.cents * row.quantity);
       totalCents += lineCents;
     }
   }

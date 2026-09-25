@@ -543,7 +543,7 @@ h2 {
 }
 
 .product-row {
-  grid-template-columns: 46px minmax(120px, 1fr) 62px 82px 12px;
+  grid-template-columns: 46px minmax(120px, 1fr) 62px 48px 82px 12px;
   padding: 11px 8px;
 }
 
@@ -596,6 +596,29 @@ h2 {
   color: var(--a-muted);
   font-size: 12px;
   font-style: normal;
+}
+
+/* The dish's VAT rate, at a glance down the list: 10% and 20% in their own
+   colours, so a drink left at the food rate stands out. */
+.vat-badge {
+  justify-self: start;
+  padding: 2px 6px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  color: var(--a-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vat-badge.vat-10 {
+  border-color: var(--a-accent);
+  color: var(--a-accent-ink);
+}
+
+.vat-badge.vat-20 {
+  border-color: var(--a-danger-line);
+  color: var(--a-danger);
 }
 
 .product-row > strong {
@@ -1221,7 +1244,7 @@ h2 {
   }
 
   .product-row {
-    grid-template-columns: 42px minmax(100px, 1fr) 65px 10px;
+    grid-template-columns: 42px minmax(100px, 1fr) 44px 65px 10px;
   }
 
   .product-kind {
@@ -2278,7 +2301,7 @@ h2 {
   }
 
   .product-row {
-    grid-template-columns: 42px minmax(0, 1fr) auto 10px;
+    grid-template-columns: 42px minmax(0, 1fr) auto auto 10px;
     gap: 10px;
   }
 
@@ -2647,5 +2670,87 @@ h2 {
 
   .tab-rename input {
     grid-column: 1 / -1;
+  }
+}
+
+/* VAT rates per category: the counts at each rate, a mixed category marked,
+   and one row of buttons to put the whole category at a rate. */
+.vat-rates {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vat-rates li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--a-line);
+  border-radius: 10px;
+  background: var(--a-sunken);
+}
+
+.vat-rates li.mixed {
+  border-color: var(--a-danger-line);
+}
+
+.vat-rates-head {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vat-rates-head strong {
+  overflow-wrap: anywhere;
+}
+
+.vat-rates-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.vat-rates-counts em {
+  color: var(--a-danger);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.vat-rates-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.vat-rates-actions button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.vat-rates-actions button.on {
+  border-color: var(--a-accent);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  opacity: 1;
+}
+
+@media (max-width: 520px) {
+  .vat-rates li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vat-rates-actions button {
+    flex: 1;
   }
 }
