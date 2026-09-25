@@ -60,7 +60,7 @@ function entryUrl(baseUrl: string, table: RestaurantTable): string {
   return `${menuUrl(baseUrl)}?table=${encodeURIComponent(table.table)}&k=${encodeURIComponent(table.token)}`;
 }
 
-/** One group of settings, as a card with its heading and one line of why. */
+/** Which settings cards the owner has folded, remembered on this device. */
 const FOLDS_KEY = "zy_admin_folded";
 
 function readFolded(): string[] {
@@ -107,6 +107,9 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
   </label>;
 }
 
+/** The places the owner fills, one per chosen tab (NAV_PINNED_MAX of them). */
+const NAV_PLACES = ["navFirst", "navSecond", "navThird"] as const;
+
 /**
  * The guest menu's tab order: the first three chosen here, the rest in their
  * usual order behind. A tab chosen for one place is greyed out in the others,
@@ -114,23 +117,27 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
  * that contradicts itself. The preview is the same function the menu uses
  * (orderNavTabs).
  */
-/** The places the owner fills, one per chosen tab (NAV_PINNED_MAX of them). */
-const NAV_PLACES = ["navFirst", "navSecond", "navThird"] as const;
-
 function NavOrder({ settings, products, onSave }: { settings: ApiSettings; products: Product[]; onSave: (navPinned: string[]) => void }) {
   const { t } = useI18n();
   const label = navLabel(settings, t);
-  const hasSets = products.some((product) => product.bundleItems?.length);
-  const categories = [...new Set(products.filter((product) => !product.bundleItems?.length).map((product) => product.category))];
+  // Only what a guest can see makes a tab: a draft or a dish marked
+  // unavailable is not on the menu, so neither is a category of nothing else.
+  const live = products.filter((product) => product.published && product.available);
+  const hasSets = live.some((product) => product.bundleItems?.length);
+  const categories = [...new Set(live.filter((product) => !product.bundleItems?.length).map((product) => product.category))];
   // In the menu's usual order, which is also the order the rest keep.
   const options = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
-  // A choice whose tab has since gone (an emptied category, a page switched off) is shown as unset.
+  // A choice whose tab has since gone (an emptied category, a page switched
+  // off) is shown as unset here, but kept behind the others while there is
+  // room: switched back on, the page takes its place again.
   const chosen = settings.navPinned.filter((tab) => options.includes(tab)).slice(0, NAV_PLACES.length);
+  const hidden = settings.navPinned.filter((tab) => !options.includes(tab));
   const places = NAV_PLACES.map((_, index) => chosen[index] ?? "");
   const choose = (position: number, value: string) => {
     const next = [...places];
     next[position] = value;
-    onSave(next.filter(Boolean));
+    const shown = next.filter(Boolean);
+    onSave([...shown, ...hidden.filter((tab) => !shown.includes(tab))].slice(0, NAV_PLACES.length));
   };
   return <div className="nav-order">
     <div className="nav-order-slots">{NAV_PLACES.map((name, position) => <label key={name}>
@@ -292,12 +299,12 @@ export function SettingsPanel(props: Props) {
         })}</div>
       </Section>
 
-      {/* The biggest card: across the page, what the page is on the left and
-          how it looks and what is on it on the right. */}
       <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t)).join(" · ") : t("navDefault")}>
         <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
       </Section>
 
+      {/* The biggest card: across the page, what the page is on the left and
+          how it looks and what is on it on the right. */}
       <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")} wide summary={settings.featuredEnabled
         ? [t("foldOn"), FEATURED_TEMPLATES.find((template) => template.id === settings.featuredTemplate)?.names[language], t("dishCount", { count: settings.featuredProductIds.length }), settings.featuredSchedule ? describeSchedule(settings.featuredSchedule, t, language) : ""].filter(Boolean).join(" · ")
         : t("foldOff")}>

@@ -539,7 +539,7 @@ export const APP_SETTINGS = {
   // rules are src/schedule.js. Outside them the page and its tab are gone.
   featuredSchedule: { key: "featured_schedule", fallback: () => null, normalize: normalizeSchedule },
   setsSchedule: { key: "sets_schedule", fallback: () => null, normalize: normalizeSchedule },
-  // Which tabs come second and third on the guest menu (packages/domain/src/navigation.ts).
+  // Which tabs come first, second and third on the guest menu (packages/domain/src/navigation.ts).
   navPinned: { key: "nav_pinned", fallback: () => [], normalize: normalizeNavPinned },
   featuredTemplate: {
     key: "featured_template",

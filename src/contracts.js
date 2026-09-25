@@ -143,7 +143,7 @@ export const SettingsBody = Type.Object({
   // The promotions and set menus pages' hours; null: always on.
   featuredSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
   setsSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
-  // The guest menu's second and third tabs; the set menus are always first.
+  // The guest menu's first three tabs, in order; the rest keep their usual order.
   navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 3 }))
 }, { minProperties: 1, additionalProperties: false });
 

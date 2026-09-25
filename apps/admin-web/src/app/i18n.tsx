@@ -136,7 +136,7 @@ const zh = {
   scheduleShowingNow: "现在显示中",
   scheduleHiddenNow: "现在已隐藏",
   timeZone: "时区",
-  timeZoneHint: "「今日套餐」和「套餐」页的显示时间段按这里的时间计算。",
+  timeZoneHint: "「活动页」和「套餐」页的显示时间段按这里的时间计算。",
   bundleEmpty: "没有找到可以加入的菜品",
   bundleNone: "还没有加入菜品。在下面搜索并点选，这个条目就成了套餐。",
   bundleSearch: "搜索菜名或编号，点一下加入",

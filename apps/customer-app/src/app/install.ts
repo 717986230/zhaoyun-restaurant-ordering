@@ -67,12 +67,18 @@ export function useInstall() {
     async install(): Promise<boolean> {
       const event = offer;
       if (!event) return false;
-      await event.prompt();
-      const { outcome } = await event.userChoice;
-      // The offer is spent either way; the browser makes a new one later.
-      offer = null;
-      changed();
-      return outcome === "accepted";
+      try {
+        await event.prompt();
+        const { outcome } = await event.userChoice;
+        return outcome === "accepted";
+      } catch {
+        // An offer already used, or one the browser withdrew: nothing to ask.
+        return false;
+      } finally {
+        // The offer is spent either way; the browser makes a new one later.
+        offer = null;
+        changed();
+      }
     }
   };
 }
