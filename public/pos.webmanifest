@@ -1,0 +1,17 @@
+{
+  "id": "./pos.html",
+  "name": "POS · 点餐收银 · Kassa",
+  "short_name": "POS",
+  "description": "点餐、送厨、结账 — Bestellen, Küche, Kassa — ordering, kitchen, payment",
+  "start_url": "./pos.html",
+  "scope": "./pos.html",
+  "display": "standalone",
+  "background_color": "#14201b",
+  "theme_color": "#14201b",
+  "icons": [
+    { "src": "icons/pos-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/pos-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/pos-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/pos.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

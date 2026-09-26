@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>POS</title>
     <meta name="theme-color" content="#14201b" />
-    <link rel="icon" type="image/svg+xml" href="/icons/menu.svg" />
+    <!-- Its own app on the home screen or the desktop, opening straight here —
+         not through the guest menu (public/pos.webmanifest). -->
+    <link rel="manifest" href="/pos.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/pos.svg" />
+    <link rel="apple-touch-icon" href="/icons/pos-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="POS" />
   </head>
   <body>
     <div id="posApp"></div>
