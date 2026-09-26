@@ -886,6 +886,143 @@ export function contractChecks(call, assert) {
       for (const product of [noodles, tea]) await call("DELETE", `/api/admin/products/${product.id}`, { admin: true });
     }],
 
+    ["the POS: paired devices, waiters' PINs, tables locked to the device that has them open, takeaway, moving a table, settlement", async () => {
+      // Only the manager pairs a device; its token is what lets waiters sign in on it.
+      assert.equal((await call("POST", "/api/admin/pos-devices", { role: "staff", body: { name: "Tablet A" } })).status, 403);
+      assert.equal((await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: " " } })).status, 400);
+      const pairA = await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Tablet A" } });
+      assert.equal(pairA.status, 201, JSON.stringify(pairA.json));
+      const deviceA = pairA.json.token;
+      const deviceB = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Phone B" } })).json.token;
+
+      // The waiters, with their PINs; no PIN ever comes back.
+      const hire = (body) => call("POST", "/api/admin/staff", { admin: true, body });
+      const li = (await hire({ name: "Li", pin: "1234" })).json.staff;
+      const wang = (await hire({ name: "Wang", role: "manager", pin: "987654" })).json.staff;
+      assert.deepEqual(li, { id: li.id, name: "Li", role: "staff", active: true });
+      assert.equal((await hire({ name: "Li", pin: "1111" })).status, 400, "one waiter per name");
+      assert.equal((await hire({ name: "Zhao", pin: "12" })).status, 400, "a PIN is 4 to 6 digits");
+      assert.equal((await hire({ name: "Zhao" })).status, 400, "a new waiter needs a PIN");
+      assert.equal((await hire({ name: "Zhao", role: "owner", pin: "1234" })).status, 400);
+
+      // A device that is not paired gets neither the names nor a sign-in.
+      assert.equal((await call("GET", "/api/pos/staff")).status, 401);
+      assert.equal((await call("POST", "/api/pos/sign-in", { body: { staffId: li.id, pin: "1234" } })).status, 401);
+      const listed = (await call("GET", "/api/pos/staff", { deviceToken: deviceA })).json.staff;
+      assert.deepEqual(listed.map((person) => person.name).filter((name) => ["Li", "Wang"].includes(name)).sort(), ["Li", "Wang"]);
+      assert.ok(listed.every((person) => !("pin_hash" in person) && !("pinHash" in person)));
+      assert.equal((await call("POST", "/api/pos/sign-in", { deviceToken: deviceA, body: { staffId: li.id, pin: "0000" } })).status, 401);
+      const liSession = (await call("POST", "/api/pos/sign-in", { deviceToken: deviceA, body: { staffId: li.id, pin: "1234" } })).json;
+      assert.ok(liSession.token);
+      assert.equal(liSession.staff.name, "Li");
+      const wangSession = (await call("POST", "/api/pos/sign-in", { deviceToken: deviceB, body: { staffId: wang.id, pin: "987654" } })).json;
+      const asLi = { token: liSession.token };
+      const asWang = { token: wangSession.token };
+
+      assert.equal((await call("GET", "/api/pos/floor", asLi)).status, 200);
+      assert.equal((await call("GET", "/api/pos/floor", { role: "staff" })).status, 403, "the POS is for a waiter signed in on a device");
+      assert.equal((await call("GET", "/api/admin/products", asLi)).status, 403, "a waiter's PIN is not the manager's console");
+
+      // Li opens table P1: it is Li's device's until Li closes it or leaves it alone.
+      const claim = await call("POST", "/api/pos/tables/p1/claim", asLi);
+      assert.equal(claim.status, 200, JSON.stringify(claim.json));
+      assert.equal(claim.json.claim.staffName, "Li");
+      const refused = await call("POST", "/api/pos/tables/P1/claim", asWang);
+      assert.equal(refused.status, 409);
+      assert.match(refused.json.error, /Li/);
+      assert.ok((await call("GET", "/api/pos/floor", asWang)).json.claims.some((entry) => entry.table === "P1" && entry.staffName === "Li"));
+
+      // Li orders on it; the ticket says who. Wang cannot add to it meanwhile.
+      const dishes = (await call("GET", "/api/catalog")).json.products.filter((product) => !product.bundleItems?.length);
+      const [food] = dishes.filter((product) => product.kind === "food");
+      const [drink] = dishes.filter((product) => product.kind === "drink");
+      const posOrder = (auth, table, clientRequestId, items) => call("POST", "/api/pos/orders", { ...auth, body: { clientRequestId, table, note: "", items } });
+      const ordered = await posOrder(asLi, "P1", "contract-pos-1", [{ id: food.id, qty: 2 }, { id: drink.id, qty: 1 }]);
+      assert.equal(ordered.status, 201, JSON.stringify(ordered.json));
+      const jobs = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.filter((job) => job.orderId === ordered.json.order.id);
+      assert.ok(jobs.length && jobs.every((job) => job.payload.staffName === "Li"), "the kitchen ticket names the waiter");
+      assert.equal((await posOrder(asWang, "P1", "contract-pos-2", [{ id: food.id, qty: 1 }])).status, 409);
+
+      // Closed on Li's device, it is anyone's.
+      assert.equal((await call("DELETE", "/api/pos/tables/P1/claim", asLi)).status, 204);
+      assert.equal((await call("POST", "/api/pos/tables/P1/claim", asWang)).status, 200);
+
+      // Wang takes payment for the food with 10% off; Li cannot pay it from the other device.
+      const bill = (await call("GET", "/api/admin/tables/P1/bill", asWang)).json.bill;
+      const foodLine = bill.items.find((item) => item.name === ordered.json.order.items[0].name);
+      assert.equal((await call("POST", "/api/admin/checkout", { ...asLi, body: { table: "P1", items: [{ orderItemId: foodLine.orderItemId, quantity: 2 }], payments: [{ type: "cash", amount: 1 }] } })).status, 409);
+      const foodCents = Math.round(food.price * 100) * 2;
+      const off = Math.round(foodCents * 10 / 100);
+      const paid = await call("POST", "/api/admin/checkout", {
+        ...asWang, body: { table: "P1", items: [{ orderItemId: foodLine.orderItemId, quantity: 2 }], discountPercent: 10, payments: [{ type: "card", amount: (foodCents - off) / 100 }] }
+      });
+      assert.equal(paid.status, 201, JSON.stringify(paid.json));
+      assert.equal(paid.json.receipt.staffName, "Wang");
+      assert.equal(paid.json.receipt.totalCents, foodCents - off);
+      const discount = paid.json.receipt.lines.find((line) => line.kind === "discount");
+      assert.equal(discount.totalCents, -off);
+      assert.deepEqual(paid.json.receipt.vat.map((group) => group.grossCents), [foodCents - off], "the discount comes off the rate it applies to");
+      assert.equal(paid.json.receipt.lines[0].names.de, food.names.de, "the receipt keeps the German name for the front printer");
+      assert.equal((await call("POST", "/api/admin/checkout", { ...asWang, body: { items: [], discountPercent: 150, vouchers: [{ amount: 5 }], payments: [{ type: "cash", amount: 5 }] } })).status, 400);
+
+      // The guests move to P2; their drink goes with them.
+      assert.equal((await call("POST", "/api/pos/tables/P1/move", { ...asWang, body: { to: "P1" } })).status, 400);
+      const moved = await call("POST", "/api/pos/tables/P1/move", { ...asWang, body: { to: "P2" } });
+      assert.equal(moved.status, 200, JSON.stringify(moved.json));
+      assert.deepEqual(moved.json, { from: "P1", to: "P2", moved: 1 });
+      const p2 = (await call("GET", "/api/admin/tables/P2/bill", asWang)).json.bill;
+      assert.equal(p2.items.length, 1);
+      assert.equal((await call("POST", "/api/pos/tables/P1/move", { ...asWang, body: { to: "P3" } })).status, 404, "nothing left on P1");
+
+      // Takeaway: the next pickup number, as a table of its own; the ticket carries it.
+      const takeaway = await call("POST", "/api/pos/takeaway", asLi);
+      assert.equal(takeaway.status, 201, JSON.stringify(takeaway.json));
+      assert.equal(takeaway.json.table, `TA-${takeaway.json.pickupNo}`);
+      const second = (await call("POST", "/api/pos/takeaway", asWang)).json;
+      assert.equal(second.pickupNo, takeaway.json.pickupNo + 1, "a number another device has open is taken");
+      const togo = await posOrder(asLi, takeaway.json.table, "contract-pos-togo", [{ id: food.id, qty: 1 }]);
+      assert.equal(togo.status, 201, JSON.stringify(togo.json));
+      const togoJob = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.find((job) => job.orderId === togo.json.order.id);
+      assert.equal(togoJob.payload.pickupNo, takeaway.json.pickupNo);
+      const togoBill = (await call("GET", `/api/admin/tables/${takeaway.json.table}/bill`, asLi)).json.bill;
+      const liPaid = await call("POST", "/api/admin/checkout", {
+        ...asLi, body: { table: takeaway.json.table, items: togoBill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: togoBill.total, tendered: togoBill.total + 5 }] }
+      });
+      assert.equal(liPaid.status, 201, JSON.stringify(liPaid.json));
+
+      // Settlement: Li hands in the cash Li took; Wang's is Wang's.
+      const preview = (await call("GET", "/api/pos/settlement", asLi)).json.totals;
+      assert.equal(preview.receipts, 1);
+      assert.equal(preview.payments.cash, Math.round(togoBill.total * 100));
+      assert.equal((await call("GET", `/api/pos/settlement?staffId=${wang.id}`, asLi)).status, 403, "only the manager looks at another waiter's");
+      const settled = await call("POST", "/api/pos/settlement", { ...asLi, body: {} });
+      assert.equal(settled.status, 201, JSON.stringify(settled.json));
+      assert.equal(settled.json.settlement.staffName, "Li");
+      assert.equal((await call("POST", "/api/pos/settlement", { ...asLi, body: {} })).status, 409, "nothing since");
+      assert.equal((await call("POST", "/api/pos/settlement", { ...asWang, body: { staffId: li.id } })).status, 409, "the manager may, but there is nothing");
+      assert.equal((await call("POST", "/api/pos/settlement", { ...asWang, body: {} })).status, 201);
+      assert.ok((await call("GET", "/api/pos/settlements", asWang)).json.settlements.some((entry) => entry.staffName === "Li"));
+
+      // In the journal: who moved what, who settled.
+      const today = new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+      const kinds = (await call("GET", `/api/admin/journal?from=${today}&to=${tomorrow}`, { admin: true })).json.entries.map((entry) => entry.kind);
+      for (const kind of ["table.moved", "staff.settled"]) assert.ok(kinds.includes(kind), kind);
+
+      // A waiter switched off is signed out at once.
+      assert.equal((await call("PUT", `/api/admin/staff/${li.id}`, { admin: true, body: { active: false } })).status, 200);
+      assert.equal((await call("GET", "/api/pos/floor", asLi)).status, 401);
+
+      // Leave the room as it was found.
+      for (const table of ["P1", "P2", takeaway.json.table, second.table]) await call("DELETE", `/api/pos/tables/${table}/claim?force=1`, asWang);
+      const p2Left = (await call("GET", "/api/admin/tables/P2/bill", asWang)).json.bill;
+      await call("POST", "/api/admin/checkout", { ...asWang, body: { table: "P2", items: p2Left.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "card", amount: p2Left.total }] } });
+      await call("PUT", `/api/admin/staff/${wang.id}`, { admin: true, body: { active: false } });
+      for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) {
+        assert.equal((await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true })).status, 204);
+      }
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

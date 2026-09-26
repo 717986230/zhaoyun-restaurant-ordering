@@ -24,11 +24,15 @@ import {
   verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent
 } from "../shared/rules.mjs";
 import {
-  CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
+  CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
   ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, receiptPrintPayload,
   receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
 } from "../shared/register.mjs";
+import {
+  assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+} from "../shared/pos.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
 // console with no password costs the same PBKDF2 work as one with.
@@ -251,17 +255,17 @@ export function createStore(db) {
     return billView(tableNo, orders, itemsByOrderId, productsById);
   }
 
-  async function createOrder(input) {
+  async function createOrder(input, pos = null) {
     const requestId = String(input.clientRequestId || "");
     if (requestId) {
       const existing = await first("SELECT * FROM orders WHERE client_request_id = ?", requestId);
       if (existing) return viewOrder(existing);
     }
 
-    return retrying(() => writeOrder(input));
+    return retrying(() => writeOrder(input, pos));
   }
 
-  async function writeOrder(input) {
+  async function writeOrder(input, pos) {
     const last = await lastJournal();
     const ids = [...new Set(orderProductIds(input))];
     const products = new Map();
@@ -272,14 +276,18 @@ export function createStore(db) {
     const parts = bundleComponentIds(products.values()).filter((partId) => !products.has(partId));
     if (parts.length) for (const row of await selectByIds("SELECT * FROM products WHERE id IN (?)", parts)) products.set(String(row.id), row);
     const { timeZone, setsSchedule } = await getSettings();
-    const plan = planOrder(input, products, { timeZone, setsSchedule });
+    const pickupNo = pos && isTakeaway(input.table) ? Number(String(input.table).slice(TAKEAWAY_PREFIX.length)) || null : null;
+    const plan = planOrder(input, products, { timeZone, setsSchedule }, { staffName: pos?.staff?.name, pickupNo });
     const { id, orderNo, clientRequestId, table, note, totalCents, timestamp } = plan.order;
 
     // A locked table is one whose bill is being settled. Refusing here is the
     // whole point of the lock: an order that lands mid-settle is either missing
     // from the bill the guest just paid or reopens a table that was released.
     const tableRow = await first("SELECT locked_at FROM restaurant_tables WHERE table_no = ?", String(table).toUpperCase());
-    if (tableRow?.locked_at) {
+    // The lock is against guests adding to a bill being paid; the floor staff
+    // who set it may still add to it. Another device's open table is theirs.
+    if (pos) assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(table).toUpperCase()), pos.deviceId);
+    if (tableRow?.locked_at && !pos) {
       const error = new Error("This table is locked; please ask a waiter");
       error.code = "TABLE_LOCKED";
       throw error;
@@ -298,7 +306,9 @@ export function createStore(db) {
         .bind(item.id, item.vatSplitJson)),
       ...plan.printJobs.map((job) => db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)")
         .bind(job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp)),
-      await journalStatement(last, "order.created", id, orderJournalPayload(plan), timestamp)
+      ...(pos ? [db.prepare("INSERT INTO order_staff (order_id, staff_id, staff_name, pickup_no, created_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp)] : []),
+      await journalStatement(last, "order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}) }, timestamp)
     ];
 
     try {
@@ -340,7 +350,7 @@ export function createStore(db) {
     .bind(uuid(), JSON.stringify(payload), at, at);
 
   /** A sale at the register (planCheckout): the receipt, and the table freed once it is all paid. */
-  async function checkout(input, role) {
+  async function checkout(input, role, pos = null) {
     const requestId = String(input.clientRequestId || uuid());
     const existing = await first("SELECT * FROM receipts WHERE client_request_id = ?", requestId);
     if (existing) return receiptDetail(existing);
@@ -350,9 +360,12 @@ export function createStore(db) {
       const itemRows = ids.length ? await selectByIds(CHECKOUT_ITEMS_SQL, ids) : [];
       const codes = [...new Set((Array.isArray(input.payments) ? input.payments : []).filter((payment) => payment.type === "voucher").map((payment) => normalizeVoucherCode(payment.voucherCode)))];
       const voucherRows = codes.length ? await selectByIds("SELECT * FROM vouchers WHERE code IN (?)", codes) : [];
+      // Another device's open table is theirs to pay, before anything else is looked at.
+      const openTable = input.table || itemRows[0]?.table_no;
+      if (pos && openTable) assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(openTable).toUpperCase()), pos.deviceId);
       const settings = await getSettings();
       const plan = planCheckout({ ...input, clientRequestId: requestId }, {
-        itemRows, voucherRows, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1, settings, role
+        itemRows, voucherRows, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1, settings, role, staff: pos?.staff ?? null
       });
       const at = plan.receipt.createdAt;
       const view = plannedReceiptView(plan.receipt);
@@ -381,7 +394,7 @@ export function createStore(db) {
   }
 
   /** Cancels a receipt with a storno receipt (planStorno). Null when there is no such receipt. */
-  async function stornoReceipt(id, reason, role) {
+  async function stornoReceipt(id, reason, role, pos = null) {
     return retrying(async () => {
       const last = await lastJournal();
       const original = await first("SELECT * FROM receipts WHERE id = ?", String(id));
@@ -392,7 +405,8 @@ export function createStore(db) {
         receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1,
         reason,
         soldVoucherRows: await all("SELECT * FROM vouchers WHERE sold_receipt_id = ?", original.id),
-        role
+        role,
+        staff: pos?.staff ?? null
       });
       const at = plan.receipt.createdAt;
       const view = plannedReceiptView(plan.receipt, original.receipt_no);
@@ -533,12 +547,142 @@ export function createStore(db) {
   async function roleForSession(token) {
     if (!token) return null;
     const row = await first("SELECT * FROM admin_sessions WHERE token_hash = ?", await hashSessionToken(token));
-    if (!row) return null;
+    // Not the console's: a waiter signed in on a POS device, perhaps.
+    if (!row) return posSession(token);
     if (row.expires_at <= now()) {
       await run("DELETE FROM admin_sessions WHERE token_hash = ?", row.token_hash);
       return null;
     }
     return { role: "manager" };
+  }
+
+  // ——— The POS (shared/pos.mjs): devices, waiters, open tables, takeaway, settlement.
+
+  async function pairDevice(nameInput) {
+    const name = normalizeDeviceName(nameInput);
+    const token = newSessionToken();
+    const id = uuid();
+    await run("INSERT INTO pos_devices (id, name, token_hash, created_at, last_seen_at) VALUES (?, ?, ?, ?, NULL)", id, name, await hashSessionToken(token), now());
+    return { device: deviceView(await first("SELECT * FROM pos_devices WHERE id = ?", id)), token };
+  }
+
+  async function deviceForToken(token) {
+    if (!token) return null;
+    const row = await first("SELECT * FROM pos_devices WHERE token_hash = ?", await hashSessionToken(token));
+    if (row) await run("UPDATE pos_devices SET last_seen_at = ? WHERE id = ?", now(), row.id);
+    return row ?? null;
+  }
+
+  async function saveStaff(input, id = null) {
+    const current = id ? await first("SELECT * FROM staff WHERE id = ?", String(id)) : null;
+    if (id && !current) return null;
+    const staff = normalizeStaffInput(input, current);
+    const at = now();
+    try {
+      if (current) {
+        const pin = staff.pin ? await hashPassword(staff.pin) : null;
+        await db.batch([
+          db.prepare("UPDATE staff SET name = ?, role = ?, active = ?, updated_at = ? WHERE id = ?").bind(staff.name, staff.role, staff.active ? 1 : 0, at, current.id),
+          ...(pin ? [db.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ?, pin_iterations = ?, updated_at = ? WHERE id = ?").bind(pin.hash, pin.salt, pin.iterations, at, current.id)] : []),
+          // A waiter switched off, or given a new PIN, is signed out everywhere.
+          ...(!staff.active || pin ? [db.prepare("DELETE FROM pos_sessions WHERE staff_id = ?").bind(current.id)] : [])
+        ]);
+        return staffView(await first("SELECT * FROM staff WHERE id = ?", current.id));
+      }
+      const { hash, salt, iterations } = await hashPassword(staff.pin);
+      const newId = uuid();
+      await run("INSERT INTO staff (id, name, role, pin_hash, pin_salt, pin_iterations, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        newId, staff.name, staff.role, hash, salt, iterations, staff.active ? 1 : 0, at, at);
+      return staffView(await first("SELECT * FROM staff WHERE id = ?", newId));
+    } catch (error) {
+      if (/UNIQUE constraint failed: staff\.name/.test(String(error?.message))) throw new Error("There is already a waiter of that name");
+      throw error;
+    }
+  }
+
+  async function posSignIn(device, staffId, pin) {
+    const row = await first("SELECT * FROM staff WHERE id = ?", String(staffId ?? ""));
+    const stored = row ? { hash: row.pin_hash, salt: row.pin_salt, iterations: row.pin_iterations } : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(pin ?? ""), stored);
+    if (!row || !row.active || !correct) return null;
+    const token = newSessionToken();
+    await run("INSERT INTO pos_sessions (token_hash, staff_id, device_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+      await hashSessionToken(token), row.id, device.id, new Date(Date.now() + POS_SESSION_TTL_MS).toISOString(), now());
+    return { token, staff: staffView(row), expiresInMs: POS_SESSION_TTL_MS };
+  }
+
+  async function posSession(token) {
+    const row = await first(
+      "SELECT pos_sessions.*, staff.name AS staff_name, staff.role AS staff_role, staff.active AS staff_active FROM pos_sessions JOIN staff ON staff.id = pos_sessions.staff_id WHERE token_hash = ?",
+      await hashSessionToken(token)
+    );
+    if (!row) return null;
+    if (row.expires_at <= now() || !row.staff_active) {
+      await run("DELETE FROM pos_sessions WHERE token_hash = ?", row.token_hash);
+      return null;
+    }
+    return { role: row.staff_role === "manager" ? "manager" : "staff", staff: { id: row.staff_id, name: row.staff_name }, deviceId: row.device_id };
+  }
+
+  async function claimTable(tableInput, pos) {
+    const table = String(tableInput).trim().toUpperCase();
+    const at = now();
+    await run(CLAIM_UPSERT_SQL, table, pos.deviceId, pos.staff?.id ?? null, pos.staff?.name ?? null, new Date(Date.now() + CLAIM_TTL_MS).toISOString(), at);
+    const row = await first("SELECT * FROM table_claims WHERE table_no = ?", table);
+    assertClaim(row, pos.deviceId, at);
+    return claimView(row, at);
+  }
+
+  async function newTakeaway(pos) {
+    const since = `${now().slice(0, 10)}T00:00:00.000Z`;
+    let next = (await first(NEXT_PICKUP_SQL, since))?.next ?? 1;
+    for (;; next += 1) {
+      try {
+        return { table: `${TAKEAWAY_PREFIX}${next}`, pickupNo: next, claim: await claimTable(`${TAKEAWAY_PREFIX}${next}`, pos) };
+      } catch (error) {
+        if (error.code !== "TABLE_CLAIMED") throw error;
+      }
+    }
+  }
+
+  async function moveTable(fromInput, toInput, pos) {
+    const from = normalizeTableNo(fromInput);
+    const to = normalizeTableNo(toInput);
+    if (from === to) throw new Error("That is the same table");
+    return retrying(async () => {
+      const last = await lastJournal();
+      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", from), pos.deviceId);
+      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", to), pos.deviceId);
+      const open = (await first("SELECT COUNT(*) AS n FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", from))?.n ?? 0;
+      if (!open) return null;
+      const at = now();
+      await db.batch([
+        db.prepare("UPDATE orders SET table_no = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'").bind(to, at, from),
+        db.prepare("DELETE FROM table_claims WHERE table_no = ? AND device_id = ?").bind(from, pos.deviceId),
+        await journalStatement(last, "table.moved", from, { from, to, orders: open, staffName: pos.staff?.name ?? null }, at)
+      ]);
+      return { from, to, moved: open };
+    });
+  }
+
+  async function settleStaff(staffId, role) {
+    return retrying(async () => {
+      const last = await lastJournal();
+      const staff = await first("SELECT * FROM staff WHERE id = ?", String(staffId));
+      const rows = staff ? await all(OPEN_STAFF_RECEIPTS_SQL, staff.id, staff.id) : [];
+      if (!rows.length) return null;
+      const totals = settlementTotals(rows);
+      const id = uuid();
+      const at = now();
+      const view = settlementView({ id, staff_id: staff.id, staff_name: staff.name, totals_json: JSON.stringify(totals), created_at: at });
+      await db.batch([
+        db.prepare("INSERT INTO staff_settlements (id, staff_id, staff_name, last_receipt_no, totals_json, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+          .bind(id, staff.id, staff.name, totals.lastReceiptNo, JSON.stringify(totals), at),
+        printStatement({ kind: "settlement", company: companyOf(await getSettings()), settlement: view }, at),
+        await journalStatement(last, "staff.settled", id, { ...view, by: role }, at)
+      ]);
+      return settlementView(await first("SELECT * FROM staff_settlements WHERE id = ?", id));
+    });
   }
 
   async function signOut(token) {
@@ -605,6 +749,23 @@ export function createStore(db) {
     signIn,
     signOut,
     roleForSession,
+    pairDevice,
+    deviceForToken,
+    listDevices: async () => (await all("SELECT * FROM pos_devices ORDER BY created_at")).map(deviceView),
+    deleteDevice: async (id) => (await run("DELETE FROM pos_devices WHERE id = ?", String(id))) > 0,
+    listStaff: async (activeOnly = false) => (await all("SELECT * FROM staff ORDER BY active DESC, name")).filter((row) => !activeOnly || row.active).map(staffView),
+    saveStaff,
+    posSignIn,
+    posSignOut: async (token) => (token ? (await run("DELETE FROM pos_sessions WHERE token_hash = ?", await hashSessionToken(token))) > 0 : false),
+    claimTable,
+    releaseTable: async (table, pos, force = false) =>
+      (await run("DELETE FROM table_claims WHERE table_no = ? AND (device_id = ? OR ? = 1)", String(table).trim().toUpperCase(), pos.deviceId, force ? 1 : 0)) > 0,
+    liveClaims: async () => (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row)),
+    newTakeaway,
+    moveTable,
+    settleStaff,
+    staffSettlementPreview: async (staffId) => settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, String(staffId), String(staffId))),
+    listSettlements: async (limit = 30) => (await all("SELECT * FROM staff_settlements ORDER BY created_at DESC LIMIT ?", Math.min(Number(limit) || 30, 200))).map(settlementView),
     listPrintJobs: async (status = "queued", limit = 100) =>
       (await all("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?", String(status), boundedLimit(limit)))
         .map(printJobView),

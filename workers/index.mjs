@@ -17,7 +17,7 @@
 import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import {
-  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
+  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SetPasswordBody, SettingsBody, SignInBody, TableBody, TableLockBody
 } from "../src/contracts.js";
 import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
@@ -191,6 +191,8 @@ async function requireRole(request, env, store, minimumRole) {
     return { denied: json({ error: "Admin authentication required" }, 401) };
   }
   throttle.pass();
+  // A waiter's session carries who they are and which device they are on.
+  const pos = session?.staff ? { staff: session.staff, deviceId: session.deviceId } : null;
   if (!roleAllows(role, minimumRole)) {
     // A valid token used beyond its role is worth recording, not just refusing.
     const url = new URL(request.url);
@@ -200,7 +202,7 @@ async function requireRole(request, env, store, minimumRole) {
     });
     return { denied: json({ error: `This role may not perform ${minimumRole} actions` }, 403) };
   }
-  return { role };
+  return { role, pos };
 }
 
 /**
@@ -309,6 +311,82 @@ async function handle(request, env) {
         return fail(error.message);
       }
     }
+  }
+
+  // ——— The POS (shared/pos.mjs). A paired device lists the waiters and takes
+  // a PIN; a waiter's session does the rest.
+  if (path[0] === "api" && path[1] === "pos") {
+    const pairedDevice = async () => store.deviceForToken(request.headers.get("x-device-token"));
+    if (path.length === 3 && path[2] === "staff" && method === "GET") {
+      if (!(await pairedDevice())) return fail("This device is not paired with the POS", 401);
+      return json({ staff: (await store.listStaff(true)).map(({ id, name, role }) => ({ id, name, role })) });
+    }
+    if (path.length === 3 && path[2] === "sign-in" && method === "POST") {
+      const throttle = authThrottle(request);
+      if (throttle.denied) return throttle.denied;
+      const device = await pairedDevice();
+      if (!device) return fail("This device is not paired with the POS", 401);
+      const { value, invalid } = await body(request, PosSignInBody);
+      if (invalid) return invalid;
+      const session = await store.posSignIn(device, value.staffId, value.pin);
+      if (!session) {
+        throttle.fail();
+        return fail("Wrong PIN", 401);
+      }
+      throttle.pass();
+      return json(session);
+    }
+    if (path.length === 3 && path[2] === "sign-out" && method === "POST") {
+      await store.posSignOut(request.headers.get("x-admin-token"));
+      return new Response(null, { status: 204 });
+    }
+    if (path.length === 3 && path[2] === "settlements" && method === "GET") {
+      const { denied } = await gate("manager");
+      if (denied) return denied;
+      return json({ settlements: await store.listSettlements(limit) });
+    }
+
+    const { denied, role, pos } = await gate("staff");
+    if (denied) return denied;
+    if (!pos) return fail("Sign in on a POS device", 403);
+    const claimed = (error) => fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400);
+    try {
+      if (path.length === 3 && path[2] === "floor" && method === "GET") {
+        return json({ tables: await store.tablesOverview(), claims: await store.liveClaims() });
+      }
+      if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
+        if (method === "POST") return json({ claim: await store.claimTable(path[3], pos) });
+        if (method === "DELETE") {
+          await store.releaseTable(path[3], pos, role === "manager" && url.searchParams.get("force") === "1");
+          return new Response(null, { status: 204 });
+        }
+      }
+      if (path.length === 3 && path[2] === "orders" && method === "POST") {
+        const { value, invalid } = await body(request, CreateOrderBody);
+        if (invalid) return invalid;
+        return json({ order: await store.createOrder(value, pos) }, 201);
+      }
+      if (path.length === 3 && path[2] === "takeaway" && method === "POST") return json(await store.newTakeaway(pos), 201);
+      if (path.length === 5 && path[2] === "tables" && path[4] === "move" && method === "POST") {
+        const { value, invalid } = await body(request, MoveTableBody);
+        if (invalid) return invalid;
+        const moved = await store.moveTable(path[3], value.to, pos);
+        return moved ? json(moved) : fail("Nothing open on that table", 404);
+      }
+      if (path.length === 3 && path[2] === "settlement") {
+        const { value } = method === "POST" ? await body(request, SettlementBody) : { value: {} };
+        const staffId = value?.staffId ?? url.searchParams.get("staffId") ?? pos.staff.id;
+        if (staffId !== pos.staff.id && role !== "manager") return fail("Only the manager settles another waiter", 403);
+        if (method === "GET") return json({ totals: await store.staffSettlementPreview(staffId) });
+        if (method === "POST") {
+          const settlement = await store.settleStaff(staffId, role);
+          return settlement ? json({ settlement }, 201) : fail("No receipts since the last settlement", 409);
+        }
+      }
+    } catch (error) {
+      return claimed(error);
+    }
+    return fail("Not found", 404);
   }
 
   if (path[0] === "api" && path[1] === "admin") {
@@ -421,14 +499,14 @@ async function handle(request, env) {
 
     // The register (shared/register.mjs): a sale, the receipts, vouchers.
     if (path.length === 3 && path[2] === "checkout" && method === "POST") {
-      const { denied, role } = await gate("staff");
+      const { denied, role, pos } = await gate("staff");
       if (denied) return denied;
       try {
         const { value, invalid } = await body(request, CheckoutBody);
         if (invalid) return invalid;
-        return json({ receipt: await store.checkout(value, role) }, 201);
+        return json({ receipt: await store.checkout(value, role, pos) }, 201);
       } catch (error) {
-        return fail(error.message);
+        return fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400);
       }
     }
     if (path[2] === "receipts" && method === "GET" && path.length <= 4) {
@@ -470,7 +548,7 @@ async function handle(request, env) {
       }
     }
 
-    const { denied, role } = await gate("manager");
+    const { denied, role, pos } = await gate("manager");
     if (denied) return denied;
 
     // A storno, the day's closing and the journal are the manager's.
@@ -478,7 +556,7 @@ async function handle(request, env) {
       try {
         const { value, invalid } = await body(request, StornoBody);
         if (invalid) return invalid;
-        const receipt = await store.stornoReceipt(path[3], value.reason, role);
+        const receipt = await store.stornoReceipt(path[3], value.reason, role, pos);
         return receipt ? json({ receipt }, 201) : fail("Receipt not found", 404);
       } catch (error) {
         return fail(error.message, /already been cancelled/.test(error.message) ? 409 : 400);
@@ -497,6 +575,35 @@ async function handle(request, env) {
       const to = url.searchParams.get("to") ?? "";
       if (![from, to].every((day) => /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)?$/.test(day))) return fail("from and to are dates (YYYY-MM-DD) or ISO times");
       return json(await store.exportJournal(from, to));
+    }
+
+    // The waiters and the devices the POS runs on.
+    if (path[2] === "staff") {
+      try {
+        if (path.length === 3 && method === "GET") return json({ staff: await store.listStaff() });
+        const { value, invalid } = await body(request, StaffBody);
+        if (invalid) return invalid;
+        if (path.length === 3 && method === "POST") return json({ staff: await store.saveStaff(value) }, 201);
+        if (path.length === 4 && method === "PUT") {
+          const staff = await store.saveStaff(value, path[3]);
+          return staff ? json({ staff }) : fail("Waiter not found", 404);
+        }
+      } catch (error) {
+        return fail(error.message);
+      }
+    }
+    if (path[2] === "pos-devices") {
+      try {
+        if (path.length === 3 && method === "GET") return json({ devices: await store.listDevices() });
+        if (path.length === 3 && method === "POST") {
+          const { value, invalid } = await body(request, DeviceBody);
+          if (invalid) return invalid;
+          return json(await store.pairDevice(value.name), 201);
+        }
+        if (path.length === 4 && method === "DELETE") return (await store.deleteDevice(path[3])) ? new Response(null, { status: 204 }) : fail("Device not found", 404);
+      } catch (error) {
+        return fail(error.message);
+      }
     }
 
     // /api/admin/audit

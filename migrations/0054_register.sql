@@ -10,6 +10,13 @@
 -- - day_closings: the day's closing (Z report) over a run of receipt numbers.
 -- - journal: every business event in order, each entry chained to the one
 --   before by its hash, so a change anywhere shows (the DEP 131 record).
+--
+-- The POS (shared/pos.mjs):
+-- - pos_devices: the tablets and phones the manager paired.
+-- - staff, pos_sessions: the waiters, their PINs (PBKDF2), their sign-ins.
+-- - table_claims: which device has a table open (the table lock).
+-- - order_staff: who ordered an order on the POS, and a takeaway's number.
+-- - staff_settlements: each waiter's settlement at the end of a shift.
 
 CREATE TABLE IF NOT EXISTS receipts (
       id TEXT PRIMARY KEY,
@@ -27,7 +34,9 @@ CREATE TABLE IF NOT EXISTS receipts (
       staff_role TEXT NOT NULL,
       fiscal_status TEXT NOT NULL DEFAULT 'unsigned',
       fiscal_json TEXT,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT
     );
 
 CREATE TABLE IF NOT EXISTS receipt_items (
@@ -54,6 +63,59 @@ CREATE TABLE IF NOT EXISTS day_closings (
       last_receipt_no INTEGER NOT NULL UNIQUE,
       totals_json TEXT NOT NULL,
       staff_role TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+CREATE TABLE IF NOT EXISTS pos_devices (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      last_seen_at TEXT
+    );
+
+CREATE TABLE IF NOT EXISTS staff (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL CHECK (role IN ('staff','manager')),
+      pin_hash TEXT NOT NULL,
+      pin_salt TEXT NOT NULL,
+      pin_iterations INTEGER NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+CREATE TABLE IF NOT EXISTS pos_sessions (
+      token_hash TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      device_id TEXT NOT NULL REFERENCES pos_devices(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+CREATE TABLE IF NOT EXISTS table_claims (
+      table_no TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT,
+      expires_at TEXT NOT NULL
+    );
+
+CREATE TABLE IF NOT EXISTS order_staff (
+      order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      staff_id TEXT,
+      staff_name TEXT,
+      pickup_no INTEGER,
+      created_at TEXT NOT NULL
+    );
+
+CREATE TABLE IF NOT EXISTS staff_settlements (
+      id TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL,
+      staff_name TEXT NOT NULL,
+      last_receipt_no INTEGER NOT NULL,
+      totals_json TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
 

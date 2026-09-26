@@ -185,6 +185,7 @@ export const CheckoutBody = Type.Object({
     quantity: Type.Integer({ minimum: 1, maximum: 99 })
   }), { maxItems: 200 })),
   vouchers: Type.Optional(Type.Array(Type.Object({ amount: Type.Number() }), { maxItems: 10 })),
+  discountPercent: Type.Optional(Type.Number()),
   payments: Type.Array(Type.Object({
     type: Type.String({ maxLength: 16 }),
     amount: Type.Number(),
@@ -192,6 +193,19 @@ export const CheckoutBody = Type.Object({
     voucherCode: Type.Optional(Type.String({ maxLength: 32 }))
   }), { minItems: 1, maxItems: 10 })
 }, { additionalProperties: false });
+
+// The POS (shared/pos.mjs). The rules on names, roles and PINs are the
+// shared module's, so both backends refuse the same way; the wire bounds sizes.
+export const StaffBody = Type.Object({
+  name: Type.Optional(Type.String({ maxLength: 64 })),
+  role: Type.Optional(Type.String({ maxLength: 16 })),
+  pin: Type.Optional(Type.String({ maxLength: 12 })),
+  active: Type.Optional(Type.Boolean())
+}, { additionalProperties: false });
+export const DeviceBody = Type.Object({ name: Type.String({ maxLength: 64 }) }, { additionalProperties: false });
+export const PosSignInBody = Type.Object({ staffId: Type.String({ minLength: 1, maxLength: 64 }), pin: Type.String({ maxLength: 12 }) }, { additionalProperties: false });
+export const MoveTableBody = Type.Object({ to: Type.String({ minLength: 1, maxLength: 8 }) }, { additionalProperties: false });
+export const SettlementBody = Type.Object({ staffId: Type.Optional(Type.String({ maxLength: 64 })) }, { additionalProperties: false });
 
 // A storno always says why.
 export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false });

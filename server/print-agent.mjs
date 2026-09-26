@@ -17,7 +17,8 @@ const labels = {
     kitchen: "后厨单 · 不是收据",
     unsigned: "测试小票 · 未签名（RKSV）", receipt: "小票", register: "收银机", storno: "冲销", stornoOf: "冲销小票 {no}",
     sum: "合计", cash: "现金", card: "银行卡", voucher: "代金券", tendered: "收", change: "找零", gross: "含税",
-    voucherCode: "代金券码", closing: "日结", sales: "销售", stornos: "冲销", receipts: "小票", vouchersSold: "售出代金券", uid: "UID"
+    voucherCode: "代金券码", closing: "日结", sales: "销售", stornos: "冲销", receipts: "小票", vouchersSold: "售出代金券", uid: "UID",
+    waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣"
   },
   de: {
     title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz",
@@ -26,7 +27,8 @@ const labels = {
     kitchen: "KÜCHENBON – KEIN BELEG",
     unsigned: "TESTBELEG – NICHT SIGNIERT", receipt: "Beleg", register: "Kasse", storno: "STORNO", stornoOf: "Storno zu Beleg {no}",
     sum: "SUMME", cash: "Bar", card: "Karte", voucher: "Gutschein", tendered: "gegeben", change: "Rückgeld", gross: "Brutto",
-    voucherCode: "Gutschein-Code", closing: "TAGESABSCHLUSS", sales: "Verkäufe", stornos: "Stornos", receipts: "Belege", vouchersSold: "Gutscheine verkauft", uid: "UID"
+    voucherCode: "Gutschein-Code", closing: "TAGESABSCHLUSS", sales: "Verkäufe", stornos: "Stornos", receipts: "Belege", vouchersSold: "Gutscheine verkauft", uid: "UID",
+    waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt"
   },
   en: {
     title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note",
@@ -35,7 +37,8 @@ const labels = {
     kitchen: "Kitchen ticket – not a receipt",
     unsigned: "TEST RECEIPT – NOT SIGNED", receipt: "Receipt", register: "Register", storno: "CANCELLATION", stornoOf: "Cancels receipt {no}",
     sum: "TOTAL", cash: "Cash", card: "Card", voucher: "Voucher", tendered: "given", change: "change", gross: "Gross",
-    voucherCode: "Voucher code", closing: "DAY CLOSING", sales: "sales", stornos: "cancellations", receipts: "Receipts", vouchersSold: "Vouchers sold", uid: "UID"
+    voucherCode: "Voucher code", closing: "DAY CLOSING", sales: "sales", stornos: "cancellations", receipts: "Receipts", vouchersSold: "Vouchers sold", uid: "UID",
+    waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount"
   }
 };
 
@@ -51,7 +54,10 @@ function orderLines(payload, copy, language) {
   const lines = [
     copy.kitchen,
     copy.title,
+    // A takeaway's pickup number is what the kitchen calls out; big on the ticket.
+    ...(payload.pickupNo ? [`${copy.pickup} ${payload.pickupNo}`] : []),
     `${copy.order} ${payload.orderNo || ""}  ${copy.table} ${payload.table || ""}`,
+    ...(payload.staffName ? [`${copy.waiter}: ${payload.staffName}`] : []),
     RULE
   ];
   for (const item of payload.items || []) {
@@ -105,7 +111,7 @@ function companyLines(company = {}, copy) {
  * paid. Until the receipt is signed (fiskaly) it says, at its head and its
  * foot, that it is a test receipt.
  */
-function receiptLines(payload, copy) {
+function receiptLines(payload, copy, language) {
   const receipt = payload.receipt;
   const unsigned = receipt.fiscalStatus !== "signed";
   const lines = [
@@ -113,12 +119,15 @@ function receiptLines(payload, copy) {
     ...companyLines(payload.company, copy),
     RULE,
     `${copy.receipt} ${receipt.receiptNo}  ${copy.register} ${receipt.cashRegisterId}`,
-    `${at(receipt.createdAt)}${receipt.table ? `  ${copy.table} ${receipt.table}` : ""}`
+    `${at(receipt.createdAt)}${receipt.table ? `  ${copy.table} ${receipt.table}` : ""}`,
+    ...(receipt.staffName ? [`${copy.waiter}: ${receipt.staffName}`] : [])
   ];
   if (receipt.type === "storno") lines.push(copy.storno, copy.stornoOf.replace("{no}", String(receipt.refersToNo ?? "")), receipt.reason || "");
   lines.push(RULE);
   for (const line of receipt.lines) {
-    lines.push(row(`${line.quantity} x ${line.name}`, euros(line.totalCents)));
+    // The dish in the front printer's language: German on the guest's receipt.
+    const name = line.names?.[language] || line.name;
+    lines.push(line.kind === "discount" ? row(name, euros(line.totalCents)) : row(`${line.quantity} x ${name}`, euros(line.totalCents)));
     for (const modifier of line.modifiers || []) lines.push(`  - ${modifier}`);
     lines.push(`    ${line.vatSplit.map((part) => `${part.percent}%`).join("/")}${line.quantity !== 1 && line.quantity !== -1 ? `  à ${euros(line.unitPriceCents)}` : ""}`);
   }
@@ -156,14 +165,33 @@ function closingLines(payload, copy) {
   return lines;
 }
 
+/** A waiter's settlement: the receipts they took and the cash they hand in. */
+function settlementLines(payload, copy) {
+  const { settlement } = payload;
+  const totals = settlement.totals;
+  return [
+    copy.settlement,
+    ...companyLines(payload.company, copy),
+    `${copy.waiter}: ${settlement.staffName}  ${at(settlement.createdAt)}`,
+    RULE,
+    `${copy.receipts} ${totals.firstReceiptNo}–${totals.lastReceiptNo}: ${totals.sales} ${copy.sales}, ${totals.stornos} ${copy.stornos}`,
+    row(`${copy.sum} EUR`, euros(totals.grossCents)),
+    RULE,
+    ...Object.entries(totals.payments).map(([type, amount]) => row(copy[type] ?? type, euros(amount))),
+    RULE,
+    "\n"
+  ];
+}
+
 export function renderReceipt(payload, printer = {}) {
   const capabilities = printer.capabilities || {};
   const language = ["zh", "de", "en"].includes(capabilities.printLanguage) ? capabilities.printLanguage : "zh";
   const encoding = ["utf8", "gb18030", "shift_jis", "cp437"].includes(capabilities.encoding) ? capabilities.encoding : "utf8";
   const copy = labels[language];
   const lines = payload.kind === "bill" ? billLines(payload, copy, language)
-    : payload.kind === "receipt" ? receiptLines(payload, copy)
+    : payload.kind === "receipt" ? receiptLines(payload, copy, language)
     : payload.kind === "closing" ? closingLines(payload, copy)
+    : payload.kind === "settlement" ? settlementLines(payload, copy)
     : orderLines(payload, copy, language);
   return Buffer.concat([
     Buffer.from([ESC, 0x40]),

@@ -42,11 +42,17 @@ export const ORDER_ITEMS_SQL = `SELECT order_items.*, order_item_vat_splits.spli
 FROM order_items LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id
 WHERE order_items.order_id = ?`;
 
-/** Order lines by id, with what planCheckout needs of their order. */
+/**
+ * Order lines by id, with what planCheckout needs of their order — and the
+ * dish's names now, so a receipt reads in the front printer's language
+ * while the kitchen ticket was in the kitchen's.
+ */
 export const CHECKOUT_ITEMS_SQL = `SELECT order_items.*, orders.table_no, orders.status, orders.billed_at, orders.order_no,
-  order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity
+  order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity,
+  products.name_zh AS name_zh, products.name_de AS name_de, products.name_en AS name_en
 FROM order_items JOIN orders ON orders.id = order_items.order_id
 LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id
+LEFT JOIN products ON products.id = order_items.product_id
 WHERE order_items.id IN (?)`;
 
 /** Whether any line of an order is on a receipt still standing. */
@@ -185,6 +191,9 @@ export function normalizeVoucherCode(value) {
  * - `input.vouchers`: vouchers sold ([{ amount }]). A value voucher is not a
  *   sale of anything yet (Mehrzweckgutschein): it is on the receipt at 0% and
  *   the VAT is due when it is spent on food or drink.
+ * - `input.discountPercent`: a discount on the dishes (not on vouchers), as
+ *   one line per receipt that takes it off each VAT rate in proportion —
+ *   the pickup discount of a takeaway, or the owner's for a regular.
  * - `input.payments`: [{ type, amount, tendered?, voucherCode? }], adding up
  *   to the total exactly; cash may be handed over with more (`tendered`),
  *   and the change is worked out.
@@ -193,7 +202,7 @@ export function normalizeVoucherCode(value) {
  * status and billed_at, and paid_quantity (ORDER_ITEMS_SQL). `voucherRows`
  * are the vouchers paid with, by code.
  */
-export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings, role, at = now() }) {
+export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings, role, staff = null, at = now() }) {
   const byId = new Map(itemRows.map((row) => [String(row.id), row]));
   const requested = Array.isArray(input.items) ? input.items : [];
   const soldVouchers = Array.isArray(input.vouchers) ? input.vouchers : [];
@@ -224,6 +233,7 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
       orderItemId: id,
       productId: row.product_id,
       name: row.product_name,
+      ...(row.name_de || row.name_en || row.name_zh ? { names: { zh: row.name_zh || row.product_name, de: row.name_de || row.product_name, en: row.name_en || row.product_name } } : {}),
       modifiers: parseJson(row.modifiers_json, []).map((modifier) => modifier.name),
       quantity,
       unitPriceCents: row.unit_price_cents,
@@ -233,6 +243,21 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
     receiptItems.push({ orderItemId: id, quantity });
   }
 
+  const percent = Number(input.discountPercent ?? 0);
+  if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error("A discount is 0 to 100 percent");
+  if (percent > 0 && lines.length) {
+    const byRate = new Map();
+    for (const part of vatParts) byRate.set(part.percent, (byRate.get(part.percent) || 0) + part.cents);
+    const split = [...byRate].sort(([left], [right]) => left - right)
+      .map(([rate, cents]) => ({ percent: rate, cents: -Math.round((cents * percent) / 100) }))
+      .filter((part) => part.cents !== 0);
+    const off = split.reduce((sum, part) => sum + part.cents, 0);
+    if (off) {
+      vatParts.push(...split);
+      lines.push({ kind: "discount", name: `Rabatt ${percent}%`, names: { zh: `折扣 ${percent}%`, de: `Rabatt ${percent}%`, en: `Discount ${percent}%` }, percent, quantity: 1, unitPriceCents: off, totalCents: off, vatSplit: split });
+    }
+  }
+
   const vouchers = [];
   for (const sold of soldVouchers) {
     const valueCents = cents(sold.amount, "A voucher");
@@ -240,7 +265,7 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
     const code = voucherCode();
     vouchers.push({ code, valueCents });
     vatParts.push({ percent: 0, cents: valueCents });
-    lines.push({ kind: "voucher", code, name: "Gutschein", quantity: 1, unitPriceCents: valueCents, totalCents: valueCents, vatSplit: [{ percent: 0, cents: valueCents }] });
+    lines.push({ kind: "voucher", code, name: "Gutschein", names: { zh: "代金券", de: "Gutschein", en: "Voucher" }, quantity: 1, unitPriceCents: valueCents, totalCents: valueCents, vatSplit: [{ percent: 0, cents: valueCents }] });
   }
 
   const totalCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
@@ -286,6 +311,8 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
     payments,
     refersTo: null,
     staffRole: role,
+    staffId: staff?.id ?? null,
+    staffName: staff?.name ?? null,
     createdAt: at
   };
   return { receipt, receiptItems, vouchers, voucherDebits: [...voucherDebits].map(([code, amountCents]) => ({ code, amountCents })) };
@@ -298,7 +325,7 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
  * vouchers it spent get their money back; vouchers it sold are voided, which
  * only an unspent voucher can be.
  */
-export function planStorno(original, { receiptNo, reason, soldVoucherRows, role, at = now() }) {
+export function planStorno(original, { receiptNo, reason, soldVoucherRows, role, staff = null, at = now() }) {
   if (original.type !== "sale") throw new Error("Only a sale can be cancelled");
   const text = String(reason ?? "").trim();
   if (!text) throw new Error("A storno needs a reason");
@@ -330,6 +357,8 @@ export function planStorno(original, { receiptNo, reason, soldVoucherRows, role,
     refersTo: original.id,
     reason: text,
     staffRole: role,
+    staffId: staff?.id ?? null,
+    staffName: staff?.name ?? null,
     createdAt: at
   };
   const refunds = payments.filter((payment) => payment.type === "voucher").map((payment) => ({ code: payment.voucherCode, amountCents: -payment.amountCents }));
@@ -341,12 +370,12 @@ export function receiptRow(receipt) {
   return [
     receipt.id, receipt.receiptNo, receipt.clientRequestId, receipt.cashRegisterId, receipt.type, receipt.table,
     JSON.stringify(receipt.lines), JSON.stringify(receipt.vat), receipt.totalCents, JSON.stringify(receipt.payments),
-    receipt.refersTo, receipt.reason ?? null, receipt.staffRole, receipt.createdAt
+    receipt.refersTo, receipt.reason ?? null, receipt.staffRole, receipt.createdAt, receipt.staffId ?? null, receipt.staffName ?? null
   ];
 }
 export const INSERT_RECEIPT_SQL = `INSERT INTO receipts (id, receipt_no, client_request_id, cash_register_id, type, table_no,
-  lines_json, vat_json, total_cents, payments_json, refers_to, reason, staff_role, created_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  lines_json, vat_json, total_cents, payments_json, refers_to, reason, staff_role, created_at, staff_id, staff_name)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 export const INSERT_JOURNAL_SQL = "INSERT INTO journal (seq, at, kind, ref, payload_json, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
 /** A receipt as the console and the printer read it. */
@@ -368,6 +397,8 @@ export function receiptView(row, { cancelledBy = null, referredNo = null } = {})
     cancelledBy,
     fiscalStatus: row.fiscal_status,
     staffRole: row.staff_role,
+    staffId: row.staff_id ?? null,
+    staffName: row.staff_name ?? null,
     createdAt: row.created_at
   };
 }
@@ -378,11 +409,11 @@ export function receiptView(row, { cancelledBy = null, referredNo = null } = {})
  * backends journal exactly the same thing.
  */
 export function plannedReceiptView(receipt, referredNo = null) {
-  const [id, receiptNo, , cashRegisterId, type, table, linesJson, vatJson, totalCents, paymentsJson, refersTo, reason, staffRole, createdAt] = receiptRow(receipt);
+  const [id, receiptNo, , cashRegisterId, type, table, linesJson, vatJson, totalCents, paymentsJson, refersTo, reason, staffRole, createdAt, staffId, staffName] = receiptRow(receipt);
   return receiptView({
     id, receipt_no: receiptNo, cash_register_id: cashRegisterId, type, table_no: table, lines_json: linesJson, vat_json: vatJson,
     total_cents: totalCents, payments_json: paymentsJson, refers_to: refersTo, reason, staff_role: staffRole, created_at: createdAt,
-    fiscal_status: "unsigned"
+    staff_id: staffId, staff_name: staffName, fiscal_status: "unsigned"
   }, { referredNo });
 }
 
@@ -412,6 +443,7 @@ export function closingTotals(rows) {
   const payments = Object.fromEntries(PAYMENT_TYPES.map((type) => [type, 0]));
   let grossCents = 0;
   let vouchersSoldCents = 0;
+  let discountCents = 0;
   let sales = 0;
   let stornos = 0;
   for (const row of rows) {
@@ -419,7 +451,10 @@ export function closingTotals(rows) {
     grossCents += row.total_cents;
     for (const group of parseJson(row.vat_json, [])) vatParts.push({ percent: group.percent, cents: group.grossCents });
     for (const payment of parseJson(row.payments_json, [])) payments[payment.type] += payment.amountCents;
-    for (const line of parseJson(row.lines_json, [])) if (line.kind === "voucher") vouchersSoldCents += line.totalCents;
+    for (const line of parseJson(row.lines_json, [])) {
+      if (line.kind === "voucher") vouchersSoldCents += line.totalCents;
+      if (line.kind === "discount") discountCents += line.totalCents;
+    }
   }
   const numbers = rows.map((row) => row.receipt_no);
   return {
@@ -431,6 +466,7 @@ export function closingTotals(rows) {
     vat: vatGroups(vatParts).filter((group) => group.grossCents !== 0),
     payments,
     vouchersSoldCents,
+    discountCents,
     cashCents: payments.cash
   };
 }

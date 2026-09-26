@@ -224,7 +224,8 @@ export function tableOverviewView(row, orders = [], fallbackTable = "") {
     registered: Boolean(row),
     state: view.locked ? "locked" : open.length ? "seated" : "free",
     orders: open,
-    total: Math.round(open.reduce((sum, order) => sum + Math.round(order.total * 100), 0)) / 100,
+    // What is still to pay: a line a receipt paid for is off the table's total.
+    total: open.reduce((sum, order) => sum + order.items.reduce((part, item) => part + Math.round(item.unitPrice * 100) * (item.qty - (item.paid ?? 0)), 0), 0) / 100,
     since: open.length ? open.map((order) => order.createdAt).sort()[0] : null
   };
 }
@@ -386,6 +387,8 @@ export function orderView(row, itemRows = []) {
       id: item.product_id,
       name: item.product_name,
       qty: item.quantity,
+      // How much of the line receipts have paid for (ORDER_ITEMS_SQL).
+      paid: item.paid_quantity ?? 0,
       unitPrice: item.unit_price_cents / 100,
       printStation: item.print_station,
       modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
@@ -859,9 +862,10 @@ function mainVatPercent(split) {
  * (bundleComponentIds), for the set's VAT split.
  *
  * A kitchen ticket carries no prices and no tax: it is not a receipt, and
- * says so when printed.
+ * says so when printed. `meta` is what the POS adds: the waiter's name and a
+ * takeaway's pickup number, for the ticket.
  */
-export function planOrder(input, productRows, hours = {}) {
+export function planOrder(input, productRows, hours = {}, meta = {}) {
   const clientRequestId = String(input.clientRequestId || uuid());
   const table = String(input.table || "").trim();
   if (!table) throw new Error("Order requires a table number");
@@ -917,7 +921,13 @@ export function planOrder(input, productRows, hours = {}) {
     id: uuid(),
     orderId: id,
     printerRole: station,
-    payloadJson: JSON.stringify({ orderNo, table, note: String(input.note || ""), items: stationItems })
+    // Who ordered it and the takeaway number come from the server (meta),
+    // never from the order a guest sends.
+    payloadJson: JSON.stringify({
+      orderNo, table, note: String(input.note || ""), items: stationItems,
+      ...(meta.staffName ? { staffName: meta.staffName } : {}),
+      ...(meta.pickupNo ? { pickupNo: meta.pickupNo } : {})
+    })
   }));
 
   return {

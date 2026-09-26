@@ -80,7 +80,9 @@ CREATE TABLE receipts (
       staff_role TEXT NOT NULL,
       fiscal_status TEXT NOT NULL DEFAULT 'unsigned',
       fiscal_json TEXT,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT
     );
 CREATE TABLE receipt_items (
       receipt_id TEXT NOT NULL REFERENCES receipts(id),
@@ -104,6 +106,53 @@ CREATE TABLE day_closings (
       last_receipt_no INTEGER NOT NULL UNIQUE,
       totals_json TEXT NOT NULL,
       staff_role TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE pos_devices (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      last_seen_at TEXT
+    );
+CREATE TABLE staff (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL CHECK (role IN ('staff','manager')),
+      pin_hash TEXT NOT NULL,
+      pin_salt TEXT NOT NULL,
+      pin_iterations INTEGER NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE pos_sessions (
+      token_hash TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      device_id TEXT NOT NULL REFERENCES pos_devices(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE table_claims (
+      table_no TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT,
+      expires_at TEXT NOT NULL
+    );
+CREATE TABLE order_staff (
+      order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      staff_id TEXT,
+      staff_name TEXT,
+      pickup_no INTEGER,
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE staff_settlements (
+      id TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL,
+      staff_name TEXT NOT NULL,
+      last_receipt_no INTEGER NOT NULL,
+      totals_json TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
 CREATE TABLE journal (

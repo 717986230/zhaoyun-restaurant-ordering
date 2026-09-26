@@ -28,7 +28,8 @@ test("Worker on D1 satisfies the API contract", { skip: baseUrl ? false : "set W
         // are the configured shared tokens. Both travel in the same header.
         ...(options.token ? { "x-admin-token": options.token } : {}),
         ...(options.admin || options.role ? { "x-admin-token": tokens[options.role || "manager"] } : {}),
-        ...(options.tableToken ? { "x-table-token": options.tableToken } : {})
+        ...(options.tableToken ? { "x-table-token": options.tableToken } : {}),
+        ...(options.deviceToken ? { "x-device-token": options.deviceToken } : {})
       },
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
       ...(options.raw ? { body: options.raw.body } : {})
