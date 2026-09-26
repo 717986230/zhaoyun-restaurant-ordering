@@ -1,19 +1,26 @@
 /**
- * The D1 half of the backend.
+ * The store: every read and write the API makes, over any SQLite — the one
+ * implementation both backends run (the Node server over node:sqlite, the
+ * Worker over D1).
  *
- * Every decision this makes — what a product row means, what an order costs,
- * which status may follow which — comes from shared/rules.mjs, the same module
- * the Node server uses. What lives here is only the part that cannot be shared:
- * `node:sqlite` is synchronous and D1 is not, and D1 has no interactive
- * transaction, so the order write that is a BEGIN/COMMIT over there is one
- * atomic `batch()` here.
+ * Every decision — what a product row means, what an order costs, which
+ * status may follow which — comes from the rule modules next to this one.
+ * What lives here is reading the rows those rules need and writing the rows
+ * they plan, through `driver` (server/sqlite-driver.mjs, workers/d1-driver.mjs):
  *
- * What that transaction also gives the Node server — nothing changes between
- * a read and the write that depends on it — the journal gives here. Every
- * order, receipt and closing writes the next journal entry, whose number is
- * the primary key, and reads the last one before anything else. Two writes
- * that read the same state both claim the same number; the second batch
- * fails whole, and `retrying` works it out again from what is there now.
+ *   first(sql, ...params) → row | null
+ *   all(sql, ...params)   → rows
+ *   run(sql, ...params)   → rows changed
+ *   batch([[sql, params], …]) → rows changed by each, all or nothing
+ *
+ * D1 has no interactive transaction, so nothing here relies on one. What a
+ * transaction would give — nothing changes between a read and the write that
+ * depends on it — the journal gives: every order, receipt and closing writes
+ * the next journal entry, whose number is the primary key, and reads the last
+ * one before anything else. Two writes that read the same state both claim
+ * the same number; the second batch fails whole, and `retrying` works it out
+ * again from what is there now. The same holds on node:sqlite, where batch
+ * is a BEGIN IMMEDIATE … COMMIT.
  */
 import {
   assertOrderTransition, assertPassword, assertRequestTransition, auditView,
@@ -22,31 +29,31 @@ import {
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
   printJobView, serviceRequestView, settingsView, tablesOverviewView, tableView, uuid, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL,
   verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL
-} from "../shared/rules.mjs";
+} from "./rules.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
   ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, receiptPrintPayload,
   receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
-} from "../shared/register.mjs";
+} from "./register.mjs";
 import {
   assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
   normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, OPEN_STAFF_VOIDS_SQL, SET_AVAILABLE_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
-} from "../shared/pos.mjs";
+} from "./pos.mjs";
 import {
   ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
   DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
   normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
-} from "../shared/account.mjs";
-import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "../shared/customer.mjs";
-import { createCustomerStore } from "../shared/customer-store.mjs";
+} from "./account.mjs";
+import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "./customer.mjs";
+import { createCustomerStore } from "./customer-store.mjs";
 import {
   CLOSE_TABLE_SESSION_SQL, closePaidTableStatements, guestOrderError, LAST_CUSTOMER_PICKUP_SQL, LAST_TABLE_GUEST_ORDER_SQL, LIVE_TABLE_SESSIONS_SQL,
   moveTableSessionStatements, NEXT_GUEST_PICKUP_SQL, OPEN_PICKUPS_SQL, openTableStatements, pickupDayStart, planGuestOrder, TABLE_SESSION_SQL, tableSessionView
-} from "../shared/ordering.mjs";
+} from "./ordering.mjs";
 
-// Matches server/database.mjs: a salt for nobody, so signing in against a
-// console with no password costs the same PBKDF2 work as one with.
+// A salt for nobody: signing in against an account that does not exist costs
+// the same PBKDF2 work as a wrong password, so timing says nothing.
 const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
 const PRODUCT_COLUMNS = [
@@ -55,14 +62,25 @@ const PRODUCT_COLUMNS = [
   "published", "sort_order", "print_station", "modifiers_json", "vat_percent", "bundle_items_json", "created_at", "updated_at"
 ];
 
-export function createStore(db) {
-  const first = (sql, ...params) => db.prepare(sql).bind(...params).first();
-  const all = async (sql, ...params) => (await db.prepare(sql).bind(...params).all()).results ?? [];
-  const run = async (sql, ...params) => (await db.prepare(sql).bind(...params).run()).meta?.changes ?? 0;
-  /** The shared modules' [sql, params] pairs, as statements for a batch. */
-  const bound = (list) => list.map(([sql, params]) => db.prepare(sql).bind(...params));
-  /** What shared/customer-store.mjs needs of a database (its `driver`). */
-  const driver = { first, all, run, batch: async (list) => { await db.batch(bound(list)); } };
+export const PRODUCT_INSERT_SQL = `INSERT INTO products (${PRODUCT_COLUMNS.join(", ")}) VALUES (${PRODUCT_COLUMNS.map(() => "?").join(", ")})`;
+
+/** A normalized product (normalizeProduct) as PRODUCT_INSERT_SQL's parameters. */
+export function productInsertParams(product, timestamp) {
+  return [
+    product.id, product.sku, product.kind, product.category, product.nameZh,
+    product.nameDe, product.nameEn, product.description, product.priceCents,
+    product.allergensJson, product.prepTime, product.portion, product.level,
+    product.ingredients, product.art, product.pattern, product.available,
+    product.published, product.sortOrder, product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, timestamp
+  ];
+}
+
+/** One statement for a batch. */
+const sql = (text, ...params) => [text, params];
+
+export function createStore(driver) {
+  const { first, all, run } = driver;
+  const batch = (list) => driver.batch(list);
 
   // SQLite binds at most 100 variables per statement, and the menu is 111
   // dishes, so an `IN (?, ?, ...)` over a whole catalogue fails outright.
@@ -73,7 +91,7 @@ export function createStore(db) {
 
   async function journalStatement(last, kind, ref, payload, at) {
     const entry = journalEntry(last ?? null, kind, ref, payload, at);
-    return db.prepare(INSERT_JOURNAL_SQL).bind(entry.seq, entry.at, entry.kind, entry.ref, entry.payloadJson, entry.prevHash, await sha256Hex(journalText(entry)));
+    return sql(INSERT_JOURNAL_SQL, entry.seq, entry.at, entry.kind, entry.ref, entry.payloadJson, entry.prevHash, await sha256Hex(journalText(entry)));
   }
 
   const TAKEN = /UNIQUE constraint failed: (journal\.seq|receipts\.receipt_no|day_closings\.(closing_no|last_receipt_no))/;
@@ -150,14 +168,7 @@ export function createStore(db) {
         product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, product.id
       );
     } else {
-      await run(
-        `INSERT INTO products (${PRODUCT_COLUMNS.join(", ")}) VALUES (${PRODUCT_COLUMNS.map(() => "?").join(", ")})`,
-        product.id, product.sku, product.kind, product.category, product.nameZh,
-        product.nameDe, product.nameEn, product.description, product.priceCents,
-        product.allergensJson, product.prepTime, product.portion, product.level,
-        product.ingredients, product.art, product.pattern, product.available,
-        product.published, product.sortOrder, product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, timestamp
-      );
+      await run(PRODUCT_INSERT_SQL, ...productInsertParams(product, timestamp));
     }
     return getProduct(product.id);
   }
@@ -177,14 +188,14 @@ export function createStore(db) {
     // batch: never dishes under a new name with pins and names left behind.
     const { rows } = normalizeSettingsInput(renamedCategorySettings(await getSettings(), from, to));
     const timestamp = now();
-    const [moved] = await db.batch([
-      db.prepare("UPDATE products SET category = ?, updated_at = ? WHERE category = ?").bind(to, timestamp, from),
-      ...rows.map(([key, value]) => db.prepare(
+    const [moved] = await batch([
+      sql("UPDATE products SET category = ?, updated_at = ? WHERE category = ?", to, timestamp, from),
+      ...rows.map(([key, value]) => sql(
         `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
-      ).bind(key, value, timestamp))
+      , key, value, timestamp))
     ]);
-    return { renamed: Number(moved.meta?.changes ?? 0), category: to, settings: await getSettings() };
+    return { renamed: Number(moved ?? 0), category: to, settings: await getSettings() };
   }
 
   /**
@@ -225,13 +236,13 @@ export function createStore(db) {
     return getProduct(productId);
   }
 
-  /** D1 hands a BLOB back as an array of numbers or an ArrayBuffer, depending on the runtime. */
+  /** A BLOB comes back as a Uint8Array, an ArrayBuffer or an array of numbers, depending on the runtime. */
   async function getMediaFile(id) {
     const row = await first("SELECT content_type, bytes FROM media_files WHERE id = ?", String(id));
     return row ? { contentType: row.content_type, bytes: new Uint8Array(row.bytes) } : null;
   }
 
-  /** A picture uploaded from the admin console, kept in D1: this deployment has no disk. */
+  /** A picture uploaded from the admin console, kept in the database (a Worker has no disk). */
   async function storeMedia(productId, { contentType, extension, bytes }) {
     if (!(await first("SELECT id FROM products WHERE id = ?", String(productId)))) return null;
     const fileId = `${uuid()}${extension}`;
@@ -332,24 +343,19 @@ export function createStore(db) {
     // actually decides it: the loser of a race fails the batch, and the order
     // the winner wrote is the one both tablets are then handed.
     const statements = [
-      db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)")
-        .bind(id, orderNo, clientRequestId, table, note, totalCents, timestamp, timestamp),
-      ...plan.items.map((item) => db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(item.id, item.orderId, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson, item.vatPercent)),
-      ...plan.items.filter((item) => item.vatSplitJson).map((item) => db.prepare("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)")
-        .bind(item.id, item.vatSplitJson)),
-      ...plan.printJobs.map((job) => db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)")
-        .bind(job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp)),
-      ...(pos ? [db.prepare("INSERT INTO order_staff (order_id, staff_id, staff_name, pickup_no, created_at) VALUES (?, ?, ?, ?, ?)")
-        .bind(id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp)] : []),
+      sql("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)", id, orderNo, clientRequestId, table, note, totalCents, timestamp, timestamp),
+      ...plan.items.map((item) => sql("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", item.id, item.orderId, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson, item.vatPercent)),
+      ...plan.items.filter((item) => item.vatSplitJson).map((item) => sql("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)", item.id, item.vatSplitJson)),
+      ...plan.printJobs.map((job) => sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)", job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp)),
+      ...(pos ? [sql("INSERT INTO order_staff (order_id, staff_id, staff_name, pickup_no, created_at) VALUES (?, ?, ?, ?, ?)", id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp)] : []),
       // The guests are seated: their phones may order too.
-      ...(pos ? bound(openTableStatements(table, settings, pos.staff?.name)) : []),
-      ...(guestPlan ? bound(guestPlan.statements) : []),
+      ...(pos ? (openTableStatements(table, settings, pos.staff?.name)) : []),
+      ...(guestPlan ? (guestPlan.statements) : []),
       await journalStatement(last, "order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}), ...(guestPlan ? guestPlan.journal : {}) }, timestamp)
     ];
 
     try {
-      await db.batch(statements);
+      await batch(statements);
     } catch (error) {
       const committed = await first(ORDER_BY_REQUEST_SQL, clientRequestId);
       if (committed) return viewOrder(committed);
@@ -362,7 +368,7 @@ export function createStore(db) {
   /** A table opened for its guests to order from (开台), or kept open longer. */
   async function openTable(tableInput, pos) {
     const table = normalizeTableNo(tableInput);
-    await db.batch(bound(openTableStatements(table, await getSettings(), pos?.staff?.name)));
+    await batch((openTableStatements(table, await getSettings(), pos?.staff?.name)));
     return tableSessionView(await first(TABLE_SESSION_SQL, table));
   }
 
@@ -376,10 +382,10 @@ export function createStore(db) {
       // A paid line stays paid: cancelling it is a storno of its receipt.
       if (status === "cancelled" && await first(ORDER_PAID_SQL, current.id)) throw new Error("This order is on a receipt; cancel the receipt first");
       const at = now();
-      await db.batch([
-        db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?").bind(status, at, current.id),
+      await batch([
+        sql("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", status, at, current.id),
         // A reward's points come back with the order it was in.
-        ...(status === "cancelled" ? bound(refundPointsStatements(current.id, at)) : []),
+        ...(status === "cancelled" ? (refundPointsStatements(current.id, at)) : []),
         await journalStatement(last, "order.status", current.id, { orderId: current.id, orderNo: current.order_no, table: current.table_no, from: current.status, to: status }, at)
       ]);
       return viewOrder(await first(ORDER_BY_ID_SQL, current.id));
@@ -393,8 +399,7 @@ export function createStore(db) {
     return receiptView(row, { cancelledBy: storno?.id ?? null, referredNo: referred?.receipt_no ?? null });
   }
 
-  const printStatement = (payload, at) => db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, NULL, 'front', ?, 'queued', ?, ?)")
-    .bind(uuid(), JSON.stringify(payload), at, at);
+  const printStatement = (payload, at) => sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, NULL, 'front', ?, 'queued', ?, ?)", uuid(), JSON.stringify(payload), at, at);
 
   /** A sale at the register (planCheckout): the receipt, and the table freed once it is all paid. */
   async function checkout(input, role, pos = null) {
@@ -418,22 +423,22 @@ export function createStore(db) {
       const view = plannedReceiptView(plan.receipt);
       const table = plan.receipt.table;
       const statements = [
-        db.prepare(INSERT_RECEIPT_SQL).bind(...receiptRow(plan.receipt)),
-        ...plan.receiptItems.map((item) => db.prepare("INSERT INTO receipt_items (receipt_id, order_item_id, quantity) VALUES (?, ?, ?)").bind(plan.receipt.id, item.orderItemId, item.quantity)),
-        ...plan.vouchers.map((voucher) => db.prepare(INSERT_VOUCHER_SQL).bind(voucher.code, voucher.valueCents, voucher.valueCents, plan.receipt.id, at, at)),
-        ...plan.voucherDebits.map((debit) => db.prepare(DEBIT_VOUCHER_SQL).bind(debit.amountCents, at, debit.code)),
+        sql(INSERT_RECEIPT_SQL, ...receiptRow(plan.receipt)),
+        ...plan.receiptItems.map((item) => sql("INSERT INTO receipt_items (receipt_id, order_item_id, quantity) VALUES (?, ?, ?)", plan.receipt.id, item.orderItemId, item.quantity)),
+        ...plan.vouchers.map((voucher) => sql(INSERT_VOUCHER_SQL, voucher.code, voucher.valueCents, voucher.valueCents, plan.receipt.id, at, at)),
+        ...plan.voucherDebits.map((debit) => sql(DEBIT_VOUCHER_SQL, debit.amountCents, at, debit.code)),
         ...(table ? [
-          db.prepare(SETTLE_PAID_TABLE_SQL).bind(at, at, table, table),
-          db.prepare(UNLOCK_PAID_TABLE_SQL).bind(at, table.toUpperCase(), table),
-          ...bound(closePaidTableStatements(table))
+          sql(SETTLE_PAID_TABLE_SQL, at, at, table, table),
+          sql(UNLOCK_PAID_TABLE_SQL, at, table.toUpperCase(), table),
+          ...(closePaidTableStatements(table))
         ] : []),
         // Points for the signed-in guests whose orders this paid (shared/customer.mjs).
-        ...bound(earnPointsStatements(plan.receipt.id, settings.loyalty, at)),
+        ...(earnPointsStatements(plan.receipt.id, settings.loyalty, at)),
         printStatement(receiptPrintPayload(view, settings), at),
         await journalStatement(last, "receipt.issued", plan.receipt.id, view, at)
       ];
       try {
-        await db.batch(statements);
+        await batch(statements);
       } catch (error) {
         const committed = await first("SELECT * FROM receipts WHERE client_request_id = ?", requestId);
         if (committed) return receiptDetail(committed);
@@ -460,12 +465,12 @@ export function createStore(db) {
       });
       const at = plan.receipt.createdAt;
       const view = plannedReceiptView(plan.receipt, original.receipt_no);
-      await db.batch([
-        db.prepare(INSERT_RECEIPT_SQL).bind(...receiptRow(plan.receipt)),
-        ...plan.refunds.map((refund) => db.prepare(CREDIT_VOUCHER_SQL).bind(refund.amountCents, at, refund.code)),
-        ...plan.voided.map((code) => db.prepare(VOID_VOUCHER_SQL).bind(at, at, code)),
-        db.prepare(REOPEN_ORDERS_SQL).bind(at, original.id),
-        ...bound(reversePointsStatements(plan.receipt.id, original.id, at)),
+      await batch([
+        sql(INSERT_RECEIPT_SQL, ...receiptRow(plan.receipt)),
+        ...plan.refunds.map((refund) => sql(CREDIT_VOUCHER_SQL, refund.amountCents, at, refund.code)),
+        ...plan.voided.map((code) => sql(VOID_VOUCHER_SQL, at, at, code)),
+        sql(REOPEN_ORDERS_SQL, at, original.id),
+        ...(reversePointsStatements(plan.receipt.id, original.id, at)),
         printStatement(receiptPrintPayload(view, settings), at),
         await journalStatement(last, "receipt.storno", plan.receipt.id, view, at)
       ]);
@@ -484,9 +489,8 @@ export function createStore(db) {
       const at = now();
       const closingNo = ((await first("SELECT MAX(closing_no) AS no FROM day_closings"))?.no ?? 0) + 1;
       const view = closingView({ id, closing_no: closingNo, totals_json: JSON.stringify(totals), created_at: at });
-      await db.batch([
-        db.prepare("INSERT INTO day_closings (id, closing_no, first_receipt_no, last_receipt_no, totals_json, staff_role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-          .bind(id, closingNo, totals.firstReceiptNo, totals.lastReceiptNo, JSON.stringify(totals), role, at),
+      await batch([
+        sql("INSERT INTO day_closings (id, closing_no, first_receipt_no, last_receipt_no, totals_json, staff_role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", id, closingNo, totals.firstReceiptNo, totals.lastReceiptNo, JSON.stringify(totals), role, at),
         printStatement(closingPrintPayload(view, await getSettings()), at),
         await journalStatement(last, "day.closed", id, view, at)
       ]);
@@ -635,11 +639,11 @@ export function createStore(db) {
     try {
       if (current) {
         const pin = staff.pin ? await hashPassword(staff.pin) : null;
-        await db.batch([
-          db.prepare("UPDATE staff SET name = ?, role = ?, active = ?, updated_at = ? WHERE id = ?").bind(staff.name, staff.role, staff.active ? 1 : 0, at, current.id),
-          ...(pin ? [db.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ?, pin_iterations = ?, updated_at = ? WHERE id = ?").bind(pin.hash, pin.salt, pin.iterations, at, current.id)] : []),
+        await batch([
+          sql("UPDATE staff SET name = ?, role = ?, active = ?, updated_at = ? WHERE id = ?", staff.name, staff.role, staff.active ? 1 : 0, at, current.id),
+          ...(pin ? [sql("UPDATE staff SET pin_hash = ?, pin_salt = ?, pin_iterations = ?, updated_at = ? WHERE id = ?", pin.hash, pin.salt, pin.iterations, at, current.id)] : []),
           // A waiter switched off, or given a new PIN, is signed out everywhere.
-          ...(!staff.active || pin ? [db.prepare("DELETE FROM pos_sessions WHERE staff_id = ?").bind(current.id)] : [])
+          ...(!staff.active || pin ? [sql("DELETE FROM pos_sessions WHERE staff_id = ?", current.id)] : [])
         ]);
         return staffView(await first("SELECT * FROM staff WHERE id = ?", current.id));
       }
@@ -714,10 +718,10 @@ export function createStore(db) {
       const open = (await first("SELECT COUNT(*) AS n FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", from))?.n ?? 0;
       if (!open) return null;
       const at = now();
-      await db.batch([
-        db.prepare("UPDATE orders SET table_no = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'").bind(to, at, from),
-        db.prepare("DELETE FROM table_claims WHERE table_no = ? AND device_id = ?").bind(from, pos.deviceId),
-        ...bound(moveTableSessionStatements(from, to, await getSettings(), pos.staff?.name)),
+      await batch([
+        sql("UPDATE orders SET table_no = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", to, at, from),
+        sql("DELETE FROM table_claims WHERE table_no = ? AND device_id = ?", from, pos.deviceId),
+        ...(moveTableSessionStatements(from, to, await getSettings(), pos.staff?.name)),
         await journalStatement(last, "table.moved", from, { from, to, orders: open, staffName: pos.staff?.name ?? null }, at)
       ]);
       return { from, to, moved: open };
@@ -728,7 +732,7 @@ export function createStore(db) {
     const view = await receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", String(id)));
     if (!view) return false;
     const at = now();
-    await printStatement(receiptPrintPayload(view, await getSettings(), { copy: true }), at).run();
+    await batch([printStatement(receiptPrintPayload(view, await getSettings(), { copy: true }), at)]);
     return true;
   }
 
@@ -750,14 +754,13 @@ export function createStore(db) {
       const at = now();
       const plan = planVoid(input, await first(VOID_ITEM_SQL, String(input?.orderItemId ?? "")), { table, staff: pos.staff, role, at });
       const entry = plan.void;
-      await db.batch([
-        db.prepare(INSERT_VOID_SQL).bind(entry.id, entry.orderItemId, entry.orderId, entry.table, entry.quantity, entry.amountCents, entry.reason, entry.staffId, entry.staffName, at),
-        db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)")
-          .bind(plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at),
+      await batch([
+        sql(INSERT_VOID_SQL, entry.id, entry.orderItemId, entry.orderId, entry.table, entry.quantity, entry.amountCents, entry.reason, entry.staffId, entry.staffName, at),
+        sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)", plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at),
         await journalStatement(last, plan.journal.kind, plan.journal.ref, plan.journal.payload, at),
         // The last open dish voided, and the rest paid: the table is settled.
-        db.prepare(SETTLE_PAID_TABLE_SQL).bind(at, at, table, table),
-        db.prepare(UNLOCK_PAID_TABLE_SQL).bind(at, table, table)
+        sql(SETTLE_PAID_TABLE_SQL, at, at, table, table),
+        sql(UNLOCK_PAID_TABLE_SQL, at, table, table)
       ]);
       return { id: entry.id, orderItemId: entry.orderItemId, quantity: entry.quantity, amountCents: entry.amountCents, reason: entry.reason, staffName: entry.staffName, createdAt: at };
     });
@@ -773,9 +776,8 @@ export function createStore(db) {
       const id = uuid();
       const at = now();
       const view = settlementView({ id, staff_id: staff.id, staff_name: staff.name, totals_json: JSON.stringify(totals), created_at: at });
-      await db.batch([
-        db.prepare("INSERT INTO staff_settlements (id, staff_id, staff_name, last_receipt_no, totals_json, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-          .bind(id, staff.id, staff.name, totals.lastReceiptNo, JSON.stringify(totals), at),
+      await batch([
+        sql("INSERT INTO staff_settlements (id, staff_id, staff_name, last_receipt_no, totals_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", id, staff.id, staff.name, totals.lastReceiptNo, JSON.stringify(totals), at),
         printStatement({ kind: "settlement", company: companyOf(await getSettings()), settlement: view }, at),
         await journalStatement(last, "staff.settled", id, { ...view, by: role }, at)
       ]);
@@ -837,6 +839,8 @@ export function createStore(db) {
     closeTable: async (table) => (await run(CLOSE_TABLE_SESSION_SQL, normalizeTableNo(table))) > 0,
     // Guests' accounts, favourites and points: the one implementation both backends share.
     customers: createCustomerStore(driver, { ordersFor: (rows) => Promise.all(rows.map(viewOrder)) }),
+    /** For what the backends add of their own (seeding, the Node print agent). */
+    driver,
     updateOrder,
     listServiceRequests: async (limit = 100) =>
       (await all("SELECT * FROM service_requests ORDER BY created_at DESC LIMIT ?", boundedLimit(limit))).map(serviceRequestView),

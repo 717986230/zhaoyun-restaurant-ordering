@@ -6,7 +6,7 @@ import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
 
-test("order writes wait for a busy write lock instead of failing immediately", (context) => {
+test("order writes wait for a busy write lock instead of failing immediately", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-sqlite-"));
   const databasePath = path.join(directory, "restaurant.sqlite");
   const database = createDatabase(databasePath, { busyTimeoutMs: 500 });
@@ -18,7 +18,7 @@ test("order writes wait for a busy write lock instead of failing immediately", (
     rmSync(directory, { recursive: true, force: true });
   });
 
-  const product = database.listProducts(true)[0];
+  const product = (await database.listProducts(true))[0];
   const order = (id) => database.createOrder({ clientRequestId: id, table: "05", note: "", items: [{ id: product.id, qty: 1 }] });
 
   agent.exec("BEGIN IMMEDIATE");
@@ -30,9 +30,9 @@ test("order writes wait for a busy write lock instead of failing immediately", (
   unconfigured.close();
 
   const waited = Date.now();
-  assert.throws(() => order("busy-order-0001"), /database is locked/);
+  await assert.rejects(order("busy-order-0001"), /database is locked/);
   assert.ok(Date.now() - waited >= 400, "the server connection retries for the configured busy timeout");
 
   agent.exec("ROLLBACK");
-  assert.equal(order("busy-order-0002").table, "05");
+  assert.equal((await order("busy-order-0002")).table, "05");
 });

@@ -8,7 +8,7 @@
  * that condition itself, so two people registering at once cannot both win.
  *
  * Both backends run these statements and these rules; only the way they
- * reach the database differs (server/database.mjs, workers/store.mjs).
+ * reach the database differs (shared/store.mjs, over each backend's driver).
  */
 import { assertPassword, SESSION_TTL_MS } from "./rules.mjs";
 

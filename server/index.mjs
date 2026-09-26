@@ -1,7 +1,6 @@
 import { mkdirSync, existsSync } from "node:fs";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import { assertRoleTokens, config } from "./config.mjs";
@@ -29,7 +28,6 @@ export async function buildServer(overrides = {}) {
     allowedHeaders: ["content-type", "x-admin-token", "x-table-token", "x-device-token", "x-customer-token"]
   });
   await app.register(websocket);
-  await app.register(multipart);
   await app.register(fastifyStatic, {
     root: settings.uploadDir,
     prefix: "/media/",

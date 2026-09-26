@@ -1,9 +1,14 @@
 const MAX_TRACKED_KEYS = 5000;
 
 /**
- * Fixed-window counter for the unauthenticated ordering endpoints.
- * A single restaurant runs one server process, so in-process state is enough;
- * a multi-instance deployment must move this to shared storage.
+ * Fixed-window counter for the unauthenticated ordering endpoints, and for
+ * guessing passwords and tokens (shared/http.mjs).
+ *
+ * In memory: a restaurant's Node server is one process, so this is the whole
+ * budget there. A Worker runs many isolates that share no memory, so there it
+ * throttles a burst from one client rather than enforcing a global budget —
+ * worth having anyway, and the database-backed limits (shared/ordering.mjs)
+ * are the global ones.
  */
 export function createRateLimiter({ windowMs, max }) {
   const buckets = new Map();
@@ -34,18 +39,5 @@ export function createRateLimiter({ windowMs, max }) {
     size() {
       return buckets.size;
     }
-  };
-}
-
-/** Fastify preHandler that rejects bursts from one client with 429 + Retry-After. */
-export function rateLimitGuard(limiter, message) {
-  return function guard(request, reply, done) {
-    const { allowed, retryAfter } = limiter.check(request.ip || "unknown");
-    if (allowed) {
-      done();
-      return;
-    }
-    reply.header("retry-after", retryAfter);
-    reply.code(429).send({ error: message, retryAfter });
   };
 }

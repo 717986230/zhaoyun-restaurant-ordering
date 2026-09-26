@@ -236,16 +236,16 @@ export function createLanTransport({ connectTimeoutMs = 3500 } = {}) {
 }
 
 export async function processPrintJob({ database, role, workerId, transport = createLanTransport(), leaseMs = 30_000, maxAttempts = 5 }) {
-  const printer = database.printerForRole(role);
+  const printer = await database.printerForRole(role);
   if (!printer || printer.transport !== "lan") return { processed: false, reason: "No enabled LAN printer configured for role" };
-  const job = database.claimPrintJob(role, workerId, leaseMs);
+  const job = await database.claimPrintJob(role, workerId, leaseMs);
   if (!job) return { processed: false, reason: "No queued job" };
   try {
     await transport.send(printer, renderReceipt(job.payload, printer));
-    database.completePrintJob(job.id, workerId);
+    await database.completePrintJob(job.id, workerId);
     return { processed: true, status: "printed", jobId: job.id };
   } catch (error) {
-    database.failPrintJob(job.id, workerId, error instanceof Error ? error.message : String(error), maxAttempts);
+    await database.failPrintJob(job.id, workerId, error instanceof Error ? error.message : String(error), maxAttempts);
     return { processed: true, status: "retry-wait", jobId: job.id, error: error instanceof Error ? error.message : String(error) };
   }
 }

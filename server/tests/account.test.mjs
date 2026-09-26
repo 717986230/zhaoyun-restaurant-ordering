@@ -37,7 +37,7 @@ test("a password set at the old door becomes the account admin, on Node and on D
   raw.close();
 
   const database = createDatabase(file);
-  assert.deepEqual(database.accountStatus(), { registered: true });
+  assert.deepEqual(await database.accountStatus(), { registered: true });
   const session = await database.signInAccount("admin", "altes-passwort-1");
   assert.equal(session.account.login, "admin");
   assert.equal((await database.signInAccount("admin", "falsch-falsch")), null);
@@ -63,6 +63,6 @@ test("two registrations at once: one account, the other refused", () => withDire
     database.registerAccount({ login: "second", password: "passwort-zwei" })
   ]);
   assert.equal(results.filter(Boolean).length, 1);
-  assert.equal(database.accountStatus().registered, true);
+  assert.equal((await database.accountStatus()).registered, true);
   database.close();
 }));
