@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { isolateLive } from "./support/live.js";
 
 const products = [
   {
@@ -51,6 +52,7 @@ const products = [
 test.use({ locale: "zh-CN" });
 
 test.beforeEach(async ({ page }) => {
+  await isolateLive(page);
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "jade", languages: ["zh", "en", "de"] }) }));
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());

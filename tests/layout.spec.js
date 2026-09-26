@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { isolateLive } from "./support/live.js";
 
 /**
  * Nothing on the menu covers anything else — on every device, in every
@@ -17,6 +18,7 @@ const catalog = JSON.parse(readFileSync(new URL("../apps/customer-app/src/app/bu
 test.use({ locale: "zh-CN" });
 
 test.beforeEach(async ({ page }) => {
+  await isolateLive(page);
   // An iPhone is offered the install steps on a first visit; measured here is the menu.
   await page.addInitScript(() => { try { localStorage.setItem("zy_install_offer", "1"); } catch { /* none */ } });
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
