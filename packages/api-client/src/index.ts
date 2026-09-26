@@ -177,6 +177,45 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
+/**
+ * A socket on the live channel (/ws) that keeps itself open: it reconnects
+ * with a growing pause (1 s up to 30 s) and says whether it is open, so a
+ * screen can poll more often while it is not. Returns the way to close it.
+ */
+export function openLive(
+  baseUrl: string,
+  query: Record<string, string>,
+  onEvent: (event: RealtimeEnvelope) => void,
+  onStatus?: (open: boolean) => void
+): () => void {
+  const base = baseUrl.replace(/^http/, "ws");
+  if (!/^wss?:\/\//.test(base) || typeof WebSocket === "undefined") return () => undefined;
+  const search = new URLSearchParams(query).toString();
+  let socket: WebSocket | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let pause = 1000;
+  let stopped = false;
+  const open = () => {
+    socket = new WebSocket(`${base}/ws${search ? `?${search}` : ""}`);
+    socket.addEventListener("open", () => { pause = 1000; onStatus?.(true); });
+    socket.addEventListener("message", (event) => {
+      try { onEvent(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Not an event. */ }
+    });
+    socket.addEventListener("close", () => {
+      onStatus?.(false);
+      if (stopped) return;
+      retry = setTimeout(open, pause);
+      pause = Math.min(pause * 2, 30_000);
+    });
+  };
+  open();
+  return () => {
+    stopped = true;
+    if (retry) clearTimeout(retry);
+    socket?.close();
+  };
+}
+
 export class AdminApi {
   get storage(): AdminStorage {
     const built = import.meta.env?.VITE_API_BASE?.replace(/\/+$/, "");
@@ -266,27 +305,9 @@ export class AdminApi {
   /** Either setting may be saved alone; the one left out keeps its value. */
   updateSettings(settings: Partial<ApiSettings>): Promise<ApiSettings> { return this.#request<Partial<ApiSettings>>("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) }).then(withSettingDefaults); }
 
-  connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
-    const base = this.storage.baseUrl.replace(/^http/, "ws");
-    if (!base) return () => undefined;
-    let socket: WebSocket | undefined;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let stopped = false;
-    const open = () => {
-      socket = new WebSocket(`${base}/ws`);
-      socket.addEventListener("message", (event) => {
-        try { onMessage(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Ignore malformed live events. */ }
-      });
-      socket.addEventListener("close", () => {
-        if (!stopped) retryTimer = setTimeout(open, 2500);
-      });
-    };
-    open();
-    return () => {
-      stopped = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      socket?.close();
-    };
+  /** The console's live channel: every change on the floor and in the menu. */
+  live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
+    return openLive(this.storage.baseUrl, { role: "staff" }, onEvent, onStatus);
   }
 
   async uploadMedia(id: string, file: File): Promise<{ product: ApiCatalogProduct }> {
@@ -362,6 +383,10 @@ export class PosApi {
 
   catalog(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/catalog"); }
   floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  /** The POS's live channel: every change on the floor, whoever made it. */
+  live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
+    return openLive(this.baseUrl, { role: "staff" }, onEvent, onStatus);
+  }
   claim(table: string): Promise<{ claim: PosClaim }> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim`, { method: "POST" }); }
   release(table: string, force = false): Promise<void> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim${force ? "?force=1" : ""}`, { method: "DELETE" }); }
   order(command: CreateOrderCommand): Promise<{ order: ApiOrder }> { return this.#request("/api/pos/orders", { method: "POST", body: JSON.stringify(command) }); }
@@ -412,27 +437,7 @@ export class RestaurantApi {
   }
 
   connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
-    const base = this.#baseUrl().replace(/^http/, "ws");
-    if (!base) return () => undefined;
-    let socket: WebSocket | undefined;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let stopped = false;
-    const open = () => {
-      const query = new URLSearchParams(this.#socketParams()).toString();
-      socket = new WebSocket(`${base}/ws${query ? `?${query}` : ""}`);
-      socket.addEventListener("message", (event) => {
-        try { onMessage(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Ignore malformed live events. */ }
-      });
-      socket.addEventListener("close", () => {
-        if (!stopped) retryTimer = setTimeout(open, 2500);
-      });
-    };
-    open();
-    return () => {
-      stopped = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      socket?.close();
-    };
+    return openLive(this.#baseUrl(), this.#socketParams(), onMessage);
   }
 
   async #request<T>(path: string, options: RequestInit = {}): Promise<T> {

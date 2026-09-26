@@ -12,6 +12,7 @@ import {
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
 import { menuSettingsView, ROLE_RANK, resolveStaffRole } from "../shared/rules.mjs";
+import { liveEvent, liveRole } from "../shared/live.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
@@ -203,8 +204,18 @@ export function registerRoutes(app, { database, realtime, config }) {
   }));
 
   app.get("/ws", { websocket: true }, (socket, request) => {
-    const table = String(request.query?.table ?? "").trim().toUpperCase();
-    realtime.connect(socket, TABLE_PATTERN.test(table) ? table : null);
+    realtime.connect(socket, liveRole(new URLSearchParams(request.query ?? {})));
+  });
+
+  /**
+   * Every successful write says so on the live channel (shared/live.mjs):
+   * the console and the POS reload at once. A route that changed nothing
+   * anyone watches — a POS keeping its table — sets `request.liveQuiet`.
+   */
+  app.addHook("onResponse", async (request, reply) => {
+    if (request.liveQuiet) return;
+    const event = liveEvent(request.method, request.url.split("?")[0], reply.statusCode, request.body?.table);
+    if (event) realtime.publish(event);
   });
 
   // A picture kept in the database answers first; anything else is an upload
@@ -240,7 +251,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/products", { preHandler: requireAdmin, schema: { body: ProductBody } }, async (request, reply) => {
     try {
       const product = database.saveProduct(request.body || {});
-      realtime.broadcast("catalog.changed", { productId: product.id });
       return reply.code(201).send({ product });
     } catch (error) {
       return errorReply(reply, error);
@@ -250,7 +260,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const product = database.saveProduct(request.body || {}, request.params.id);
       if (!product) return errorReply(reply, new Error("Product not found"), 404);
-      realtime.broadcast("catalog.changed", { productId: product.id });
       return { product };
     } catch (error) {
       return errorReply(reply, error);
@@ -258,7 +267,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   });
   app.delete("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     if (!database.deleteProduct(request.params.id)) return errorReply(reply, new Error("Product not found"), 404);
-    realtime.broadcast("catalog.changed", { productId: request.params.id });
     return reply.code(204).send();
   });
 
@@ -266,7 +274,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const result = database.renameCategory(request.body.from, request.body.to);
       if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
-      realtime.broadcast("catalog.changed", { category: result.category });
       return result;
     } catch (error) {
       return errorReply(reply, error);
@@ -277,7 +284,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const result = database.setCategoryVat(request.body.category, request.body.vatPercent);
       if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
-      realtime.broadcast("catalog.changed", { category: result.category });
       return result;
     } catch (error) {
       return errorReply(reply, error);
@@ -287,7 +293,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/products/:id/duplicate", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const product = database.duplicateProduct(request.params.id);
     if (!product) return errorReply(reply, new Error("Product not found"), 404);
-    realtime.broadcast("catalog.changed", { productId: product.id });
     return reply.code(201).send({ product });
   });
 
@@ -315,7 +320,6 @@ export function registerRoutes(app, { database, realtime, config }) {
         await unlink(target).catch(() => undefined);
         return errorReply(reply, new Error("Product not found"), 404);
       }
-      realtime.broadcast("catalog.changed", { productId: product.id });
       return reply.code(201).send({ product });
     } catch (error) {
       await unlink(target).catch(() => undefined);
@@ -329,8 +333,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/orders", { preHandler: [guardOrders, requireTable], schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body || {});
-      realtime.broadcast("order.changed", order, order.table);
-      realtime.broadcast("print.queued", { orderId: order.id }, order.table);
       return reply.code(201).send({ order });
     } catch (error) {
       // A locked table is a state the guest can wait out, not a malformed
@@ -343,7 +345,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const order = database.updateOrder(request.params.id, request.body?.status);
       if (!order) return errorReply(reply, new Error("Order not found"), 404);
-      realtime.broadcast("order.changed", order, order.table);
       return { order };
     } catch (error) {
       return errorReply(reply, error);
@@ -356,7 +357,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/service-requests", { preHandler: [guardServiceRequests, requireTable], schema: { body: ServiceRequestBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.createServiceRequest(request.body || {});
-      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return reply.code(201).send({ request: serviceRequest });
     } catch (error) {
       return errorReply(reply, error);
@@ -366,7 +366,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const serviceRequest = database.updateServiceRequest(request.params.id, request.body?.status);
       if (!serviceRequest) return errorReply(reply, new Error("Service request not found"), 404);
-      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return { request: serviceRequest };
     } catch (error) {
       return errorReply(reply, error);
@@ -462,7 +461,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const table = database.setTableLock(request.params.table, request.body.locked);
       if (!table) return errorReply(reply, new Error("Table not found"), 404);
-      realtime.broadcast("table.changed", { table: table.table, locked: table.locked }, table.table);
       return { table };
     } catch (error) {
       return errorReply(reply, error);
@@ -486,7 +484,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/tables/:table/bill/print", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
     const bill = database.printTableBill(request.params.table);
     if (!bill) return errorReply(reply, new Error("Table has nothing left to pay"), 409);
-    realtime.broadcast("print.queued", { jobId: bill.printJobId }, bill.table);
     return { bill };
   });
 
@@ -494,7 +491,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/checkout", { preHandler: requireFloor, schema: { body: CheckoutBody } }, async (request, reply) => {
     try {
       const receipt = database.checkout(request.body, request.staffRole, request.pos);
-      if (receipt.table) realtime.broadcast("bill.paid", { table: receipt.table, receiptNo: receipt.receiptNo }, receipt.table);
       return reply.code(201).send({ receipt });
     } catch (error) {
       return errorReply(reply, error, error.code === "TABLE_CLAIMED" ? 409 : 400);
@@ -601,6 +597,8 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/pos/floor", { preHandler: requirePos }, async () => ({ tables: database.tablesOverview(), claims: database.liveClaims(), takeawayDiscountPercent: database.getSettings().takeawayDiscountPercent }));
   app.post("/api/pos/tables/:table/claim", { preHandler: requirePos, schema: { params: TableParams } }, async (request, reply) => {
     try {
+      // A POS keeps its table every half minute; only taking it is news.
+      request.liveQuiet = database.holdsTable(request.params.table, request.pos.deviceId);
       return { claim: database.claimTable(request.params.table, request.pos) };
     } catch (error) {
       return claimed(reply, error);
@@ -613,7 +611,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/pos/orders", { preHandler: requirePos, schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body, request.pos);
-      realtime.broadcast("order.created", { orderId: order.id, table: order.table }, order.table);
       return reply.code(201).send({ order });
     } catch (error) {
       return claimed(reply, error);

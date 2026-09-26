@@ -40,7 +40,7 @@ test("Worker on D1 satisfies the API contract", { skip: baseUrl ? false : "set W
     return { status: response.status, json, bytes, headers: Object.fromEntries(response.headers) };
   };
 
-  for (const [name, check] of contractChecks(call, assert)) {
+  for (const [name, check] of contractChecks(call, assert, { liveBase: baseUrl.replace(/^http/, "ws") })) {
     await context.test(name, check);
   }
 });

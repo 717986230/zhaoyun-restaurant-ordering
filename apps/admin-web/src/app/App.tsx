@@ -40,6 +40,9 @@ const initialState: AdminState = {
 };
 
 const BOARD_REFRESH_MS = 5000;
+const BOARD_REFRESH_LIVE_MS = 30_000;
+/** Several writes in a row (an order and its print jobs) make one reload. */
+const LIVE_SETTLE_MS = 250;
 
 /**
  * Which sections exist for whom. The waiter tablet and the kitchen screen
@@ -212,12 +215,28 @@ export function App() {
     void loadTables();
   }, [state.tab, loadTables]);
 
+  // The board and the room follow the floor live (shared/live.mjs): a waiter's
+  // order, a guest's call or a paid bill shows at once. Polling stays as the
+  // net under it — slow while the channel is open, quick while it is not.
+  const [live, setLive] = useState(false);
+  const floorTab = state.tab === "board" || state.tab === "tables";
   useEffect(() => {
-    if (state.tab !== "board" && state.tab !== "tables") return undefined;
+    if (!state.role || !floorTab) return undefined;
+    let pending: number | undefined;
+    const stop = adminApi.live((event) => {
+      if (event.type === "catalog.changed") return;
+      window.clearTimeout(pending);
+      pending = window.setTimeout(() => void loadBoard(true), LIVE_SETTLE_MS);
+    }, setLive);
+    return () => { window.clearTimeout(pending); stop(); setLive(false); };
+  }, [state.role, floorTab, loadBoard]);
+
+  useEffect(() => {
+    if (!floorTab) return undefined;
     void loadBoard();
-    const timer = window.setInterval(() => void loadBoard(true), BOARD_REFRESH_MS);
+    const timer = window.setInterval(() => void loadBoard(true), live ? BOARD_REFRESH_LIVE_MS : BOARD_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [state.tab, loadBoard]);
+  }, [floorTab, live, loadBoard]);
 
   async function runBoardAction(action: () => Promise<unknown>, message: string) {
     setState((current) => ({ ...current, boardBusy: true }));
@@ -462,7 +481,7 @@ export function App() {
       <div className="admin-brand">
         <strong>{restaurantName || t("admin")}</strong>
         {state.role && <span className={`admin-role ${state.role}`}>{state.account ? state.account.name : t(ROLE_KEYS[state.role])}</span>}
-        <i className={`admin-status ${state.connected ? "online" : ""}`} title={t(state.connected ? "online" : "offline")} aria-label={t(state.connected ? "online" : "offline")} />
+        <i className={`admin-status ${state.connected ? "online" : ""} ${live ? "live" : ""}`} title={t(state.connected ? (live ? "onlineLive" : "online") : "offline")} aria-label={t(state.connected ? (live ? "onlineLive" : "online") : "offline")} />
       </div>
       <div className="admin-head-actions">
         {languagePicker}

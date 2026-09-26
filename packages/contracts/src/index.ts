@@ -293,8 +293,13 @@ export interface ApiPrintJob {
 export type ApiOrderStatus = OrderStatus;
 export type ApiServiceRequestStatus = ServiceStatus;
 
-export interface RealtimeEnvelope<T = unknown> {
-  type: "connected" | "catalog.changed" | "order.changed" | "service.changed" | "print.queued" | "bill.settled";
-  payload?: T;
+/**
+ * What the live channel (/ws) says: a signal, never data (shared/live.mjs).
+ * `connected` comes first on every (re)connection — a cue to fetch, since
+ * anything may have changed while the socket was away.
+ */
+export interface RealtimeEnvelope {
+  type: "connected" | "catalog.changed" | "floor.changed";
+  table?: string;
   at: string;
 }

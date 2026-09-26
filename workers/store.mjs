@@ -30,7 +30,7 @@ import {
   receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
 } from "../shared/register.mjs";
 import {
-  assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
+  assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
   normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
 import {
@@ -641,6 +641,10 @@ export function createStore(db) {
     return claimView(row, at);
   }
 
+  async function holdsTable(tableInput, deviceId) {
+    return holdsClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(tableInput).trim().toUpperCase()), deviceId);
+  }
+
   async function newTakeaway(pos) {
     const since = `${now().slice(0, 10)}T00:00:00.000Z`;
     let next = (await first(NEXT_PICKUP_SQL, since))?.next ?? 1;
@@ -767,6 +771,7 @@ export function createStore(db) {
     posSignIn,
     posSignOut: async (token) => (token ? (await run("DELETE FROM pos_sessions WHERE token_hash = ?", await hashSessionToken(token))) > 0 : false),
     claimTable,
+    holdsTable,
     releaseTable: async (table, pos, force = false) =>
       (await run("DELETE FROM table_claims WHERE table_no = ? AND (device_id = ? OR ? = 1)", String(table).trim().toUpperCase(), pos.deviceId, force ? 1 : 0)) > 0,
     liveClaims: async () => (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row)),

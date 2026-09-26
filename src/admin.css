@@ -152,6 +152,19 @@ button {
   box-shadow: 0 0 0 3px var(--a-ok-ring);
 }
 
+/* Live: the floor arrives as it happens, so the dot breathes. */
+.admin-status.online.live {
+  animation: admin-live 2.4s ease-in-out infinite;
+}
+
+@keyframes admin-live {
+  50% { box-shadow: 0 0 0 5px var(--a-ok-ring); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-status.online.live { animation: none; }
+}
+
 .admin-head-actions {
   flex-shrink: 0;
   display: flex;

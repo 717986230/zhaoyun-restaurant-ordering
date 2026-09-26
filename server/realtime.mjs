@@ -1,21 +1,25 @@
+import { liveMessage, reaches } from "../shared/live.mjs";
+
+/**
+ * The live channel on the Node server: every open /ws socket and its role,
+ * "staff" (the console, the POS) or "guest" (a menu). What an event is and
+ * who hears it is shared/live.mjs's; this only holds the sockets.
+ */
 export function createRealtimeHub() {
-  // Guest tablets share one socket endpoint, so every socket carries the table
-  // it belongs to. Order, service and bill events only reach that table;
-  // catalog events reach everyone.
   const clients = new Map();
 
   return {
-    connect(socket, table = null) {
-      clients.set(socket, table);
-      socket.send(JSON.stringify({ type: "connected", at: new Date().toISOString() }));
+    connect(socket, role = "guest") {
+      clients.set(socket, role);
+      socket.send(liveMessage({ type: "connected" }));
       socket.on("close", () => clients.delete(socket));
       socket.on("error", () => clients.delete(socket));
     },
-    broadcast(type, payload, table = null) {
-      const message = JSON.stringify({ type, payload, at: new Date().toISOString() });
-      for (const [socket, scope] of clients) {
-        if (table && scope !== table) continue;
-        if (socket.readyState === 1) socket.send(message);
+    /** @param {{ type: string, table?: string }} event */
+    publish(event) {
+      const message = liveMessage(event);
+      for (const [socket, role] of clients) {
+        if (reaches(event, role) && socket.readyState === 1) socket.send(message);
       }
     },
     size() {

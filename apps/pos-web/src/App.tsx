@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { PosApi, toProduct } from "@zhaoyun/api-client";
-import type { PosStaff } from "@zhaoyun/contracts";
+import type { PosStaff, RealtimeEnvelope } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { formatEuro, initialLanguage, POS_LANGUAGES, translator } from "./i18n";
 import type { PosKey, PosLanguage } from "./i18n";
@@ -21,6 +21,30 @@ export interface Pos {
   products: Product[];
   notify: (message: string, kind?: "ok" | "error") => void;
   failed: (error: unknown) => void;
+  /** Whether the live channel is open: screens poll slowly while it is. */
+  live: boolean;
+  /** Hears every change on the floor as it happens; returns the way to stop. */
+  onLive: (listener: (event: RealtimeEnvelope) => void) => () => void;
+}
+
+type LiveListener = (event: RealtimeEnvelope) => void;
+
+/**
+ * Calls `reload` once shortly after the events `wanted` picks out — several
+ * writes in a row (an order and its tickets) make one reload, not several.
+ */
+export function useLiveReload(pos: Pos, wanted: (event: RealtimeEnvelope) => boolean, reload: () => void) {
+  const latest = useRef({ wanted, reload });
+  latest.current = { wanted, reload };
+  useEffect(() => {
+    let pending: number | undefined;
+    const stop = pos.onLive((event) => {
+      if (!latest.current.wanted(event)) return;
+      window.clearTimeout(pending);
+      pending = window.setTimeout(() => latest.current.reload(), 250);
+    });
+    return () => { window.clearTimeout(pending); stop(); };
+  }, [pos.onLive]);
 }
 
 export type Screen =
@@ -46,8 +70,14 @@ export function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [screen, setScreen] = useState<Screen>({ name: "floor" });
   const [toast, setToast] = useState<{ message: string; kind: "ok" | "error" } | null>(null);
+  const [live, setLive] = useState(false);
+  const listeners = useRef(new Set<LiveListener>());
   const t = translator(language);
   const unpair = useCallback(() => { api.unpair(); setPaired(false); }, []);
+  const onLive = useCallback((listener: LiveListener) => {
+    listeners.current.add(listener);
+    return () => { listeners.current.delete(listener); };
+  }, []);
 
   const notify = useCallback((message: string, kind: "ok" | "error" = "ok") => {
     setToast({ message, kind });
@@ -65,10 +95,23 @@ export function App() {
     try { localStorage.setItem("zy_pos_language", language); } catch { /* not kept */ }
   }, [language]);
 
-  useEffect(() => {
-    if (!staff) return;
+  const loadCatalog = useCallback(() => {
     api.catalog().then(({ products: list }) => setProducts(list.map(toProduct))).catch(failed);
-  }, [staff, failed]);
+  }, [failed]);
+  useEffect(() => {
+    if (staff) loadCatalog();
+  }, [staff, loadCatalog]);
+
+  // One live channel for the device while a waiter is signed in: the menu
+  // reloads when a dish changes (sold out, say), and each screen hears the floor.
+  useEffect(() => {
+    if (!staff) return undefined;
+    const stop = api.live((event) => {
+      if (event.type === "catalog.changed" || event.type === "connected") loadCatalog();
+      for (const listener of listeners.current) listener(event);
+    }, setLive);
+    return () => { stop(); setLive(false); };
+  }, [staff, loadCatalog]);
 
   const languages = <div className="pos-languages" role="group" aria-label="Language">{POS_LANGUAGES.map((option) => <button
     key={option} type="button" className={option === language ? "on" : ""} aria-pressed={option === language} onClick={() => setLanguage(option)}
@@ -78,7 +121,7 @@ export function App() {
   if (!paired) body = <Pair t={t} onPaired={() => setPaired(true)} />;
   else if (!staff) body = <SignIn t={t} onSignedIn={setStaff} onUnpair={unpair} failed={failed} />;
   else {
-    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed };
+    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive };
     body = screen.name === "order" ? <OrderScreen pos={pos} table={screen.table} pickupNo={screen.pickupNo} go={setScreen} />
       : screen.name === "pay" ? <PayScreen pos={pos} table={screen.table} go={setScreen} />
       : screen.name === "records" ? <Records pos={pos} go={setScreen} />
@@ -89,6 +132,7 @@ export function App() {
     <header className="pos-head">
       <strong>POS</strong>
       {staff && <span className="pos-who">{staff.name}{staff.role === "manager" ? " ★" : ""}</span>}
+      {staff && <i className={`pos-live ${live ? "on" : ""}`} role="img" aria-label={t(live ? "liveOn" : "liveOff")} title={t(live ? "liveOn" : "liveOff")} />}
       <span className="pos-head-actions">
         {staff && screen.name === "floor" && <button type="button" onClick={() => setScreen({ name: "records" })}>{t("records")}</button>}
         {languages}

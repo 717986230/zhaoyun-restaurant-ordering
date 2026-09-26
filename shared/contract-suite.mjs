@@ -18,7 +18,36 @@ const clockTime = (minute) => {
   return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
 };
 
-export function contractChecks(call, assert) {
+/**
+ * A socket on the live channel that hands its messages out one at a time:
+ * `next()` resolves with the next one, or fails after `ms` without one.
+ */
+function listen(url) {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(url);
+    const queue = [];
+    const waiting = [];
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data));
+      const deliver = waiting.shift();
+      if (deliver) deliver(message); else queue.push(message);
+    });
+    socket.addEventListener("error", () => reject(new Error(`could not open ${url}`)));
+    socket.addEventListener("open", () => resolve({
+      next(ms = 5000) {
+        if (queue.length) return Promise.resolve(queue.shift());
+        return new Promise((done, fail) => {
+          const timer = setTimeout(() => fail(new Error("no live event")), ms);
+          waiting.push((message) => { clearTimeout(timer); done(message); });
+        });
+      },
+      close: () => socket.close()
+    }));
+  });
+}
+
+/** `liveBase` is the backend's address as ws://host:port. */
+export function contractChecks(call, assert, { liveBase } = {}) {
   return [
     ["the catalogue is the seeded menu", async () => {
       const denied = await call("GET", "/api/admin/products");
@@ -1016,6 +1045,37 @@ export function contractChecks(call, assert) {
       await call("PUT", `/api/admin/staff/${wang.id}`, { admin: true, body: { active: false } });
       for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) {
         assert.equal((await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true })).status, 204);
+      }
+    }],
+
+    ["every write tells the console and the POS at once, and the menus only about the dishes", async () => {
+      const staff = await listen(`${liveBase}/ws?role=staff`);
+      const guest = await listen(`${liveBase}/ws?table=05`);
+      try {
+        assert.equal((await staff.next()).type, "connected");
+        assert.equal((await guest.next()).type, "connected");
+
+        // A signal, never data: the type and the table, and nothing to leak.
+        assert.equal((await call("POST", "/api/admin/tables", { admin: true, body: { table: "lv1" } })).status, 201);
+        const registered = await staff.next();
+        assert.deepEqual({ type: registered.type, table: registered.table }, { type: "floor.changed", table: "LV1" });
+        assert.deepEqual(Object.keys(registered).sort(), ["at", "table", "type"]);
+
+        // A refused write and a read say nothing; the next event is the next change.
+        assert.equal((await call("POST", "/api/admin/tables", { admin: true, body: { table: "!!" } })).status, 400);
+        await call("GET", "/api/admin/tables/overview", { admin: true });
+        assert.equal((await call("DELETE", "/api/admin/tables/LV1", { admin: true })).status, 204);
+        const removed = await staff.next();
+        assert.deepEqual({ type: removed.type, table: removed.table }, { type: "floor.changed", table: "LV1" });
+
+        // The dishes: everybody, the guests included — and the guests heard nothing before it.
+        const current = (await call("GET", "/api/admin/settings", { admin: true })).json;
+        assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { menuTitle: current.menuTitle } })).status, 200);
+        assert.equal((await staff.next()).type, "catalog.changed");
+        assert.equal((await guest.next()).type, "catalog.changed", "a guest hears of the dishes, and of nothing on the floor");
+      } finally {
+        staff.close();
+        guest.close();
       }
     }],
 

@@ -20,7 +20,7 @@ import {
   UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
 } from "../shared/register.mjs";
 import {
-  assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
+  assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
   normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
 import {
@@ -1045,6 +1045,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return claimView(row, at);
   }
 
+  function holdsTable(tableInput, deviceId) {
+    return holdsClaim(statements.claimByTable.get(String(tableInput).trim().toUpperCase()), deviceId);
+  }
+
   /** Closes a table on this device; a manager may close it on any. */
   function releaseTable(tableInput, pos, force = false) {
     return statements.releaseClaim.run(String(tableInput).trim().toUpperCase(), pos.deviceId, force ? 1 : 0).changes > 0;
@@ -1442,6 +1446,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     posSignOut,
     claimTable,
     releaseTable,
+    holdsTable,
     liveClaims: () => statements.liveClaims.all(now()).map((row) => claimView(row)),
     newTakeaway,
     moveTable,

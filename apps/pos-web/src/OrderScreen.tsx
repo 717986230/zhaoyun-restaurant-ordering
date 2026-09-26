@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { ApiBill } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
-import { api } from "./App";
+import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 
 /** How often an open table tells the server this device still has it. */
@@ -41,6 +41,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
     return () => { window.clearInterval(hold); void api.release(table).catch(() => undefined); };
   }, [table, loadBill, pos.failed]);
+
+  // A guest ordering at this table by QR, a move to it: the sent lines follow.
+  useLiveReload(pos, (event) => event.type === "floor.changed" && (!event.table || event.table === table), () => void loadBill());
 
   const menu = useMemo(() => pos.products.filter((product) => product.published && product.available), [pos.products]);
   const categories = useMemo(() => [...new Set(menu.map((product) => product.category))], [menu]);

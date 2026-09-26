@@ -81,6 +81,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 .pos-head strong { letter-spacing: 0.08em; }
 .pos-who { font-weight: 700; }
+/* The live channel: green while changes arrive as they happen, grey while the screens poll. */
+.pos-live { width: 9px; height: 9px; border-radius: 50%; background: var(--p-muted); flex-shrink: 0; }
+.pos-live.on { background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.25); }
 .pos-head-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .pos-head-actions button { min-height: 40px; border-color: #3c4a44; background: transparent; color: #fff; }
 .pos-languages { display: flex; gap: 2px; }

@@ -16,6 +16,13 @@
  */
 import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
+import { openLive, publishLive } from "./live.mjs";
+import { liveEvent } from "../shared/live.mjs";
+
+export { LiveHub } from "./live.mjs";
+
+/** Responses that changed nothing anyone watches (a POS keeping its table): no live event. */
+const QUIET = new WeakSet();
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody
@@ -355,7 +362,13 @@ async function handle(request, env) {
         return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
       }
       if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
-        if (method === "POST") return json({ claim: await store.claimTable(path[3], pos) });
+        if (method === "POST") {
+          // A POS keeps its table every half minute; only taking it is news.
+          const renewing = await store.holdsTable(path[3], pos.deviceId);
+          const response = json({ claim: await store.claimTable(path[3], pos) });
+          if (renewing) QUIET.add(response);
+          return response;
+        }
         if (method === "DELETE") {
           await store.releaseTable(path[3], pos, role === "manager" && url.searchParams.get("force") === "1");
           return new Response(null, { status: 204 });
@@ -789,16 +802,27 @@ async function handle(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const cors = corsHeaders(request, env);
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: { ...cors, ...SECURITY_HEADERS } });
     }
+    const url = new URL(request.url);
+    if (url.pathname === "/ws") return openLive(request, env);
+    // The table a write's body names, for the live event when the path does not say.
+    const writing = !["GET", "HEAD"].includes(request.method);
+    const tableHint = writing && request.headers.get("content-type")?.includes("application/json")
+      ? request.clone().json().then((parsed) => parsed?.table, () => undefined)
+      : undefined;
     let response;
     try {
       response = await handle(request, env);
     } catch (error) {
       response = fail(error?.message || "Unhandled error", 500);
+    }
+    if (writing && !QUIET.has(response)) {
+      const event = liveEvent(request.method, url.pathname, response.status, await tableHint);
+      if (event) ctx?.waitUntil(publishLive(env, event));
     }
     if (!Object.keys(cors).length) return response;
     const headers = new Headers(response.headers);

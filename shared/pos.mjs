@@ -76,6 +76,11 @@ export function claimView(row, at = now()) {
   return { table: row.table_no, deviceId: row.device_id, staffId: row.staff_id, staffName: row.staff_name, expiresAt: row.expires_at };
 }
 
+/** Whether this device already has the table open: keeping it is not news. */
+export function holdsClaim(row, deviceId, at = now()) {
+  return Boolean(row && row.device_id === deviceId && row.expires_at > at);
+}
+
 /** Throws when another device has the table open. */
 export function assertClaim(row, deviceId, at = now()) {
   const claim = claimView(row, at);

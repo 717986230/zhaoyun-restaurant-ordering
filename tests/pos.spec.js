@@ -39,7 +39,7 @@ test.beforeAll(async ({ request }, testInfo) => {
   for (const [name, pin, role] of [["Li", "1234", "staff"], ["Wang", "9876", "manager"]]) {
     expect((await admin(request, "post", "/api/admin/staff", { name, pin, role })).ok()).toBe(true);
   }
-  expect((await admin(request, "put", "/api/admin/settings", { takeawayDiscountPercent: 10 })).ok()).toBe(true);
+  expect((await admin(request, "put", "/api/admin/settings", { takeawayDiscountPercent: 10, showOrdering: true })).ok()).toBe(true);
 });
 
 test.afterAll(() => {
@@ -146,6 +146,36 @@ test("a table open on one device is locked to it; the manager may take it over",
   await expect(phone.locator(".pos-ticket h1")).toHaveText("桌 8");
   await counter.close();
   await phone.close();
+});
+
+test("an order sent on one tablet shows at once on the other and on the admin board", async ({ browser, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const [dish] = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
+  const counter = await browser.newPage({ locale: "zh-CN" });
+  const phone = await browser.newPage({ locale: "zh-CN" });
+  const office = await browser.newPage({ locale: "zh-CN" });
+  await pairAndSignIn(counter, "Tablet live A", "Li", "1234");
+  await pairAndSignIn(phone, "Phone live B", "Wang", "9876");
+  const { token } = await (await request.post(`${API}/api/account/sign-in`, { data: { login: LOGIN, password: PASSWORD } })).json();
+  await office.addInitScript((session) => sessionStorage.setItem("zy_admin_token", session), token);
+  await office.goto("/admin.html");
+  await office.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "订单", exact: true }).click();
+  await expect(phone.locator(".pos-live.on")).toBeVisible();
+  await expect(office.locator(".admin-status.live")).toBeVisible();
+
+  // Faster than any poll (8 s without the channel, 30 s with it): pushed.
+  const LIVE = { timeout: 3000 };
+  await counter.getByLabel("打开桌号").fill("9");
+  await counter.getByRole("button", { name: "打开", exact: true }).click();
+  await counter.locator(`.pos-dishes button[data-sku="${dish.sku}"]`).click();
+  await confirmOptions(counter);
+  await counter.getByRole("button", { name: "送厨" }).click();
+  await expect(counter.locator(".pos-lines.sent li")).toHaveCount(1);
+
+  await expect(phone.locator('.pos-table[data-table="9"]')).toContainText(dish.price.toFixed(2), LIVE);
+  await expect(phone.locator('.pos-table[data-table="9"]')).toContainText("Li", LIVE);
+  await expect(office.locator(".board-card", { hasText: "桌 9" })).toContainText(dish.names.zh, LIVE);
+  await Promise.all([counter.close(), phone.close(), office.close()]);
 });
 
 test("a takeaway gets a pickup number and its discount; the waiter settles the shift", async ({ page, request }, testInfo) => {

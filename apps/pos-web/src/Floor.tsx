@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { TableOverview } from "@zhaoyun/api-client";
 import type { PosClaim } from "@zhaoyun/contracts";
-import { api } from "./App";
+import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 
 const TAKEAWAY = /^TA-/i;
+/** The poll under the live channel: quick while it is down, slow while it is up. */
 const REFRESH_MS = 8000;
+const REFRESH_LIVE_MS = 30_000;
 
 /**
  * Opens a table on this device: locked to it (shared/pos.mjs) until it is
@@ -44,9 +46,10 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), REFRESH_MS);
+    const timer = window.setInterval(() => void load(), pos.live ? REFRESH_LIVE_MS : REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [load]);
+  }, [load, pos.live]);
+  useLiveReload(pos, (event) => event.type !== "catalog.changed", () => void load());
 
   const claimOf = (table: string) => claims.find((claim) => claim.table === table.toUpperCase());
   const room = tables.filter((table) => !TAKEAWAY.test(table.table));
