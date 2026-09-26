@@ -18,7 +18,36 @@ const clockTime = (minute) => {
   return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
 };
 
-export function contractChecks(call, assert) {
+/**
+ * A socket on the live channel that hands its messages out one at a time:
+ * `next()` resolves with the next one, or fails after `ms` without one.
+ */
+function listen(url) {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(url);
+    const queue = [];
+    const waiting = [];
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data));
+      const deliver = waiting.shift();
+      if (deliver) deliver(message); else queue.push(message);
+    });
+    socket.addEventListener("error", () => reject(new Error(`could not open ${url}`)));
+    socket.addEventListener("open", () => resolve({
+      next(ms = 5000) {
+        if (queue.length) return Promise.resolve(queue.shift());
+        return new Promise((done, fail) => {
+          const timer = setTimeout(() => fail(new Error("no live event")), ms);
+          waiting.push((message) => { clearTimeout(timer); done(message); });
+        });
+      },
+      close: () => socket.close()
+    }));
+  });
+}
+
+/** `liveBase` is the backend's address as ws://host:port. */
+export function contractChecks(call, assert, { liveBase } = {}) {
   return [
     ["the catalogue is the seeded menu", async () => {
       const denied = await call("GET", "/api/admin/products");
@@ -385,65 +414,61 @@ export function contractChecks(call, assert) {
       );
     }],
 
-    ["the console's password gate is set once and then signs in", async () => {
-      const before = await call("GET", "/api/admin/gate");
-      assert.equal(before.status, 200, "the gate says whether a password exists, without one");
-      assert.equal(before.json.configured, false, "a fresh deployment has no password yet");
-      // One bit, and only that bit: the hash must never leave the database.
-      assert.deepEqual(Object.keys(before.json), ["configured"]);
+    ["the restaurant registers one account, signs in with its name and password, and gets back in with ADMIN_TOKEN", async () => {
+      const before = await call("GET", "/api/account");
+      assert.equal(before.status, 200, "whether there is an account is answered without one");
+      assert.deepEqual(before.json, { registered: false }, "one bit, and only that bit");
+      assert.equal((await call("GET", "/api/admin/products")).status, 401);
 
-      const tooShort = await call("POST", "/api/admin/gate/password", { body: { password: "short" } });
-      assert.equal(tooShort.status, 400, "the password floor is refused at the edge");
+      assert.equal((await call("POST", "/api/account/register", { body: { login: "wirt", password: "short" } })).status, 400, "the password floor");
+      assert.equal((await call("POST", "/api/account/register", { body: { login: "x", password: "kueche-passwort-2026" } })).status, 400, "the account name floor");
+      assert.equal((await call("POST", "/api/account/register", { body: { login: "wirt name!", password: "kueche-passwort-2026" } })).status, 400, "the account name's letters");
 
-      const set = await call("POST", "/api/admin/gate/password", { body: { password: "kueche-passwort-2026" } });
-      assert.equal(set.status, 200);
-      assert.equal(set.json.configured, true);
-      assert.equal((await call("GET", "/api/admin/gate")).json.configured, true);
+      const registered = await call("POST", "/api/account/register", { body: { login: " Wirt@Zhaoyun.at ", name: "Frau Li", password: "kueche-passwort-2026" } });
+      assert.equal(registered.status, 201);
+      assert.ok(registered.json.token, "registering signs in");
+      assert.deepEqual({ ...registered.json.account, id: "", createdAt: "" }, { id: "", login: "wirt@zhaoyun.at", name: "Frau Li", createdAt: "" }, "the name is kept without case or spaces; no hash leaves");
+      assert.deepEqual((await call("GET", "/api/account")).json, { registered: true });
+      const second = await call("POST", "/api/account/register", { body: { login: "someone", password: "anderes-passwort" } });
+      assert.equal(second.status, 409, "one restaurant, one account: registration closes");
 
-      const wrong = await call("POST", "/api/admin/gate/sign-in", { body: { password: "kueche-passwort-2025" } });
-      assert.equal(wrong.status, 401, "a wrong password is refused");
-
-      const signedIn = await call("POST", "/api/admin/gate/sign-in", { body: { password: "kueche-passwort-2026" } });
-      assert.equal(signedIn.status, 200);
-      assert.ok(signedIn.json.token, "signing in hands back a session token");
-      assert.equal(signedIn.json.password, undefined, "and nothing else about the password");
+      assert.equal((await call("POST", "/api/account/sign-in", { body: { login: "wirt@zhaoyun.at", password: "kueche-passwort-2025" } })).status, 401, "a wrong password");
+      assert.equal((await call("POST", "/api/account/sign-in", { body: { login: "nobody", password: "kueche-passwort-2026" } })).status, 401, "an unknown name, the same answer");
+      const signedIn = await call("POST", "/api/account/sign-in", { body: { login: "WIRT@zhaoyun.at", password: "kueche-passwort-2026" } });
+      assert.equal(signedIn.status, 200, "the name without case");
       const session = signedIn.json.token;
+      assert.equal((await call("GET", "/api/admin/products", { token: session })).status, 200, "the account is manager");
+      const who = (await call("GET", "/api/admin/session", { token: session })).json;
+      assert.equal(who.role, "manager");
+      assert.equal(who.account.name, "Frau Li", "and says whose session it is");
 
-      // The session is presented in the same header every other route reads,
-      // which is the whole reason no other route had to change.
-      const asManager = await call("GET", "/api/admin/products", { token: session });
-      assert.equal(asManager.status, 200, "past the gate the console is manager");
-      assert.equal((await call("GET", "/api/admin/session", { token: session })).json.role, "manager");
-
-      // Once set, changing it takes the one in force — otherwise anyone who
-      // reached the console could take it over.
-      const unproven = await call("POST", "/api/admin/gate/password", { body: { password: "ein-neues-passwort" } });
-      assert.equal(unproven.status, 401, "a second set needs the current password");
-
-      const changed = await call("POST", "/api/admin/gate/password", {
-        body: { password: "ein-neues-passwort", currentPassword: "kueche-passwort-2026" }
-      });
+      // Every change is made against the password in force.
+      assert.equal((await call("PUT", "/api/account", { token: session, body: { currentPassword: "falsch-falsch", name: "X" } })).status, 401);
+      const renamed = await call("PUT", "/api/account", { token: session, body: { currentPassword: "kueche-passwort-2026", login: "chef", name: "Chef Li" } });
+      assert.equal(renamed.status, 200);
+      assert.equal(renamed.json.account.login, "chef");
+      assert.equal(renamed.json.token, undefined, "a new name keeps the sessions");
+      assert.equal((await call("GET", "/api/admin/products", { token: session })).status, 200);
+      const changed = await call("PUT", "/api/account", { token: session, body: { currentPassword: "kueche-passwort-2026", password: "ein-neues-passwort" } });
       assert.equal(changed.status, 200);
-      assert.equal(
-        (await call("GET", "/api/admin/products", { token: session })).status, 401,
-        "changing the password ends the sessions opened with the old one"
-      );
-      assert.equal((await call("POST", "/api/admin/gate/sign-in", { body: { password: "kueche-passwort-2026" } })).status, 401);
+      assert.ok(changed.json.token, "a new password hands this device a fresh session");
+      assert.equal((await call("GET", "/api/admin/products", { token: session })).status, 401, "and ends the others");
+      assert.equal((await call("GET", "/api/admin/products", { token: changed.json.token })).status, 200);
+      assert.equal((await call("POST", "/api/account/sign-in", { body: { login: "chef", password: "kueche-passwort-2026" } })).status, 401);
 
-      // ADMIN_TOKEN is the way back in when the password is forgotten, and it
-      // is the token rather than a live session that may do this: a stolen
-      // session must not be able to lock the owner out of their own menu.
-      const recovered = await call("POST", "/api/admin/gate/password", { admin: true, body: { password: "wieder-hereingekommen" } });
+      // ADMIN_TOKEN is the way back in, and it is the token rather than a
+      // session that may do this: a stolen tablet must not lock the owner out.
+      assert.equal((await call("POST", "/api/account/recover", { token: changed.json.token, body: { password: "wieder-hereingekommen" } })).status, 401);
+      const recovered = await call("POST", "/api/account/recover", { admin: true, body: { password: "wieder-hereingekommen" } });
       assert.equal(recovered.status, 200, "ADMIN_TOKEN resets the password without knowing it");
-      const back = await call("POST", "/api/admin/gate/sign-in", { body: { password: "wieder-hereingekommen" } });
+      assert.equal(recovered.json.account.login, "chef");
+      assert.equal((await call("GET", "/api/admin/products", { token: changed.json.token })).status, 401, "and ends every session");
+      const back = await call("POST", "/api/account/sign-in", { body: { login: "chef", password: "wieder-hereingekommen" } });
       assert.equal(back.status, 200);
 
-      const out = await call("POST", "/api/admin/gate/sign-out", { token: back.json.token });
+      const out = await call("POST", "/api/account/sign-out", { token: back.json.token });
       assert.equal(out.status, 204);
-      assert.equal(
-        (await call("GET", "/api/admin/products", { token: back.json.token })).status, 401,
-        "a signed-out token is dead"
-      );
+      assert.equal((await call("GET", "/api/admin/products", { token: back.json.token })).status, 401, "a signed-out token is dead");
     }],
 
     ["a table round-trips with the token its card prints", async () => {
@@ -943,6 +968,19 @@ export function contractChecks(call, assert) {
       assert.ok(jobs.length && jobs.every((job) => job.payload.staffName === "Li"), "the kitchen ticket names the waiter");
       assert.equal((await posOrder(asWang, "P1", "contract-pos-2", [{ id: food.id, qty: 1 }])).status, 409);
 
+      // The console sees the floor as it stands: who has P1 open, who took the
+      // order, and each waiter — where signed in, which tables, the shift so far.
+      const p1Now = (await call("GET", "/api/admin/tables/overview", { admin: true })).json.tables.find((entry) => entry.table === "P1");
+      assert.deepEqual(p1Now.openOn, { staffId: li.id, staffName: "Li" });
+      assert.equal(p1Now.orders[0].staffName, "Li");
+      assert.equal((await call("GET", "/api/orders?limit=20", { admin: true })).json.orders.find((order) => order.id === ordered.json.order.id).staffName, "Li");
+      const liNow = (await call("GET", "/api/admin/staff/activity", { admin: true })).json.staff.find((entry) => entry.id === li.id);
+      assert.equal(liNow.online, true);
+      assert.equal(liNow.devices.length, 1);
+      assert.deepEqual(liNow.tables, ["P1"]);
+      assert.equal(liNow.shift.receipts, 0);
+      assert.equal((await call("GET", "/api/admin/staff/activity", asLi)).status, 403, "the manager's view");
+
       // Closed on Li's device, it is anyone's.
       assert.equal((await call("DELETE", "/api/pos/tables/P1/claim", asLi)).status, 204);
       assert.equal((await call("POST", "/api/pos/tables/P1/claim", asWang)).status, 200);
@@ -989,6 +1027,9 @@ export function contractChecks(call, assert) {
         ...asLi, body: { table: takeaway.json.table, items: togoBill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: togoBill.total, tendered: togoBill.total + 5 }] }
       });
       assert.equal(liPaid.status, 201, JSON.stringify(liPaid.json));
+      const liShift = (await call("GET", "/api/admin/staff/activity", { admin: true })).json.staff.find((entry) => entry.id === li.id).shift;
+      assert.equal(liShift.receipts, 1);
+      assert.equal(liShift.payments.cash, Math.round(togoBill.total * 100), "the cash Li holds");
 
       // Settlement: Li hands in the cash Li took; Wang's is Wang's.
       const preview = (await call("GET", "/api/pos/settlement", asLi)).json.totals;
@@ -1020,6 +1061,110 @@ export function contractChecks(call, assert) {
       await call("PUT", `/api/admin/staff/${wang.id}`, { admin: true, body: { active: false } });
       for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) {
         assert.equal((await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true })).status, 204);
+      }
+    }],
+
+    ["a dish sent to the kitchen is voided with a reason, a receipt printed again as a copy, and a dish sold out", async () => {
+      const device = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Tablet V" } })).json.token;
+      const zhou = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Zhou", pin: "4321" } })).json.staff;
+      const asZhou = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: device, body: { staffId: zhou.id, pin: "4321" } })).json.token };
+      const [food] = (await call("GET", "/api/catalog")).json.products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
+      const cents = Math.round(food.price * 100);
+      assert.equal((await call("POST", "/api/pos/tables/V1/claim", asZhou)).status, 200);
+      const order = (await call("POST", "/api/pos/orders", { ...asZhou, body: { clientRequestId: "contract-void-1", table: "V1", note: "", items: [{ id: food.id, qty: 3 }] } })).json.order;
+      const line = (await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill.items[0];
+
+      // 退菜: one of three, with a reason. The order stays as sent; the bill loses one.
+      const voidOne = (body) => call("POST", "/api/pos/tables/V1/void", { ...asZhou, body: { orderItemId: line.orderItemId, ...body } });
+      assert.equal((await voidOne({ quantity: 1 })).status, 400, "a void says why");
+      assert.equal((await voidOne({ quantity: 4, reason: "zu viel" })).status, 400, "no more than is open");
+      assert.equal((await call("POST", "/api/pos/tables/V1/void", { ...asZhou, body: { orderItemId: "no-such-line", quantity: 1, reason: "x" } })).status, 404);
+      const voided = await voidOne({ quantity: 1, reason: "Gast hat storniert" });
+      assert.equal(voided.status, 201, JSON.stringify(voided.json));
+      assert.deepEqual({ quantity: voided.json.void.quantity, amountCents: voided.json.void.amountCents, staffName: voided.json.void.staffName }, { quantity: 1, amountCents: cents, staffName: "Zhou" });
+      const after = (await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill;
+      assert.equal(after.items[0].qty, 2);
+      assert.equal(Math.round(after.total * 100), cents * 2);
+      const listed = (await call("GET", "/api/orders?limit=50", { admin: true })).json.orders.find((entry) => entry.id === order.id);
+      assert.equal(listed.items[0].qty, 3, "the order as it was sent");
+      assert.equal(listed.items[0].voided, 1);
+      assert.equal(Math.round(listed.total * 100), cents * 2, "its total, less the void");
+      // The kitchen stops cooking it: a void ticket, without a price.
+      const ticket = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.find((job) => job.payload.kind === "void" && job.orderId === order.id);
+      assert.equal(ticket.printerRole, food.printStation ?? "kitchen");
+      assert.deepEqual({ reason: ticket.payload.reason, quantity: ticket.payload.items[0].quantity, staffName: ticket.payload.staffName }, { reason: "Gast hat storniert", quantity: 1, staffName: "Zhou" });
+      assert.ok(!/price|Cents/i.test(JSON.stringify(ticket.payload)), "no price on a kitchen ticket");
+      // In the journal, and on Zhou's shift.
+      const day = new Date().toISOString().slice(0, 10);
+      const next = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+      assert.ok((await call("GET", `/api/admin/journal?from=${day}&to=${next}`, { admin: true })).json.entries.some((entry) => entry.kind === "item.voided" && entry.payload.reason === "Gast hat storniert"));
+      assert.deepEqual((await call("GET", "/api/pos/settlement", asZhou)).json.totals.voids, { count: 1, cents });
+
+      // Paid, then printed again for the guest: the same receipt, marked a copy.
+      const paid = (await call("POST", "/api/admin/checkout", { ...asZhou, body: { table: "V1", items: [{ orderItemId: line.orderItemId, quantity: 2 }], payments: [{ type: "card", amount: after.total }] } })).json.receipt;
+      assert.equal(paid.totalCents, cents * 2);
+      assert.equal((await voidOne({ quantity: 1, reason: "zu spät" })).status, 404, "nothing open to void once paid");
+      assert.equal((await call("POST", `/api/admin/receipts/${paid.id}/print`, asZhou)).status, 204);
+      assert.equal((await call("POST", "/api/admin/receipts/no-such-receipt/print", asZhou)).status, 404);
+      const copy = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.find((job) => job.payload.kind === "receipt" && job.payload.copy && job.payload.receipt.id === paid.id);
+      assert.ok(copy, "the copy is on the front printer's queue");
+
+      // The last open dish voided, the rest paid: the table is settled and free.
+      await call("POST", "/api/pos/orders", { ...asZhou, body: { clientRequestId: "contract-void-2", table: "V1", note: "", items: [{ id: food.id, qty: 1 }] } });
+      const last = (await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill.items[0];
+      assert.equal((await call("POST", "/api/pos/tables/V1/void", { ...asZhou, body: { orderItemId: last.orderItemId, quantity: 1, reason: "falscher Tisch" } })).status, 201);
+      assert.equal((await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill.items.length, 0);
+      const v1 = (await call("GET", "/api/admin/tables/overview", { admin: true })).json.tables.find((entry) => entry.table === "V1");
+      assert.ok(!v1 || v1.state === "free", "nothing left on V1");
+
+      // 沽清: sold out on the POS, off the guests' menu at once; the POS still sees it, to switch back on.
+      assert.equal((await call("PUT", `/api/pos/products/${food.id}/availability`, { ...asZhou, body: { available: "no" } })).status, 400);
+      assert.equal((await call("PUT", "/api/pos/products/no-such-dish/availability", { ...asZhou, body: { available: false } })).status, 404);
+      const soldOut = await call("PUT", `/api/pos/products/${food.id}/availability`, { ...asZhou, body: { available: false } });
+      assert.equal(soldOut.status, 200);
+      assert.equal(soldOut.json.product.available, false);
+      assert.ok(!(await call("GET", "/api/catalog")).json.products.some((product) => product.id === food.id), "gone from the guests' menu");
+      const posMenu = (await call("GET", "/api/pos/catalog", asZhou)).json.products;
+      assert.equal(posMenu.find((product) => product.id === food.id).available, false, "the POS keeps it, marked");
+      assert.ok(posMenu.every((product) => product.published));
+      assert.equal((await call("POST", "/api/pos/orders", { ...asZhou, body: { clientRequestId: "contract-void-3", table: "V1", note: "", items: [{ id: food.id, qty: 1 }] } })).status, 400, "and it cannot be ordered");
+      assert.equal((await call("PUT", `/api/pos/products/${food.id}/availability`, { ...asZhou, body: { available: true } })).json.product.available, true);
+      assert.ok((await call("GET", "/api/catalog")).json.products.some((product) => product.id === food.id));
+
+      // Leave the room as it was found.
+      await call("DELETE", "/api/pos/tables/V1/claim", asZhou);
+      await call("PUT", `/api/admin/staff/${zhou.id}`, { admin: true, body: { active: false } });
+      for (const paired of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${paired.id}`, { admin: true });
+    }],
+
+    ["every write tells the console and the POS at once, and the menus only about the dishes", async () => {
+      const staff = await listen(`${liveBase}/ws?role=staff`);
+      const guest = await listen(`${liveBase}/ws?table=05`);
+      try {
+        assert.equal((await staff.next()).type, "connected");
+        assert.equal((await guest.next()).type, "connected");
+
+        // A signal, never data: the type and the table, and nothing to leak.
+        assert.equal((await call("POST", "/api/admin/tables", { admin: true, body: { table: "lv1" } })).status, 201);
+        const registered = await staff.next();
+        assert.deepEqual({ type: registered.type, table: registered.table }, { type: "floor.changed", table: "LV1" });
+        assert.deepEqual(Object.keys(registered).sort(), ["at", "table", "type"]);
+
+        // A refused write and a read say nothing; the next event is the next change.
+        assert.equal((await call("POST", "/api/admin/tables", { admin: true, body: { table: "!!" } })).status, 400);
+        await call("GET", "/api/admin/tables/overview", { admin: true });
+        assert.equal((await call("DELETE", "/api/admin/tables/LV1", { admin: true })).status, 204);
+        const removed = await staff.next();
+        assert.deepEqual({ type: removed.type, table: removed.table }, { type: "floor.changed", table: "LV1" });
+
+        // The dishes: everybody, the guests included — and the guests heard nothing before it.
+        const current = (await call("GET", "/api/admin/settings", { admin: true })).json;
+        assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { menuTitle: current.menuTitle } })).status, 200);
+        assert.equal((await staff.next()).type, "catalog.changed");
+        assert.equal((await guest.next()).type, "catalog.changed", "a guest hears of the dishes, and of nothing on the floor");
+      } finally {
+        staff.close();
+        guest.close();
       }
     }],
 

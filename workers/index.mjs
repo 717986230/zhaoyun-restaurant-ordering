@@ -16,11 +16,18 @@
  */
 import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
+import { openLive, publishLive } from "./live.mjs";
+import { liveEvent } from "../shared/live.mjs";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
-  SetPasswordBody, SettingsBody, SignInBody, TableBody, TableLockBody
+  SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody
 } from "../src/contracts.js";
 import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
+
+export { LiveHub } from "./live.mjs";
+
+/** Responses that changed nothing anyone watches (a POS keeping its table): no live event. */
+const QUIET = new WeakSet();
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 
@@ -184,8 +191,8 @@ async function requireRole(request, env, store, minimumRole) {
   if (!role) {
     // Nothing configured that could ever grant one: say so, rather than
     // counting a failure against a caller who had no way to succeed.
-    if (!expected && !(await store.adminGate()).configured) {
-      return { denied: fail("Set a password on the admin console, or configure ADMIN_TOKEN", 503) };
+    if (!expected && !(await store.accountStatus()).registered) {
+      return { denied: fail("Register the restaurant's account on the admin console, or configure ADMIN_TOKEN", 503) };
     }
     throttle.fail();
     return { denied: json({ error: "Admin authentication required" }, 401) };
@@ -202,7 +209,7 @@ async function requireRole(request, env, store, minimumRole) {
     });
     return { denied: json({ error: `This role may not perform ${minimumRole} actions` }, 403) };
   }
-  return { role, pos };
+  return { role, pos, account: session?.account ?? null };
 }
 
 /**
@@ -355,7 +362,13 @@ async function handle(request, env) {
         return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
       }
       if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
-        if (method === "POST") return json({ claim: await store.claimTable(path[3], pos) });
+        if (method === "POST") {
+          // A POS keeps its table every half minute; only taking it is news.
+          const renewing = await store.holdsTable(path[3], pos.deviceId);
+          const response = json({ claim: await store.claimTable(path[3], pos) });
+          if (renewing) QUIET.add(response);
+          return response;
+        }
         if (method === "DELETE") {
           await store.releaseTable(path[3], pos, role === "manager" && url.searchParams.get("force") === "1");
           return new Response(null, { status: 204 });
@@ -373,6 +386,25 @@ async function handle(request, env) {
         const moved = await store.moveTable(path[3], value.to, pos);
         return moved ? json(moved) : fail("Nothing open on that table", 404);
       }
+      if (path.length === 5 && path[2] === "tables" && path[4] === "void" && method === "POST") {
+        const { value, invalid } = await body(request, VoidBody);
+        if (invalid) return invalid;
+        try {
+          return json({ void: await store.voidItem(path[3], value, pos, role) }, 201);
+        } catch (error) {
+          if (error.code === "NOT_FOUND") return fail(error.message, 404);
+          throw error;
+        }
+      }
+      if (path.length === 3 && path[2] === "catalog" && method === "GET") {
+        return json({ products: (await store.listProducts(false)).filter((product) => product.published) });
+      }
+      if (path.length === 5 && path[2] === "products" && path[4] === "availability" && method === "PUT") {
+        const { value, invalid } = await body(request, AvailabilityBody);
+        if (invalid) return invalid;
+        const product = await store.setAvailable(path[3], value.available);
+        return product ? json({ product }) : fail("No such dish on the menu", 404);
+      }
       if (path.length === 3 && path[2] === "settlement") {
         const { value } = method === "POST" ? await body(request, SettlementBody) : { value: {} };
         const staffId = value?.staffId ?? url.searchParams.get("staffId") ?? pos.staff.id;
@@ -389,75 +421,76 @@ async function handle(request, env) {
     return fail("Not found", 404);
   }
 
-  if (path[0] === "api" && path[1] === "admin") {
-    /**
-     * The door of the admin console, ahead of every guarded route because it
-     * is how a caller gets something to present to them.
-     *
-     * The GET is deliberately open: it answers one bit — has a password been
-     * set — which the console needs before it can draw anything, and which
-     * anyone who tried to sign in would learn regardless.
-     */
-    if (path.length === 3 && path[2] === "gate" && method === "GET") {
-      return json(await store.adminGate());
-    }
-    if (path.length === 4 && path[2] === "gate" && path[3] === "sign-in" && method === "POST") {
-      const throttle = authThrottle(request);
-      if (throttle.denied) return throttle.denied;
-      const { value, invalid } = await body(request, SignInBody);
+  /**
+   * The restaurant's account (shared/account.mjs), as server/routes.mjs has it.
+   * `GET /api/account` is open on purpose: one bit, whether there is an account
+   * yet, which the console needs to choose between registering and signing in.
+   */
+  if (path[0] === "api" && path[1] === "account") {
+    if (path.length === 2 && method === "GET") return json(await store.accountStatus());
+    if (path.length === 2 && method === "PUT") {
+      const { denied, account } = await gate("manager");
+      if (denied) return denied;
+      if (!account) return fail("Sign in with the account to change it", 403);
+      const { value, invalid } = await body(request, AccountUpdateBody);
       if (invalid) return invalid;
-      const session = await store.signIn(value.password);
-      if (!session) {
-        throttle.fail();
-        return fail("Wrong password", 401);
-      }
-      throttle.pass();
-      return json(session);
-    }
-    /**
-     * Sets the password: once for whoever opens the console first, because
-     * there is nothing yet to prove, and thereafter only for someone who can
-     * produce the one in force.
-     *
-     * The recovery path is ADMIN_TOKEN, and it is the token that is accepted
-     * here rather than a live session on purpose: a stolen session must not be
-     * able to change the password and lock the owner out of their own menu.
-     */
-    if (path.length === 4 && path[2] === "gate" && path[3] === "password" && method === "POST") {
-      const throttle = authThrottle(request);
-      if (throttle.denied) return throttle.denied;
-      const { value, invalid } = await body(request, SetPasswordBody);
-      if (invalid) return invalid;
-      const expected = adminToken(env);
-      const recovering = Boolean(expected) && tokenMatches(request.headers.get("x-admin-token"), expected);
       try {
-        const updated = recovering
-          ? await store.resetAdminGatePassword(value.password)
-          : await store.setAdminGatePassword(value.password, value.currentPassword);
-        if (!updated) {
-          throttle.fail();
-          return fail("Wrong password", 401);
-        }
-        throttle.pass();
-        return json(updated);
+        const updated = await store.updateAccount(account.id, value);
+        return updated ? json(updated) : fail("Wrong password", 401);
       } catch (error) {
         return fail(error.message);
       }
     }
-    if (path.length === 4 && path[2] === "gate" && path[3] === "sign-out" && method === "POST") {
+    if (path.length === 3 && path[2] === "sign-out" && method === "POST") {
       const { denied } = await gate("kitchen");
       if (denied) return denied;
       await store.signOut(request.headers.get("x-admin-token"));
       return new Response(null, { status: 204, headers: SECURITY_HEADERS });
     }
+    if (path.length === 3 && method === "POST" && ["register", "sign-in", "recover"].includes(path[2])) {
+      const throttle = authThrottle(request);
+      if (throttle.denied) return throttle.denied;
+      if (path[2] === "sign-in") {
+        const { value, invalid } = await body(request, AccountSignInBody);
+        if (invalid) return invalid;
+        const session = await store.signInAccount(value.login, value.password);
+        if (!session) {
+          throttle.fail();
+          return fail("Wrong account name or password", 401);
+        }
+        throttle.pass();
+        return json(session);
+      }
+      if (path[2] === "recover") {
+        // ADMIN_TOKEN and only the token — not a live session, which a stolen tablet would carry.
+        const expected = adminToken(env);
+        if (!expected || !tokenMatches(request.headers.get("x-admin-token"), expected)) {
+          throttle.fail();
+          return fail("ADMIN_TOKEN required", 401);
+        }
+        throttle.pass();
+      }
+      const { value, invalid } = await body(request, path[2] === "register" ? RegisterBody : AccountRecoverBody);
+      if (invalid) return invalid;
+      try {
+        if (path[2] === "recover") return json(await store.recoverAccount(value));
+        const session = await store.registerAccount(value);
+        return session ? json(session, 201) : fail("This restaurant already has an account: sign in", 409);
+      } catch (error) {
+        return fail(error.message);
+      }
+    }
+    return fail("Not found", 404);
+  }
 
+  if (path[0] === "api" && path[1] === "admin") {
     // The three routes a waiter tablet and the kitchen screen legitimately
     // reach. They are guarded at their own rank, before the manager gate that
     // covers everything below them — which is what keeps the catalogue, and so
     // the menu's prices and allergen declarations, manager-only.
     if (path.length === 3 && path[2] === "session" && method === "GET") {
-      const { denied, role } = await gate("kitchen");
-      return denied || json({ role });
+      const { denied, role, account } = await gate("kitchen");
+      return denied || json(account ? { role, account } : { role });
     }
     if (path.length === 4 && path[2] === "tables" && path[3] === "open" && method === "GET") {
       const { denied } = await gate("staff");
@@ -508,6 +541,12 @@ async function handle(request, env) {
       } catch (error) {
         return fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400);
       }
+    }
+    // A receipt printed again for the guest, marked as a copy (Belegkopie).
+    if (path.length === 5 && path[2] === "receipts" && path[4] === "print" && method === "POST") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      return (await store.reprintReceipt(path[3])) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("No such receipt", 404);
     }
     if (path[2] === "receipts" && method === "GET" && path.length <= 4) {
       const { denied } = await gate("staff");
@@ -578,6 +617,9 @@ async function handle(request, env) {
     }
 
     // The waiters and the devices the POS runs on.
+    if (path.length === 4 && path[2] === "staff" && path[3] === "activity" && method === "GET") {
+      return json({ staff: await store.staffActivity() });
+    }
     if (path[2] === "staff") {
       try {
         if (path.length === 3 && method === "GET") return json({ staff: await store.listStaff() });
@@ -788,16 +830,27 @@ async function handle(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const cors = corsHeaders(request, env);
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: { ...cors, ...SECURITY_HEADERS } });
     }
+    const url = new URL(request.url);
+    if (url.pathname === "/ws") return openLive(request, env);
+    // The table a write's body names, for the live event when the path does not say.
+    const writing = !["GET", "HEAD"].includes(request.method);
+    const tableHint = writing && request.headers.get("content-type")?.includes("application/json")
+      ? request.clone().json().then((parsed) => parsed?.table, () => undefined)
+      : undefined;
     let response;
     try {
       response = await handle(request, env);
     } catch (error) {
       response = fail(error?.message || "Unhandled error", 500);
+    }
+    if (writing && !QUIET.has(response)) {
+      const event = liveEvent(request.method, url.pathname, response.status, await tableHint);
+      if (event) ctx?.waitUntil(publishLive(env, event));
     }
     if (!Object.keys(cors).length) return response;
     const headers = new Headers(response.headers);

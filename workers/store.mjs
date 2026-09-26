@@ -16,23 +16,28 @@
  * fails whole, and `retrying` works it out again from what is there now.
  */
 import {
-  adminGateView, assertOrderTransition, assertPassword, assertRequestTransition, auditView,
+  assertOrderTransition, assertPassword, assertRequestTransition, auditView,
   billView, bool, boundedLimit, duplicateInput, hashPassword, hashSessionToken, mapProduct, newSessionToken,
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
-  printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
+  printJobView, serviceRequestView, settingsView, tablesOverviewView, tableView, uuid, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL,
   verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent
 } from "../shared/rules.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
   ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, receiptPrintPayload,
-  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
+  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
 } from "../shared/register.mjs";
 import {
-  assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
-  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+  assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, OPEN_STAFF_VOIDS_SQL, SET_AVAILABLE_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
+import {
+  ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
+  DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
+  normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
+} from "../shared/account.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
 // console with no password costs the same PBKDF2 work as one with.
@@ -489,71 +494,74 @@ export function createStore(db) {
     return printerView(await first("SELECT * FROM printer_profiles WHERE id = ?", printer.id));
   }
 
-  /**
-   * The password gate and its sessions, the same decisions
-   * server/database.mjs makes — the hashing, the token shape and the session
-   * lifetime all come from shared/rules.mjs, so only the reads and writes
-   * differ here.
-   */
-  async function adminGate() {
-    return adminGateView(await first("SELECT * FROM admin_gate WHERE id = 1"));
+  // ——— The account (shared/account.mjs): the same decisions server/database.mjs
+  // makes; only the reads and writes differ.
+
+  async function accountStatus() {
+    return { registered: (await first(ACCOUNT_COUNT_SQL)).count > 0 };
   }
 
-  async function resetAdminGatePassword(password) {
-    const stored = await hashPassword(assertPassword(password));
-    await run(
-      `INSERT INTO admin_gate (id, password_hash, password_salt, password_iterations, updated_at)
-       VALUES (1, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         password_hash = excluded.password_hash,
-         password_salt = excluded.password_salt,
-         password_iterations = excluded.password_iterations,
-         updated_at = excluded.updated_at`,
-      stored.hash, stored.salt, stored.iterations, now()
-    );
-    await run("DELETE FROM admin_sessions");
-    return adminGate();
-  }
-
-  async function setAdminGatePassword(password, currentPassword) {
-    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
-    if (row) {
-      const correct = await verifyPassword(String(currentPassword ?? ""), {
-        hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations
-      });
-      if (!correct) return null;
-    }
-    return resetAdminGatePassword(password);
-  }
-
-  async function signIn(password) {
-    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
-    const stored = row
-      ? { hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations }
-      : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
-    const correct = await verifyPassword(String(password ?? ""), stored);
-    if (!row || !correct) return null;
-
+  async function openAccountSession(row) {
     const token = newSessionToken();
     const timestamp = now();
-    await run("DELETE FROM admin_sessions WHERE expires_at <= ?", timestamp);
-    await run(
-      "INSERT INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)",
-      await hashSessionToken(token), new Date(Date.now() + SESSION_TTL_MS).toISOString(), timestamp
-    );
-    return { token, expiresInMs: SESSION_TTL_MS };
+    await run(DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, timestamp);
+    await run(INSERT_ACCOUNT_SESSION_SQL, await hashSessionToken(token), row.id, new Date(Date.now() + ACCOUNT_SESSION_TTL_MS).toISOString(), timestamp);
+    return { token, expiresInMs: ACCOUNT_SESSION_TTL_MS, account: accountView(row) };
+  }
+
+  async function registerAccount(input) {
+    const { login, name, password } = normalizeRegistration(input);
+    const stored = await hashPassword(password);
+    const timestamp = now();
+    const id = uuid();
+    if (!(await run(REGISTER_ACCOUNT_SQL, id, login, name, stored.hash, stored.salt, stored.iterations, timestamp, timestamp))) return null;
+    return openAccountSession(await first(ACCOUNT_BY_ID_SQL, id));
+  }
+
+  async function signInAccount(loginInput, password) {
+    const row = await first(ACCOUNT_BY_LOGIN_SQL, String(loginInput ?? "").trim().toLowerCase());
+    const stored = row ? storedPassword(row) : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(password ?? ""), stored);
+    return row && correct ? openAccountSession(row) : null;
+  }
+
+  async function updateAccount(accountId, input) {
+    const row = await first(ACCOUNT_BY_ID_SQL, String(accountId));
+    if (!row || !(await verifyPassword(String(input?.currentPassword ?? ""), storedPassword(row)))) return null;
+    const login = input.login === undefined ? row.login : normalizeLogin(input.login);
+    const name = input.name === undefined ? row.name : normalizeAccountName(input.name, login);
+    const stored = input.password === undefined ? storedPassword(row) : await hashPassword(assertPassword(input.password));
+    if (login !== row.login && (await first(ACCOUNT_BY_LOGIN_SQL, login))) throw new Error("That account name is taken");
+    await run(UPDATE_ACCOUNT_SQL, login, name, stored.hash, stored.salt, stored.iterations, now(), row.id);
+    if (input.password !== undefined) await run(DELETE_ACCOUNT_SESSIONS_SQL, row.id);
+    const updated = await first(ACCOUNT_BY_ID_SQL, row.id);
+    return input.password !== undefined ? openAccountSession(updated) : { account: accountView(updated) };
+  }
+
+  async function recoverAccount(input) {
+    const owner = await first(OWNER_ACCOUNT_SQL);
+    if (!owner) {
+      await registerAccount({ login: input?.login ?? MIGRATED_LOGIN, name: input?.name, password: input?.password });
+      return { account: accountView(await first(OWNER_ACCOUNT_SQL)) };
+    }
+    const login = input?.login === undefined ? owner.login : normalizeLogin(input.login);
+    const stored = await hashPassword(assertPassword(input?.password));
+    await run(UPDATE_ACCOUNT_SQL, login, normalizeAccountName(input?.name ?? owner.name, login), stored.hash, stored.salt, stored.iterations, now(), owner.id);
+    await run(DELETE_ACCOUNT_SESSIONS_SQL, owner.id);
+    return { account: accountView(await first(ACCOUNT_BY_ID_SQL, owner.id)) };
   }
 
   async function roleForSession(token) {
     if (!token) return null;
-    const row = await first("SELECT * FROM admin_sessions WHERE token_hash = ?", await hashSessionToken(token));
-    // Not the console's: a waiter signed in on a POS device, perhaps.
+    const tokenHash = await hashSessionToken(token);
+    const row = await first(ACCOUNT_SESSION_SQL, tokenHash);
+    // Not the account's: a waiter signed in on a POS device, perhaps.
     if (!row) return posSession(token);
     if (row.expires_at <= now()) {
-      await run("DELETE FROM admin_sessions WHERE token_hash = ?", row.token_hash);
+      await run(DELETE_ACCOUNT_SESSION_SQL, tokenHash);
       return null;
     }
-    return { role: "manager" };
+    return { role: "manager", account: accountView(row) };
   }
 
   // ——— The POS (shared/pos.mjs): devices, waiters, open tables, takeaway, settlement.
@@ -633,6 +641,10 @@ export function createStore(db) {
     return claimView(row, at);
   }
 
+  async function holdsTable(tableInput, deviceId) {
+    return holdsClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(tableInput).trim().toUpperCase()), deviceId);
+  }
+
   async function newTakeaway(pos) {
     const since = `${now().slice(0, 10)}T00:00:00.000Z`;
     let next = (await first(NEXT_PICKUP_SQL, since))?.next ?? 1;
@@ -665,13 +677,52 @@ export function createStore(db) {
     });
   }
 
+  async function reprintReceipt(id) {
+    const view = await receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", String(id)));
+    if (!view) return false;
+    const at = now();
+    await printStatement(receiptPrintPayload(view, await getSettings(), { copy: true }), at).run();
+    return true;
+  }
+
+  async function setAvailable(id, available) {
+    if (!(await run(SET_AVAILABLE_SQL, available ? 1 : 0, now(), String(id)))) return null;
+    return getProduct(String(id));
+  }
+
+  /**
+   * Takes dishes sent to the kitchen off this table's bill (shared/register.mjs,
+   * planVoid). Two voids of the same dish at once read the same journal entry;
+   * the second batch fails on its number and is worked out again.
+   */
+  async function voidItem(tableInput, input, pos, role) {
+    const table = normalizeTableNo(tableInput);
+    return retrying(async () => {
+      const last = await lastJournal();
+      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", table), pos.deviceId);
+      const at = now();
+      const plan = planVoid(input, await first(VOID_ITEM_SQL, String(input?.orderItemId ?? "")), { table, staff: pos.staff, role, at });
+      const entry = plan.void;
+      await db.batch([
+        db.prepare(INSERT_VOID_SQL).bind(entry.id, entry.orderItemId, entry.orderId, entry.table, entry.quantity, entry.amountCents, entry.reason, entry.staffId, entry.staffName, at),
+        db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)")
+          .bind(plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at),
+        await journalStatement(last, plan.journal.kind, plan.journal.ref, plan.journal.payload, at),
+        // The last open dish voided, and the rest paid: the table is settled.
+        db.prepare(SETTLE_PAID_TABLE_SQL).bind(at, at, table, table),
+        db.prepare(UNLOCK_PAID_TABLE_SQL).bind(at, table, table)
+      ]);
+      return { id: entry.id, orderItemId: entry.orderItemId, quantity: entry.quantity, amountCents: entry.amountCents, reason: entry.reason, staffName: entry.staffName, createdAt: at };
+    });
+  }
+
   async function settleStaff(staffId, role) {
     return retrying(async () => {
       const last = await lastJournal();
       const staff = await first("SELECT * FROM staff WHERE id = ?", String(staffId));
       const rows = staff ? await all(OPEN_STAFF_RECEIPTS_SQL, staff.id, staff.id) : [];
       if (!rows.length) return null;
-      const totals = settlementTotals(rows);
+      const totals = settlementTotals(rows, await all(OPEN_STAFF_VOIDS_SQL, staff.id, staff.id));
       const id = uuid();
       const at = now();
       const view = settlementView({ id, staff_id: staff.id, staff_name: staff.name, totals_json: JSON.stringify(totals), created_at: at });
@@ -687,7 +738,7 @@ export function createStore(db) {
 
   async function signOut(token) {
     if (!token) return false;
-    return (await run("DELETE FROM admin_sessions WHERE token_hash = ?", await hashSessionToken(token))) > 0;
+    return (await run(DELETE_ACCOUNT_SESSION_SQL, await hashSessionToken(token))) > 0;
   }
 
   async function getSettings() {
@@ -729,7 +780,7 @@ export function createStore(db) {
     getMediaFile,
     storeMedia,
     listOrders: async (limit = 100) => {
-      const rows = await all("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?", boundedLimit(limit));
+      const rows = await all(RECENT_ORDERS_SQL, boundedLimit(limit));
       return Promise.all(rows.map(viewOrder));
     },
     createOrder,
@@ -743,10 +794,11 @@ export function createStore(db) {
     deletePrinter: async (id) => (await run("DELETE FROM printer_profiles WHERE id = ?", String(id))) > 0,
     getSettings,
     saveSettings,
-    adminGate,
-    setAdminGatePassword,
-    resetAdminGatePassword,
-    signIn,
+    accountStatus,
+    registerAccount,
+    signInAccount,
+    updateAccount,
+    recoverAccount,
     signOut,
     roleForSession,
     pairDevice,
@@ -758,13 +810,17 @@ export function createStore(db) {
     posSignIn,
     posSignOut: async (token) => (token ? (await run("DELETE FROM pos_sessions WHERE token_hash = ?", await hashSessionToken(token))) > 0 : false),
     claimTable,
+    holdsTable,
+    voidItem,
+    reprintReceipt,
+    setAvailable,
     releaseTable: async (table, pos, force = false) =>
       (await run("DELETE FROM table_claims WHERE table_no = ? AND (device_id = ? OR ? = 1)", String(table).trim().toUpperCase(), pos.deviceId, force ? 1 : 0)) > 0,
     liveClaims: async () => (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row)),
     newTakeaway,
     moveTable,
     settleStaff,
-    staffSettlementPreview: async (staffId) => settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, String(staffId), String(staffId))),
+    staffSettlementPreview: async (staffId) => settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, String(staffId), String(staffId)), await all(OPEN_STAFF_VOIDS_SQL, String(staffId), String(staffId))),
     listSettlements: async (limit = 30) => (await all("SELECT * FROM staff_settlements ORDER BY created_at DESC LIMIT ?", Math.min(Number(limit) || 30, 200))).map(settlementView),
     listPrintJobs: async (status = "queued", limit = 100) =>
       (await all("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?", String(status), boundedLimit(limit)))
@@ -862,20 +918,17 @@ export function createStore(db) {
      * than not appearing at all.
      */
     tablesOverview: async () => {
-      const orderRows = await all("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at");
-      const byTable = new Map();
-      for (const row of orderRows) {
-        const list = byTable.get(row.table_no) ?? [];
-        list.push(await viewOrder(row));
-        byTable.set(row.table_no, list);
-      }
-      const rows = await all("SELECT * FROM restaurant_tables ORDER BY table_no");
-      const known = new Set(rows.map((row) => row.table_no));
-      const overview = rows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? []));
-      for (const [tableNo, orders] of byTable) {
-        if (!known.has(tableNo)) overview.push(tableOverviewView(null, orders, tableNo));
-      }
-      return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+      const orders = [];
+      for (const row of await all(OPEN_TABLE_ORDERS_SQL)) orders.push(await viewOrder(row));
+      const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
+      return tablesOverviewView(await all("SELECT * FROM restaurant_tables ORDER BY table_no"), orders, claims);
+    },
+    staffActivity: async () => {
+      const staffRows = await all("SELECT * FROM staff ORDER BY active DESC, name");
+      const shifts = new Map();
+      for (const row of staffRows) shifts.set(row.id, settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, row.id, row.id), await all(OPEN_STAFF_VOIDS_SQL, row.id, row.id)));
+      const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
+      return staffActivityView(staffRows, await all(LIVE_POS_SESSIONS_SQL, now()), claims, shifts);
     },
     openBillTables: async () =>
       (await all("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"))

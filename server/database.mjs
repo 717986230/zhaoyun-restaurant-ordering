@@ -7,22 +7,27 @@ import { dishPhotos } from "./dish-photos.mjs";
 import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
-  adminGateView, assertPassword, assertSetServed, auditView, billView, hashPassword,
+  assertPassword, assertSetServed, auditView, billView, hashPassword,
   duplicateInput, hashSessionToken, newSessionToken, normalizeCategoryName, normalizeSettingsInput,
   mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT,
-  normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
-  renamedCategorySettings, tableOverviewView, tableView, verifyPassword
+  normalizeTableNo, PASSWORD_ITERATIONS, settingsView,
+  orderView as sharedOrderView, renamedCategorySettings, tablesOverviewView, tableView, verifyPassword, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL
 } from "../shared/rules.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, companyOf, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL, INSERT_RECEIPT_SQL,
   INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL, ORDER_ITEMS_SQL, ORDER_PAID_SQL,
   orderJournalPayload, planCheckout, planStorno, plannedReceiptView, receiptPrintPayload, receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL,
-  UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
+  UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
 } from "../shared/register.mjs";
 import {
-  assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
-  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+  assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, OPEN_STAFF_VOIDS_SQL, SET_AVAILABLE_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
+import {
+  ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
+  DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
+  normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
+} from "../shared/account.mjs";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
 // password yet still spends the same PBKDF2 work as one that does, so the
@@ -240,6 +245,22 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- Dishes taken off a bill after they went to the kitchen (退菜), each
+    -- with its reason and who did it; the order stays as it was sent
+    -- (shared/register.mjs, planVoid). See migrations/0056_item_voids.sql.
+    CREATE TABLE IF NOT EXISTS order_item_voids (
+      id TEXT PRIMARY KEY,
+      order_item_id TEXT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+      order_id TEXT NOT NULL,
+      table_no TEXT NOT NULL,
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      amount_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS staff_settlements (
       id TEXT PRIMARY KEY,
       staff_id TEXT NOT NULL,
@@ -373,12 +394,44 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- The restaurant's account (shared/account.mjs): registered once, signed
+    -- in with its name and password; the waiters are under it. admin_gate and
+    -- admin_sessions above are the one-password door it replaced, kept only
+    -- so a password set there becomes the account "admin" and still works.
+    -- See migrations/0055_accounts.sql.
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      login TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_iterations INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS account_sessions (
+      token_hash TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at)
+    SELECT 'owner', 'admin', 'Admin', password_hash, password_salt, password_iterations, updated_at, updated_at
+    FROM admin_gate WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM accounts);
+    DELETE FROM admin_gate;
+    DELETE FROM admin_sessions;
+
     -- Hours were briefly kept per dish; they belong to the promotions and set
     -- menus pages (app_settings). See migrations/0052_drop_product_schedules.sql.
     DROP TABLE IF EXISTS product_schedules;
 
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_account_sessions_expiry ON account_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_order_item_voids_item ON order_item_voids(order_item_id);
+    CREATE INDEX IF NOT EXISTS idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
@@ -498,7 +551,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     recentClosings: db.prepare("SELECT * FROM day_closings ORDER BY closing_no DESC LIMIT ?"),
     journalBetween: db.prepare("SELECT * FROM journal WHERE at >= ? AND at < ? ORDER BY seq"),
     journalBySeq: db.prepare("SELECT * FROM journal WHERE seq = ?"),
-    listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC, rowid DESC LIMIT ?"),
+    listOrders: db.prepare(RECENT_ORDERS_SQL),
     openBillOrders: db.prepare("SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at"),
     openBillTables: db.prepare("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"),
     insertOrder: db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)"),
@@ -528,22 +581,23 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     `),
     deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
-    openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
-    getAdminGate: db.prepare("SELECT * FROM admin_gate WHERE id = 1"),
-    setAdminGate: db.prepare(`
-      INSERT INTO admin_gate (id, password_hash, password_salt, password_iterations, updated_at)
-      VALUES (1, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        password_hash = excluded.password_hash,
-        password_salt = excluded.password_salt,
-        password_iterations = excluded.password_iterations,
-        updated_at = excluded.updated_at
-    `),
-    insertSession: db.prepare("INSERT INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)"),
-    sessionByHash: db.prepare("SELECT * FROM admin_sessions WHERE token_hash = ?"),
-    deleteSession: db.prepare("DELETE FROM admin_sessions WHERE token_hash = ?"),
-    deleteAllSessions: db.prepare("DELETE FROM admin_sessions"),
-    deleteExpiredSessions: db.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?"),
+    openOrdersForTables: db.prepare(OPEN_TABLE_ORDERS_SQL),
+    livePosSessions: db.prepare(LIVE_POS_SESSIONS_SQL),
+    openStaffVoids: db.prepare(OPEN_STAFF_VOIDS_SQL),
+    setAvailable: db.prepare(SET_AVAILABLE_SQL),
+    voidItem: db.prepare(VOID_ITEM_SQL),
+    insertVoid: db.prepare(INSERT_VOID_SQL),
+    accountCount: db.prepare(ACCOUNT_COUNT_SQL),
+    accountById: db.prepare(ACCOUNT_BY_ID_SQL),
+    accountByLogin: db.prepare(ACCOUNT_BY_LOGIN_SQL),
+    ownerAccount: db.prepare(OWNER_ACCOUNT_SQL),
+    registerAccount: db.prepare(REGISTER_ACCOUNT_SQL),
+    updateAccount: db.prepare(UPDATE_ACCOUNT_SQL),
+    insertAccountSession: db.prepare(INSERT_ACCOUNT_SESSION_SQL),
+    accountSession: db.prepare(ACCOUNT_SESSION_SQL),
+    deleteAccountSession: db.prepare(DELETE_ACCOUNT_SESSION_SQL),
+    deleteAccountSessions: db.prepare(DELETE_ACCOUNT_SESSIONS_SQL),
+    deleteExpiredAccountSessions: db.prepare(DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL),
     getSettings: db.prepare("SELECT * FROM restaurant_settings WHERE id = 1"),
     allAppSettings: db.prepare("SELECT key, value FROM app_settings"),
     setAppSetting: db.prepare(`
@@ -657,30 +711,9 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return getProduct(productId);
   }
 
+  /** The shared view (shared/rules.mjs), with the order's lines read here. */
   function orderView(row) {
-    if (!row) return null;
-    return {
-      id: row.id,
-      no: row.order_no,
-      clientRequestId: row.client_request_id,
-      table: row.table_no,
-      status: row.status,
-      note: row.note,
-      total: row.total_cents / 100,
-      items: statements.orderItems.all(row.id).map((item) => ({
-        id: item.product_id,
-        name: item.product_name,
-        qty: item.quantity,
-        paid: item.paid_quantity ?? 0,
-        unitPrice: item.unit_price_cents / 100,
-        printStation: item.print_station,
-        vatPercent: item.vat_percent,
-        modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
-      })),
-      billedAt: row.billed_at ?? null,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
+    return row ? sharedOrderView(row, statements.orderItems.all(row.id)) : null;
   }
 
   function serviceRequestView(row) {
@@ -1014,6 +1047,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return claimView(row, at);
   }
 
+  function holdsTable(tableInput, deviceId) {
+    return holdsClaim(statements.claimByTable.get(String(tableInput).trim().toUpperCase()), deviceId);
+  }
+
   /** Closes a table on this device; a manager may close it on any. */
   function releaseTable(tableInput, pos, force = false) {
     return statements.releaseClaim.run(String(tableInput).trim().toUpperCase(), pos.deviceId, force ? 1 : 0).changes > 0;
@@ -1058,6 +1095,44 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     }
   }
 
+  /** A receipt on the front printer again, marked as a copy (Belegkopie). False when there is no such receipt. */
+  function reprintReceipt(id) {
+    const view = receiptDetail(statements.receiptById.get(String(id)));
+    if (!view) return false;
+    const at = now();
+    statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, getSettings(), { copy: true })), at, at);
+    return true;
+  }
+
+  /** Sold out, or back on (沽清). Null for a dish that is not on the menu. */
+  function setAvailable(id, available) {
+    if (!statements.setAvailable.run(available ? 1 : 0, now(), String(id)).changes) return null;
+    return getProduct(String(id));
+  }
+
+  /** Takes dishes sent to the kitchen off this table's bill (shared/register.mjs, planVoid). */
+  function voidItem(tableInput, input, pos, role) {
+    const table = normalizeTableNo(tableInput);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      assertClaim(statements.claimByTable.get(table), pos.deviceId);
+      const at = now();
+      const plan = planVoid(input, statements.voidItem.get(String(input?.orderItemId ?? "")), { table, staff: pos.staff, role, at });
+      const entry = plan.void;
+      statements.insertVoid.run(entry.id, entry.orderItemId, entry.orderId, entry.table, entry.quantity, entry.amountCents, entry.reason, entry.staffId, entry.staffName, at);
+      statements.insertPrintJob.run(plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at);
+      journal(plan.journal.kind, plan.journal.ref, plan.journal.payload, at);
+      // The last open dish voided, and the rest paid: the table is settled.
+      statements.settlePaidTable.run(at, at, table, table);
+      statements.unlockPaidTable.run(at, table, table);
+      db.exec("COMMIT");
+      return { id: entry.id, orderItemId: entry.orderItemId, quantity: entry.quantity, amountCents: entry.amountCents, reason: entry.reason, staffName: entry.staffName, createdAt: at };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   /** A waiter's settlement at the end of the shift. Null when they took nothing since the last. */
   function settleStaff(staffId, role) {
     db.exec("BEGIN IMMEDIATE");
@@ -1068,7 +1143,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         db.exec("COMMIT");
         return null;
       }
-      const totals = settlementTotals(rows);
+      const totals = settlementTotals(rows, statements.openStaffVoids.all(staff.id, staff.id));
       const id = randomUUID();
       const at = now();
       statements.insertSettlement.run(id, staff.id, staff.name, totals.lastReceiptNo, JSON.stringify(totals), at);
@@ -1160,80 +1235,93 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     };
   }
 
-  function adminGate() {
-    return adminGateView(statements.getAdminGate.get());
+  // ——— The account (shared/account.mjs): registration, sign-in, sessions.
+
+  function accountStatus() {
+    return { registered: statements.accountCount.get().count > 0 };
   }
 
-  /** Sets the password without asking for the current one. Only the ADMIN_TOKEN
-   *  recovery route and a first-run set reach this. */
-  async function resetAdminGatePassword(password) {
-    const stored = await hashPassword(assertPassword(password));
-    statements.setAdminGate.run(stored.hash, stored.salt, stored.iterations, now());
-    // Changing the password ends every session opened with the old one; that
-    // is most of the reason anyone changes it.
-    statements.deleteAllSessions.run();
-    return adminGateView(statements.getAdminGate.get());
+  async function openAccountSession(row) {
+    const token = newSessionToken();
+    const timestamp = now();
+    statements.deleteExpiredAccountSessions.run(timestamp);
+    statements.insertAccountSession.run(await hashSessionToken(token), row.id, new Date(Date.now() + ACCOUNT_SESSION_TTL_MS).toISOString(), timestamp);
+    return { token, expiresInMs: ACCOUNT_SESSION_TTL_MS, account: accountView(row) };
+  }
+
+  /** The first account, and only the first: null once one exists. */
+  async function registerAccount(input) {
+    const { login, name, password } = normalizeRegistration(input);
+    const stored = await hashPassword(password);
+    const timestamp = now();
+    const id = randomUUID();
+    if (!statements.registerAccount.run(id, login, name, stored.hash, stored.salt, stored.iterations, timestamp, timestamp).changes) return null;
+    return openAccountSession(statements.accountById.get(id));
+  }
+
+  /** An account name and its password for a session, or null — an unknown
+   *  name costs the same PBKDF2 work as a wrong password, so timing says nothing. */
+  async function signInAccount(loginInput, password) {
+    const row = statements.accountByLogin.get(String(loginInput ?? "").trim().toLowerCase());
+    const stored = row ? storedPassword(row) : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(password ?? ""), stored);
+    return row && correct ? openAccountSession(row) : null;
   }
 
   /**
-   * Sets the console's password: once with no current password, because the
-   * first person through the door has none to give, and thereafter only for
-   * someone who can produce the one in force.
-   *
-   * Returns null rather than throwing on a wrong current password, so the
-   * caller answers it the way it answers a wrong sign-in — one refusal, no
-   * detail — and its rate limiter counts it.
+   * Changes the account's name, its display name or its password, always
+   * against the password in force — a session left open on a counter must not
+   * be enough to take the account over. A new password ends every session and
+   * hands this one a fresh token. Null on a wrong current password.
    */
-  async function setAdminGatePassword(password, currentPassword) {
-    const row = statements.getAdminGate.get();
-    if (row) {
-      const correct = await verifyPassword(String(currentPassword ?? ""), {
-        hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations
-      });
-      if (!correct) return null;
+  async function updateAccount(accountId, input) {
+    const row = statements.accountById.get(String(accountId));
+    if (!row || !(await verifyPassword(String(input?.currentPassword ?? ""), storedPassword(row)))) return null;
+    const login = input.login === undefined ? row.login : normalizeLogin(input.login);
+    const name = input.name === undefined ? row.name : normalizeAccountName(input.name, login);
+    const stored = input.password === undefined ? storedPassword(row) : await hashPassword(assertPassword(input.password));
+    if (login !== row.login && statements.accountByLogin.get(login)) throw new Error("That account name is taken");
+    statements.updateAccount.run(login, name, stored.hash, stored.salt, stored.iterations, now(), row.id);
+    if (input.password !== undefined) statements.deleteAccountSessions.run(row.id);
+    const updated = statements.accountById.get(row.id);
+    return input.password !== undefined ? openAccountSession(updated) : { account: accountView(updated) };
+  }
+
+  /**
+   * The way back in with ADMIN_TOKEN when the password is forgotten: sets the
+   * owner's password (and name, if given), or registers the owner when there
+   * is no account yet. Every session of the owner ends.
+   */
+  async function recoverAccount(input) {
+    const owner = statements.ownerAccount.get();
+    if (!owner) {
+      await registerAccount({ login: input?.login ?? MIGRATED_LOGIN, name: input?.name, password: input?.password });
+      return { account: accountView(statements.ownerAccount.get()) };
     }
-    return resetAdminGatePassword(password);
+    const login = input?.login === undefined ? owner.login : normalizeLogin(input.login);
+    const stored = await hashPassword(assertPassword(input?.password));
+    statements.updateAccount.run(login, normalizeAccountName(input?.name ?? owner.name, login), stored.hash, stored.salt, stored.iterations, now(), owner.id);
+    statements.deleteAccountSessions.run(owner.id);
+    return { account: accountView(statements.accountById.get(owner.id)) };
   }
 
-  /** Exchanges the password for a session token, or nothing at all. */
-  async function signIn(password) {
-    const row = statements.getAdminGate.get();
-    const stored = row
-      ? { hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations }
-      // Verify against a throwaway hash anyway, so an unconfigured gate does
-      // not answer faster than a wrong password and say so by timing.
-      : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
-    const correct = await verifyPassword(String(password ?? ""), stored);
-    if (!row || !correct) return null;
-
-    const token = newSessionToken();
-    const timestamp = now();
-    statements.deleteExpiredSessions.run(timestamp);
-    statements.insertSession.run(
-      await hashSessionToken(token),
-      new Date(Date.now() + SESSION_TTL_MS).toISOString(), timestamp
-    );
-    return { token, expiresInMs: SESSION_TTL_MS };
-  }
-
-  /** The role behind a session token, or null — expired and revoked look the
-   *  same to a caller, which is what they should. Past the gate there is only
-   *  one role, and it is manager: this is the owner's own console. */
+  /** Who a token belongs to: the account (as manager), a waiter on a POS
+   *  device, or nobody — expired and revoked look the same to a caller. */
   async function roleForSession(token) {
     if (!token) return null;
-    const row = statements.sessionByHash.get(await hashSessionToken(token));
-    // Not the console's: a waiter signed in on a POS device, perhaps.
+    const tokenHash = await hashSessionToken(token);
+    const row = statements.accountSession.get(tokenHash);
     if (!row) return posSession(token);
     if (row.expires_at <= now()) {
-      statements.deleteSession.run(row.token_hash);
+      statements.deleteAccountSession.run(tokenHash);
       return null;
     }
-    return { role: "manager" };
+    return { role: "manager", account: accountView(row) };
   }
 
   async function signOut(token) {
     if (!token) return false;
-    return statements.deleteSession.run(await hashSessionToken(token)).changes > 0;
+    return statements.deleteAccountSession.run(await hashSessionToken(token)).changes > 0;
   }
 
   function getSettings() {
@@ -1398,11 +1486,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     posSignOut,
     claimTable,
     releaseTable,
+    holdsTable,
+    voidItem,
+    reprintReceipt,
+    setAvailable,
     liveClaims: () => statements.liveClaims.all(now()).map((row) => claimView(row)),
     newTakeaway,
     moveTable,
     settleStaff,
-    staffSettlementPreview: (staffId) => settlementTotals(statements.openStaffReceipts.all(String(staffId), String(staffId))),
+    staffSettlementPreview: (staffId) => settlementTotals(statements.openStaffReceipts.all(String(staffId), String(staffId)), statements.openStaffVoids.all(String(staffId), String(staffId))),
     listSettlements: (limit = 30) => statements.recentSettlements.all(Math.min(Number(limit) || 30, 200)).map(settlementView),
     checkout,
     stornoReceipt,
@@ -1431,20 +1523,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
      * that was deleted, or typed a number — so it appears as seated rather
      * than not appearing at all.
      */
-    tablesOverview: () => {
-      const byTable = new Map();
-      for (const row of statements.openOrdersForTables.all()) {
-        const list = byTable.get(row.table_no) ?? [];
-        list.push(orderView(row, statements.orderItems.all(row.id)));
-        byTable.set(row.table_no, list);
-      }
-      const rows = statements.listTables.all();
-      const known = new Set(rows.map((row) => row.table_no));
-      const overview = rows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? []));
-      for (const [tableNo, orders] of byTable) {
-        if (!known.has(tableNo)) overview.push(tableOverviewView(null, orders, tableNo));
-      }
-      return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+    tablesOverview: () => tablesOverviewView(
+      statements.listTables.all(),
+      statements.openOrdersForTables.all().map((row) => orderView(row)),
+      statements.liveClaims.all(now()).map((row) => claimView(row))
+    ),
+    staffActivity: () => {
+      const staffRows = statements.listStaff.all();
+      const shifts = new Map(staffRows.map((row) => [row.id, settlementTotals(statements.openStaffReceipts.all(row.id, row.id), statements.openStaffVoids.all(row.id, row.id))]));
+      return staffActivityView(staffRows, statements.livePosSessions.all(now()), statements.liveClaims.all(now()).map((row) => claimView(row)), shifts);
     },
     setTableLock: (table, locked) => {
       const tableNo = normalizeTableNo(table);
@@ -1463,10 +1550,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
     getSettings,
     saveSettings,
-    adminGate,
-    setAdminGatePassword,
-    resetAdminGatePassword,
-    signIn,
+    accountStatus,
+    registerAccount,
+    signInAccount,
+    updateAccount,
+    recoverAccount,
     signOut,
     roleForSession,
     listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map(printJobView),

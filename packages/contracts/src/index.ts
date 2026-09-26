@@ -65,10 +65,14 @@ export interface ApiOrder {
   status: OrderStatus;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for. */ paid?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
+  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for, and was voided. */ paid?: number; voided?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
   createdAt: string;
   updatedAt?: string;
   billedAt?: string | null;
+  /** The waiter who took it on a POS; absent for a guest's own order. */
+  staffName?: string;
+  /** A takeaway's pickup number. */
+  pickupNo?: number;
 }
 
 export type PrintStationName = "kitchen" | "bar" | "sushi" | "front";
@@ -173,11 +177,33 @@ export interface ApiJournalEntry { seq: number; at: string; kind: string; ref: s
 export interface ApiJournalExport { entries: ApiJournalEntry[]; verification: { ok: boolean; brokenAt: number | null; reason: "chain" | "content" | null } }
 
 /** The POS (shared/pos.mjs). */
+/** The restaurant's account (shared/account.mjs): what the owner registers and signs in with. */
+export interface ApiAccount { id: string; login: string; name: string; createdAt: string }
+export interface AccountSession { token: string; expiresInMs: number; account: ApiAccount }
+export interface RegisterCommand { login: string; name?: string; password: string }
+/** Every change is made against the password in force. */
+export interface AccountUpdateCommand { currentPassword: string; login?: string; name?: string; password?: string }
+
 export interface PosStaff { id: string; name: string; role: "staff" | "manager"; active?: boolean }
 export interface PosDevice { id: string; name: string; createdAt: string; lastSeenAt: string | null }
 /** A table open on a device, locked to it until closed or left alone. */
 export interface PosClaim { table: string; deviceId: string; staffId: string | null; staffName: string | null; expiresAt: string }
-export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number }; createdAt: string }
+/** A waiter as the manager watches the floor (GET /api/admin/staff/activity). */
+export interface PosStaffActivity extends PosStaff {
+  online: boolean;
+  /** The devices they are signed in on now. */
+  devices: string[];
+  /** The tables they have open now. */
+  tables: string[];
+  /** Since their last settlement: what they took, the cash they hold included. */
+  shift: ApiClosingTotals & { receipts: number; voids: PosVoidTotals };
+}
+
+/** What a waiter voided since their last settlement (退菜). */
+export interface PosVoidTotals { count: number; cents: number }
+/** Dishes taken off a bill after they went to the kitchen. */
+export interface PosVoid { id: string; orderItemId: string; quantity: number; amountCents: number; reason: string; staffName: string | null; createdAt: string }
+export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number; voids?: PosVoidTotals }; createdAt: string }
 
 export interface ApiServiceRequest {
   id: string;
@@ -286,8 +312,13 @@ export interface ApiPrintJob {
 export type ApiOrderStatus = OrderStatus;
 export type ApiServiceRequestStatus = ServiceStatus;
 
-export interface RealtimeEnvelope<T = unknown> {
-  type: "connected" | "catalog.changed" | "order.changed" | "service.changed" | "print.queued" | "bill.settled";
-  payload?: T;
+/**
+ * What the live channel (/ws) says: a signal, never data (shared/live.mjs).
+ * `connected` comes first on every (re)connection — a cue to fetch, since
+ * anything may have changed while the socket was away.
+ */
+export interface RealtimeEnvelope {
+  type: "connected" | "catalog.changed" | "floor.changed";
+  table?: string;
   at: string;
 }

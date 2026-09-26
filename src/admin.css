@@ -152,6 +152,19 @@ button {
   box-shadow: 0 0 0 3px var(--a-ok-ring);
 }
 
+/* Live: the floor arrives as it happens, so the dot breathes. */
+.admin-status.online.live {
+  animation: admin-live 2.4s ease-in-out infinite;
+}
+
+@keyframes admin-live {
+  50% { box-shadow: 0 0 0 5px var(--a-ok-ring); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-status.online.live { animation: none; }
+}
+
 .admin-head-actions {
   flex-shrink: 0;
   display: flex;
@@ -841,6 +854,76 @@ h2 {
 /* The room, one tile per table. Two columns on a phone is unreadable for a
    tile that carries an order list, so the tiles set a minimum and the grid
    decides how many fit. */
+/* The waiters now: who is signed in where, their tables, their shift. */
+.staff-live {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.staff-live-card {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 10px 12px;
+}
+
+.staff-live-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--a-muted);
+}
+
+.staff-live-card .staff-live-shift {
+  color: var(--a-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-live-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.staff-live-head small {
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--a-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-live-head i {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--a-idle);
+}
+
+.staff-live-card.online .staff-live-head i {
+  background: var(--a-ok);
+}
+
+em.voided {
+  color: var(--a-danger);
+  font-style: normal;
+}
+
+.table-open-on {
+  align-self: flex-start;
+  border-radius: 999px;
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .table-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

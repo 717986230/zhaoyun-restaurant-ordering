@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiBill, PaymentType } from "@zhaoyun/contracts";
-import { api } from "./App";
+import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 
 const HOLD_MS = 30_000;
@@ -28,22 +28,32 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [busy, setBusy] = useState(false);
   const requestId = useRef(crypto.randomUUID());
 
-  const load = useCallback(async (keepSeparate: boolean) => {
+  /**
+   * `picks`: "all" takes every open line (together), "none" starts a guest
+   * afresh (separately, after a receipt), "keep" keeps what is picked — a
+   * guest's QR order arriving must not undo the waiter's picking.
+   */
+  const load = useCallback(async (picking: "all" | "none" | "keep") => {
     try {
       const { bill: loaded } = await api.bill(table);
       setBill(loaded);
-      setPicks(keepSeparate ? {} : Object.fromEntries(loaded.items.map((item) => [item.orderItemId, item.qty])));
+      setPicks((current) => Object.fromEntries(loaded.items.flatMap((item) => {
+        const count = picking === "all" ? item.qty : picking === "keep" ? Math.min(current[item.orderItemId] ?? 0, item.qty) : 0;
+        return count ? [[item.orderItemId, count]] : [];
+      })));
       return loaded;
     } catch (error) { pos.failed(error); return null; }
   }, [table, pos.failed]);
 
   useEffect(() => {
-    void load(false);
+    void load("all");
     if (takeaway) api.floor().then((floor) => setDiscount(floor.takeawayDiscountPercent)).catch(() => undefined);
     void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
     return () => { window.clearInterval(hold); void api.release(table).catch(() => undefined); };
   }, [table, takeaway, load, pos.failed]);
+
+  useLiveReload(pos, (event) => event.type === "floor.changed" && event.table === table, () => void load(separate ? "keep" : "all"));
 
   const lines = bill?.items ?? [];
   const itemsCents = lines.reduce((sum, item) => sum + Math.round(item.unitPrice * 100) * (picks[item.orderItemId] ?? 0), 0);
@@ -99,7 +109,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       pos.notify(t("issued", { no: receipt.receiptNo, change: given?.changeCents ? t("issuedChange", { amount: money(given.changeCents) }) : "" }));
       requestId.current = crypto.randomUUID();
       setPayments([]);
-      const left = await load(separate);
+      const left = await load(separate ? "none" : "all");
       if (left && !left.items.length) {
         pos.notify(t("tablePaid", { table }));
         go({ name: "floor" });

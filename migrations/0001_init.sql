@@ -147,6 +147,18 @@ CREATE TABLE order_staff (
       pickup_no INTEGER,
       created_at TEXT NOT NULL
     );
+CREATE TABLE order_item_voids (
+      id TEXT PRIMARY KEY,
+      order_item_id TEXT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+      order_id TEXT NOT NULL,
+      table_no TEXT NOT NULL,
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      amount_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT,
+      created_at TEXT NOT NULL
+    );
 CREATE TABLE staff_settlements (
       id TEXT PRIMARY KEY,
       staff_id TEXT NOT NULL,
@@ -247,10 +259,29 @@ CREATE TABLE admin_sessions (
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+CREATE TABLE accounts (
+      id TEXT PRIMARY KEY,
+      login TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_iterations INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE account_sessions (
+      token_hash TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
 CREATE INDEX idx_admin_sessions_expiry ON admin_sessions(expires_at);
+CREATE INDEX idx_account_sessions_expiry ON account_sessions(expires_at);
+CREATE INDEX idx_order_item_voids_item ON order_item_voids(order_item_id);
+CREATE INDEX idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
 CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);
 CREATE INDEX idx_audit_at ON audit_log(at DESC);

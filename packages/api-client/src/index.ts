@@ -1,7 +1,8 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosDevice, PosClaim, PosSettlement
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
+  AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -132,6 +133,8 @@ export interface TableOverview {
   orders: ApiOrder[];
   total: number;
   since: string | null;
+  /** Open on a POS right now, and by whom. */
+  openOn?: { staffId: string | null; staffName: string | null } | null;
 }
 
 export interface AdminStorage {
@@ -176,6 +179,45 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
+/**
+ * A socket on the live channel (/ws) that keeps itself open: it reconnects
+ * with a growing pause (1 s up to 30 s) and says whether it is open, so a
+ * screen can poll more often while it is not. Returns the way to close it.
+ */
+export function openLive(
+  baseUrl: string,
+  query: Record<string, string>,
+  onEvent: (event: RealtimeEnvelope) => void,
+  onStatus?: (open: boolean) => void
+): () => void {
+  const base = baseUrl.replace(/^http/, "ws");
+  if (!/^wss?:\/\//.test(base) || typeof WebSocket === "undefined") return () => undefined;
+  const search = new URLSearchParams(query).toString();
+  let socket: WebSocket | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let pause = 1000;
+  let stopped = false;
+  const open = () => {
+    socket = new WebSocket(`${base}/ws${search ? `?${search}` : ""}`);
+    socket.addEventListener("open", () => { pause = 1000; onStatus?.(true); });
+    socket.addEventListener("message", (event) => {
+      try { onEvent(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Not an event. */ }
+    });
+    socket.addEventListener("close", () => {
+      onStatus?.(false);
+      if (stopped) return;
+      retry = setTimeout(open, pause);
+      pause = Math.min(pause * 2, 30_000);
+    });
+  };
+  open();
+  return () => {
+    stopped = true;
+    if (retry) clearTimeout(retry);
+    socket?.close();
+  };
+}
+
 export class AdminApi {
   get storage(): AdminStorage {
     const built = import.meta.env?.VITE_API_BASE?.replace(/\/+$/, "");
@@ -204,19 +246,24 @@ export class AdminApi {
     sessionStorage.removeItem("zy_admin_token");
   }
 
-  /** Open on purpose: one bit, which the console needs before it can decide
-   *  whether to ask for a password or to set one. */
-  gate(): Promise<{ configured: boolean }> { return this.#request("/api/admin/gate"); }
-  signIn(password: string): Promise<{ token: string; expiresInMs: number }> {
-    return this.#request("/api/admin/gate/sign-in", { method: "POST", body: JSON.stringify({ password }) });
+  /** Open on purpose: one bit, which the console needs to choose between
+   *  registering the restaurant's account and signing in to it. */
+  accountStatus(): Promise<{ registered: boolean }> { return this.#request("/api/account"); }
+  register(command: RegisterCommand): Promise<AccountSession> {
+    return this.#request("/api/account/register", { method: "POST", body: JSON.stringify(command) });
   }
-  setPassword(password: string, currentPassword?: string): Promise<{ configured: boolean }> {
-    return this.#request("/api/admin/gate/password", {
-      method: "POST",
-      body: JSON.stringify(currentPassword ? { password, currentPassword } : { password })
-    });
+  signIn(login: string, password: string): Promise<AccountSession> {
+    return this.#request("/api/account/sign-in", { method: "POST", body: JSON.stringify({ login, password }) });
   }
-  signOut(): Promise<void> { return this.#request("/api/admin/gate/sign-out", { method: "POST" }); }
+  /** A new password ends every session and answers with a fresh one for this device. */
+  updateAccount(command: AccountUpdateCommand): Promise<{ account: ApiAccount; token?: string; expiresInMs?: number }> {
+    return this.#request("/api/account", { method: "PUT", body: JSON.stringify(command) });
+  }
+  signOut(): Promise<void> { return this.#request("/api/account/sign-out", { method: "POST" }); }
+  /** With ADMIN_TOKEN in the header: a forgotten password set anew (and the account name, if given). */
+  recoverAccount(command: { login?: string; password: string }): Promise<{ account: ApiAccount }> {
+    return this.#request("/api/account/recover", { method: "POST", body: JSON.stringify(command) });
+  }
 
   mediaUrl(path: string): string { return `${this.storage.baseUrl}${path}`; }
   health(): Promise<{ ok: boolean }> { return this.#request("/api/health"); }
@@ -231,7 +278,7 @@ export class AdminApi {
   renameCategory(from: string, to: string): Promise<{ renamed: number; category: string; settings: ApiSettings }> { return this.#request("/api/admin/categories/rename", { method: "POST", body: JSON.stringify({ from, to }) }); }
   /** Every dish of a category at one VAT rate; set menus keep their split. */
   setCategoryVat(category: string, vatPercent: VatPercent): Promise<{ updated: number; category: string; vatPercent: VatPercent }> { return this.#request("/api/admin/categories/vat", { method: "POST", body: JSON.stringify({ category, vatPercent }) }); }
-  session(): Promise<{ role: StaffRole }> { return this.#request("/api/admin/session"); }
+  session(): Promise<{ role: StaffRole; account?: ApiAccount }> { return this.#request("/api/admin/session"); }
   audit(limit = 100): Promise<{ entries: AuditEntry[] }> { return this.#request(`/api/admin/audit?limit=${limit}`); }
   orders(limit = 100): Promise<{ orders: ApiOrder[] }> { return this.#request(`/api/orders?limit=${limit}`); }
   updateOrderStatus(id: string, status: ApiOrder["status"]): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
@@ -244,6 +291,8 @@ export class AdminApi {
   saveStaff(input: { name?: string; role?: PosStaff["role"]; pin?: string; active?: boolean }, id?: string): Promise<{ staff: PosStaff }> {
     return this.#request(id ? `/api/admin/staff/${encodeURIComponent(id)}` : "/api/admin/staff", { method: id ? "PUT" : "POST", body: JSON.stringify(input) });
   }
+  /** Each waiter now: signed in where, which tables open, the shift so far. */
+  staffActivity(): Promise<{ staff: PosStaffActivity[] }> { return this.#request("/api/admin/staff/activity"); }
   posDevices(): Promise<{ devices: PosDevice[] }> { return this.#request("/api/admin/pos-devices"); }
   unpairDevice(id: string): Promise<void> { return this.#request(`/api/admin/pos-devices/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   /** An interim bill on the front printer; it marks nothing paid. */
@@ -264,27 +313,9 @@ export class AdminApi {
   /** Either setting may be saved alone; the one left out keeps its value. */
   updateSettings(settings: Partial<ApiSettings>): Promise<ApiSettings> { return this.#request<Partial<ApiSettings>>("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) }).then(withSettingDefaults); }
 
-  connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
-    const base = this.storage.baseUrl.replace(/^http/, "ws");
-    if (!base) return () => undefined;
-    let socket: WebSocket | undefined;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let stopped = false;
-    const open = () => {
-      socket = new WebSocket(`${base}/ws`);
-      socket.addEventListener("message", (event) => {
-        try { onMessage(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Ignore malformed live events. */ }
-      });
-      socket.addEventListener("close", () => {
-        if (!stopped) retryTimer = setTimeout(open, 2500);
-      });
-    };
-    open();
-    return () => {
-      stopped = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      socket?.close();
-    };
+  /** The console's live channel: every change on the floor and in the menu. */
+  live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
+    return openLive(this.storage.baseUrl, { role: "staff" }, onEvent, onStatus);
   }
 
   async uploadMedia(id: string, file: File): Promise<{ product: ApiCatalogProduct }> {
@@ -331,12 +362,17 @@ export class PosApi {
   }
 
   /** Pairs this device, with the manager's password: done once per device. */
-  async pair(baseUrl: string, password: string, name: string): Promise<PosDevice> {
+  async pair(baseUrl: string, login: string, password: string, name: string): Promise<PosDevice> {
     if (baseUrl) localStorage.setItem("zy_api_base", baseUrl.replace(/\/+$/, ""));
-    const { token: manager } = await this.#request<{ token: string }>("/api/admin/gate/sign-in", { method: "POST", body: JSON.stringify({ password }) }, "");
-    const { device, token } = await this.#request<{ device: PosDevice; token: string }>("/api/admin/pos-devices", { method: "POST", body: JSON.stringify({ name }) }, manager);
-    localStorage.setItem("zy_pos_device", token);
-    return device;
+    const { token: account } = await this.#request<AccountSession>("/api/account/sign-in", { method: "POST", body: JSON.stringify({ login, password }) }, "");
+    try {
+      const { device, token } = await this.#request<{ device: PosDevice; token: string }>("/api/admin/pos-devices", { method: "POST", body: JSON.stringify({ name }) }, account);
+      localStorage.setItem("zy_pos_device", token);
+      return device;
+    } finally {
+      // The account's session was for pairing only; the device keeps its own token.
+      await this.#request("/api/account/sign-out", { method: "POST" }, account).catch(() => undefined);
+    }
   }
   unpair(): void {
     localStorage.removeItem("zy_pos_device");
@@ -353,8 +389,21 @@ export class PosApi {
     try { await this.#request("/api/pos/sign-out", { method: "POST" }); } finally { localStorage.removeItem("zy_pos_session"); }
   }
 
-  catalog(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/catalog"); }
+  /** Every published dish, the sold-out ones too (marked), so they can be switched back on. */
+  catalog(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/pos/catalog"); }
+  /** 沽清: sold out, or back on. The guests' menus follow at once. */
+  setAvailable(productId: string, available: boolean): Promise<{ product: ApiCatalogProduct }> {
+    return this.#request(`/api/pos/products/${encodeURIComponent(productId)}/availability`, { method: "PUT", body: JSON.stringify({ available }) });
+  }
+  /** 退菜: dishes sent to the kitchen taken off the bill, with a reason; the kitchen gets a void ticket. */
+  voidItem(table: string, orderItemId: string, quantity: number, reason: string): Promise<{ void: PosVoid }> {
+    return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/void`, { method: "POST", body: JSON.stringify({ orderItemId, quantity, reason }) });
+  }
   floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  /** The POS's live channel: every change on the floor, whoever made it. */
+  live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
+    return openLive(this.baseUrl, { role: "staff" }, onEvent, onStatus);
+  }
   claim(table: string): Promise<{ claim: PosClaim }> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim`, { method: "POST" }); }
   release(table: string, force = false): Promise<void> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim${force ? "?force=1" : ""}`, { method: "DELETE" }); }
   order(command: CreateOrderCommand): Promise<{ order: ApiOrder }> { return this.#request("/api/pos/orders", { method: "POST", body: JSON.stringify(command) }); }
@@ -365,6 +414,8 @@ export class PosApi {
   checkout(command: CheckoutCommand): Promise<{ receipt: ApiReceipt }> { return this.#request("/api/admin/checkout", { method: "POST", body: JSON.stringify(command) }); }
   receipts(limit = 50): Promise<{ receipts: ApiReceipt[] }> { return this.#request(`/api/admin/receipts?limit=${limit}`); }
   stornoReceipt(id: string, reason: string): Promise<{ receipt: ApiReceipt }> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/storno`, { method: "POST", body: JSON.stringify({ reason }) }); }
+  /** The receipt on the front printer again, marked as a copy (Belegkopie). */
+  reprintReceipt(id: string): Promise<void> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/print`, { method: "POST" }); }
   voucher(code: string): Promise<{ voucher: ApiVoucher }> { return this.#request(`/api/admin/vouchers/${encodeURIComponent(code)}`); }
   settlement(staffId?: string): Promise<{ totals: PosSettlement["totals"] }> { return this.#request(`/api/pos/settlement${staffId ? `?staffId=${encodeURIComponent(staffId)}` : ""}`); }
   settle(staffId?: string): Promise<{ settlement: PosSettlement }> { return this.#request("/api/pos/settlement", { method: "POST", body: JSON.stringify(staffId ? { staffId } : {}) }); }
@@ -405,27 +456,7 @@ export class RestaurantApi {
   }
 
   connect(onMessage: (message: RealtimeEnvelope) => void): () => void {
-    const base = this.#baseUrl().replace(/^http/, "ws");
-    if (!base) return () => undefined;
-    let socket: WebSocket | undefined;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let stopped = false;
-    const open = () => {
-      const query = new URLSearchParams(this.#socketParams()).toString();
-      socket = new WebSocket(`${base}/ws${query ? `?${query}` : ""}`);
-      socket.addEventListener("message", (event) => {
-        try { onMessage(JSON.parse(String(event.data)) as RealtimeEnvelope); } catch { /* Ignore malformed live events. */ }
-      });
-      socket.addEventListener("close", () => {
-        if (!stopped) retryTimer = setTimeout(open, 2500);
-      });
-    };
-    open();
-    return () => {
-      stopped = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      socket?.close();
-    };
+    return openLive(this.#baseUrl(), this.#socketParams(), onMessage);
   }
 
   async #request<T>(path: string, options: RequestInit = {}): Promise<T> {

@@ -18,7 +18,8 @@ const labels = {
     unsigned: "测试小票 · 未签名（RKSV）", receipt: "小票", register: "收银机", storno: "冲销", stornoOf: "冲销小票 {no}",
     sum: "合计", cash: "现金", card: "银行卡", voucher: "代金券", tendered: "收", change: "找零", gross: "含税",
     voucherCode: "代金券码", closing: "日结", sales: "销售", stornos: "冲销", receipts: "小票", vouchersSold: "售出代金券", uid: "UID",
-    waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣"
+    waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣",
+    voidTicket: "*** 退菜 · 停止制作 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***"
   },
   de: {
     title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz",
@@ -28,7 +29,8 @@ const labels = {
     unsigned: "TESTBELEG – NICHT SIGNIERT", receipt: "Beleg", register: "Kasse", storno: "STORNO", stornoOf: "Storno zu Beleg {no}",
     sum: "SUMME", cash: "Bar", card: "Karte", voucher: "Gutschein", tendered: "gegeben", change: "Rückgeld", gross: "Brutto",
     voucherCode: "Gutschein-Code", closing: "TAGESABSCHLUSS", sales: "Verkäufe", stornos: "Stornos", receipts: "Belege", vouchersSold: "Gutscheine verkauft", uid: "UID",
-    waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt"
+    waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt",
+    voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***"
   },
   en: {
     title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note",
@@ -38,7 +40,8 @@ const labels = {
     unsigned: "TEST RECEIPT – NOT SIGNED", receipt: "Receipt", register: "Register", storno: "CANCELLATION", stornoOf: "Cancels receipt {no}",
     sum: "TOTAL", cash: "Cash", card: "Card", voucher: "Voucher", tendered: "given", change: "change", gross: "Gross",
     voucherCode: "Voucher code", closing: "DAY CLOSING", sales: "sales", stornos: "cancellations", receipts: "Receipts", vouchersSold: "Vouchers sold", uid: "UID",
-    waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount"
+    waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount",
+    voidTicket: "*** VOID – STOP COOKING ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***"
   }
 };
 
@@ -51,7 +54,10 @@ function money(value) {
 /** A kitchen ticket: what to cook, for which table. No price and no tax —
  *  it is not a receipt, and says so on its first line. */
 function orderLines(payload, copy, language) {
+  // A void: the same ticket, marked, the quantities taken back, and why.
+  const voiding = payload.kind === "void";
   const lines = [
+    ...(voiding ? [copy.voidTicket] : []),
     copy.kitchen,
     copy.title,
     // A takeaway's pickup number is what the kitchen calls out; big on the ticket.
@@ -61,10 +67,11 @@ function orderLines(payload, copy, language) {
     RULE
   ];
   for (const item of payload.items || []) {
-    lines.push(`${item.quantity} x ${item.names?.[language] || item.name || item.sku || "Item"}`);
+    lines.push(`${voiding ? "-" : ""}${item.quantity} x ${item.names?.[language] || item.name || item.sku || "Item"}`);
     for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}`);
   }
   if (payload.note) lines.push(`${copy.note}: ${payload.note}`);
+  if (voiding && payload.reason) lines.push(`${copy.reason}: ${payload.reason}`);
   lines.push(RULE, "\n");
   return lines;
 }
@@ -115,6 +122,7 @@ function receiptLines(payload, copy, language) {
   const receipt = payload.receipt;
   const unsigned = receipt.fiscalStatus !== "signed";
   const lines = [
+    ...(payload.copy ? [copy.receiptCopy] : []),
     ...(unsigned ? [copy.unsigned] : []),
     ...companyLines(payload.company, copy),
     RULE,
@@ -178,6 +186,7 @@ function settlementLines(payload, copy) {
     row(`${copy.sum} EUR`, euros(totals.grossCents)),
     RULE,
     ...Object.entries(totals.payments).map(([type, amount]) => row(copy[type] ?? type, euros(amount))),
+    ...(totals.voids?.count ? [row(`${copy.voids} ${totals.voids.count}x`, euros(-totals.voids.cents))] : []),
     RULE,
     "\n"
   ];

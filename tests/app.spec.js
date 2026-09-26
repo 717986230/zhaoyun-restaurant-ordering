@@ -67,8 +67,8 @@ test("opening the app goes straight to the menu, with nothing to click through f
   await expect(page.locator(".cartbar")).toHaveCount(0);
 });
 
-test("seven quick taps on the title open the admin console, which asks for the password", async ({ page }) => {
-  await page.route("**/api/admin/gate", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ configured: true }) }));
+test("seven quick taps on the title open the admin console, which asks for the account", async ({ page }) => {
+  await page.route("**/api/account", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ registered: true }) }));
   const title = page.locator(".topbar .title");
   // Six is a guest fiddling with the header, not a way in.
   for (let tap = 0; tap < 6; tap += 1) await title.click();
@@ -77,9 +77,9 @@ test("seven quick taps on the title open the admin console, which asks for the p
 
   await title.click();
   await expect(page).toHaveURL(/admin\.html/);
-  // The taps are not the lock; the password page behind them is.
-  await expect(page.getByRole("heading", { name: "管理台" })).toBeVisible();
-  await expect(page.locator("input[name='admin-password']")).toBeVisible();
+  // The taps are not the lock; the sign-in behind them is.
+  await expect(page.getByRole("heading", { name: "登录管理台" })).toBeVisible();
+  await expect(page.locator("input[name='password']")).toBeVisible();
 });
 
 test("taps spread out over more than four seconds do not add up", async ({ page }) => {

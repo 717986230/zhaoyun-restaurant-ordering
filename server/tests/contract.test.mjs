@@ -55,7 +55,11 @@ test("Node server satisfies the API contract", async (context) => {
     return { status: response.statusCode, json, bytes: response.rawPayload, headers: response.headers };
   };
 
-  for (const [name, check] of contractChecks(call, assert)) {
+  // The live channel needs a real socket, which app.inject cannot give.
+  await app.listen({ host: "127.0.0.1", port: 0 });
+  const liveBase = `ws://127.0.0.1:${app.server.address().port}`;
+
+  for (const [name, check] of contractChecks(call, assert, { liveBase })) {
     await context.test(name, check);
   }
 });

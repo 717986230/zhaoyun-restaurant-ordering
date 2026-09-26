@@ -63,8 +63,8 @@ export function BoardPanel(props: Props) {
           const next = nextOrderStatus[order.status];
           return <article className="board-card" key={order.id}>
             <div className="board-card-head"><b>{t("table", { table: order.table })}</b><span className={`status ${order.status}`}>{t(ORDER_STATUS_KEYS[order.status])}</span></div>
-            <small>{order.no} · {formatTime(order.createdAt, language)} · {formatMoney(Math.round(order.total * 100), language)}{order.billedAt ? ` · ${t("boardBilled")}` : ""}</small>
-            <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>{item.qty} × {item.name || item.id}{item.modifiers?.length ? <em> ({item.modifiers.map((modifier) => modifier.name).join(" · ")})</em> : null}</li>)}</ul>
+            <small>{order.no} · {formatTime(order.createdAt, language)} · {formatMoney(Math.round(order.total * 100), language)}{order.staffName ? ` · ${order.staffName}` : ""}{order.pickupNo ? ` · ${t("pickupShort", { no: order.pickupNo })}` : ""}{order.billedAt ? ` · ${t("boardBilled")}` : ""}</small>
+            <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>{item.qty} × {item.name || item.id}{item.voided ? <em className="voided"> {t("voidedCount", { count: item.voided })}</em> : null}{item.modifiers?.length ? <em> ({item.modifiers.map((modifier) => modifier.name).join(" · ")})</em> : null}</li>)}</ul>
             {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}
             <div className="board-actions">
               {next && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOrderStatus(order.id, next)}>{t("boardAdvance", { status: t(ORDER_STATUS_KEYS[next]) })}</button>}

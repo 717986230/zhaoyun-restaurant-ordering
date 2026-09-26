@@ -1,5 +1,5 @@
 import type { StaffRole, TableOverview } from "@zhaoyun/api-client";
-import type { ApiBill } from "@zhaoyun/contracts";
+import type { ApiBill, PosStaffActivity } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { ORDER_STATUS_KEYS } from "../board/BoardPanel";
@@ -14,6 +14,8 @@ const euro = (amount: number) => Math.round(amount * 100);
 
 interface Props {
   tables: TableOverview[];
+  /** The waiters now (the manager's view; empty otherwise). */
+  staff: PosStaffActivity[];
   bill: ApiBill | null;
   role: StaffRole | null;
   busy: boolean;
@@ -53,11 +55,28 @@ export function TablesPanel(props: Props) {
       <button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>{t("refresh")}</button>
     </div>
 
+    {props.staff.length > 0 && <section className="staff-live" aria-label={t("staffLive")}>
+      {props.staff.map((person) => <article key={person.id} data-staff={person.name} className={`staff-live-card ${person.online ? "online" : ""}`}>
+        <div className="staff-live-head">
+          <i aria-hidden="true" />
+          <b>{person.name}</b>
+          <small>{person.online ? person.devices.join(" · ") : t("staffOffline")}</small>
+        </div>
+        <p>{person.tables.length ? t("staffTables", { tables: person.tables.join(", ") }) : t("staffNoTables")}</p>
+        <p className="staff-live-shift">{t("staffShift", {
+          receipts: person.shift.receipts,
+          total: formatMoney(person.shift.grossCents, language),
+          cash: formatMoney(person.shift.payments.cash, language)
+        })}</p>
+      </article>)}
+    </section>}
+
     <div className="table-grid">{props.tables.length ? props.tables.map((table) => <article className={`table-tile ${table.state}`} key={table.table}>
       <div className="table-tile-head">
         <b>{t("table", { table: table.table })}</b>
         <span className={`status ${table.state}`}>{t(STATE_KEYS[table.state])}</span>
       </div>
+      {table.openOn?.staffName && <span className="table-open-on">{t("openOnPos", { name: table.openOn.staffName })}</span>}
       <small className="table-tile-meta">
         {table.label || "—"}
         {table.since ? ` · ${t("tableSince", { time: formatTime(table.since, language) })}` : ""}
@@ -68,11 +87,12 @@ export function TablesPanel(props: Props) {
       {table.orders.length ? <>
         <ul className="table-tile-orders">{table.orders.map((order) => <li key={order.id}>
           <div className="table-tile-order-head">
-            <span>{order.no}</span>
+            <span>{order.no}{order.staffName ? ` · ${order.staffName}` : ""}{order.pickupNo ? ` · ${t("pickupShort", { no: order.pickupNo })}` : ""}</span>
             <span className={`status ${order.status}`}>{t(ORDER_STATUS_KEYS[order.status])}</span>
           </div>
           <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>
             {item.qty} × {item.name || item.id}
+            {item.voided ? <em className="voided"> {t("voidedCount", { count: item.voided })}</em> : null}
             {item.modifiers?.length ? <em> ({item.modifiers.map((modifier) => modifier.name).join(" · ")})</em> : null}
           </li>)}</ul>
           {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}

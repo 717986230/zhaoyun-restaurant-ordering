@@ -59,6 +59,7 @@ test.beforeEach(async ({ page }) => {
   // The POS's waiters and devices, on the settings page.
   await page.route("**/api/admin/staff", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff: [] }) }));
   await page.route("**/api/admin/pos-devices", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ devices: [] }) }));
+  await page.route("**/api/admin/staff/activity", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff: [] }) }));
   await page.goto("/admin.html");
 });
 

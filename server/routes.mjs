@@ -5,13 +5,14 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody, SetPasswordBody, SettingsBody,
-  SignInBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
+  ProductBody, ServiceRequestBody, ServiceStatusBody, SettingsBody,
+  RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
   StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
 import { menuSettingsView, ROLE_RANK, resolveStaffRole } from "../shared/rules.mjs";
+import { liveEvent, liveRole } from "../shared/live.mjs";
 
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
@@ -149,6 +150,7 @@ export function registerRoutes(app, { database, realtime, config }) {
       request.staffRole = role;
       // A waiter's session carries who they are and which device they are on.
       request.pos = session.staff ? { staff: session.staff, deviceId: session.deviceId } : null;
+      request.account = session.account ?? null;
       if (ROLE_RANK[role] < required) {
         // A valid token used beyond its role is worth recording, not just refusing.
         request.auditedDenial = true;
@@ -202,8 +204,18 @@ export function registerRoutes(app, { database, realtime, config }) {
   }));
 
   app.get("/ws", { websocket: true }, (socket, request) => {
-    const table = String(request.query?.table ?? "").trim().toUpperCase();
-    realtime.connect(socket, TABLE_PATTERN.test(table) ? table : null);
+    realtime.connect(socket, liveRole(new URLSearchParams(request.query ?? {})));
+  });
+
+  /**
+   * Every successful write says so on the live channel (shared/live.mjs):
+   * the console and the POS reload at once. A route that changed nothing
+   * anyone watches — a POS keeping its table — sets `request.liveQuiet`.
+   */
+  app.addHook("onResponse", async (request, reply) => {
+    if (request.liveQuiet) return;
+    const event = liveEvent(request.method, request.url.split("?")[0], reply.statusCode, request.body?.table);
+    if (event) realtime.publish(event);
   });
 
   // A picture kept in the database answers first; anything else is an upload
@@ -239,7 +251,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/products", { preHandler: requireAdmin, schema: { body: ProductBody } }, async (request, reply) => {
     try {
       const product = database.saveProduct(request.body || {});
-      realtime.broadcast("catalog.changed", { productId: product.id });
       return reply.code(201).send({ product });
     } catch (error) {
       return errorReply(reply, error);
@@ -249,7 +260,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const product = database.saveProduct(request.body || {}, request.params.id);
       if (!product) return errorReply(reply, new Error("Product not found"), 404);
-      realtime.broadcast("catalog.changed", { productId: product.id });
       return { product };
     } catch (error) {
       return errorReply(reply, error);
@@ -257,7 +267,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   });
   app.delete("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     if (!database.deleteProduct(request.params.id)) return errorReply(reply, new Error("Product not found"), 404);
-    realtime.broadcast("catalog.changed", { productId: request.params.id });
     return reply.code(204).send();
   });
 
@@ -265,7 +274,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const result = database.renameCategory(request.body.from, request.body.to);
       if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
-      realtime.broadcast("catalog.changed", { category: result.category });
       return result;
     } catch (error) {
       return errorReply(reply, error);
@@ -276,7 +284,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const result = database.setCategoryVat(request.body.category, request.body.vatPercent);
       if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
-      realtime.broadcast("catalog.changed", { category: result.category });
       return result;
     } catch (error) {
       return errorReply(reply, error);
@@ -286,7 +293,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/products/:id/duplicate", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
     const product = database.duplicateProduct(request.params.id);
     if (!product) return errorReply(reply, new Error("Product not found"), 404);
-    realtime.broadcast("catalog.changed", { productId: product.id });
     return reply.code(201).send({ product });
   });
 
@@ -314,7 +320,6 @@ export function registerRoutes(app, { database, realtime, config }) {
         await unlink(target).catch(() => undefined);
         return errorReply(reply, new Error("Product not found"), 404);
       }
-      realtime.broadcast("catalog.changed", { productId: product.id });
       return reply.code(201).send({ product });
     } catch (error) {
       await unlink(target).catch(() => undefined);
@@ -328,8 +333,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/orders", { preHandler: [guardOrders, requireTable], schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body || {});
-      realtime.broadcast("order.changed", order, order.table);
-      realtime.broadcast("print.queued", { orderId: order.id }, order.table);
       return reply.code(201).send({ order });
     } catch (error) {
       // A locked table is a state the guest can wait out, not a malformed
@@ -342,7 +345,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const order = database.updateOrder(request.params.id, request.body?.status);
       if (!order) return errorReply(reply, new Error("Order not found"), 404);
-      realtime.broadcast("order.changed", order, order.table);
       return { order };
     } catch (error) {
       return errorReply(reply, error);
@@ -355,7 +357,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/service-requests", { preHandler: [guardServiceRequests, requireTable], schema: { body: ServiceRequestBody } }, async (request, reply) => {
     try {
       const serviceRequest = database.createServiceRequest(request.body || {});
-      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return reply.code(201).send({ request: serviceRequest });
     } catch (error) {
       return errorReply(reply, error);
@@ -365,7 +366,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const serviceRequest = database.updateServiceRequest(request.params.id, request.body?.status);
       if (!serviceRequest) return errorReply(reply, new Error("Service request not found"), 404);
-      realtime.broadcast("service.changed", serviceRequest, serviceRequest.table);
       return { request: serviceRequest };
     } catch (error) {
       return errorReply(reply, error);
@@ -373,61 +373,77 @@ export function registerRoutes(app, { database, realtime, config }) {
   });
 
   /**
-   * The door of the admin console.
+   * The restaurant's account (shared/account.mjs).
    *
-   * `GET` is deliberately open: it answers one bit — has a password been set —
-   * which the console needs before it can draw anything, and which anyone who
-   * tried to sign in would learn regardless.
+   * `GET /api/account` is deliberately open: it answers one bit — is there an
+   * account yet — which the console needs to know whether to show the
+   * registration or the sign-in, and which anyone who tried either would learn.
+   * Registration, sign-in and recovery share the auth throttle, so guessing a
+   * password and guessing a token are counted together.
    */
-  app.get("/api/admin/gate", async () => database.adminGate());
+  app.get("/api/account", async () => database.accountStatus());
 
-  app.post("/api/admin/gate/sign-in", { schema: { body: SignInBody } }, async (request, reply) => {
+  app.post("/api/account/register", { schema: { body: RegisterBody } }, async (request, reply) => {
     const throttle = authThrottle(request, reply);
     if (!throttle) return reply;
-    const session = await database.signIn(request.body?.password);
-    if (!session) {
-      throttle.fail();
-      return reply.code(401).send({ error: "Wrong password" });
-    }
-    throttle.pass();
-    return session;
-  });
-
-  /**
-   * Sets the password: once for whoever opens the console first, because there
-   * is nothing yet to prove, and thereafter only for someone who can produce
-   * the one in force.
-   *
-   * The recovery path is ADMIN_TOKEN, and it is the token that is accepted
-   * here rather than a live session on purpose: a stolen session must not be
-   * able to change the password and lock the owner out of their own menu.
-   */
-  app.post("/api/admin/gate/password", { schema: { body: SetPasswordBody } }, async (request, reply) => {
-    const throttle = authThrottle(request, reply);
-    if (!throttle) return reply;
-    const provided = request.headers["x-admin-token"];
-    const recovering = Boolean(config.adminToken) && tokenMatches(provided, config.adminToken);
     try {
-      const gate = recovering
-        ? await database.resetAdminGatePassword(request.body?.password)
-        : await database.setAdminGatePassword(request.body?.password, request.body?.currentPassword);
-      if (!gate) {
-        throttle.fail();
-        return reply.code(401).send({ error: "Wrong password" });
-      }
+      const session = await database.registerAccount(request.body);
+      if (!session) return reply.code(409).send({ error: "This restaurant already has an account: sign in" });
       throttle.pass();
-      return gate;
+      return reply.code(201).send(session);
     } catch (error) {
       return errorReply(reply, error);
     }
   });
 
-  app.post("/api/admin/gate/sign-out", { preHandler: requireKitchen }, async (request, reply) => {
+  app.post("/api/account/sign-in", { schema: { body: AccountSignInBody } }, async (request, reply) => {
+    const throttle = authThrottle(request, reply);
+    if (!throttle) return reply;
+    const session = await database.signInAccount(request.body.login, request.body.password);
+    if (!session) {
+      throttle.fail();
+      return reply.code(401).send({ error: "Wrong account name or password" });
+    }
+    throttle.pass();
+    return session;
+  });
+
+  app.put("/api/account", { preHandler: requireAdmin, schema: { body: AccountUpdateBody } }, async (request, reply) => {
+    if (!request.account) return reply.code(403).send({ error: "Sign in with the account to change it" });
+    try {
+      const updated = await database.updateAccount(request.account.id, request.body);
+      if (!updated) return reply.code(401).send({ error: "Wrong password" });
+      return updated;
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+
+  /**
+   * The way back in when the password is forgotten: ADMIN_TOKEN, and only the
+   * token — not a live session, which a stolen tablet would carry.
+   */
+  app.post("/api/account/recover", { schema: { body: AccountRecoverBody } }, async (request, reply) => {
+    const throttle = authThrottle(request, reply);
+    if (!throttle) return reply;
+    if (!config.adminToken || !tokenMatches(request.headers["x-admin-token"], config.adminToken)) {
+      throttle.fail();
+      return reply.code(401).send({ error: "ADMIN_TOKEN required" });
+    }
+    try {
+      throttle.pass();
+      return await database.recoverAccount(request.body);
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+
+  app.post("/api/account/sign-out", { preHandler: requireKitchen }, async (request, reply) => {
     await database.signOut(request.headers["x-admin-token"]);
     return reply.code(204).send();
   });
 
-  app.get("/api/admin/session", { preHandler: requireKitchen }, async (request) => ({ role: request.staffRole }));
+  app.get("/api/admin/session", { preHandler: requireKitchen }, async (request) => (request.account ? { role: request.staffRole, account: request.account } : { role: request.staffRole }));
   app.get("/api/admin/audit", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     entries: database.listAudit(request.query.limit)
   }));
@@ -445,7 +461,6 @@ export function registerRoutes(app, { database, realtime, config }) {
     try {
       const table = database.setTableLock(request.params.table, request.body.locked);
       if (!table) return errorReply(reply, new Error("Table not found"), 404);
-      realtime.broadcast("table.changed", { table: table.table, locked: table.locked }, table.table);
       return { table };
     } catch (error) {
       return errorReply(reply, error);
@@ -469,7 +484,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/tables/:table/bill/print", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
     const bill = database.printTableBill(request.params.table);
     if (!bill) return errorReply(reply, new Error("Table has nothing left to pay"), 409);
-    realtime.broadcast("print.queued", { jobId: bill.printJobId }, bill.table);
     return { bill };
   });
 
@@ -477,7 +491,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/admin/checkout", { preHandler: requireFloor, schema: { body: CheckoutBody } }, async (request, reply) => {
     try {
       const receipt = database.checkout(request.body, request.staffRole, request.pos);
-      if (receipt.table) realtime.broadcast("bill.paid", { table: receipt.table, receiptNo: receipt.receiptNo }, receipt.table);
       return reply.code(201).send({ receipt });
     } catch (error) {
       return errorReply(reply, error, error.code === "TABLE_CLAIMED" ? 409 : 400);
@@ -490,6 +503,10 @@ export function registerRoutes(app, { database, realtime, config }) {
     const receipt = database.getReceipt(request.params.id);
     return receipt ? { receipt } : errorReply(reply, new Error("Receipt not found"), 404);
   });
+  // A receipt printed again for the guest, marked as a copy (Belegkopie).
+  app.post("/api/admin/receipts/:id/print", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => (
+    database.reprintReceipt(request.params.id) ? reply.code(204).send() : errorReply(reply, new Error("No such receipt"), 404)
+  ));
   app.post("/api/admin/receipts/:id/storno", { preHandler: requireAdmin, schema: { params: IdParams, body: StornoBody } }, async (request, reply) => {
     try {
       const receipt = database.stornoReceipt(request.params.id, request.body.reason, request.staffRole, request.pos);
@@ -516,6 +533,8 @@ export function registerRoutes(app, { database, realtime, config }) {
   // waiters; a paired device lists them and takes a PIN; a waiter's session
   // does the rest.
   app.get("/api/admin/staff", { preHandler: requireAdmin }, async () => ({ staff: database.listStaff() }));
+  // The floor as the manager watches it: each waiter, where they are signed in, their open tables and their shift.
+  app.get("/api/admin/staff/activity", { preHandler: requireAdmin }, async () => ({ staff: database.staffActivity() }));
   app.post("/api/admin/staff", { preHandler: requireAdmin, schema: { body: StaffBody } }, async (request, reply) => {
     try {
       return reply.code(201).send({ staff: await database.saveStaff(request.body) });
@@ -584,6 +603,8 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/pos/floor", { preHandler: requirePos }, async () => ({ tables: database.tablesOverview(), claims: database.liveClaims(), takeawayDiscountPercent: database.getSettings().takeawayDiscountPercent }));
   app.post("/api/pos/tables/:table/claim", { preHandler: requirePos, schema: { params: TableParams } }, async (request, reply) => {
     try {
+      // A POS keeps its table every half minute; only taking it is news.
+      request.liveQuiet = database.holdsTable(request.params.table, request.pos.deviceId);
       return { claim: database.claimTable(request.params.table, request.pos) };
     } catch (error) {
       return claimed(reply, error);
@@ -596,7 +617,6 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.post("/api/pos/orders", { preHandler: requirePos, schema: { body: CreateOrderBody } }, async (request, reply) => {
     try {
       const order = database.createOrder(request.body, request.pos);
-      realtime.broadcast("order.created", { orderId: order.id, table: order.table }, order.table);
       return reply.code(201).send({ order });
     } catch (error) {
       return claimed(reply, error);
@@ -610,6 +630,21 @@ export function registerRoutes(app, { database, realtime, config }) {
     } catch (error) {
       return claimed(reply, error);
     }
+  });
+  // 退菜: dishes sent to the kitchen taken off the bill, with a reason; the kitchen gets a void ticket.
+  app.post("/api/pos/tables/:table/void", { preHandler: requirePos, schema: { params: TableParams, body: VoidBody } }, async (request, reply) => {
+    try {
+      return reply.code(201).send({ void: database.voidItem(request.params.table, request.body, request.pos, request.staffRole) });
+    } catch (error) {
+      return error.code === "NOT_FOUND" ? errorReply(reply, error, 404) : claimed(reply, error);
+    }
+  });
+  // The menu as the POS needs it: every published dish, the sold-out ones too, to switch back on.
+  app.get("/api/pos/catalog", { preHandler: requirePos }, async () => ({ products: database.listProducts(false).filter((product) => product.published) }));
+  // 沽清: sold out, or back on — the guests' menus follow at once.
+  app.put("/api/pos/products/:id/availability", { preHandler: requirePos, schema: { params: IdParams, body: AvailabilityBody } }, async (request, reply) => {
+    const product = database.setAvailable(request.params.id, request.body.available);
+    return product ? { product } : errorReply(reply, new Error("No such dish on the menu"), 404);
   });
   /** A waiter's own settlement; the manager may settle anyone's. */
   const settlementFor = (request, reply) => {

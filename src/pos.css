@@ -81,6 +81,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 .pos-head strong { letter-spacing: 0.08em; }
 .pos-who { font-weight: 700; }
+/* The live channel: green while changes arrive as they happen, grey while the screens poll. */
+.pos-live { width: 9px; height: 9px; border-radius: 50%; background: var(--p-muted); flex-shrink: 0; }
+.pos-live.on { background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.25); }
 .pos-head-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .pos-head-actions button { min-height: 40px; border-color: #3c4a44; background: transparent; color: #fff; }
 .pos-languages { display: flex; gap: 2px; }
@@ -167,6 +170,12 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-lines li > span:first-child { display: grid; min-width: 0; overflow-wrap: anywhere; }
 .pos-lines small { color: var(--p-muted); }
 .pos-lines b { text-align: right; font-variant-numeric: tabular-nums; }
+/* A sent line: the dish, its amount and 退菜. */
+.pos-lines.sent li { grid-template-columns: minmax(0, 1fr) auto auto; }
+.pos-void { min-height: 36px; padding: 4px 10px; border-color: var(--p-warn); color: var(--p-warn); background: transparent; font-size: 14px; }
+.pos-danger { border-color: var(--p-warn); background: var(--p-warn); }
+.pos-void-form { display: grid; gap: 12px; }
+.pos-void-form .pos-stepper { justify-self: start; }
 
 .pos-stepper { display: flex; align-items: center; gap: 6px; }
 .pos-stepper button { width: 44px; min-height: 44px; padding: 0; font-size: 22px; }
@@ -194,6 +203,13 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-dishes small { color: var(--p-accent); font-weight: 700; }
 .pos-dishes b { font-weight: 600; overflow-wrap: anywhere; }
 .pos-dishes span { color: var(--p-muted); font-variant-numeric: tabular-nums; }
+/* 沽清: a sold-out dish stays on the POS, struck through, to be switched back on. */
+.pos-dishes button.soldout { opacity: 0.55; background: var(--p-bg); }
+.pos-dishes button.soldout b { text-decoration: line-through; }
+.pos-dishes button.soldout span { color: var(--p-warn); font-weight: 700; }
+.pos-dishes.choosing-soldout button { outline: 2px dashed var(--p-warn); outline-offset: -4px; }
+.pos-soldout-mode { justify-self: start; min-height: 40px; }
+.pos-soldout-mode.on { border-color: var(--p-warn); background: var(--p-warn-wash); color: var(--p-warn); font-weight: 700; }
 
 .pos-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.55); }
 .pos-modal .pos-card { width: min(520px, 100%); max-height: 90vh; overflow-y: auto; }
@@ -231,6 +247,8 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-journal.ok { color: var(--p-accent); font-weight: 700; }
 .pos-journal.broken { color: var(--p-warn); font-weight: 700; }
 .pos-receipts { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.pos-receipt-actions { display: flex; gap: 6px; }
+.pos-voids { color: var(--p-warn); }
 .pos-receipts li { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--p-line); }
 .pos-receipts li > span { display: grid; min-width: 0; color: var(--p-muted); font-size: 14px; }
 .pos-receipts em { color: var(--p-warn); font-style: normal; }
