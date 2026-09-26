@@ -163,6 +163,15 @@ test("opening and closing a dish leaves the header where it was, on every phone 
   const before = await top();
   await page.locator(".dish-card").nth(2).click();
   await expect(page.locator(".dish-detail-card")).toBeVisible();
+  // The card rises into place (28 px and 94 % at the start); what is measured
+  // is where it settles, which a slow WebKit can still be short of here.
+  let last = null;
+  await expect.poll(async () => {
+    const box = await page.locator(".dish-detail-card").boundingBox();
+    const settled = last !== null && box.y === last.y && box.height === last.height;
+    last = box;
+    return settled;
+  }, { intervals: [150] }).toBe(true);
   // The card sits inside the screen, its price included.
   const [card, price] = await Promise.all([page.locator(".dish-detail-card").boundingBox(), page.locator(".detail-buy").boundingBox()]);
   expect(card.y + card.height).toBeLessThanOrEqual(page.viewportSize().height + 1);
