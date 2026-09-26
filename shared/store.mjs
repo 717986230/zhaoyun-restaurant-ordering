@@ -22,14 +22,14 @@
  * again from what is there now. The same holds on node:sqlite, where batch
  * is a BEGIN IMMEDIATE … COMMIT.
  */
+import { bool, boundedLimit, now, parseJson, uuid } from "./core.mjs";
+import { assertPassword, auditView, hashPassword, hashSessionToken, newSessionToken, PASSWORD_ITERATIONS, verifyPassword } from "./auth.mjs";
+import { bundleComponentIds, duplicateInput, mapProduct, normalizeProduct, normalizeVatPercent } from "./products.mjs";
+import { normalizeCategoryName, normalizeMenuTheme, normalizeSettingsInput, renamedCategorySettings, settingsView } from "./settings.mjs";
 import {
-  assertOrderTransition, assertPassword, assertRequestTransition, auditView,
-  billView, bool, boundedLimit, duplicateInput, hashPassword, hashSessionToken, mapProduct, newSessionToken,
-  normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
-  orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
-  printJobView, serviceRequestView, settingsView, tablesOverviewView, tableView, uuid, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL,
-  verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL
-} from "./rules.mjs";
+  assertOrderTransition, assertRequestTransition, billView, normalizeTableNo, OPEN_TABLE_ORDERS_SQL, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL, orderProductIds, orderView, planOrder, RECENT_ORDERS_SQL, serviceRequestView, tablesOverviewView, tableView
+} from "./orders.mjs";
+import { normalizePrinter, planPrintFailure, printerView, printJobView } from "./printing.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
@@ -259,7 +259,7 @@ export function createStore(driver) {
   }
 
   /**
-   * The VAT split itself lives in `shared/rules.mjs`, so this computes a bill
+   * The VAT split itself lives in `shared/products.mjs`, so this computes a bill
    * the same way the Node server does rather than a second, guessed way. All
    * that is left here is reading the rows.
    */

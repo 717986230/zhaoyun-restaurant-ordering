@@ -19,7 +19,8 @@ import {
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody
 } from "../src/contracts.js";
-import { customerAccountsOn, menuSettingsView, resolveStaffRole, roleAllows } from "./rules.mjs";
+import { resolveStaffRole, roleAllows } from "./auth.mjs";
+import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
 import { liveEvent } from "./live.mjs";
 import { createRateLimiter } from "./rate-limit.mjs";
 

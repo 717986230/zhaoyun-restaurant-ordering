@@ -8,8 +8,7 @@ import type { CheckoutCommand, CreateOrderCommand, CreateServiceRequestCommand, 
 import type { AdminProductInput } from "../../api-client/src/index";
 import { MENU_THEME_IDS } from "../../domain/src/themes";
 import { FEATURED_TEMPLATE_IDS } from "../../domain/src/featured";
-import { FEATURED_TEMPLATES as RULE_FEATURED_TEMPLATES } from "../../../shared/rules.mjs";
-import { MENU_LANGUAGES as RULE_MENU_LANGUAGES } from "../../../shared/rules.mjs";
+import { FEATURED_TEMPLATES as RULE_FEATURED_TEMPLATES, MENU_LANGUAGES as RULE_MENU_LANGUAGES } from "../../../shared/settings.mjs";
 
 /**
  * The runtime schemas and these TypeScript types describe the same requests.

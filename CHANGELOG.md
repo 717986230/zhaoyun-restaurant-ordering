@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-26（四）
+
+### Changed（重构，不改功能）
+
+- **两个后端合成一套代码**：以前 Node 服务器和 Cloudflare Worker 各写一遍路由和数据库读写，靠契约测试对齐；
+  现在路由只有 `shared/http.mjs`，读写只有 `shared/store.mjs`，两边只各留一个很薄的驱动
+  （`server/sqlite-driver.mjs`、`workers/d1-driver.mjs`）。以后加功能只写一次。
+- 顺带统一了两边原本不一致的地方：Worker 也有了公开接口限流、完整的员工写操作审计、服务呼叫的桌码校验；
+  校验失败的提示格式两边一样。
+- `shared/rules.mjs`（1100 多行）按主题拆成 `core`、`auth`、`products`、`settings`、`orders`、`printing` 六个模块。
+- 去掉不再需要的 `@fastify/multipart` 依赖。
+
 ## 2026-09-26（三）
 
 ### Added

@@ -16,7 +16,8 @@
  * `ordersFor(rows)` turns order rows into the API's orders, lines included,
  * the way each backend already does for the board.
  */
-import { assertPassword, hashPassword, hashSessionToken, newSessionToken, now, PASSWORD_ITERATIONS, uuid, verifyPassword } from "./rules.mjs";
+import { assertPassword, hashPassword, hashSessionToken, newSessionToken, PASSWORD_ITERATIONS, verifyPassword } from "./auth.mjs";
+import { now, uuid } from "./core.mjs";
 import {
   ADD_FAVORITE_SQL, CHANGE_POINTS_SQL, CUSTOMER_BY_EMAIL_SQL, CUSTOMER_BY_ID_SQL, CUSTOMER_SESSION_SQL,
   CUSTOMER_SESSION_TTL_MS, customerView, DELETE_CUSTOMER_SESSION_SQL, DELETE_CUSTOMER_SESSIONS_SQL, DELETE_CUSTOMER_STATEMENTS,

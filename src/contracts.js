@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import { ALLERGEN_CODES } from "./allergens.js";
-import { FEATURED_TEMPLATES } from "../shared/rules.mjs";
+import { FEATURED_TEMPLATES } from "../shared/settings.mjs";
 
 /**
  * The wire contract, defined once.
@@ -136,21 +136,21 @@ export const ProductBody = Type.Object({
   bundleItems: Type.Optional(Type.Array(BundleItem, { maxItems: 32 }))
 });
 
-// The languages a menu can offer, in flag order; shared/rules.mjs holds the
+// The languages a menu can offer, in flag order; shared/settings.mjs holds the
 // same list, and parity.test.ts holds the two to each other.
 export const MENU_LANGUAGES = ["zh", "en", "de"];
 
 export const COLOR_SCHEMES = ["dark", "light"];
 
 // Any subset may be saved; an empty body is a mistake, not a save. The text
-// limits are the ones shared/rules.mjs enforces after trimming, stated here too
+// limits are the ones shared/settings.mjs enforces after trimming, stated here too
 // so an oversized value is a 400 at the edge.
 export const SettingsBody = Type.Object({
   menuTheme: Type.Optional(literals(MENU_THEMES)),
   menuLanguages: Type.Optional(Type.Array(literals(MENU_LANGUAGES), { minItems: 1, maxItems: MENU_LANGUAGES.length, uniqueItems: true })),
   restaurantName: Type.Optional(Type.String({ minLength: 1, maxLength: 40 })),
   menuTitle: Type.Optional(Type.String({ minLength: 1, maxLength: 24 })),
-  // Who issues the receipts, and the register's id (shared/rules.mjs checks the form).
+  // Who issues the receipts, and the register's id (shared/settings.mjs checks the form).
   companyName: Type.Optional(Type.String({ maxLength: 80 })),
   companyAddress: Type.Optional(Type.String({ maxLength: 160 })),
   companyUid: Type.Optional(Type.String({ maxLength: 16 })),
@@ -196,7 +196,7 @@ export const SettingsBody = Type.Object({
   navLabels: Type.Optional(Type.Record(
     Type.String({ minLength: 1, maxLength: 64 }),
     // A language other than zh, en or de is refused by the settings rule
-    // (shared/rules.mjs), not stripped here: Fastify would drop it quietly
+    // (shared/settings.mjs), not stripped here: Fastify would drop it quietly
     // where the Worker refuses it, and the two must answer alike.
     Type.Object({
       zh: Type.Optional(Type.String({ maxLength: 24 })),

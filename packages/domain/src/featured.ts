@@ -4,7 +4,7 @@
  * Every design renders the same markup (`FeaturedPage` in the guest app) and
  * differs only in its CSS block in `src/styles.css`, under
  * `.featured-page[data-template="…"]`. So a design is data, not code: adding
- * one is an id in `shared/rules.mjs`, an entry here and a CSS block, and
+ * one is an id in `shared/settings.mjs`, an entry here and a CSS block, and
  * `packages/contracts/test/parity.test.ts` fails if the ids drift apart.
  *
  * Each follows a pattern restaurants actually use for promotions and set

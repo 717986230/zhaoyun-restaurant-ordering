@@ -1,7 +1,7 @@
 import type { CartLine, Product, SelectedModifier } from "@zhaoyun/domain";
 
 /**
- * The guest's cart, priced the way the server will price it (shared/rules.mjs,
+ * The guest's cart, priced the way the server will price it (shared/orders.mjs,
  * planOrder): a dish at its price plus its options; a reward — the dish for
  * its points — at its options alone. The server prices the order again and
  * its total is the one that counts; this is what the guest sees before.

@@ -5,7 +5,8 @@ import { photoMenuDishes } from "./photo-menu.mjs";
 import { dishPhotos } from "./dish-photos.mjs";
 import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 import { sqliteDriver } from "./sqlite-driver.mjs";
-import { DEFAULT_VAT_PERCENT, mapProduct, normalizeProduct, now, parseJson } from "../shared/rules.mjs";
+import { now, parseJson } from "../shared/core.mjs";
+import { DEFAULT_VAT_PERCENT, mapProduct, normalizeProduct } from "../shared/products.mjs";
 import { createStore, PRODUCT_INSERT_SQL, productInsertParams } from "../shared/store.mjs";
 
 /**

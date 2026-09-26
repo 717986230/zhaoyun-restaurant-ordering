@@ -21,9 +21,7 @@
  * alike and the menu can say what to do about it.
  */
 import { isOnSchedule, normalizeSchedule } from "../src/schedule.js";
-// Cycles (rules.mjs reads this module's settings rule): only function
-// declarations cross them, and those exist before any module runs.
-import { planOrder } from "./rules.mjs";
+import { planOrder } from "./orders.mjs";
 import { redeemPointsStatements, rewardPrices } from "./customer.mjs";
 import { isTakeaway, TAKEAWAY_PREFIX } from "./pos.mjs";
 

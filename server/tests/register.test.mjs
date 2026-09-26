@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { vatSplit } from "../../shared/rules.mjs";
+import { vatSplit } from "../../shared/products.mjs";
 
 /**
  * The journal is only worth anything if a change to it shows. Each entry

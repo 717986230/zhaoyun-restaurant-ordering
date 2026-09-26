@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { hashPassword } from "../../shared/rules.mjs";
+import { hashPassword } from "../../shared/auth.mjs";
 
 const migration = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "migrations", "0055_accounts.sql"), "utf8");
 

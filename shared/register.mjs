@@ -4,7 +4,7 @@
  * closing adds up, and the journal every business event is written into.
  *
  * Both backends call these and only read and write the rows, the way they
- * do for orders (shared/rules.mjs).
+ * do for orders (shared/orders.mjs).
  *
  * What the law asks, in short (RKSV, § 131 and § 132a BAO):
  * - Every sale gets a receipt with a running number, the date and time, what
@@ -22,7 +22,7 @@
  * a Kassenbeleg.
  */
 
-import { now, parseJson, uuid } from "./rules.mjs";
+import { now, parseJson, uuid } from "./core.mjs";
 
 export const PAYMENT_TYPES = ["cash", "card", "voucher"];
 /** The hash the first journal entry follows. */
