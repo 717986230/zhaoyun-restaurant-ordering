@@ -175,6 +175,18 @@ test("an order sent on one tablet shows at once on the other and on the admin bo
   await expect(phone.locator('.pos-table[data-table="9"]')).toContainText(dish.price.toFixed(2), LIVE);
   await expect(phone.locator('.pos-table[data-table="9"]')).toContainText("Li", LIVE);
   await expect(office.locator(".board-card", { hasText: "桌 9" })).toContainText(dish.names.zh, LIVE);
+  await expect(office.locator(".board-card", { hasText: "桌 9" })).toContainText("· Li");
+
+  // The room, as the manager sees it: who has table 9 open, and each waiter now.
+  await office.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "桌位", exact: true }).click();
+  await expect(office.locator(".table-tile", { hasText: "桌 9" }).locator(".table-open-on")).toHaveText("Li 正在操作");
+  const li = office.locator('.staff-live-card[data-staff="Li"]');
+  await expect(li).toHaveClass(/online/);
+  await expect(li).toContainText("Tablet live A");
+  await expect(li).toContainText("开着：9");
+  // Li leaves the table: the manager's view follows without a reload.
+  await counter.getByRole("button", { name: "← 返回" }).click();
+  await expect(li).toContainText("没有开着的桌", LIVE);
   await Promise.all([counter.close(), phone.close(), office.close()]);
 });
 

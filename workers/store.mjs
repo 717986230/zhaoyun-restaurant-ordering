@@ -20,7 +20,7 @@ import {
   billView, bool, boundedLimit, duplicateInput, hashPassword, hashSessionToken, mapProduct, newSessionToken,
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
-  printJobView, serviceRequestView, settingsView, tableOverviewView, tableView, uuid,
+  printJobView, serviceRequestView, settingsView, tablesOverviewView, tableView, uuid, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL,
   verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent
 } from "../shared/rules.mjs";
 import {
@@ -31,7 +31,7 @@ import {
 } from "../shared/register.mjs";
 import {
   assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
-  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
 import {
   ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
@@ -741,7 +741,7 @@ export function createStore(db) {
     getMediaFile,
     storeMedia,
     listOrders: async (limit = 100) => {
-      const rows = await all("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?", boundedLimit(limit));
+      const rows = await all(RECENT_ORDERS_SQL, boundedLimit(limit));
       return Promise.all(rows.map(viewOrder));
     },
     createOrder,
@@ -876,20 +876,17 @@ export function createStore(db) {
      * than not appearing at all.
      */
     tablesOverview: async () => {
-      const orderRows = await all("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at");
-      const byTable = new Map();
-      for (const row of orderRows) {
-        const list = byTable.get(row.table_no) ?? [];
-        list.push(await viewOrder(row));
-        byTable.set(row.table_no, list);
-      }
-      const rows = await all("SELECT * FROM restaurant_tables ORDER BY table_no");
-      const known = new Set(rows.map((row) => row.table_no));
-      const overview = rows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? []));
-      for (const [tableNo, orders] of byTable) {
-        if (!known.has(tableNo)) overview.push(tableOverviewView(null, orders, tableNo));
-      }
-      return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+      const orders = [];
+      for (const row of await all(OPEN_TABLE_ORDERS_SQL)) orders.push(await viewOrder(row));
+      const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
+      return tablesOverviewView(await all("SELECT * FROM restaurant_tables ORDER BY table_no"), orders, claims);
+    },
+    staffActivity: async () => {
+      const staffRows = await all("SELECT * FROM staff ORDER BY active DESC, name");
+      const shifts = new Map();
+      for (const row of staffRows) shifts.set(row.id, settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, row.id, row.id)));
+      const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
+      return staffActivityView(staffRows, await all(LIVE_POS_SESSIONS_SQL, now()), claims, shifts);
     },
     openBillTables: async () =>
       (await all("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"))

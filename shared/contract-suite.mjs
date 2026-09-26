@@ -968,6 +968,19 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.ok(jobs.length && jobs.every((job) => job.payload.staffName === "Li"), "the kitchen ticket names the waiter");
       assert.equal((await posOrder(asWang, "P1", "contract-pos-2", [{ id: food.id, qty: 1 }])).status, 409);
 
+      // The console sees the floor as it stands: who has P1 open, who took the
+      // order, and each waiter — where signed in, which tables, the shift so far.
+      const p1Now = (await call("GET", "/api/admin/tables/overview", { admin: true })).json.tables.find((entry) => entry.table === "P1");
+      assert.deepEqual(p1Now.openOn, { staffId: li.id, staffName: "Li" });
+      assert.equal(p1Now.orders[0].staffName, "Li");
+      assert.equal((await call("GET", "/api/orders?limit=20", { admin: true })).json.orders.find((order) => order.id === ordered.json.order.id).staffName, "Li");
+      const liNow = (await call("GET", "/api/admin/staff/activity", { admin: true })).json.staff.find((entry) => entry.id === li.id);
+      assert.equal(liNow.online, true);
+      assert.equal(liNow.devices.length, 1);
+      assert.deepEqual(liNow.tables, ["P1"]);
+      assert.equal(liNow.shift.receipts, 0);
+      assert.equal((await call("GET", "/api/admin/staff/activity", asLi)).status, 403, "the manager's view");
+
       // Closed on Li's device, it is anyone's.
       assert.equal((await call("DELETE", "/api/pos/tables/P1/claim", asLi)).status, 204);
       assert.equal((await call("POST", "/api/pos/tables/P1/claim", asWang)).status, 200);
@@ -1014,6 +1027,9 @@ export function contractChecks(call, assert, { liveBase } = {}) {
         ...asLi, body: { table: takeaway.json.table, items: togoBill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: togoBill.total, tendered: togoBill.total + 5 }] }
       });
       assert.equal(liPaid.status, 201, JSON.stringify(liPaid.json));
+      const liShift = (await call("GET", "/api/admin/staff/activity", { admin: true })).json.staff.find((entry) => entry.id === li.id).shift;
+      assert.equal(liShift.receipts, 1);
+      assert.equal(liShift.payments.cash, Math.round(togoBill.total * 100), "the cash Li holds");
 
       // Settlement: Li hands in the cash Li took; Wang's is Wang's.
       const preview = (await call("GET", "/api/pos/settlement", asLi)).json.totals;

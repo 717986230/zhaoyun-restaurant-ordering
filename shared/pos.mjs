@@ -116,5 +116,30 @@ export function settlementView(row) {
 export const OPEN_STAFF_RECEIPTS_SQL = `SELECT * FROM receipts WHERE staff_id = ?
   AND receipt_no > COALESCE((SELECT MAX(last_receipt_no) FROM staff_settlements WHERE staff_id = ?), 0) ORDER BY receipt_no`;
 
+/** Who is signed in on which device right now. */
+export const LIVE_POS_SESSIONS_SQL = `SELECT pos_sessions.staff_id, pos_devices.name AS device_name
+  FROM pos_sessions JOIN pos_devices ON pos_devices.id = pos_sessions.device_id
+  WHERE pos_sessions.expires_at > ? ORDER BY pos_devices.name`;
+
+/**
+ * Each waiter as the manager watches the floor: signed in or not and where,
+ * the tables they have open, and their shift so far — what they took since
+ * their last settlement, the cash they hold included.
+ * `sessions` are LIVE_POS_SESSIONS_SQL rows, `claims` claimView objects,
+ * `shifts` each waiter's settlementTotals by id.
+ */
+export function staffActivityView(staffRows, sessions, claims, shifts) {
+  return staffRows.filter((row) => row.active).map((row) => {
+    const devices = sessions.filter((session) => session.staff_id === row.id).map((session) => session.device_name);
+    return {
+      ...staffView(row),
+      online: devices.length > 0,
+      devices: [...new Set(devices)],
+      tables: claims.filter((claim) => claim.staffId === row.id).map((claim) => claim.table).sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
+      shift: shifts.get(row.id)
+    };
+  });
+}
+
 /** The next takeaway number today, by the restaurant's clock. */
 export const NEXT_PICKUP_SQL = `SELECT COALESCE(MAX(pickup_no), 0) + 1 AS next FROM order_staff WHERE pickup_no IS NOT NULL AND created_at >= ?`;

@@ -1,7 +1,7 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosDevice, PosClaim, PosSettlement,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosDevice, PosClaim, PosSettlement,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
@@ -133,6 +133,8 @@ export interface TableOverview {
   orders: ApiOrder[];
   total: number;
   since: string | null;
+  /** Open on a POS right now, and by whom. */
+  openOn?: { staffId: string | null; staffName: string | null } | null;
 }
 
 export interface AdminStorage {
@@ -285,6 +287,8 @@ export class AdminApi {
   saveStaff(input: { name?: string; role?: PosStaff["role"]; pin?: string; active?: boolean }, id?: string): Promise<{ staff: PosStaff }> {
     return this.#request(id ? `/api/admin/staff/${encodeURIComponent(id)}` : "/api/admin/staff", { method: id ? "PUT" : "POST", body: JSON.stringify(input) });
   }
+  /** Each waiter now: signed in where, which tables open, the shift so far. */
+  staffActivity(): Promise<{ staff: PosStaffActivity[] }> { return this.#request("/api/admin/staff/activity"); }
   posDevices(): Promise<{ devices: PosDevice[] }> { return this.#request("/api/admin/pos-devices"); }
   unpairDevice(id: string): Promise<void> { return this.#request(`/api/admin/pos-devices/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   /** An interim bill on the front printer; it marks nothing paid. */

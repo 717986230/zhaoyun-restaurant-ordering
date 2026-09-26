@@ -35,7 +35,7 @@ const initialState: AdminState = {
   gate: { checking: true, registered: false, busy: false, error: null, reachable: true },
   auditEntries: [],
   connected: false, connectionError: null, products: [], printers: [],
-  orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
+  orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], staffActivity: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", settings: null, toast: null
 };
 
@@ -128,10 +128,13 @@ export function App() {
       const { orders } = await adminApi.orders();
       // The kitchen screen may only read orders; asking for the rest would 403.
       const floor = roleRef.current === "kitchen"
-        ? { requests: [], jobs: [], tables: [] }
-        : await Promise.all([adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.tableOverview()])
-          .then(([a, b, c]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables }));
-      setState((current) => ({ ...current, orders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables }));
+        ? { requests: [], jobs: [], tables: [], staff: [] }
+        : await Promise.all([
+          adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.tableOverview(),
+          // Who is on the floor and their shift: the manager's to see.
+          roleRef.current === "manager" ? adminApi.staffActivity() : Promise.resolve({ staff: [] })
+        ]).then(([a, b, c, d]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables, staff: d.staff }));
+      setState((current) => ({ ...current, orders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables, staffActivity: floor.staff }));
     } catch (error) {
       if (!silent) failed(error, "boardLoadFailed");
     }
@@ -507,6 +510,7 @@ export function App() {
       />}
       {state.tab === "tables" && <TablesPanel
         tables={state.tableOverview}
+        staff={state.staffActivity}
         bill={state.bill}
         role={state.role}
         busy={state.boardBusy}

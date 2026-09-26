@@ -592,6 +592,9 @@ async function handle(request, env) {
     }
 
     // The waiters and the devices the POS runs on.
+    if (path.length === 4 && path[2] === "staff" && path[3] === "activity" && method === "GET") {
+      return json({ staff: await store.staffActivity() });
+    }
     if (path[2] === "staff") {
       try {
         if (path.length === 3 && method === "GET") return json({ staff: await store.listStaff() });

@@ -11,7 +11,7 @@ import {
   duplicateInput, hashSessionToken, newSessionToken, normalizeCategoryName, normalizeSettingsInput,
   mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT,
   normalizeTableNo, PASSWORD_ITERATIONS, settingsView,
-  renamedCategorySettings, tableOverviewView, tableView, verifyPassword
+  orderView as sharedOrderView, renamedCategorySettings, tablesOverviewView, tableView, verifyPassword, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL
 } from "../shared/rules.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, companyOf, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL, INSERT_RECEIPT_SQL,
@@ -21,7 +21,7 @@ import {
 } from "../shared/register.mjs";
 import {
   assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
-  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
 import {
   ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
@@ -533,7 +533,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     recentClosings: db.prepare("SELECT * FROM day_closings ORDER BY closing_no DESC LIMIT ?"),
     journalBetween: db.prepare("SELECT * FROM journal WHERE at >= ? AND at < ? ORDER BY seq"),
     journalBySeq: db.prepare("SELECT * FROM journal WHERE seq = ?"),
-    listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC, rowid DESC LIMIT ?"),
+    listOrders: db.prepare(RECENT_ORDERS_SQL),
     openBillOrders: db.prepare("SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at"),
     openBillTables: db.prepare("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"),
     insertOrder: db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)"),
@@ -563,7 +563,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     `),
     deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
-    openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
+    openOrdersForTables: db.prepare(OPEN_TABLE_ORDERS_SQL),
+    livePosSessions: db.prepare(LIVE_POS_SESSIONS_SQL),
     accountCount: db.prepare(ACCOUNT_COUNT_SQL),
     accountById: db.prepare(ACCOUNT_BY_ID_SQL),
     accountByLogin: db.prepare(ACCOUNT_BY_LOGIN_SQL),
@@ -688,30 +689,9 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return getProduct(productId);
   }
 
+  /** The shared view (shared/rules.mjs), with the order's lines read here. */
   function orderView(row) {
-    if (!row) return null;
-    return {
-      id: row.id,
-      no: row.order_no,
-      clientRequestId: row.client_request_id,
-      table: row.table_no,
-      status: row.status,
-      note: row.note,
-      total: row.total_cents / 100,
-      items: statements.orderItems.all(row.id).map((item) => ({
-        id: item.product_id,
-        name: item.product_name,
-        qty: item.quantity,
-        paid: item.paid_quantity ?? 0,
-        unitPrice: item.unit_price_cents / 100,
-        printStation: item.print_station,
-        vatPercent: item.vat_percent,
-        modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
-      })),
-      billedAt: row.billed_at ?? null,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
+    return row ? sharedOrderView(row, statements.orderItems.all(row.id)) : null;
   }
 
   function serviceRequestView(row) {
@@ -1480,20 +1460,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
      * that was deleted, or typed a number — so it appears as seated rather
      * than not appearing at all.
      */
-    tablesOverview: () => {
-      const byTable = new Map();
-      for (const row of statements.openOrdersForTables.all()) {
-        const list = byTable.get(row.table_no) ?? [];
-        list.push(orderView(row, statements.orderItems.all(row.id)));
-        byTable.set(row.table_no, list);
-      }
-      const rows = statements.listTables.all();
-      const known = new Set(rows.map((row) => row.table_no));
-      const overview = rows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? []));
-      for (const [tableNo, orders] of byTable) {
-        if (!known.has(tableNo)) overview.push(tableOverviewView(null, orders, tableNo));
-      }
-      return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+    tablesOverview: () => tablesOverviewView(
+      statements.listTables.all(),
+      statements.openOrdersForTables.all().map((row) => orderView(row)),
+      statements.liveClaims.all(now()).map((row) => claimView(row))
+    ),
+    staffActivity: () => {
+      const staffRows = statements.listStaff.all();
+      const shifts = new Map(staffRows.map((row) => [row.id, settlementTotals(statements.openStaffReceipts.all(row.id, row.id))]));
+      return staffActivityView(staffRows, statements.livePosSessions.all(now()), statements.liveClaims.all(now()).map((row) => claimView(row)), shifts);
     },
     setTableLock: (table, locked) => {
       const tableNo = normalizeTableNo(table);

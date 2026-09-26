@@ -1,4 +1,4 @@
-import type { ApiAccount, ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
+import type { PosStaffActivity, ApiAccount, ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
 import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
@@ -41,6 +41,8 @@ export interface AdminState {
   bill: ApiBill | null;
   tables: RestaurantTable[];
   tableOverview: TableOverview[];
+  /** The waiters as the floor has them now; the manager's view only. */
+  staffActivity: PosStaffActivity[];
   boardBusy: boolean;
   printers: PrinterProfile[];
   discoveredPrinters: DiscoveredPrinter[];

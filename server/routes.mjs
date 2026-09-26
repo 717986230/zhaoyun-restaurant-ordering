@@ -529,6 +529,8 @@ export function registerRoutes(app, { database, realtime, config }) {
   // waiters; a paired device lists them and takes a PIN; a waiter's session
   // does the rest.
   app.get("/api/admin/staff", { preHandler: requireAdmin }, async () => ({ staff: database.listStaff() }));
+  // The floor as the manager watches it: each waiter, where they are signed in, their open tables and their shift.
+  app.get("/api/admin/staff/activity", { preHandler: requireAdmin }, async () => ({ staff: database.staffActivity() }));
   app.post("/api/admin/staff", { preHandler: requireAdmin, schema: { body: StaffBody } }, async (request, reply) => {
     try {
       return reply.code(201).send({ staff: await database.saveStaff(request.body) });

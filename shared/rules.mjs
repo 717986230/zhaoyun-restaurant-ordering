@@ -210,7 +210,30 @@ export const TABLE_STATES = new Set(["free", "seated", "locked"]);
  * releases it. Both backends aggregate their own rows; this decides what the
  * result means, so the two cannot disagree about when a table is free.
  */
-export function tableOverviewView(row, orders = [], fallbackTable = "") {
+/**
+ * Orders with the waiter who took them on a POS and a takeaway's pickup
+ * number (order_staff), for the board and the room. A guest's own order
+ * has neither.
+ */
+const ORDERS_WITH_STAFF = `SELECT orders.*, order_staff.staff_name AS staff_name, order_staff.pickup_no AS pickup_no
+  FROM orders LEFT JOIN order_staff ON order_staff.order_id = orders.id`;
+export const RECENT_ORDERS_SQL = `${ORDERS_WITH_STAFF} ORDER BY orders.created_at DESC, orders.rowid DESC LIMIT ?`;
+export const OPEN_TABLE_ORDERS_SQL = `${ORDERS_WITH_STAFF} WHERE orders.billed_at IS NULL AND orders.status <> 'cancelled' ORDER BY orders.table_no, orders.created_at`;
+
+/** `claims` are the live table claims (claimView): who has each table open on a POS. */
+export function tablesOverviewView(tableRows, orders, claims = []) {
+  const byTable = new Map();
+  for (const order of orders) byTable.set(order.table, [...(byTable.get(order.table) ?? []), order]);
+  const claimOf = new Map(claims.map((claim) => [claim.table, claim]));
+  const overview = tableRows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? [], "", claimOf.get(row.table_no)));
+  const known = new Set(tableRows.map((row) => row.table_no));
+  for (const [tableNo, list] of byTable) {
+    if (!known.has(tableNo)) overview.push(tableOverviewView(null, list, tableNo, claimOf.get(tableNo)));
+  }
+  return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));
+}
+
+export function tableOverviewView(row, orders = [], fallbackTable = "", claim = null) {
   const open = orders.filter((order) => order.status !== "cancelled");
   const view = tableView(row) ?? { table: String(fallbackTable), label: "", enabled: true, locked: false, lockedAt: null };
   return {
@@ -226,7 +249,9 @@ export function tableOverviewView(row, orders = [], fallbackTable = "") {
     orders: open,
     // What is still to pay: a line a receipt paid for is off the table's total.
     total: open.reduce((sum, order) => sum + order.items.reduce((part, item) => part + Math.round(item.unitPrice * 100) * (item.qty - (item.paid ?? 0)), 0), 0) / 100,
-    since: open.length ? open.map((order) => order.createdAt).sort()[0] : null
+    since: open.length ? open.map((order) => order.createdAt).sort()[0] : null,
+    // Open on a POS right now, and by whom.
+    openOn: claim ? { staffId: claim.staffId, staffName: claim.staffName } : null
   };
 }
 
@@ -391,8 +416,13 @@ export function orderView(row, itemRows = []) {
       paid: item.paid_quantity ?? 0,
       unitPrice: item.unit_price_cents / 100,
       printStation: item.print_station,
+      vatPercent: item.vat_percent,
       modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
     })),
+    billedAt: row.billed_at ?? null,
+    // Who took it on a POS, and a takeaway's number, when the query asked (RECENT_ORDERS_SQL).
+    ...(row.staff_name ? { staffName: row.staff_name } : {}),
+    ...(row.pickup_no ? { pickupNo: row.pickup_no } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

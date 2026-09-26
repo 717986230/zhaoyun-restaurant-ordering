@@ -69,6 +69,10 @@ export interface ApiOrder {
   createdAt: string;
   updatedAt?: string;
   billedAt?: string | null;
+  /** The waiter who took it on a POS; absent for a guest's own order. */
+  staffName?: string;
+  /** A takeaway's pickup number. */
+  pickupNo?: number;
 }
 
 export type PrintStationName = "kitchen" | "bar" | "sushi" | "front";
@@ -184,6 +188,17 @@ export interface PosStaff { id: string; name: string; role: "staff" | "manager";
 export interface PosDevice { id: string; name: string; createdAt: string; lastSeenAt: string | null }
 /** A table open on a device, locked to it until closed or left alone. */
 export interface PosClaim { table: string; deviceId: string; staffId: string | null; staffName: string | null; expiresAt: string }
+/** A waiter as the manager watches the floor (GET /api/admin/staff/activity). */
+export interface PosStaffActivity extends PosStaff {
+  online: boolean;
+  /** The devices they are signed in on now. */
+  devices: string[];
+  /** The tables they have open now. */
+  tables: string[];
+  /** Since their last settlement: what they took, the cash they hold included. */
+  shift: ApiClosingTotals & { receipts: number };
+}
+
 export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number }; createdAt: string }
 
 export interface ApiServiceRequest {
