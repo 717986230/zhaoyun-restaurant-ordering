@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { isolateLive } from "./support/live.js";
 
 /**
  * The door of the admin console: the restaurant's account.
@@ -13,6 +14,7 @@ const ACCOUNT = { id: "a-1", login: "wirt@zhaoyun.at", name: "Frau Li", createdA
 
 // The admin follows the browser's language; these tests read the Chinese copy.
 test.use({ locale: "zh-CN" });
+test.beforeEach(({ page }) => isolateLive(page));
 
 /** The console loads its catalogue, printers and settings the moment it is
  *  through the door; these keep that from erroring past the assertion. */

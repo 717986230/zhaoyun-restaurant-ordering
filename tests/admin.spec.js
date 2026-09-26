@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
+import { isolateLive } from "./support/live.js";
 
 const require = createRequire(import.meta.url);
 
@@ -18,6 +19,7 @@ let mainCategory;
 test.use({ locale: "zh-CN" });
 
 test.beforeEach(async ({ page }) => {
+  await isolateLive(page);
   orderStatus = "new";
   mainCategory = "MAIN";
   requestStatus = "open";
