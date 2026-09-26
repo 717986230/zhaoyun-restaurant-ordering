@@ -116,3 +116,27 @@ test("the account's name and password are changed in the settings, against the p
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("zy_admin_token"))).toBe("fresh-token");
   await expect(card.locator("input[name='currentPassword']")).toHaveValue("");
 });
+
+test("with ADMIN_TOKEN a forgotten account password is set anew in the settings", async ({ page }) => {
+  let sent = null;
+  await stubConsole(page);
+  await page.unroute("**/api/admin/session");
+  await page.route("**/api/admin/session", (route) => route.fulfill({ ...OK, body: JSON.stringify({ role: "manager" }) }));
+  await page.addInitScript(() => sessionStorage.setItem("zy_admin_token", "the-admin-token-from-the-environment"));
+  await page.route("**/api/account", (route) => route.fulfill({ ...OK, body: JSON.stringify({ registered: true }) }));
+  await page.route("**/api/account/recover", (route) => {
+    sent = { body: route.request().postDataJSON(), token: route.request().headers()["x-admin-token"] };
+    return route.fulfill({ ...OK, body: JSON.stringify({ account: ACCOUNT }) });
+  });
+  await page.route("**/api/admin/staff", (route) => route.fulfill({ ...OK, body: JSON.stringify({ staff: [] }) }));
+  await page.route("**/api/admin/pos-devices", (route) => route.fulfill({ ...OK, body: JSON.stringify({ devices: [] }) }));
+  await page.goto("/admin.html");
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+
+  const form = page.locator(".account-recover");
+  await form.locator("input[name='nextPassword']").fill("wieder-da-2026");
+  await form.locator("input[name='repeatPassword']").fill("wieder-da-2026");
+  await form.getByRole("button", { name: "重设账户密码" }).click();
+  await expect.poll(() => sent).toEqual({ body: { password: "wieder-da-2026" }, token: "the-admin-token-from-the-environment" });
+  await expect(page.locator("#adminToast")).toHaveText("账户 wirt@zhaoyun.at 的密码已重设，所有设备需要重新登录");
+});

@@ -260,6 +260,10 @@ export class AdminApi {
     return this.#request("/api/account", { method: "PUT", body: JSON.stringify(command) });
   }
   signOut(): Promise<void> { return this.#request("/api/account/sign-out", { method: "POST" }); }
+  /** With ADMIN_TOKEN in the header: a forgotten password set anew (and the account name, if given). */
+  recoverAccount(command: { login?: string; password: string }): Promise<{ account: ApiAccount }> {
+    return this.#request("/api/account/recover", { method: "POST", body: JSON.stringify(command) });
+  }
 
   mediaUrl(path: string): string { return `${this.storage.baseUrl}${path}`; }
   health(): Promise<{ ok: boolean }> { return this.#request("/api/health"); }

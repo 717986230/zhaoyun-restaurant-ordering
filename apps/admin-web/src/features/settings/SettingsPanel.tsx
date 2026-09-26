@@ -51,6 +51,8 @@ interface Props {
   /** The account signed in; null on a device opened with a configured token. */
   account: ApiAccount | null;
   onUpdateAccount: (command: AccountUpdateCommand) => Promise<boolean>;
+  /** Signed in with ADMIN_TOKEN: the forgotten password set anew. */
+  onRecoverAccount: (command: { login?: string; password: string }) => Promise<boolean>;
 }
 
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
@@ -353,6 +355,20 @@ export function SettingsPanel(props: Props) {
     }
   }
 
+  async function recoverAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const next = String(data.get("nextPassword") || "");
+    if (next !== String(data.get("repeatPassword") || "")) {
+      setPasswordNote(t("gateMismatch"));
+      return;
+    }
+    setPasswordNote("");
+    const login = String(data.get("login") || "").trim().toLowerCase();
+    if (await props.onRecoverAccount({ ...(login ? { login } : {}), password: next })) form.reset();
+  }
+
   function saveConnection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -561,7 +577,14 @@ export function SettingsPanel(props: Props) {
           <label><span>{t("currentPassword")}</span><input name="currentPassword" required type="password" autoComplete="current-password" /></label>
           {passwordNote && <p className="gate-note error" role="alert">{passwordNote}</p>}
           <button className="primary-action" type="submit">{t("changePassword")}</button>
-        </form> : <p className="settings-hint">{t("accountTokenOnly")}</p>}
+        </form> : <form className="editor-form account-recover" onSubmit={(event) => void recoverAccount(event)}>
+          <p className="settings-hint">{t("accountTokenOnly")}</p>
+          <label><span>{t("gateLogin")}</span><input name="login" minLength={3} maxLength={64} autoComplete="username" autoCapitalize="none" placeholder={t("accountKeepLogin")} /></label>
+          <label><span>{t("newPassword")}</span><input name="nextPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
+          <label><span>{t("gateRepeat")}</span><input name="repeatPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
+          {passwordNote && <p className="gate-note error" role="alert">{passwordNote}</p>}
+          <button className="primary-action" type="submit">{t("accountRecover")}</button>
+        </form>}
       </Section>
     </div>
 

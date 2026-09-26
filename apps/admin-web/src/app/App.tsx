@@ -414,6 +414,18 @@ export function App() {
     }
   }
 
+  /** ADMIN_TOKEN's way back in: the password set anew; every session of the account ends. */
+  async function recoverAccount(command: { login?: string; password: string }): Promise<boolean> {
+    try {
+      const { account } = await adminApi.recoverAccount(command);
+      notify(t("accountRecovered", { login: account.login }));
+      return true;
+    } catch (error) {
+      failed(error, "passwordChangeFailed");
+      return false;
+    }
+  }
+
   async function saveConnection(nextStorage: AdminStorage) {
     adminApi.configure(nextStorage);
     await connect();
@@ -538,6 +550,7 @@ export function App() {
         onDeleteTable={deleteTable}
         account={state.account}
         onUpdateAccount={updateAccount}
+        onRecoverAccount={recoverAccount}
       />}
     </main>
   </div><BackToTop key={state.tab} label={t("backToTop")} /><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;
