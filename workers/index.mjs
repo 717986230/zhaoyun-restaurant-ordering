@@ -20,9 +20,10 @@ import { openLive, publishLive } from "./live.mjs";
 import { liveEvent } from "../shared/live.mjs";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
-  SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody
+  SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
+  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody
 } from "../src/contracts.js";
-import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
+import { customerAccountsOn, menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
 export { LiveHub } from "./live.mjs";
 
@@ -54,10 +55,14 @@ const AUTH_MAX_TRACKED_SOURCES = 10_000;
  * Object, and that arrives with the realtime one.
  */
 const authFailures = new Map();
+// Guests signing in keep a budget of their own: a restaurant's Wi-Fi is one
+// address for the guests and the staff tablets alike, and a guest mistyping
+// their password must not lock the POS out.
+const customerFailures = new Map();
 
-function pruneAuthFailures(moment) {
-  for (const [source, entry] of authFailures) {
-    if (entry.resetAt <= moment) authFailures.delete(source);
+function pruneAuthFailures(moment, failures = authFailures) {
+  for (const [source, entry] of failures) {
+    if (entry.resetAt <= moment) failures.delete(source);
   }
 }
 
@@ -90,7 +95,7 @@ function corsHeaders(request, env) {
   return {
     "access-control-allow-origin": allow,
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "access-control-allow-headers": "content-type,x-admin-token,x-table-token,x-device-token",
+    "access-control-allow-headers": "content-type,x-admin-token,x-table-token,x-device-token,x-customer-token",
     "access-control-max-age": "86400",
     ...(allow === "*" ? {} : { vary: "origin" })
   };
@@ -131,12 +136,12 @@ async function refuseUnknownTable(request, store, order) {
  * so guessing the password and guessing a token are counted together. Returns
  * `{ denied }` once the budget is spent.
  */
-function authThrottle(request) {
+function authThrottle(request, failuresBySource = authFailures) {
   const moment = Date.now();
   const key = clientKey(request);
-  const current = authFailures.get(key);
-  if (current && current.resetAt <= moment) authFailures.delete(key);
-  const active = authFailures.get(key);
+  const current = failuresBySource.get(key);
+  if (current && current.resetAt <= moment) failuresBySource.delete(key);
+  const active = failuresBySource.get(key);
   if (active && active.failures >= AUTH_MAX_FAILURES) {
     const retryAfter = Math.max(1, Math.ceil((active.resetAt - moment) / 1000));
     return { denied: json({ error: "Too many authentication attempts", retryAfter }, 429, { "retry-after": String(retryAfter) }) };
@@ -144,11 +149,11 @@ function authThrottle(request) {
   return {
     fail() {
       const failures = (active?.failures ?? 0) + 1;
-      if (!active && authFailures.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(moment);
-      authFailures.set(key, { failures, resetAt: moment + AUTH_WINDOW_MS });
+      if (!active && failuresBySource.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(moment, failuresBySource);
+      failuresBySource.set(key, { failures, resetAt: moment + AUTH_WINDOW_MS });
     },
     pass() {
-      authFailures.delete(key);
+      failuresBySource.delete(key);
     }
   };
 }
@@ -231,6 +236,12 @@ async function body(request, schema) {
   return { invalid: fail(problem ? `body${problem.path}: ${problem.message}` : "Invalid request body") };
 }
 
+/** A refusal that says what it is (`code`) and, for a pause, how long (retry-after). */
+function coded(error) {
+  const status = error.status ?? (error.code === "TABLE_LOCKED" ? 409 : 400);
+  return json({ error: error.message || "Request failed", ...(error.code ? { code: error.code } : {}) }, status, error.retryAfter ? { "retry-after": String(error.retryAfter) } : {});
+}
+
 function segments(pathname) {
   return pathname.split("/").filter(Boolean);
 }
@@ -262,19 +273,13 @@ async function handle(request, env) {
       if (denied) return denied;
       return json({ orders: await store.listOrders(limit) });
     }
+    // The older way a guest orders at the table, under the same rules as /api/guest/orders.
     if (path.length === 2 && method === "POST") {
-      try {
-        const { value, invalid } = await body(request, CreateOrderBody);
-        if (invalid) return invalid;
-        const refused = await refuseUnknownTable(request, store, value);
-        if (refused) return refused;
-        return json({ order: await store.createOrder(value) }, 201);
-      } catch (error) {
-        // A locked table is a state the guest can wait out, not a malformed
-        // request, so the app can tell them to ask a waiter instead of telling
-        // them their cart is wrong.
-        return fail(error.message, error.code === "TABLE_LOCKED" ? 409 : 400);
-      }
+      const { value, invalid } = await body(request, CreateOrderBody);
+      if (invalid) return invalid;
+      const refused = await refuseUnknownTable(request, store, value);
+      if (refused) return refused;
+      return placeGuestOrder({ ...value, channel: "dine-in" });
     }
     if (path.length === 4 && path[3] === "status" && method === "PATCH") {
       const { denied } = await gate("kitchen");
@@ -288,6 +293,99 @@ async function handle(request, env) {
         return fail(error.message);
       }
     }
+  }
+
+  /**
+   * A guest's own order (shared/ordering.mjs): switched off until the owner
+   * switches it on, and within its limits. A locked or closed table, a pause
+   * between orders: the code says which, so the menu can say what to do.
+   */
+  async function placeGuestOrder({ channel, payment, ...order }) {
+    try {
+      const customer = await store.customers.session(request.headers.get("x-customer-token"));
+      return json({ order: await store.placeGuestOrder(order, { channel, payment, customer }) }, 201);
+    } catch (error) {
+      return coded(error);
+    }
+  }
+
+  if (path[0] === "api" && path[1] === "guest" && path[2] === "orders" && path.length === 3) {
+    if (method === "POST") {
+      const { value, invalid } = await body(request, GuestOrderBody);
+      if (invalid) return invalid;
+      // A pickup names no table; an order at the table names its own, with its card's token.
+      if (value.channel === "pickup") delete value.table;
+      else {
+        const refused = await refuseUnknownTable(request, store, value);
+        if (refused) return refused;
+      }
+      return placeGuestOrder(value);
+    }
+    // A guest without an account follows the orders their phone placed, by the ids it made up for them.
+    if (method === "GET") {
+      const ids = String(url.searchParams.get("ids") ?? "").split(",").map((id) => id.trim()).filter((id) => id.length >= 8 && id.length <= 128);
+      return json({ orders: await store.customers.ordersByRequest(ids) });
+    }
+  }
+
+  /**
+   * Guests' own accounts (shared/customer.mjs, shared/customer-store.mjs), as
+   * server/routes.mjs has them. The session travels in `x-customer-token`.
+   */
+  if (path[0] === "api" && path[1] === "customer") {
+    const customers = store.customers;
+    const rest = path.slice(2).join("/");
+    if (method === "POST" && (rest === "register" || rest === "sign-in")) {
+      if (rest === "register" && !customerAccountsOn(await store.getSettings())) return json({ error: "Guest accounts are not available", code: "ACCOUNTS_OFF" }, 403);
+      const throttle = authThrottle(request, customerFailures);
+      if (throttle.denied) return throttle.denied;
+      if (rest === "register") {
+        const { value, invalid } = await body(request, CustomerRegisterBody);
+        if (invalid) return invalid;
+        try {
+          return json(await customers.register(value), 201);
+        } catch (error) {
+          return coded(error);
+        }
+      }
+      const { value, invalid } = await body(request, CustomerSignInBody);
+      if (invalid) return invalid;
+      const session = await customers.signIn(value.email, value.password);
+      if (!session) {
+        throttle.fail();
+        return fail("Wrong email or password", 401);
+      }
+      throttle.pass();
+      return json(session);
+    }
+    if (method === "POST" && rest === "sign-out") {
+      await customers.signOut(request.headers.get("x-customer-token"));
+      return new Response(null, { status: 204, headers: SECURITY_HEADERS });
+    }
+    const customer = await customers.session(request.headers.get("x-customer-token"));
+    if (!customer) return json({ error: "Please sign in", code: "SIGN_IN_REQUIRED" }, 401);
+    try {
+      if (rest === "" && method === "GET") return json(await customers.profile(customer.id));
+      if (rest === "" && method === "PUT") {
+        const { value, invalid } = await body(request, CustomerUpdateBody);
+        if (invalid) return invalid;
+        const updated = await customers.update(customer.id, value);
+        return updated ? json(updated) : fail("Wrong password", 401);
+      }
+      if (rest === "delete" && method === "POST") {
+        const { value, invalid } = await body(request, CustomerDeleteBody);
+        if (invalid) return invalid;
+        return (await customers.deleteOwn(customer.id, value.password)) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("Wrong password", 401);
+      }
+      if (path.length === 4 && path[2] === "favorites" && (method === "PUT" || method === "DELETE")) {
+        return json({ favorites: await customers.setFavorite(customer.id, decodeURIComponent(path[3]), method === "PUT") });
+      }
+      if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
+      if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
+    } catch (error) {
+      return coded(error);
+    }
+    return fail("Not found", 404);
   }
 
   // /api/service-requests and /api/service-requests/:id/status
@@ -504,6 +602,20 @@ async function handle(request, env) {
       if (denied) return denied;
       return json({ tables: await store.tablesOverview() });
     }
+    // Open a table for its guests to order from their phones (开台), or close it.
+    if (path.length === 5 && path[2] === "tables" && path[4] === "ordering" && method === "POST") {
+      const { denied, pos } = await gate("staff");
+      if (denied) return denied;
+      const { value, invalid } = await body(request, TableOrderingBody);
+      if (invalid) return invalid;
+      try {
+        if (value.open) return json({ session: await store.openTable(decodeURIComponent(path[3]), pos) });
+        await store.closeTable(decodeURIComponent(path[3]));
+        return json({ session: null });
+      } catch (error) {
+        return fail(error.message);
+      }
+    }
     if (path.length === 5 && path[2] === "tables" && path[4] === "lock" && method === "POST") {
       const { denied } = await gate("staff");
       if (denied) return denied;
@@ -614,6 +726,35 @@ async function handle(request, env) {
       const to = url.searchParams.get("to") ?? "";
       if (![from, to].every((day) => /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)?$/.test(day))) return fail("from and to are dates (YYYY-MM-DD) or ISO times");
       return json(await store.exportJournal(from, to));
+    }
+
+    // Guests' accounts, the manager's side: look a guest up, change their
+    // points with a reason, set a new password, remove the account.
+    if (path[2] === "customers") {
+      const customers = store.customers;
+      try {
+        if (path.length === 3 && method === "GET") return json({ customers: await customers.list(url.searchParams.get("q") ?? "", limit) });
+        const id = path[3] ? decodeURIComponent(path[3]) : "";
+        if (path.length === 4 && method === "GET") {
+          const found = await customers.get(id);
+          return found ? json(found) : fail("Guest not found", 404);
+        }
+        if (path.length === 4 && method === "DELETE") return (await customers.remove(id)) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("Guest not found", 404);
+        if (path.length === 5 && path[4] === "points" && method === "POST") {
+          const { value, invalid } = await body(request, PointsAdjustBody);
+          if (invalid) return invalid;
+          const customer = await customers.adjustPoints(id, value);
+          return customer ? json({ customer }) : fail("Guest not found", 404);
+        }
+        if (path.length === 5 && path[4] === "password" && method === "POST") {
+          const { value, invalid } = await body(request, CustomerPasswordBody);
+          if (invalid) return invalid;
+          const customer = await customers.resetPassword(id, value.password);
+          return customer ? json({ customer }) : fail("Guest not found", 404);
+        }
+      } catch (error) {
+        return coded(error);
+      }
     }
 
     // The waiters and the devices the POS runs on.

@@ -5,7 +5,8 @@ import { PRINT_JOB_STATUSES } from "../src/contracts.js";
 // below are server-local.
 export {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, CreateOrderBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody,
-  ServiceStatusBody, SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody
+  ServiceStatusBody, SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
+  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody
 } from "../src/contracts.js";
 
 const IdParams = Type.Object({ id: Type.String({ minLength: 1, maxLength: 128 }) });

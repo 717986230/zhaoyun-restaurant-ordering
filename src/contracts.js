@@ -73,6 +73,25 @@ export const CreateOrderBody = Type.Object({
   }), { minItems: 1, maxItems: 100 })
 });
 
+// A guest's own order from the menu (shared/ordering.mjs): at their table, or
+// for pickup. A reward is a dish ordered for points. What may be ordered, when
+// and how much is the shared rule's to say; the wire only bounds sizes.
+export const GUEST_CHANNELS = ["dine-in", "pickup"];
+export const GUEST_PAYMENTS = ["in-store", "online"];
+export const GuestOrderBody = Type.Object({
+  clientRequestId: Type.String({ minLength: 8, maxLength: 128 }),
+  channel: literals(GUEST_CHANNELS),
+  table: Type.Optional(TableNo),
+  note: Type.String({ maxLength: 500 }),
+  payment: Type.Optional(literals(GUEST_PAYMENTS)),
+  items: Type.Array(Type.Object({
+    id: ProductId,
+    qty: Type.Integer({ minimum: 1, maximum: 99 }),
+    modifiers: Type.Optional(Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }) }), { maxItems: 32 })),
+    reward: Type.Optional(Type.Boolean())
+  }), { minItems: 1, maxItems: 100 })
+}, { additionalProperties: false });
+
 export const ServiceRequestBody = Type.Object({
   table: TableNo,
   type: Type.String({ minLength: 1, maxLength: 64 })
@@ -149,6 +168,28 @@ export const SettingsBody = Type.Object({
   // The promotions and set menus pages' hours; null: always on.
   featuredSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
   setsSchedule: Type.Optional(Type.Union([Schedule, Type.Null()])),
+  // Guests' accounts, ordering from the menu and points. The inner objects are
+  // the shared rules' to check (shared/ordering.mjs, shared/customer.mjs),
+  // unknown fields included; the wire bounds what can be sent.
+  customerAccounts: Type.Optional(Type.Boolean()),
+  guestOrdering: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    dineIn: Type.Optional(Type.Boolean()),
+    pickup: Type.Optional(Type.Boolean()),
+    hours: Type.Optional(Type.Array(Schedule, { maxItems: 7 })),
+    requireOpenTable: Type.Optional(Type.Boolean()),
+    tableSessionHours: Type.Optional(Type.Number()),
+    maxItems: Type.Optional(Type.Number()),
+    maxOrderCents: Type.Optional(Type.Number()),
+    minIntervalSeconds: Type.Optional(Type.Number()),
+    maxOpenPickups: Type.Optional(Type.Number())
+  }, { maxProperties: 16 })),
+  loyalty: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    pointsPerEuro: Type.Optional(Type.Number()),
+    maxRewardsPerOrder: Type.Optional(Type.Number()),
+    rewards: Type.Optional(Type.Array(Type.Object({ productId: ProductId, points: Type.Number() }), { maxItems: 30 }))
+  }, { maxProperties: 8 })),
   // The guest menu's first three tabs, in order; the rest keep their usual order.
   navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 3 })),
   // What the tabs are called, per language: "ALLE", "__sets__" or a category.
@@ -192,7 +233,8 @@ export const CheckoutBody = Type.Object({
     amount: Type.Number(),
     tendered: Type.Optional(Type.Number()),
     voucherCode: Type.Optional(Type.String({ maxLength: 32 }))
-  }), { minItems: 1, maxItems: 10 })
+  // None only for a receipt of nothing to pay: a reward bought with points (planCheckout).
+  }), { minItems: 0, maxItems: 10 })
 }, { additionalProperties: false });
 
 // The POS (shared/pos.mjs). The rules on names, roles and PINs are the
@@ -258,9 +300,28 @@ export const TableLockBody = Type.Object({
   locked: Type.Boolean()
 });
 
+// A table opened for its guests to order from their phones (开台), or closed.
+export const TableOrderingBody = Type.Object({ open: Type.Boolean() }, { additionalProperties: false });
+
 export const TableBody = Type.Object({
   table: TableNo,
   label: Type.Optional(Type.String({ maxLength: 64 })),
   enabled: Type.Optional(Type.Boolean()),
   rotateToken: Type.Optional(Type.Boolean())
 });
+
+// Guests' own accounts (shared/customer.mjs). An email and a password; the
+// email's form and the password floor are the shared rules'.
+const Email = Type.String({ minLength: 3, maxLength: 254 });
+export const CustomerRegisterBody = Type.Object({ email: Email, name: Type.Optional(Type.String({ maxLength: 40 })), password: Password }, { additionalProperties: false });
+export const CustomerSignInBody = Type.Object({ email: Type.String({ maxLength: 254 }), password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
+// Every change is made against the password in force.
+export const CustomerUpdateBody = Type.Object({
+  currentPassword: Type.String({ maxLength: 200 }),
+  name: Type.Optional(Type.String({ maxLength: 40 })),
+  password: Type.Optional(Password)
+}, { additionalProperties: false });
+export const CustomerDeleteBody = Type.Object({ password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
+// The manager's side: points changed by hand, always with a reason; a new password set at the counter.
+export const PointsAdjustBody = Type.Object({ delta: Type.Integer({ minimum: -1000000, maximum: 1000000 }), note: Type.String({ minLength: 1, maxLength: 120 }) }, { additionalProperties: false });
+export const CustomerPasswordBody = Type.Object({ password: Password }, { additionalProperties: false });

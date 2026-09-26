@@ -21,7 +21,7 @@ import {
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
   printJobView, serviceRequestView, settingsView, tablesOverviewView, tableView, uuid, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL,
-  verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent
+  verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL
 } from "../shared/rules.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
@@ -38,6 +38,12 @@ import {
   DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
   normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
 } from "../shared/account.mjs";
+import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "../shared/customer.mjs";
+import { createCustomerStore } from "../shared/customer-store.mjs";
+import {
+  CLOSE_TABLE_SESSION_SQL, closePaidTableStatements, guestOrderError, LAST_CUSTOMER_PICKUP_SQL, LAST_TABLE_GUEST_ORDER_SQL, LIVE_TABLE_SESSIONS_SQL,
+  moveTableSessionStatements, NEXT_GUEST_PICKUP_SQL, OPEN_PICKUPS_SQL, openTableStatements, pickupDayStart, planGuestOrder, TABLE_SESSION_SQL, tableSessionView
+} from "../shared/ordering.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
 // console with no password costs the same PBKDF2 work as one with.
@@ -53,6 +59,10 @@ export function createStore(db) {
   const first = (sql, ...params) => db.prepare(sql).bind(...params).first();
   const all = async (sql, ...params) => (await db.prepare(sql).bind(...params).all()).results ?? [];
   const run = async (sql, ...params) => (await db.prepare(sql).bind(...params).run()).meta?.changes ?? 0;
+  /** The shared modules' [sql, params] pairs, as statements for a batch. */
+  const bound = (list) => list.map(([sql, params]) => db.prepare(sql).bind(...params));
+  /** What shared/customer-store.mjs needs of a database (its `driver`). */
+  const driver = { first, all, run, batch: async (list) => { await db.batch(bound(list)); } };
 
   // SQLite binds at most 100 variables per statement, and the menu is 111
   // dishes, so an `IN (?, ?, ...)` over a whole catalogue fails outright.
@@ -260,17 +270,31 @@ export function createStore(db) {
     return billView(tableNo, orders, itemsByOrderId, productsById);
   }
 
-  async function createOrder(input, pos = null) {
+  async function createOrder(input, pos = null, guest = null) {
     const requestId = String(input.clientRequestId || "");
     if (requestId) {
-      const existing = await first("SELECT * FROM orders WHERE client_request_id = ?", requestId);
+      const existing = await first(ORDER_BY_REQUEST_SQL, requestId);
       if (existing) return viewOrder(existing);
     }
 
-    return retrying(() => writeOrder(input, pos));
+    return retrying(() => writeOrder(input, pos, guest));
   }
 
-  async function writeOrder(input, pos) {
+  /** What a guest's order is checked against (shared/ordering.mjs, assertGuestOrder). */
+  async function guestReads(input, guest) {
+    const at = new Date();
+    const table = String(input.table ?? "").toUpperCase();
+    const dineIn = guest.channel === "dine-in";
+    const last = dineIn ? await first(LAST_TABLE_GUEST_ORDER_SQL, table) : guest.customer ? await first(LAST_CUSTOMER_PICKUP_SQL, guest.customer.id) : null;
+    return {
+      tableSession: dineIn ? await first(TABLE_SESSION_SQL, table) : null,
+      lastOrderAt: last?.at ?? null,
+      openPickups: guest.customer ? Number((await first(OPEN_PICKUPS_SQL, guest.customer.id))?.n ?? 0) : 0,
+      nextPickupNo: dineIn ? null : Number((await first(NEXT_GUEST_PICKUP_SQL, pickupDayStart(at), at.toISOString()))?.next ?? 1)
+    };
+  }
+
+  async function writeOrder(input, pos, guest) {
     const last = await lastJournal();
     const ids = [...new Set(orderProductIds(input))];
     const products = new Map();
@@ -280,9 +304,14 @@ export function createStore(db) {
     // The dishes inside a set, for its VAT split.
     const parts = bundleComponentIds(products.values()).filter((partId) => !products.has(partId));
     if (parts.length) for (const row of await selectByIds("SELECT * FROM products WHERE id IN (?)", parts)) products.set(String(row.id), row);
-    const { timeZone, setsSchedule } = await getSettings();
-    const pickupNo = pos && isTakeaway(input.table) ? Number(String(input.table).slice(TAKEAWAY_PREFIX.length)) || null : null;
-    const plan = planOrder(input, products, { timeZone, setsSchedule }, { staffName: pos?.staff?.name, pickupNo });
+    const settings = await getSettings();
+    const { timeZone, setsSchedule } = settings;
+    // A guest's own order is planned with its limits and rewards (shared/ordering.mjs).
+    // Read after the journal: two pickups that read the same next number both
+    // claim the same journal entry, and the loser works it out again.
+    const guestPlan = guest ? planGuestOrder(input, products, settings, guest, await guestReads(input, guest)) : null;
+    const pickupNo = guestPlan ? guestPlan.pickupNo : pos && isTakeaway(input.table) ? Number(String(input.table).slice(TAKEAWAY_PREFIX.length)) || null : null;
+    const plan = guestPlan?.plan ?? planOrder(input, products, { timeZone, setsSchedule }, { staffName: pos?.staff?.name, pickupNo });
     const { id, orderNo, clientRequestId, table, note, totalCents, timestamp } = plan.order;
 
     // A locked table is one whose bill is being settled. Refusing here is the
@@ -313,17 +342,28 @@ export function createStore(db) {
         .bind(job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp)),
       ...(pos ? [db.prepare("INSERT INTO order_staff (order_id, staff_id, staff_name, pickup_no, created_at) VALUES (?, ?, ?, ?, ?)")
         .bind(id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp)] : []),
-      await journalStatement(last, "order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}) }, timestamp)
+      // The guests are seated: their phones may order too.
+      ...(pos ? bound(openTableStatements(table, settings, pos.staff?.name)) : []),
+      ...(guestPlan ? bound(guestPlan.statements) : []),
+      await journalStatement(last, "order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}), ...(guestPlan ? guestPlan.journal : {}) }, timestamp)
     ];
 
     try {
       await db.batch(statements);
     } catch (error) {
-      const committed = await first("SELECT * FROM orders WHERE client_request_id = ?", clientRequestId);
+      const committed = await first(ORDER_BY_REQUEST_SQL, clientRequestId);
       if (committed) return viewOrder(committed);
+      if (isOverdrawn(error)) throw guestOrderError("NOT_ENOUGH_POINTS", "Not enough points for this reward", 409);
       throw error;
     }
-    return viewOrder(await first("SELECT * FROM orders WHERE id = ?", id));
+    return viewOrder(await first(ORDER_BY_ID_SQL, id));
+  }
+
+  /** A table opened for its guests to order from (开台), or kept open longer. */
+  async function openTable(tableInput, pos) {
+    const table = normalizeTableNo(tableInput);
+    await db.batch(bound(openTableStatements(table, await getSettings(), pos?.staff?.name)));
+    return tableSessionView(await first(TABLE_SESSION_SQL, table));
   }
 
   async function updateOrder(id, status) {
@@ -338,9 +378,11 @@ export function createStore(db) {
       const at = now();
       await db.batch([
         db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?").bind(status, at, current.id),
+        // A reward's points come back with the order it was in.
+        ...(status === "cancelled" ? bound(refundPointsStatements(current.id, at)) : []),
         await journalStatement(last, "order.status", current.id, { orderId: current.id, orderNo: current.order_no, table: current.table_no, from: current.status, to: status }, at)
       ]);
-      return viewOrder(await first("SELECT * FROM orders WHERE id = ?", current.id));
+      return viewOrder(await first(ORDER_BY_ID_SQL, current.id));
     });
   }
 
@@ -382,8 +424,11 @@ export function createStore(db) {
         ...plan.voucherDebits.map((debit) => db.prepare(DEBIT_VOUCHER_SQL).bind(debit.amountCents, at, debit.code)),
         ...(table ? [
           db.prepare(SETTLE_PAID_TABLE_SQL).bind(at, at, table, table),
-          db.prepare(UNLOCK_PAID_TABLE_SQL).bind(at, table.toUpperCase(), table)
+          db.prepare(UNLOCK_PAID_TABLE_SQL).bind(at, table.toUpperCase(), table),
+          ...bound(closePaidTableStatements(table))
         ] : []),
+        // Points for the signed-in guests whose orders this paid (shared/customer.mjs).
+        ...bound(earnPointsStatements(plan.receipt.id, settings.loyalty, at)),
         printStatement(receiptPrintPayload(view, settings), at),
         await journalStatement(last, "receipt.issued", plan.receipt.id, view, at)
       ];
@@ -420,6 +465,7 @@ export function createStore(db) {
         ...plan.refunds.map((refund) => db.prepare(CREDIT_VOUCHER_SQL).bind(refund.amountCents, at, refund.code)),
         ...plan.voided.map((code) => db.prepare(VOID_VOUCHER_SQL).bind(at, at, code)),
         db.prepare(REOPEN_ORDERS_SQL).bind(at, original.id),
+        ...bound(reversePointsStatements(plan.receipt.id, original.id, at)),
         printStatement(receiptPrintPayload(view, settings), at),
         await journalStatement(last, "receipt.storno", plan.receipt.id, view, at)
       ]);
@@ -671,6 +717,7 @@ export function createStore(db) {
       await db.batch([
         db.prepare("UPDATE orders SET table_no = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'").bind(to, at, from),
         db.prepare("DELETE FROM table_claims WHERE table_no = ? AND device_id = ?").bind(from, pos.deviceId),
+        ...bound(moveTableSessionStatements(from, to, await getSettings(), pos.staff?.name)),
         await journalStatement(last, "table.moved", from, { from, to, orders: open, staffName: pos.staff?.name ?? null }, at)
       ]);
       return { from, to, moved: open };
@@ -784,6 +831,12 @@ export function createStore(db) {
       return Promise.all(rows.map(viewOrder));
     },
     createOrder,
+    /** A guest's own order from the menu (shared/ordering.mjs): `guest` is { channel, customer, payment }. */
+    placeGuestOrder: (input, guest) => createOrder(input, null, guest),
+    openTable,
+    closeTable: async (table) => (await run(CLOSE_TABLE_SESSION_SQL, normalizeTableNo(table))) > 0,
+    // Guests' accounts, favourites and points: the one implementation both backends share.
+    customers: createCustomerStore(driver, { ordersFor: (rows) => Promise.all(rows.map(viewOrder)) }),
     updateOrder,
     listServiceRequests: async (limit = 100) =>
       (await all("SELECT * FROM service_requests ORDER BY created_at DESC LIMIT ?", boundedLimit(limit))).map(serviceRequestView),
@@ -921,7 +974,7 @@ export function createStore(db) {
       const orders = [];
       for (const row of await all(OPEN_TABLE_ORDERS_SQL)) orders.push(await viewOrder(row));
       const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
-      return tablesOverviewView(await all("SELECT * FROM restaurant_tables ORDER BY table_no"), orders, claims);
+      return tablesOverviewView(await all("SELECT * FROM restaurant_tables ORDER BY table_no"), orders, claims, await all(LIVE_TABLE_SESSIONS_SQL, now()));
     },
     staffActivity: async () => {
       const staffRows = await all("SELECT * FROM staff ORDER BY active DESC, name");

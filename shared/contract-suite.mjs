@@ -46,6 +46,9 @@ function listen(url) {
   });
 }
 
+/** Ordering from the menu with its limits out of the way, for the checks that order as guests do. */
+const OPEN_ORDERING = { enabled: true, requireOpenTable: false, minIntervalSeconds: 0, maxItems: 200, maxOrderCents: 1_000_000 };
+
 /** `liveBase` is the backend's address as ws://host:port. */
 export function contractChecks(call, assert, { liveBase } = {}) {
   return [
@@ -155,6 +158,29 @@ export function contractChecks(call, assert, { liveBase } = {}) {
 
       await call("PUT", "/api/admin/settings", { admin: true, body: { featuredEnabled: false, featuredTitle: "", featuredProductIds: [], featuredTemplate: "gallery" } });
       assert.equal((await call("GET", "/api/catalog")).json.menu.featured, null);
+    }],
+
+    ["guests order from the menu only once the owner switches it on", async () => {
+      const command = { clientRequestId: "contract-guest-off", table: "17", note: "", items: [{ id: "photo-r1", qty: 1 }] };
+      const off = await call("POST", "/api/orders", { body: command });
+      assert.equal(off.status, 403, "ordering is off until switched on");
+      assert.equal(off.json.code, "ORDERING_OFF");
+      const menu = (await call("GET", "/api/catalog")).json.menu;
+      assert.equal(menu.ordering, null);
+      assert.equal(menu.accounts, false);
+      assert.equal(menu.loyalty, null);
+      for (const guestOrdering of [{ enabled: "yes" }, { maxItems: 0 }, { maxOrderCents: 50 }, { unknown: true }, { hours: [{ days: [], from: "11:00", to: "14:00" }] }, { tableSessionHours: 25 }]) {
+        assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { guestOrdering } })).status, 400, `${JSON.stringify(guestOrdering)} must be refused`);
+      }
+      // The checks below order as guests do, the limits out of their way; the
+      // limits have a check of their own further down.
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { guestOrdering: OPEN_ORDERING } });
+      assert.equal(saved.status, 200);
+      assert.deepEqual(saved.json.guestOrdering, {
+        enabled: true, dineIn: true, pickup: false, hours: [], requireOpenTable: false, tableSessionHours: 4,
+        maxItems: 200, maxOrderCents: 1_000_000, minIntervalSeconds: 0, maxOpenPickups: 2
+      });
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.ordering, { dineIn: true, pickup: false, hours: [], maxItems: 200, maxOrderCents: 1_000_000, requireOpenTable: false });
     }],
 
     ["an order prices its modifiers and routes one job per station", async () => {
@@ -332,7 +358,9 @@ export function contractChecks(call, assert, { liveBase } = {}) {
 
     ["the restaurant's name, the menu's title and its look are the owner's to set", async () => {
       const before = await call("GET", "/api/catalog");
-      assert.deepEqual(before.json.menu, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null },
+      // Ordering is on here only because the checks above switched it on (OPEN_ORDERING).
+      const { ordering: _ordering, ...fresh } = before.json.menu;
+      assert.deepEqual(fresh, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null },
         "a fresh restaurant ships with these");
 
       assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
@@ -347,8 +375,9 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       });
       assert.equal(saved.status, 200);
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
-      assert.deepEqual((await call("GET", "/api/catalog")).json.menu,
-        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null });
+      const { ordering: _orderingNow, ...menu } = (await call("GET", "/api/catalog")).json.menu;
+      assert.deepEqual(menu,
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
       // A save of one setting leaves the rest where they were.
       assert.equal(saved.json.menuTheme, "jade");
@@ -1166,6 +1195,222 @@ export function contractChecks(call, assert, { liveBase } = {}) {
         staff.close();
         guest.close();
       }
+    }],
+
+    ["guests register with an email, keep favourites, and sign in and out", async () => {
+      const guest = { email: "Mei.Lin@Example.com", name: "Mei", password: "noodles-4-life" };
+      const closed = await call("POST", "/api/customer/register", { body: guest });
+      assert.equal(closed.status, 403, "no guest accounts until the owner wants them");
+      assert.equal(closed.json.code, "ACCOUNTS_OFF");
+      await call("PUT", "/api/admin/settings", { admin: true, body: { customerAccounts: true } });
+      assert.equal((await call("GET", "/api/catalog")).json.menu.accounts, true);
+
+      assert.equal((await call("POST", "/api/customer/register", { body: { ...guest, email: "not-an-email" } })).status, 400);
+      assert.equal((await call("POST", "/api/customer/register", { body: { ...guest, password: "short" } })).status, 400);
+      const registered = await call("POST", "/api/customer/register", { body: guest });
+      assert.equal(registered.status, 201, JSON.stringify(registered.json));
+      assert.ok(registered.json.token);
+      assert.deepEqual({ ...registered.json.customer, id: "", createdAt: "" }, { id: "", email: "mei.lin@example.com", name: "Mei", points: 0, createdAt: "" });
+      const again = await call("POST", "/api/customer/register", { body: { ...guest, email: "mei.lin@example.com" } });
+      assert.equal(again.status, 409);
+      assert.equal(again.json.code, "EMAIL_TAKEN");
+
+      assert.equal((await call("POST", "/api/customer/sign-in", { body: { email: guest.email, password: "wrong-password" } })).status, 401);
+      const signedIn = await call("POST", "/api/customer/sign-in", { body: { email: " MEI.LIN@example.com ", password: guest.password } });
+      assert.equal(signedIn.status, 200);
+      const token = signedIn.json.token;
+      // A guest's session opens nothing of the restaurant's.
+      assert.equal((await call("GET", "/api/admin/session", { token })).status, 401);
+      assert.equal((await call("GET", "/api/customer")).status, 401);
+      const me = await call("GET", "/api/customer", { customerToken: token });
+      assert.equal(me.status, 200);
+      assert.equal(me.json.customer.email, "mei.lin@example.com");
+      assert.deepEqual(me.json.favorites, []);
+
+      assert.deepEqual((await call("PUT", "/api/customer/favorites/photo-r1", { customerToken: token })).json.favorites, ["photo-r1"]);
+      assert.deepEqual((await call("PUT", "/api/customer/favorites/photo-t4", { customerToken: token })).json.favorites, ["photo-r1", "photo-t4"]);
+      assert.deepEqual((await call("PUT", "/api/customer/favorites/photo-r1", { customerToken: token })).json.favorites, ["photo-r1", "photo-t4"], "once each");
+      assert.equal((await call("PUT", "/api/customer/favorites/no-such-dish", { customerToken: token })).status, 404);
+      assert.deepEqual((await call("DELETE", "/api/customer/favorites/photo-t4", { customerToken: token })).json.favorites, ["photo-r1"]);
+
+      assert.equal((await call("PUT", "/api/customer", { customerToken: token, body: { currentPassword: "wrong-password", name: "M" } })).status, 401);
+      const renamed = await call("PUT", "/api/customer", { customerToken: token, body: { currentPassword: guest.password, name: "  Mei   Lin " } });
+      assert.equal(renamed.status, 200);
+      assert.equal(renamed.json.customer.name, "Mei Lin");
+
+      // Deleting one's own account takes the password, and takes everything that was theirs.
+      const other = (await call("POST", "/api/customer/register", { body: { email: "brief@example.com", password: "passing-through" } })).json;
+      assert.equal((await call("POST", "/api/customer/delete", { customerToken: other.token, body: { password: "nope-nope" } })).status, 401);
+      assert.equal((await call("POST", "/api/customer/delete", { customerToken: other.token, body: { password: "passing-through" } })).status, 204);
+      assert.equal((await call("GET", "/api/customer", { customerToken: other.token })).status, 401);
+      assert.equal((await call("POST", "/api/customer/sign-in", { body: { email: "brief@example.com", password: "passing-through" } })).status, 401);
+
+      assert.equal((await call("POST", "/api/customer/sign-out", { customerToken: token })).status, 204);
+      assert.equal((await call("GET", "/api/customer", { customerToken: token })).status, 401);
+    }],
+
+    ["a guest orders at a table a waiter opened, or for pickup, within the owner's limits, straight to the kitchen", async () => {
+      // The ordering settings are saved whole: what is left out is its default.
+      const limits = { enabled: true, dineIn: true, pickup: true, hours: [], requireOpenTable: true, tableSessionHours: 4, maxItems: 5, maxOrderCents: 5000, minIntervalSeconds: 60, maxOpenPickups: 1 };
+      await call("PUT", "/api/admin/settings", { admin: true, body: { guestOrdering: limits } });
+      const tableToken = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "G1" } })).json.table.token;
+      let n = 0;
+      const atTable = (items, extra = {}) => call("POST", "/api/guest/orders", { tableToken, ...extra, body: { clientRequestId: `contract-guest-${++n}`, channel: "dine-in", table: "G1", note: "", items } });
+      const ramen = [{ id: "photo-r1", qty: 1 }];
+
+      const notOpen = await atTable(ramen);
+      assert.equal(notOpen.status, 409, "a table nobody opened takes no orders");
+      assert.equal(notOpen.json.code, "TABLE_NOT_OPEN");
+      assert.equal((await call("POST", "/api/admin/tables/G1/ordering", { body: { open: true } })).status, 401, "opening a table is the floor's");
+      const opened = await call("POST", "/api/admin/tables/G1/ordering", { role: "staff", body: { open: true } });
+      assert.equal(opened.status, 200);
+      assert.equal(opened.json.session.table, "G1");
+      const overview = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.find((table) => table.table === "G1");
+      assert.ok(overview.orderingUntil > new Date().toISOString(), "the floor sees the table is open for ordering, and until when");
+
+      assert.equal((await atTable([{ id: "photo-r1", qty: 6 }])).json.code, "ORDER_TOO_LARGE", "more items than an order may have");
+      const tooDear = await atTable([{ id: "photo-r1", qty: 5 }]);
+      assert.equal(tooDear.status, 400, "62.50 is over the 50.00 an order may cost");
+      assert.equal(tooDear.json.code, "ORDER_TOO_LARGE");
+      assert.equal((await atTable(ramen, { tableToken: "wrong-token-000" })).status, 403);
+
+      const placed = await atTable(ramen);
+      assert.equal(placed.status, 201, JSON.stringify(placed.json));
+      assert.equal(placed.json.order.channel, "dine-in");
+      assert.equal(placed.json.order.table, "G1");
+      const ticket = (await call("GET", "/api/admin/print-jobs?status=queued&limit=500", { admin: true })).json.jobs.find((job) => job.orderId === placed.json.order.id);
+      assert.deepEqual(ticket.payload.guest, { channel: "dine-in" }, "the kitchen ticket says the guest ordered it");
+      const soon = await atTable(ramen);
+      assert.equal(soon.status, 429, "one order a minute from a table");
+      assert.equal(soon.json.code, "TOO_SOON");
+      assert.ok(Number(soon.headers["retry-after"]) > 0);
+      // The phone that placed it follows it without an account.
+      const followed = await call("GET", `/api/guest/orders?ids=${placed.json.order.clientRequestId},not-an-order-id`);
+      assert.deepEqual(followed.json.orders.map((order) => [order.id, order.status]), [[placed.json.order.id, "new"]]);
+
+      // Outside the hours the owner set, nobody orders.
+      const { day, minute } = wallClock(new Date(), (await call("GET", "/api/admin/settings", { admin: true })).json.timeZone);
+      await call("PUT", "/api/admin/settings", { admin: true, body: { guestOrdering: { ...limits, minIntervalSeconds: 0, hours: [{ days: [day], from: clockTime(minute + 120), to: clockTime(minute + 180) }] } } });
+      const closed = await atTable(ramen);
+      assert.equal(closed.status, 409);
+      assert.equal(closed.json.code, "ORDERING_CLOSED");
+      await call("PUT", "/api/admin/settings", { admin: true, body: { guestOrdering: { ...limits, minIntervalSeconds: 0, hours: [{ days: EVERY_DAY, from: clockTime(minute - 60), to: clockTime(minute + 60) }] } } });
+      assert.equal((await atTable(ramen)).status, 201, "within the hours");
+
+      // Pickup: a signed-in guest's, with a number the POS shares.
+      const pickup = (items, customerToken, extra = {}) => call("POST", "/api/guest/orders", { customerToken, body: { clientRequestId: `contract-pickup-${++n}`, channel: "pickup", note: "", items, ...extra } });
+      const anonymous = await pickup(ramen);
+      assert.equal(anonymous.status, 401);
+      assert.equal(anonymous.json.code, "SIGN_IN_REQUIRED");
+      const guest = (await call("POST", "/api/customer/register", { body: { email: "pickup@example.com", name: "Tao", password: "takeaway-please" } })).json;
+      const collected = await pickup(ramen, guest.token);
+      assert.equal(collected.status, 201, JSON.stringify(collected.json));
+      const order = collected.json.order;
+      assert.equal(order.channel, "pickup");
+      assert.match(order.table, /^TA-\d+$/);
+      assert.equal(order.pickupNo, Number(order.table.slice(3)));
+      const pickupTicket = (await call("GET", "/api/admin/print-jobs?status=queued&limit=500", { admin: true })).json.jobs.find((job) => job.orderId === order.id);
+      assert.deepEqual({ pickupNo: pickupTicket.payload.pickupNo, guest: pickupTicket.payload.guest }, { pickupNo: order.pickupNo, guest: { channel: "pickup", name: "Tao" } });
+      assert.equal((await pickup(ramen, guest.token)).json.code, "TOO_MANY_PICKUPS", "one pickup at a time");
+      assert.equal((await pickup(ramen, guest.token, { payment: "online" })).json.code, "PAYMENT_UNAVAILABLE");
+      const mine = await call("GET", "/api/customer/orders", { customerToken: guest.token });
+      assert.deepEqual(mine.json.orders.map((entry) => [entry.id, entry.channel, entry.pickupNo]), [[order.id, "pickup", order.pickupNo]]);
+
+      // Paid in full, the table is closed for ordering until a waiter opens it again.
+      const staff = { role: "staff" };
+      const bill = (await call("GET", "/api/admin/tables/G1/bill", staff)).json.bill;
+      const paid = await call("POST", "/api/admin/checkout", { ...staff, body: { table: "G1", items: bill.items.map((line) => ({ orderItemId: line.orderItemId, quantity: line.qty })), payments: [{ type: "cash", amount: bill.total }] } });
+      assert.equal(paid.status, 201, JSON.stringify(paid.json));
+      assert.equal((await call("GET", "/api/admin/tables/overview", staff)).json.tables.find((table) => table.table === "G1").orderingUntil, null);
+      assert.equal((await atTable(ramen)).json.code, "TABLE_NOT_OPEN");
+      await call("POST", "/api/admin/tables/G1/ordering", { ...staff, body: { open: true } });
+      assert.equal((await call("POST", "/api/admin/tables/G1/ordering", { ...staff, body: { open: false } })).json.session, null);
+      assert.equal((await atTable(ramen)).json.code, "TABLE_NOT_OPEN", "closed by hand");
+    }],
+
+    ["guests earn points on what they pay and spend them on rewards; a storno and a cancellation undo them", async () => {
+      await call("PUT", "/api/admin/settings", { admin: true, body: { guestOrdering: { ...OPEN_ORDERING, pickup: true, hours: [], maxOpenPickups: 5 } } });
+      for (const loyalty of [{ pointsPerEuro: -1 }, { rewards: [{ productId: "photo-n1-6", points: 0 }] }, { rewards: [{ productId: "a", points: 1 }, { productId: "a", points: 2 }] }, { maxRewardsPerOrder: 0 }]) {
+        assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty } })).status, 400, `${JSON.stringify(loyalty)} must be refused`);
+      }
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 } } });
+      assert.equal(saved.status, 200);
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.loyalty, { pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 });
+
+      const guest = (await call("POST", "/api/customer/register", { body: { email: "points@example.com", password: "collect-them-all" } })).json;
+      const me = async () => (await call("GET", "/api/customer", { customerToken: guest.token })).json.customer;
+      let n = 0;
+      const pickup = (items) => call("POST", "/api/guest/orders", { customerToken: guest.token, body: { clientRequestId: `contract-points-${++n}`, channel: "pickup", note: "", items } });
+      const staff = { role: "staff" };
+      const payAll = async (table) => {
+        const bill = (await call("GET", `/api/admin/tables/${table}/bill`, staff)).json.bill;
+        const payments = bill.total > 0 ? [{ type: "cash", amount: bill.total }] : [];
+        return call("POST", "/api/admin/checkout", { ...staff, body: { table, items: bill.items.map((line) => ({ orderItemId: line.orderItemId, quantity: line.qty })), payments } });
+      };
+
+      // 12.50 paid at 2 points a euro: 25 points.
+      const ramen = (await pickup([{ id: "photo-r1", qty: 1 }])).json.order;
+      const receipt = (await payAll(ramen.table)).json.receipt;
+      assert.equal((await me()).points, 25);
+      const history = (await call("GET", "/api/customer/points", { customerToken: guest.token })).json.entries;
+      assert.deepEqual(history.map((entry) => [entry.reason, entry.delta, entry.ref]), [["earn", 25, receipt.id]]);
+
+      // A reward: the dish for 5 points, nothing to pay.
+      assert.equal((await pickup([{ id: "photo-n1-6", qty: 2, reward: true }])).status, 400, "one reward an order");
+      assert.equal((await pickup([{ id: "photo-r1", qty: 1, reward: true }])).status, 400, "not a reward");
+      const tableToken = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "G2" } })).json.table.token;
+      const anonymous = await call("POST", "/api/guest/orders", { tableToken, body: { clientRequestId: "contract-points-anon", channel: "dine-in", table: "G2", note: "", items: [{ id: "photo-n1-6", qty: 1, reward: true }] } });
+      assert.equal(anonymous.status, 400, "a reward needs a signed-in guest");
+      const rewarded = await pickup([{ id: "photo-n1-6", qty: 1, reward: true }]);
+      assert.equal(rewarded.status, 201, JSON.stringify(rewarded.json));
+      assert.equal(rewarded.json.order.total, 0);
+      assert.ok(rewarded.json.order.items[0].modifiers.some((modifier) => modifier.id === "reward"), "the ticket and the bill say it is a reward");
+      assert.equal((await me()).points, 20);
+
+      // Cancelled before it was paid: the points come back.
+      assert.equal((await call("PATCH", `/api/orders/${rewarded.json.order.id}/status`, { admin: true, body: { status: "cancelled" } })).status, 200);
+      assert.equal((await me()).points, 25);
+      // Not cancelled, it is paid with nothing: a receipt of 0.00.
+      const second = (await pickup([{ id: "photo-n1-6", qty: 1, reward: true }])).json.order;
+      const nothing = await payAll(second.table);
+      assert.equal(nothing.status, 201, JSON.stringify(nothing.json));
+      assert.equal(nothing.json.receipt.totalCents, 0);
+      assert.equal((await me()).points, 20);
+
+      // Too dear now: refused whole, nothing spent.
+      await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 500 }], maxRewardsPerOrder: 1 } } });
+      const dear = await pickup([{ id: "photo-n1-6", qty: 1, reward: true }]);
+      assert.equal(dear.status, 409);
+      assert.equal(dear.json.code, "NOT_ENOUGH_POINTS");
+      assert.equal((await me()).points, 20);
+
+      // The ramen's receipt cancelled: its 25 points go, as far as there are any left.
+      const storno = await call("POST", `/api/admin/receipts/${receipt.id}/storno`, { admin: true, body: { reason: "wrong table" } });
+      assert.equal(storno.status, 201);
+      assert.equal((await me()).points, 0);
+      const reversed = (await call("GET", "/api/customer/points", { customerToken: guest.token })).json.entries[0];
+      assert.deepEqual([reversed.reason, reversed.delta], ["reverse", -20]);
+
+      // The manager: finds the guest, adds points with a reason, cannot take more than there are.
+      assert.equal((await call("GET", "/api/admin/customers", { role: "staff" })).status, 403, "the guest list is the manager's");
+      const found = (await call("GET", "/api/admin/customers?q=points@", { admin: true })).json.customers;
+      assert.deepEqual(found.map((customer) => customer.email), ["points@example.com"]);
+      const id = found[0].id;
+      assert.equal((await call("POST", `/api/admin/customers/${id}/points`, { admin: true, body: { delta: 10, note: "" } })).status, 400, "a change of points says why");
+      assert.equal((await call("POST", `/api/admin/customers/${id}/points`, { admin: true, body: { delta: 10, note: "birthday" } })).json.customer.points, 10);
+      const overdrawn = await call("POST", `/api/admin/customers/${id}/points`, { admin: true, body: { delta: -11, note: "typo" } });
+      assert.equal(overdrawn.status, 409);
+      const detail = (await call("GET", `/api/admin/customers/${id}`, { admin: true })).json;
+      assert.deepEqual([detail.customer.points, detail.points[0].reason, detail.points[0].note], [10, "adjust", "birthday"]);
+      // A forgotten password, set anew at the counter; then the account removed on request.
+      assert.equal((await call("POST", `/api/admin/customers/${id}/password`, { admin: true, body: { password: "fresh-start-1" } })).status, 200);
+      assert.equal((await call("GET", "/api/customer", { customerToken: guest.token })).status, 401, "the old sessions end");
+      assert.equal((await call("POST", "/api/customer/sign-in", { body: { email: "points@example.com", password: "fresh-start-1" } })).status, 200);
+      assert.equal((await call("DELETE", `/api/admin/customers/${id}`, { admin: true })).status, 204);
+      assert.equal((await call("DELETE", `/api/admin/customers/${id}`, { admin: true })).status, 404);
+      assert.equal((await call("POST", "/api/customer/sign-in", { body: { email: "points@example.com", password: "fresh-start-1" } })).status, 401);
+      // Their orders stay the restaurant's.
+      assert.ok((await call("GET", "/api/orders?limit=500", { admin: true })).json.orders.some((entry) => entry.id === ramen.id));
     }],
 
     ["an unknown API route is a JSON 404, not the web app", async () => {
