@@ -173,6 +173,13 @@ export interface ApiJournalEntry { seq: number; at: string; kind: string; ref: s
 export interface ApiJournalExport { entries: ApiJournalEntry[]; verification: { ok: boolean; brokenAt: number | null; reason: "chain" | "content" | null } }
 
 /** The POS (shared/pos.mjs). */
+/** The restaurant's account (shared/account.mjs): what the owner registers and signs in with. */
+export interface ApiAccount { id: string; login: string; name: string; createdAt: string }
+export interface AccountSession { token: string; expiresInMs: number; account: ApiAccount }
+export interface RegisterCommand { login: string; name?: string; password: string }
+/** Every change is made against the password in force. */
+export interface AccountUpdateCommand { currentPassword: string; login?: string; name?: string; password?: string }
+
 export interface PosStaff { id: string; name: string; role: "staff" | "manager"; active?: boolean }
 export interface PosDevice { id: string; name: string; createdAt: string; lastSeenAt: string | null }
 /** A table open on a device, locked to it until closed or left alone. */

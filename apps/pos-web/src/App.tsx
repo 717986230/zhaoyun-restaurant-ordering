@@ -100,7 +100,7 @@ export function App() {
   </div>;
 }
 
-/** Pairing, once per device, with the manager's password. */
+/** Pairing, once per device, with the restaurant's account. */
 function Pair({ t, onPaired }: { t: (key: PosKey) => string; onPaired: () => void }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -110,7 +110,7 @@ function Pair({ t, onPaired }: { t: (key: PosKey) => string; onPaired: () => voi
     setBusy(true);
     setError("");
     try {
-      await api.pair(String(data.get("base") || "").trim(), String(data.get("password") || ""), String(data.get("name") || "").trim());
+      await api.pair(String(data.get("base") || "").trim(), String(data.get("login") || "").trim().toLowerCase(), String(data.get("password") || ""), String(data.get("name") || "").trim());
       onPaired();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t("pairFailed"));
@@ -122,6 +122,7 @@ function Pair({ t, onPaired }: { t: (key: PosKey) => string; onPaired: () => voi
     <h1>{t("pairTitle")}</h1>
     <p>{t("pairLead")}</p>
     <label><span>{t("deviceName")}</span><input name="name" required maxLength={32} /></label>
+    <label><span>{t("accountLogin")}</span><input name="login" required autoComplete="username" autoCapitalize="none" spellCheck={false} /></label>
     <label><span>{t("managerPassword")}</span><input name="password" type="password" required autoComplete="current-password" /></label>
     <label><span>{t("apiBase")}</span><input name="base" inputMode="url" placeholder="https://…" /></label>
     {error && <p className="pos-error" role="alert">{error}</p>}

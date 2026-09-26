@@ -8,9 +8,10 @@ export const POS_LANGUAGES: PosLanguage[] = ["zh", "de", "en"];
 
 const zh = {
   pairTitle: "配对这台设备",
-  pairLead: "每台收银 / 点单设备只需配对一次，需要经理密码。配对后跑堂用自己的 PIN 登录。",
+  pairLead: "每台收银 / 点单设备只需配对一次：用餐厅账户（在管理台注册的账户名和密码）。配对后跑堂用自己的 PIN 登录。",
   apiBase: "服务器地址（留空用默认）",
-  managerPassword: "经理密码",
+  accountLogin: "账户名",
+  managerPassword: "账户密码",
   deviceName: "设备名称（如 前台平板、跑堂手机 1）",
   pair: "配对",
   pairFailed: "配对失败",
@@ -118,9 +119,10 @@ type Copy = typeof zh;
 
 const de: Copy = {
   pairTitle: "Gerät koppeln",
-  pairLead: "Jedes Kassen- oder Bestellgerät wird einmal mit dem Passwort der Leitung gekoppelt. Danach melden sich die Kellner mit ihrer PIN an.",
+  pairLead: "Jedes Kassen- oder Bestellgerät wird einmal mit dem Konto des Lokals gekoppelt (Kontoname und Passwort aus der Verwaltung). Danach melden sich die Kellner mit ihrer PIN an.",
   apiBase: "Serveradresse (leer: Standard)",
-  managerPassword: "Passwort der Leitung",
+  accountLogin: "Kontoname",
+  managerPassword: "Passwort des Kontos",
   deviceName: "Gerätename (z. B. Tablet Theke, Handy Kellner 1)",
   pair: "Koppeln",
   pairFailed: "Koppeln fehlgeschlagen",
@@ -226,9 +228,10 @@ const de: Copy = {
 
 const en: Copy = {
   pairTitle: "Pair this device",
-  pairLead: "Each till or order device is paired once, with the manager's password. After that waiters sign in with their PIN.",
+  pairLead: "Each till or order device is paired once, with the restaurant's account (the account name and password registered in the admin console). After that waiters sign in with their PIN.",
   apiBase: "Server address (empty: default)",
-  managerPassword: "Manager password",
+  accountLogin: "Account name",
+  managerPassword: "Account password",
   deviceName: "Device name (e.g. Counter tablet, Waiter phone 1)",
   pair: "Pair",
   pairFailed: "Pairing failed",

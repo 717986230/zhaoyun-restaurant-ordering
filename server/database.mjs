@@ -7,10 +7,10 @@ import { dishPhotos } from "./dish-photos.mjs";
 import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 // The table and audit shapes the two backends must agree on, byte for byte.
 import {
-  adminGateView, assertPassword, assertSetServed, auditView, billView, hashPassword,
+  assertPassword, assertSetServed, auditView, billView, hashPassword,
   duplicateInput, hashSessionToken, newSessionToken, normalizeCategoryName, normalizeSettingsInput,
   mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT,
-  normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
+  normalizeTableNo, PASSWORD_ITERATIONS, settingsView,
   renamedCategorySettings, tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
 import {
@@ -23,6 +23,11 @@ import {
   assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
   normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
+import {
+  ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
+  DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
+  normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
+} from "../shared/account.mjs";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
 // password yet still spends the same PBKDF2 work as one that does, so the
@@ -373,12 +378,42 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- The restaurant's account (shared/account.mjs): registered once, signed
+    -- in with its name and password; the waiters are under it. admin_gate and
+    -- admin_sessions above are the one-password door it replaced, kept only
+    -- so a password set there becomes the account "admin" and still works.
+    -- See migrations/0055_accounts.sql.
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      login TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_iterations INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS account_sessions (
+      token_hash TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at)
+    SELECT 'owner', 'admin', 'Admin', password_hash, password_salt, password_iterations, updated_at, updated_at
+    FROM admin_gate WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM accounts);
+    DELETE FROM admin_gate;
+    DELETE FROM admin_sessions;
+
     -- Hours were briefly kept per dish; they belong to the promotions and set
     -- menus pages (app_settings). See migrations/0052_drop_product_schedules.sql.
     DROP TABLE IF EXISTS product_schedules;
 
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_account_sessions_expiry ON account_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
@@ -529,21 +564,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
     openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
-    getAdminGate: db.prepare("SELECT * FROM admin_gate WHERE id = 1"),
-    setAdminGate: db.prepare(`
-      INSERT INTO admin_gate (id, password_hash, password_salt, password_iterations, updated_at)
-      VALUES (1, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        password_hash = excluded.password_hash,
-        password_salt = excluded.password_salt,
-        password_iterations = excluded.password_iterations,
-        updated_at = excluded.updated_at
-    `),
-    insertSession: db.prepare("INSERT INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)"),
-    sessionByHash: db.prepare("SELECT * FROM admin_sessions WHERE token_hash = ?"),
-    deleteSession: db.prepare("DELETE FROM admin_sessions WHERE token_hash = ?"),
-    deleteAllSessions: db.prepare("DELETE FROM admin_sessions"),
-    deleteExpiredSessions: db.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?"),
+    accountCount: db.prepare(ACCOUNT_COUNT_SQL),
+    accountById: db.prepare(ACCOUNT_BY_ID_SQL),
+    accountByLogin: db.prepare(ACCOUNT_BY_LOGIN_SQL),
+    ownerAccount: db.prepare(OWNER_ACCOUNT_SQL),
+    registerAccount: db.prepare(REGISTER_ACCOUNT_SQL),
+    updateAccount: db.prepare(UPDATE_ACCOUNT_SQL),
+    insertAccountSession: db.prepare(INSERT_ACCOUNT_SESSION_SQL),
+    accountSession: db.prepare(ACCOUNT_SESSION_SQL),
+    deleteAccountSession: db.prepare(DELETE_ACCOUNT_SESSION_SQL),
+    deleteAccountSessions: db.prepare(DELETE_ACCOUNT_SESSIONS_SQL),
+    deleteExpiredAccountSessions: db.prepare(DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL),
     getSettings: db.prepare("SELECT * FROM restaurant_settings WHERE id = 1"),
     allAppSettings: db.prepare("SELECT key, value FROM app_settings"),
     setAppSetting: db.prepare(`
@@ -1160,80 +1191,93 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     };
   }
 
-  function adminGate() {
-    return adminGateView(statements.getAdminGate.get());
+  // ——— The account (shared/account.mjs): registration, sign-in, sessions.
+
+  function accountStatus() {
+    return { registered: statements.accountCount.get().count > 0 };
   }
 
-  /** Sets the password without asking for the current one. Only the ADMIN_TOKEN
-   *  recovery route and a first-run set reach this. */
-  async function resetAdminGatePassword(password) {
-    const stored = await hashPassword(assertPassword(password));
-    statements.setAdminGate.run(stored.hash, stored.salt, stored.iterations, now());
-    // Changing the password ends every session opened with the old one; that
-    // is most of the reason anyone changes it.
-    statements.deleteAllSessions.run();
-    return adminGateView(statements.getAdminGate.get());
+  async function openAccountSession(row) {
+    const token = newSessionToken();
+    const timestamp = now();
+    statements.deleteExpiredAccountSessions.run(timestamp);
+    statements.insertAccountSession.run(await hashSessionToken(token), row.id, new Date(Date.now() + ACCOUNT_SESSION_TTL_MS).toISOString(), timestamp);
+    return { token, expiresInMs: ACCOUNT_SESSION_TTL_MS, account: accountView(row) };
+  }
+
+  /** The first account, and only the first: null once one exists. */
+  async function registerAccount(input) {
+    const { login, name, password } = normalizeRegistration(input);
+    const stored = await hashPassword(password);
+    const timestamp = now();
+    const id = randomUUID();
+    if (!statements.registerAccount.run(id, login, name, stored.hash, stored.salt, stored.iterations, timestamp, timestamp).changes) return null;
+    return openAccountSession(statements.accountById.get(id));
+  }
+
+  /** An account name and its password for a session, or null — an unknown
+   *  name costs the same PBKDF2 work as a wrong password, so timing says nothing. */
+  async function signInAccount(loginInput, password) {
+    const row = statements.accountByLogin.get(String(loginInput ?? "").trim().toLowerCase());
+    const stored = row ? storedPassword(row) : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(password ?? ""), stored);
+    return row && correct ? openAccountSession(row) : null;
   }
 
   /**
-   * Sets the console's password: once with no current password, because the
-   * first person through the door has none to give, and thereafter only for
-   * someone who can produce the one in force.
-   *
-   * Returns null rather than throwing on a wrong current password, so the
-   * caller answers it the way it answers a wrong sign-in — one refusal, no
-   * detail — and its rate limiter counts it.
+   * Changes the account's name, its display name or its password, always
+   * against the password in force — a session left open on a counter must not
+   * be enough to take the account over. A new password ends every session and
+   * hands this one a fresh token. Null on a wrong current password.
    */
-  async function setAdminGatePassword(password, currentPassword) {
-    const row = statements.getAdminGate.get();
-    if (row) {
-      const correct = await verifyPassword(String(currentPassword ?? ""), {
-        hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations
-      });
-      if (!correct) return null;
+  async function updateAccount(accountId, input) {
+    const row = statements.accountById.get(String(accountId));
+    if (!row || !(await verifyPassword(String(input?.currentPassword ?? ""), storedPassword(row)))) return null;
+    const login = input.login === undefined ? row.login : normalizeLogin(input.login);
+    const name = input.name === undefined ? row.name : normalizeAccountName(input.name, login);
+    const stored = input.password === undefined ? storedPassword(row) : await hashPassword(assertPassword(input.password));
+    if (login !== row.login && statements.accountByLogin.get(login)) throw new Error("That account name is taken");
+    statements.updateAccount.run(login, name, stored.hash, stored.salt, stored.iterations, now(), row.id);
+    if (input.password !== undefined) statements.deleteAccountSessions.run(row.id);
+    const updated = statements.accountById.get(row.id);
+    return input.password !== undefined ? openAccountSession(updated) : { account: accountView(updated) };
+  }
+
+  /**
+   * The way back in with ADMIN_TOKEN when the password is forgotten: sets the
+   * owner's password (and name, if given), or registers the owner when there
+   * is no account yet. Every session of the owner ends.
+   */
+  async function recoverAccount(input) {
+    const owner = statements.ownerAccount.get();
+    if (!owner) {
+      await registerAccount({ login: input?.login ?? MIGRATED_LOGIN, name: input?.name, password: input?.password });
+      return { account: accountView(statements.ownerAccount.get()) };
     }
-    return resetAdminGatePassword(password);
+    const login = input?.login === undefined ? owner.login : normalizeLogin(input.login);
+    const stored = await hashPassword(assertPassword(input?.password));
+    statements.updateAccount.run(login, normalizeAccountName(input?.name ?? owner.name, login), stored.hash, stored.salt, stored.iterations, now(), owner.id);
+    statements.deleteAccountSessions.run(owner.id);
+    return { account: accountView(statements.accountById.get(owner.id)) };
   }
 
-  /** Exchanges the password for a session token, or nothing at all. */
-  async function signIn(password) {
-    const row = statements.getAdminGate.get();
-    const stored = row
-      ? { hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations }
-      // Verify against a throwaway hash anyway, so an unconfigured gate does
-      // not answer faster than a wrong password and say so by timing.
-      : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
-    const correct = await verifyPassword(String(password ?? ""), stored);
-    if (!row || !correct) return null;
-
-    const token = newSessionToken();
-    const timestamp = now();
-    statements.deleteExpiredSessions.run(timestamp);
-    statements.insertSession.run(
-      await hashSessionToken(token),
-      new Date(Date.now() + SESSION_TTL_MS).toISOString(), timestamp
-    );
-    return { token, expiresInMs: SESSION_TTL_MS };
-  }
-
-  /** The role behind a session token, or null — expired and revoked look the
-   *  same to a caller, which is what they should. Past the gate there is only
-   *  one role, and it is manager: this is the owner's own console. */
+  /** Who a token belongs to: the account (as manager), a waiter on a POS
+   *  device, or nobody — expired and revoked look the same to a caller. */
   async function roleForSession(token) {
     if (!token) return null;
-    const row = statements.sessionByHash.get(await hashSessionToken(token));
-    // Not the console's: a waiter signed in on a POS device, perhaps.
+    const tokenHash = await hashSessionToken(token);
+    const row = statements.accountSession.get(tokenHash);
     if (!row) return posSession(token);
     if (row.expires_at <= now()) {
-      statements.deleteSession.run(row.token_hash);
+      statements.deleteAccountSession.run(tokenHash);
       return null;
     }
-    return { role: "manager" };
+    return { role: "manager", account: accountView(row) };
   }
 
   async function signOut(token) {
     if (!token) return false;
-    return statements.deleteSession.run(await hashSessionToken(token)).changes > 0;
+    return statements.deleteAccountSession.run(await hashSessionToken(token)).changes > 0;
   }
 
   function getSettings() {
@@ -1463,10 +1507,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deletePrinter: (id) => statements.deletePrinter.run(String(id)).changes > 0,
     getSettings,
     saveSettings,
-    adminGate,
-    setAdminGatePassword,
-    resetAdminGatePassword,
-    signIn,
+    accountStatus,
+    registerAccount,
+    signInAccount,
+    updateAccount,
+    recoverAccount,
     signOut,
     roleForSession,
     listPrintJobs: (status = "queued", limit = 100) => statements.listPrintJobs.all(String(status), Math.min(Number(limit) || 100, 500)).map(printJobView),

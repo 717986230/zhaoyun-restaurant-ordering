@@ -1,7 +1,7 @@
 import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
 import type { AdminApi, AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
-import type { ApiSettings, ColorScheme, MenuLanguage, NavLabels, VatPercent } from "@zhaoyun/contracts";
+import type { AccountUpdateCommand, ApiAccount, ApiSettings, ColorScheme, MenuLanguage, NavLabels, VatPercent } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themePattern } from "@zhaoyun/domain";
 import { translate, useI18n } from "../../app/i18n";
@@ -48,7 +48,9 @@ interface Props {
   onSaveConnection: (storage: AdminStorage) => Promise<void>;
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<boolean>;
   onDeleteTable: (table: string) => Promise<void>;
-  onChangePassword: (password: string, currentPassword: string) => Promise<boolean>;
+  /** The account signed in; null on a device opened with a configured token. */
+  account: ApiAccount | null;
+  onUpdateAccount: (command: AccountUpdateCommand) => Promise<boolean>;
 }
 
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
@@ -328,7 +330,7 @@ export function SettingsPanel(props: Props) {
     }, "restaurantSaved");
   }
 
-  async function changePassword(event: FormEvent<HTMLFormElement>) {
+  async function saveAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
@@ -340,7 +342,15 @@ export function SettingsPanel(props: Props) {
       return;
     }
     setPasswordNote("");
-    if (await props.onChangePassword(next, String(data.get("currentPassword") || ""))) form.reset();
+    const saved = await props.onUpdateAccount({
+      currentPassword: String(data.get("currentPassword") || ""),
+      login: String(data.get("login") || "").trim().toLowerCase(),
+      name: String(data.get("accountName") || "").trim(),
+      ...(next ? { password: next } : {})
+    });
+    if (saved) {
+      for (const field of ["currentPassword", "nextPassword", "repeatPassword"]) (form.elements.namedItem(field) as HTMLInputElement).value = "";
+    }
   }
 
   function saveConnection(event: FormEvent<HTMLFormElement>) {
@@ -543,13 +553,15 @@ export function SettingsPanel(props: Props) {
       </Section>
 
       <Section id="password" title={t("sectionPassword")} hint={t("passwordHint")}>
-        <form className="editor-form" onSubmit={(event) => void changePassword(event)}>
+        {props.account ? <form className="editor-form account-form" key={props.account.id + props.account.login + props.account.name} onSubmit={(event) => void saveAccount(event)}>
+          <label><span>{t("gateLogin")}</span><input name="login" required minLength={3} maxLength={64} pattern="[a-zA-Z0-9][a-zA-Z0-9._@\-]{2,63}" autoComplete="username" autoCapitalize="none" defaultValue={props.account.login} /></label>
+          <label><span>{t("gateName")}</span><input name="accountName" maxLength={40} autoComplete="name" defaultValue={props.account.name} /></label>
+          <label><span>{t("newPassword")}</span><input name="nextPassword" minLength={6} type="password" autoComplete="new-password" /></label>
+          <label><span>{t("gateRepeat")}</span><input name="repeatPassword" minLength={6} type="password" autoComplete="new-password" /></label>
           <label><span>{t("currentPassword")}</span><input name="currentPassword" required type="password" autoComplete="current-password" /></label>
-          <label><span>{t("newPassword")}</span><input name="nextPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
-          <label><span>{t("gateRepeat")}</span><input name="repeatPassword" required minLength={6} type="password" autoComplete="new-password" /></label>
           {passwordNote && <p className="gate-note error" role="alert">{passwordNote}</p>}
           <button className="primary-action" type="submit">{t("changePassword")}</button>
-        </form>
+        </form> : <p className="settings-hint">{t("accountTokenOnly")}</p>}
       </Section>
     </div>
 

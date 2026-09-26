@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminApi, toProduct } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
-import type { ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings, VatPercent } from "@zhaoyun/contracts";
+import type { AccountUpdateCommand, ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings, RegisterCommand, VatPercent } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
 import { LANGUAGE_INFO } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
@@ -31,8 +31,8 @@ function SignOutIcon() {
 }
 
 const initialState: AdminState = {
-  tab: "catalog", role: null,
-  gate: { checking: true, configured: false, busy: false, error: null, reachable: true },
+  tab: "catalog", role: null, account: null,
+  gate: { checking: true, registered: false, busy: false, error: null, reachable: true },
   auditEntries: [],
   connected: false, connectionError: null, products: [], printers: [],
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], boardBusy: false,
@@ -91,7 +91,7 @@ export function App() {
   const connect = useCallback(async (): Promise<boolean> => {
     try {
       await adminApi.health();
-      const { role } = await adminApi.session();
+      const { role, account = null } = await adminApi.session();
       roleRef.current = role;
       const manager = role === "manager";
       const [catalog, printerList, settings] = manager
@@ -102,6 +102,7 @@ export function App() {
         return {
           ...current,
           role,
+          account,
           connected: true,
           connectionError: null,
           products: catalog.products.map(toProduct),
@@ -113,7 +114,7 @@ export function App() {
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : null;
-      setState((current) => ({ ...current, role: null, connected: false, connectionError: message }));
+      setState((current) => ({ ...current, role: null, account: null, connected: false, connectionError: message }));
       return false;
     }
   }, []);
@@ -147,12 +148,12 @@ export function App() {
   useEffect(() => {
     void (async () => {
       if (adminApi.storage.token && await connect()) {
-        setState((current) => ({ ...current, gate: { ...current.gate, checking: false, configured: true } }));
+        setState((current) => ({ ...current, gate: { ...current.gate, checking: false, registered: true } }));
         return;
       }
       try {
-        const { configured } = await adminApi.gate();
-        setState((current) => ({ ...current, gate: { checking: false, configured, busy: false, error: null, reachable: true } }));
+        const { registered } = await adminApi.accountStatus();
+        setState((current) => ({ ...current, gate: { checking: false, registered, busy: false, error: null, reachable: true } }));
       } catch (error) {
         setState((current) => ({
           ...current,
@@ -173,7 +174,7 @@ export function App() {
       const entered = await connect();
       setState((current) => ({
         ...current,
-        gate: { ...current.gate, checking: false, configured: true, busy: false, error: entered ? null : current.connectionError }
+        gate: { ...current.gate, checking: false, registered: true, busy: false, error: entered ? null : current.connectionError }
       }));
     } catch (error) {
       setState((current) => ({
@@ -183,21 +184,16 @@ export function App() {
     }
   }, [connect, t]);
 
-  const signIn = useCallback((password: string) => enterWith(() => adminApi.signIn(password)), [enterWith]);
-
-  // Setting the first password does not sign anyone in by itself, so the
-  // console immediately spends it on a session rather than asking for it twice.
-  const setFirstPassword = useCallback((password: string) => enterWith(async () => {
-    await adminApi.setPassword(password);
-    return adminApi.signIn(password);
-  }), [enterWith]);
+  const signIn = useCallback((login: string, password: string) => enterWith(() => adminApi.signIn(login, password)), [enterWith]);
+  // Registering signs in: the account is ready to use at once.
+  const register = useCallback((command: RegisterCommand) => enterWith(() => adminApi.register(command)), [enterWith]);
 
   const signOut = useCallback(async () => {
     try { await adminApi.signOut(); } catch { /* Leaving is not something to fail at. */ }
     adminApi.forget();
     setState((current) => ({
       ...initialState,
-      gate: { checking: false, configured: current.gate.configured, busy: false, error: null, reachable: true }
+      gate: { checking: false, registered: current.gate.registered, busy: false, error: null, reachable: true }
     }));
   }, []);
 
@@ -381,14 +377,14 @@ export function App() {
     }
   }
 
-  /** Changing the password ends every session opened with the old one — this
-   *  one included, so the console signs itself back in with the new one. */
-  async function changePassword(password: string, currentPassword: string): Promise<boolean> {
+  /** A new password ends every session, this one included; the server hands
+   *  this device a fresh one, so nobody here has to sign in again. */
+  async function updateAccount(command: AccountUpdateCommand): Promise<boolean> {
     try {
-      await adminApi.setPassword(password, currentPassword);
-      const { token } = await adminApi.signIn(password);
-      adminApi.remember(token);
-      notify(t("passwordChanged"));
+      const { account, token } = await adminApi.updateAccount(command);
+      if (token) adminApi.remember(token);
+      setState((current) => ({ ...current, account }));
+      notify(t(command.password ? "passwordChanged" : "accountSaved"));
       return true;
     } catch (error) {
       failed(error, "passwordChangeFailed");
@@ -448,11 +444,11 @@ export function App() {
     return <div className="admin-shell gate-shell">
       <div className="gate-languages">{languagePicker}</div>
       <GatePanel
-        configured={state.gate.configured}
+        registered={state.gate.registered}
         busy={state.gate.busy}
         error={state.gate.error}
         onSignIn={signIn}
-        onSetPassword={setFirstPassword}
+        onRegister={register}
       />
     </div>;
   }
@@ -465,7 +461,7 @@ export function App() {
     <header className="admin-head">
       <div className="admin-brand">
         <strong>{restaurantName || t("admin")}</strong>
-        {state.role && <span className={`admin-role ${state.role}`}>{t(ROLE_KEYS[state.role])}</span>}
+        {state.role && <span className={`admin-role ${state.role}`}>{state.account ? state.account.name : t(ROLE_KEYS[state.role])}</span>}
         <i className={`admin-status ${state.connected ? "online" : ""}`} title={t(state.connected ? "online" : "offline")} aria-label={t(state.connected ? "online" : "offline")} />
       </div>
       <div className="admin-head-actions">
@@ -517,7 +513,8 @@ export function App() {
         onSaveConnection={saveConnection}
         onSaveTable={saveTable}
         onDeleteTable={deleteTable}
-        onChangePassword={changePassword}
+        account={state.account}
+        onUpdateAccount={updateAccount}
       />}
     </main>
   </div><BackToTop key={state.tab} label={t("backToTop")} /><div id="adminToast" className={`admin-toast ${state.toast ? "show" : ""} ${state.toast?.kind ?? ""}`} role="status">{state.toast?.message ?? ""}</div></>;

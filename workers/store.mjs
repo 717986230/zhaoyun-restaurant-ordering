@@ -16,11 +16,11 @@
  * fails whole, and `retrying` works it out again from what is there now.
  */
 import {
-  adminGateView, assertOrderTransition, assertPassword, assertRequestTransition, auditView,
+  assertOrderTransition, assertPassword, assertRequestTransition, auditView,
   billView, bool, boundedLimit, duplicateInput, hashPassword, hashSessionToken, mapProduct, newSessionToken,
   normalizeMenuTheme, normalizePrinter, normalizeSettingsInput, normalizeProduct, normalizeTableNo, now,
   orderProductIds, orderView, parseJson, PASSWORD_ITERATIONS, planOrder, planPrintFailure, printerView,
-  printJobView, serviceRequestView, SESSION_TTL_MS, settingsView, tableOverviewView, tableView, uuid,
+  printJobView, serviceRequestView, settingsView, tableOverviewView, tableView, uuid,
   verifyPassword, normalizeCategoryName, renamedCategorySettings, bundleComponentIds, normalizeVatPercent
 } from "../shared/rules.mjs";
 import {
@@ -33,6 +33,11 @@ import {
   assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
   normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
+import {
+  ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
+  DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
+  normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
+} from "../shared/account.mjs";
 
 // Matches server/database.mjs: a salt for nobody, so signing in against a
 // console with no password costs the same PBKDF2 work as one with.
@@ -489,71 +494,74 @@ export function createStore(db) {
     return printerView(await first("SELECT * FROM printer_profiles WHERE id = ?", printer.id));
   }
 
-  /**
-   * The password gate and its sessions, the same decisions
-   * server/database.mjs makes — the hashing, the token shape and the session
-   * lifetime all come from shared/rules.mjs, so only the reads and writes
-   * differ here.
-   */
-  async function adminGate() {
-    return adminGateView(await first("SELECT * FROM admin_gate WHERE id = 1"));
+  // ——— The account (shared/account.mjs): the same decisions server/database.mjs
+  // makes; only the reads and writes differ.
+
+  async function accountStatus() {
+    return { registered: (await first(ACCOUNT_COUNT_SQL)).count > 0 };
   }
 
-  async function resetAdminGatePassword(password) {
-    const stored = await hashPassword(assertPassword(password));
-    await run(
-      `INSERT INTO admin_gate (id, password_hash, password_salt, password_iterations, updated_at)
-       VALUES (1, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         password_hash = excluded.password_hash,
-         password_salt = excluded.password_salt,
-         password_iterations = excluded.password_iterations,
-         updated_at = excluded.updated_at`,
-      stored.hash, stored.salt, stored.iterations, now()
-    );
-    await run("DELETE FROM admin_sessions");
-    return adminGate();
-  }
-
-  async function setAdminGatePassword(password, currentPassword) {
-    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
-    if (row) {
-      const correct = await verifyPassword(String(currentPassword ?? ""), {
-        hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations
-      });
-      if (!correct) return null;
-    }
-    return resetAdminGatePassword(password);
-  }
-
-  async function signIn(password) {
-    const row = await first("SELECT * FROM admin_gate WHERE id = 1");
-    const stored = row
-      ? { hash: row.password_hash, salt: row.password_salt, iterations: row.password_iterations }
-      : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
-    const correct = await verifyPassword(String(password ?? ""), stored);
-    if (!row || !correct) return null;
-
+  async function openAccountSession(row) {
     const token = newSessionToken();
     const timestamp = now();
-    await run("DELETE FROM admin_sessions WHERE expires_at <= ?", timestamp);
-    await run(
-      "INSERT INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)",
-      await hashSessionToken(token), new Date(Date.now() + SESSION_TTL_MS).toISOString(), timestamp
-    );
-    return { token, expiresInMs: SESSION_TTL_MS };
+    await run(DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, timestamp);
+    await run(INSERT_ACCOUNT_SESSION_SQL, await hashSessionToken(token), row.id, new Date(Date.now() + ACCOUNT_SESSION_TTL_MS).toISOString(), timestamp);
+    return { token, expiresInMs: ACCOUNT_SESSION_TTL_MS, account: accountView(row) };
+  }
+
+  async function registerAccount(input) {
+    const { login, name, password } = normalizeRegistration(input);
+    const stored = await hashPassword(password);
+    const timestamp = now();
+    const id = uuid();
+    if (!(await run(REGISTER_ACCOUNT_SQL, id, login, name, stored.hash, stored.salt, stored.iterations, timestamp, timestamp))) return null;
+    return openAccountSession(await first(ACCOUNT_BY_ID_SQL, id));
+  }
+
+  async function signInAccount(loginInput, password) {
+    const row = await first(ACCOUNT_BY_LOGIN_SQL, String(loginInput ?? "").trim().toLowerCase());
+    const stored = row ? storedPassword(row) : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(password ?? ""), stored);
+    return row && correct ? openAccountSession(row) : null;
+  }
+
+  async function updateAccount(accountId, input) {
+    const row = await first(ACCOUNT_BY_ID_SQL, String(accountId));
+    if (!row || !(await verifyPassword(String(input?.currentPassword ?? ""), storedPassword(row)))) return null;
+    const login = input.login === undefined ? row.login : normalizeLogin(input.login);
+    const name = input.name === undefined ? row.name : normalizeAccountName(input.name, login);
+    const stored = input.password === undefined ? storedPassword(row) : await hashPassword(assertPassword(input.password));
+    if (login !== row.login && (await first(ACCOUNT_BY_LOGIN_SQL, login))) throw new Error("That account name is taken");
+    await run(UPDATE_ACCOUNT_SQL, login, name, stored.hash, stored.salt, stored.iterations, now(), row.id);
+    if (input.password !== undefined) await run(DELETE_ACCOUNT_SESSIONS_SQL, row.id);
+    const updated = await first(ACCOUNT_BY_ID_SQL, row.id);
+    return input.password !== undefined ? openAccountSession(updated) : { account: accountView(updated) };
+  }
+
+  async function recoverAccount(input) {
+    const owner = await first(OWNER_ACCOUNT_SQL);
+    if (!owner) {
+      await registerAccount({ login: input?.login ?? MIGRATED_LOGIN, name: input?.name, password: input?.password });
+      return { account: accountView(await first(OWNER_ACCOUNT_SQL)) };
+    }
+    const login = input?.login === undefined ? owner.login : normalizeLogin(input.login);
+    const stored = await hashPassword(assertPassword(input?.password));
+    await run(UPDATE_ACCOUNT_SQL, login, normalizeAccountName(input?.name ?? owner.name, login), stored.hash, stored.salt, stored.iterations, now(), owner.id);
+    await run(DELETE_ACCOUNT_SESSIONS_SQL, owner.id);
+    return { account: accountView(await first(ACCOUNT_BY_ID_SQL, owner.id)) };
   }
 
   async function roleForSession(token) {
     if (!token) return null;
-    const row = await first("SELECT * FROM admin_sessions WHERE token_hash = ?", await hashSessionToken(token));
-    // Not the console's: a waiter signed in on a POS device, perhaps.
+    const tokenHash = await hashSessionToken(token);
+    const row = await first(ACCOUNT_SESSION_SQL, tokenHash);
+    // Not the account's: a waiter signed in on a POS device, perhaps.
     if (!row) return posSession(token);
     if (row.expires_at <= now()) {
-      await run("DELETE FROM admin_sessions WHERE token_hash = ?", row.token_hash);
+      await run(DELETE_ACCOUNT_SESSION_SQL, tokenHash);
       return null;
     }
-    return { role: "manager" };
+    return { role: "manager", account: accountView(row) };
   }
 
   // ——— The POS (shared/pos.mjs): devices, waiters, open tables, takeaway, settlement.
@@ -687,7 +695,7 @@ export function createStore(db) {
 
   async function signOut(token) {
     if (!token) return false;
-    return (await run("DELETE FROM admin_sessions WHERE token_hash = ?", await hashSessionToken(token))) > 0;
+    return (await run(DELETE_ACCOUNT_SESSION_SQL, await hashSessionToken(token))) > 0;
   }
 
   async function getSettings() {
@@ -743,10 +751,11 @@ export function createStore(db) {
     deletePrinter: async (id) => (await run("DELETE FROM printer_profiles WHERE id = ?", String(id))) > 0,
     getSettings,
     saveSettings,
-    adminGate,
-    setAdminGatePassword,
-    resetAdminGatePassword,
-    signIn,
+    accountStatus,
+    registerAccount,
+    signInAccount,
+    updateAccount,
+    recoverAccount,
     signOut,
     roleForSession,
     pairDevice,

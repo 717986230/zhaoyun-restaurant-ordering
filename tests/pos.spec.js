@@ -14,6 +14,7 @@ import { expect, test } from "@playwright/test";
 const PROJECT = "android-tablet-landscape";
 const API = "http://127.0.0.1:8787";
 const ADMIN = "pos-e2e-admin-token";
+const LOGIN = "zhaoyun";
 const PASSWORD = "chef-password";
 
 test.describe.configure({ mode: "serial" });
@@ -34,7 +35,7 @@ test.beforeAll(async ({ request }, testInfo) => {
     try { if ((await request.get(`${API}/api/health`)).ok()) break; } catch { /* not up yet */ }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  expect((await request.post(`${API}/api/admin/gate/password`, { headers: { "x-admin-token": ADMIN }, data: { password: PASSWORD } })).ok()).toBe(true);
+  expect((await request.post(`${API}/api/account/register`, { data: { login: LOGIN, name: "Chef", password: PASSWORD } })).status()).toBe(201);
   for (const [name, pin, role] of [["Li", "1234", "staff"], ["Wang", "9876", "manager"]]) {
     expect((await admin(request, "post", "/api/admin/staff", { name, pin, role })).ok()).toBe(true);
   }
@@ -55,7 +56,8 @@ async function confirmOptions(page) {
 async function pairAndSignIn(page, device, name, pin) {
   await page.goto("/pos.html");
   await page.getByLabel(/设备名称/).fill(device);
-  await page.getByLabel("经理密码").fill(PASSWORD);
+  await page.getByLabel("账户名").fill(LOGIN);
+  await page.getByLabel("账户密码").fill(PASSWORD);
   await page.getByRole("button", { name: "配对" }).click();
   await page.getByRole("button", { name, exact: true }).click();
   for (const digit of pin) await page.locator(".pos-keypad").getByRole("button", { name: digit, exact: true }).click();

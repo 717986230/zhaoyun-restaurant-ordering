@@ -215,23 +215,25 @@ export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxL
 // shared rule (normalizeVatPercent), so both backends refuse the same way.
 export const CategoryVatBody = Type.Object({ category: Category, vatPercent: Type.Number() }, { additionalProperties: false });
 
-// The console's password gate. The floor is the one `assertPassword` enforces
-// — stated twice on purpose, so a too-short password is refused at the edge
-// with a 400 rather than turning into a 500 further in. There is no username:
-// there is one console and one password on it.
+// The restaurant's account (shared/account.mjs). The password floor is the
+// one `assertPassword` enforces — stated twice on purpose, so a too-short
+// password is refused at the edge with a 400 rather than further in. The
+// account name's own pattern is the shared rule's (normalizeLogin).
 const Password = Type.String({ minLength: 6, maxLength: 200 });
+const Login = Type.String({ minLength: 3, maxLength: 64 });
+const AccountName = Type.String({ maxLength: 40 });
 
-export const SignInBody = Type.Object({
-  password: Password
-});
-
-// `currentPassword` is absent the first time, when there is nothing to prove,
-// and required afterwards — a rule the database enforces, because only it
-// knows whether a password is already set.
-export const SetPasswordBody = Type.Object({
-  password: Password,
-  currentPassword: Type.Optional(Password)
-});
+export const RegisterBody = Type.Object({ login: Login, name: Type.Optional(AccountName), password: Password }, { additionalProperties: false });
+export const AccountSignInBody = Type.Object({ login: Type.String({ maxLength: 64 }), password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
+// Every change is made against the password in force.
+export const AccountUpdateBody = Type.Object({
+  currentPassword: Type.String({ maxLength: 200 }),
+  login: Type.Optional(Login),
+  name: Type.Optional(AccountName),
+  password: Type.Optional(Password)
+}, { additionalProperties: false });
+// ADMIN_TOKEN's way back in: a new password, and a new account name if wanted.
+export const AccountRecoverBody = Type.Object({ login: Type.Optional(Login), name: Type.Optional(AccountName), password: Password }, { additionalProperties: false });
 
 export const PrinterBody = Type.Object({
   name: Type.String({ minLength: 1, maxLength: 120 }),

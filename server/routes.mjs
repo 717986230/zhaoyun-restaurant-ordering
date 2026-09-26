@@ -5,8 +5,8 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody, SetPasswordBody, SettingsBody,
-  SignInBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
+  ProductBody, ServiceRequestBody, ServiceStatusBody, SettingsBody,
+  RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
   StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
@@ -149,6 +149,7 @@ export function registerRoutes(app, { database, realtime, config }) {
       request.staffRole = role;
       // A waiter's session carries who they are and which device they are on.
       request.pos = session.staff ? { staff: session.staff, deviceId: session.deviceId } : null;
+      request.account = session.account ?? null;
       if (ROLE_RANK[role] < required) {
         // A valid token used beyond its role is worth recording, not just refusing.
         request.auditedDenial = true;
@@ -373,61 +374,77 @@ export function registerRoutes(app, { database, realtime, config }) {
   });
 
   /**
-   * The door of the admin console.
+   * The restaurant's account (shared/account.mjs).
    *
-   * `GET` is deliberately open: it answers one bit — has a password been set —
-   * which the console needs before it can draw anything, and which anyone who
-   * tried to sign in would learn regardless.
+   * `GET /api/account` is deliberately open: it answers one bit — is there an
+   * account yet — which the console needs to know whether to show the
+   * registration or the sign-in, and which anyone who tried either would learn.
+   * Registration, sign-in and recovery share the auth throttle, so guessing a
+   * password and guessing a token are counted together.
    */
-  app.get("/api/admin/gate", async () => database.adminGate());
+  app.get("/api/account", async () => database.accountStatus());
 
-  app.post("/api/admin/gate/sign-in", { schema: { body: SignInBody } }, async (request, reply) => {
+  app.post("/api/account/register", { schema: { body: RegisterBody } }, async (request, reply) => {
     const throttle = authThrottle(request, reply);
     if (!throttle) return reply;
-    const session = await database.signIn(request.body?.password);
-    if (!session) {
-      throttle.fail();
-      return reply.code(401).send({ error: "Wrong password" });
-    }
-    throttle.pass();
-    return session;
-  });
-
-  /**
-   * Sets the password: once for whoever opens the console first, because there
-   * is nothing yet to prove, and thereafter only for someone who can produce
-   * the one in force.
-   *
-   * The recovery path is ADMIN_TOKEN, and it is the token that is accepted
-   * here rather than a live session on purpose: a stolen session must not be
-   * able to change the password and lock the owner out of their own menu.
-   */
-  app.post("/api/admin/gate/password", { schema: { body: SetPasswordBody } }, async (request, reply) => {
-    const throttle = authThrottle(request, reply);
-    if (!throttle) return reply;
-    const provided = request.headers["x-admin-token"];
-    const recovering = Boolean(config.adminToken) && tokenMatches(provided, config.adminToken);
     try {
-      const gate = recovering
-        ? await database.resetAdminGatePassword(request.body?.password)
-        : await database.setAdminGatePassword(request.body?.password, request.body?.currentPassword);
-      if (!gate) {
-        throttle.fail();
-        return reply.code(401).send({ error: "Wrong password" });
-      }
+      const session = await database.registerAccount(request.body);
+      if (!session) return reply.code(409).send({ error: "This restaurant already has an account: sign in" });
       throttle.pass();
-      return gate;
+      return reply.code(201).send(session);
     } catch (error) {
       return errorReply(reply, error);
     }
   });
 
-  app.post("/api/admin/gate/sign-out", { preHandler: requireKitchen }, async (request, reply) => {
+  app.post("/api/account/sign-in", { schema: { body: AccountSignInBody } }, async (request, reply) => {
+    const throttle = authThrottle(request, reply);
+    if (!throttle) return reply;
+    const session = await database.signInAccount(request.body.login, request.body.password);
+    if (!session) {
+      throttle.fail();
+      return reply.code(401).send({ error: "Wrong account name or password" });
+    }
+    throttle.pass();
+    return session;
+  });
+
+  app.put("/api/account", { preHandler: requireAdmin, schema: { body: AccountUpdateBody } }, async (request, reply) => {
+    if (!request.account) return reply.code(403).send({ error: "Sign in with the account to change it" });
+    try {
+      const updated = await database.updateAccount(request.account.id, request.body);
+      if (!updated) return reply.code(401).send({ error: "Wrong password" });
+      return updated;
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+
+  /**
+   * The way back in when the password is forgotten: ADMIN_TOKEN, and only the
+   * token — not a live session, which a stolen tablet would carry.
+   */
+  app.post("/api/account/recover", { schema: { body: AccountRecoverBody } }, async (request, reply) => {
+    const throttle = authThrottle(request, reply);
+    if (!throttle) return reply;
+    if (!config.adminToken || !tokenMatches(request.headers["x-admin-token"], config.adminToken)) {
+      throttle.fail();
+      return reply.code(401).send({ error: "ADMIN_TOKEN required" });
+    }
+    try {
+      throttle.pass();
+      return await database.recoverAccount(request.body);
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+
+  app.post("/api/account/sign-out", { preHandler: requireKitchen }, async (request, reply) => {
     await database.signOut(request.headers["x-admin-token"]);
     return reply.code(204).send();
   });
 
-  app.get("/api/admin/session", { preHandler: requireKitchen }, async (request) => ({ role: request.staffRole }));
+  app.get("/api/admin/session", { preHandler: requireKitchen }, async (request) => (request.account ? { role: request.staffRole, account: request.account } : { role: request.staffRole }));
   app.get("/api/admin/audit", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
     entries: database.listAudit(request.query.limit)
   }));

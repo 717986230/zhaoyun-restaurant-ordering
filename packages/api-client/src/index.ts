@@ -1,7 +1,8 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosDevice, PosClaim, PosSettlement
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosDevice, PosClaim, PosSettlement,
+  AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -204,19 +205,20 @@ export class AdminApi {
     sessionStorage.removeItem("zy_admin_token");
   }
 
-  /** Open on purpose: one bit, which the console needs before it can decide
-   *  whether to ask for a password or to set one. */
-  gate(): Promise<{ configured: boolean }> { return this.#request("/api/admin/gate"); }
-  signIn(password: string): Promise<{ token: string; expiresInMs: number }> {
-    return this.#request("/api/admin/gate/sign-in", { method: "POST", body: JSON.stringify({ password }) });
+  /** Open on purpose: one bit, which the console needs to choose between
+   *  registering the restaurant's account and signing in to it. */
+  accountStatus(): Promise<{ registered: boolean }> { return this.#request("/api/account"); }
+  register(command: RegisterCommand): Promise<AccountSession> {
+    return this.#request("/api/account/register", { method: "POST", body: JSON.stringify(command) });
   }
-  setPassword(password: string, currentPassword?: string): Promise<{ configured: boolean }> {
-    return this.#request("/api/admin/gate/password", {
-      method: "POST",
-      body: JSON.stringify(currentPassword ? { password, currentPassword } : { password })
-    });
+  signIn(login: string, password: string): Promise<AccountSession> {
+    return this.#request("/api/account/sign-in", { method: "POST", body: JSON.stringify({ login, password }) });
   }
-  signOut(): Promise<void> { return this.#request("/api/admin/gate/sign-out", { method: "POST" }); }
+  /** A new password ends every session and answers with a fresh one for this device. */
+  updateAccount(command: AccountUpdateCommand): Promise<{ account: ApiAccount; token?: string; expiresInMs?: number }> {
+    return this.#request("/api/account", { method: "PUT", body: JSON.stringify(command) });
+  }
+  signOut(): Promise<void> { return this.#request("/api/account/sign-out", { method: "POST" }); }
 
   mediaUrl(path: string): string { return `${this.storage.baseUrl}${path}`; }
   health(): Promise<{ ok: boolean }> { return this.#request("/api/health"); }
@@ -231,7 +233,7 @@ export class AdminApi {
   renameCategory(from: string, to: string): Promise<{ renamed: number; category: string; settings: ApiSettings }> { return this.#request("/api/admin/categories/rename", { method: "POST", body: JSON.stringify({ from, to }) }); }
   /** Every dish of a category at one VAT rate; set menus keep their split. */
   setCategoryVat(category: string, vatPercent: VatPercent): Promise<{ updated: number; category: string; vatPercent: VatPercent }> { return this.#request("/api/admin/categories/vat", { method: "POST", body: JSON.stringify({ category, vatPercent }) }); }
-  session(): Promise<{ role: StaffRole }> { return this.#request("/api/admin/session"); }
+  session(): Promise<{ role: StaffRole; account?: ApiAccount }> { return this.#request("/api/admin/session"); }
   audit(limit = 100): Promise<{ entries: AuditEntry[] }> { return this.#request(`/api/admin/audit?limit=${limit}`); }
   orders(limit = 100): Promise<{ orders: ApiOrder[] }> { return this.#request(`/api/orders?limit=${limit}`); }
   updateOrderStatus(id: string, status: ApiOrder["status"]): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
@@ -331,12 +333,17 @@ export class PosApi {
   }
 
   /** Pairs this device, with the manager's password: done once per device. */
-  async pair(baseUrl: string, password: string, name: string): Promise<PosDevice> {
+  async pair(baseUrl: string, login: string, password: string, name: string): Promise<PosDevice> {
     if (baseUrl) localStorage.setItem("zy_api_base", baseUrl.replace(/\/+$/, ""));
-    const { token: manager } = await this.#request<{ token: string }>("/api/admin/gate/sign-in", { method: "POST", body: JSON.stringify({ password }) }, "");
-    const { device, token } = await this.#request<{ device: PosDevice; token: string }>("/api/admin/pos-devices", { method: "POST", body: JSON.stringify({ name }) }, manager);
-    localStorage.setItem("zy_pos_device", token);
-    return device;
+    const { token: account } = await this.#request<AccountSession>("/api/account/sign-in", { method: "POST", body: JSON.stringify({ login, password }) }, "");
+    try {
+      const { device, token } = await this.#request<{ device: PosDevice; token: string }>("/api/admin/pos-devices", { method: "POST", body: JSON.stringify({ name }) }, account);
+      localStorage.setItem("zy_pos_device", token);
+      return device;
+    } finally {
+      // The account's session was for pairing only; the device keeps its own token.
+      await this.#request("/api/account/sign-out", { method: "POST" }, account).catch(() => undefined);
+    }
   }
   unpair(): void {
     localStorage.removeItem("zy_pos_device");
