@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Admin</title>
     <meta name="theme-color" content="#18221e" />
-    <link rel="icon" type="image/svg+xml" href="/icons/menu.svg" />
+    <!-- Its own app on the home screen or the desktop, opening straight here —
+         not through the guest menu (public/admin.webmanifest). -->
+    <link rel="manifest" href="/admin.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/admin.svg" />
+    <link rel="apple-touch-icon" href="/icons/admin-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
   </head>
   <body>
     <div id="adminApp"></div>

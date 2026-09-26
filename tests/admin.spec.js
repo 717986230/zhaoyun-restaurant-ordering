@@ -845,8 +845,14 @@ test("VAT is kept per dish and per category: counts, a mixed category marked, a 
   await expect(page.getByText("套餐的税率按里面各道菜的价格比例自动拆分")).toBeVisible();
 });
 
-test("the console installs nothing of its own: the menu is what installs", async ({ page }) => {
-  await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
+test("the console and the POS each install as their own app, opening straight to themselves, not through the menu", async ({ page, request }) => {
+  // The browser's own "install" / "add to home screen" — no button of the console's own for it.
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", /admin\.webmanifest$/);
+  for (const [app, name] of [["admin", "Admin"], ["pos", "POS"]]) {
+    const manifest = await (await request.get(`/${app}.webmanifest`)).json();
+    expect(manifest).toMatchObject({ short_name: name, start_url: `./${app}.html`, scope: `./${app}.html`, display: "standalone" });
+    expect((await request.get(`/${manifest.icons[0].src}`)).ok()).toBe(true);
+  }
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByRole("heading", { name: "桌面版", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /安装/ })).toHaveCount(0);
