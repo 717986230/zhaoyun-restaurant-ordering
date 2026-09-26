@@ -1,6 +1,7 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
-  CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent
+  CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosDevice, PosClaim, PosSettlement
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -58,6 +59,11 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     setsSchedule: null,
     navPinned: [],
     navLabels: {},
+    companyName: "",
+    companyAddress: "",
+    companyUid: "",
+    cashRegisterId: "KASSE-1",
+    takeawayDiscountPercent: 0,
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
   } as ApiSettings;
 }
@@ -233,7 +239,15 @@ export class AdminApi {
   updateServiceRequestStatus(id: string, status: ApiServiceRequest["status"]): Promise<{ request: ApiServiceRequest }> { return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   printJobs(status: PrintJobStatus = "failed", limit = 50): Promise<{ jobs: ApiPrintJob[] }> { return this.#request(`/api/admin/print-jobs?status=${status}&limit=${limit}`); }
   bill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill`); }
-  settleBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/settle`, { method: "POST" }); }
+  // The POS's waiters and devices, kept by the manager.
+  staffList(): Promise<{ staff: PosStaff[] }> { return this.#request("/api/admin/staff"); }
+  saveStaff(input: { name?: string; role?: PosStaff["role"]; pin?: string; active?: boolean }, id?: string): Promise<{ staff: PosStaff }> {
+    return this.#request(id ? `/api/admin/staff/${encodeURIComponent(id)}` : "/api/admin/staff", { method: id ? "PUT" : "POST", body: JSON.stringify(input) });
+  }
+  posDevices(): Promise<{ devices: PosDevice[] }> { return this.#request("/api/admin/pos-devices"); }
+  unpairDevice(id: string): Promise<void> { return this.#request(`/api/admin/pos-devices/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  /** An interim bill on the front printer; it marks nothing paid. */
+  printBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/print`, { method: "POST" }); }
   tables(): Promise<{ tables: RestaurantTable[] }> { return this.#request("/api/admin/tables"); }
   openTables(): Promise<{ tables: string[] }> { return this.#request("/api/admin/tables/open"); }
   tableOverview(): Promise<{ tables: TableOverview[] }> { return this.#request("/api/admin/tables/overview"); }
@@ -287,6 +301,78 @@ export class AdminApi {
     if (response.status === 204) return undefined as T;
     return parseJsonResponse<T>(response);
   }
+}
+
+/**
+ * The POS (apps/pos-web). A device is paired once with the manager's password
+ * and keeps its device token; a waiter signs in on it with a PIN for a session
+ * token. Both travel with every call: the device token says where, the
+ * session token who.
+ */
+export class PosApi {
+  get baseUrl(): string {
+    const built = import.meta.env?.VITE_API_BASE?.replace(/\/+$/, "");
+    const fallback = location.port === "5173" ? "http://127.0.0.1:8787" : built || location.origin;
+    return localStorage.getItem("zy_api_base") || fallback;
+  }
+  get deviceToken(): string { return localStorage.getItem("zy_pos_device") || ""; }
+  get session(): { token: string; staff: PosStaff } | null {
+    try { return JSON.parse(localStorage.getItem("zy_pos_session") || "null"); } catch { return null; }
+  }
+
+  async #request<T>(path: string, options: RequestInit = {}, token = this.session?.token ?? ""): Promise<T> {
+    const headers = new Headers(options.headers);
+    if (options.body) headers.set("content-type", "application/json");
+    if (token) headers.set("x-admin-token", token);
+    if (this.deviceToken) headers.set("x-device-token", this.deviceToken);
+    const response = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
+    if (response.status === 204) return undefined as T;
+    return parseJsonResponse<T>(response);
+  }
+
+  /** Pairs this device, with the manager's password: done once per device. */
+  async pair(baseUrl: string, password: string, name: string): Promise<PosDevice> {
+    if (baseUrl) localStorage.setItem("zy_api_base", baseUrl.replace(/\/+$/, ""));
+    const { token: manager } = await this.#request<{ token: string }>("/api/admin/gate/sign-in", { method: "POST", body: JSON.stringify({ password }) }, "");
+    const { device, token } = await this.#request<{ device: PosDevice; token: string }>("/api/admin/pos-devices", { method: "POST", body: JSON.stringify({ name }) }, manager);
+    localStorage.setItem("zy_pos_device", token);
+    return device;
+  }
+  unpair(): void {
+    localStorage.removeItem("zy_pos_device");
+    localStorage.removeItem("zy_pos_session");
+  }
+
+  staff(): Promise<{ staff: PosStaff[] }> { return this.#request("/api/pos/staff", {}, ""); }
+  async signIn(staffId: string, pin: string): Promise<PosStaff> {
+    const { token, staff } = await this.#request<{ token: string; staff: PosStaff }>("/api/pos/sign-in", { method: "POST", body: JSON.stringify({ staffId, pin }) }, "");
+    localStorage.setItem("zy_pos_session", JSON.stringify({ token, staff }));
+    return staff;
+  }
+  async signOut(): Promise<void> {
+    try { await this.#request("/api/pos/sign-out", { method: "POST" }); } finally { localStorage.removeItem("zy_pos_session"); }
+  }
+
+  catalog(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/catalog"); }
+  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  claim(table: string): Promise<{ claim: PosClaim }> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim`, { method: "POST" }); }
+  release(table: string, force = false): Promise<void> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim${force ? "?force=1" : ""}`, { method: "DELETE" }); }
+  order(command: CreateOrderCommand): Promise<{ order: ApiOrder }> { return this.#request("/api/pos/orders", { method: "POST", body: JSON.stringify(command) }); }
+  takeaway(): Promise<{ table: string; pickupNo: number; claim: PosClaim }> { return this.#request("/api/pos/takeaway", { method: "POST" }); }
+  move(from: string, to: string): Promise<{ from: string; to: string; moved: number }> { return this.#request(`/api/pos/tables/${encodeURIComponent(from)}/move`, { method: "POST", body: JSON.stringify({ to }) }); }
+  bill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill`); }
+  printBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/print`, { method: "POST" }); }
+  checkout(command: CheckoutCommand): Promise<{ receipt: ApiReceipt }> { return this.#request("/api/admin/checkout", { method: "POST", body: JSON.stringify(command) }); }
+  receipts(limit = 50): Promise<{ receipts: ApiReceipt[] }> { return this.#request(`/api/admin/receipts?limit=${limit}`); }
+  stornoReceipt(id: string, reason: string): Promise<{ receipt: ApiReceipt }> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/storno`, { method: "POST", body: JSON.stringify({ reason }) }); }
+  voucher(code: string): Promise<{ voucher: ApiVoucher }> { return this.#request(`/api/admin/vouchers/${encodeURIComponent(code)}`); }
+  settlement(staffId?: string): Promise<{ totals: PosSettlement["totals"] }> { return this.#request(`/api/pos/settlement${staffId ? `?staffId=${encodeURIComponent(staffId)}` : ""}`); }
+  settle(staffId?: string): Promise<{ settlement: PosSettlement }> { return this.#request("/api/pos/settlement", { method: "POST", body: JSON.stringify(staffId ? { staffId } : {}) }); }
+  settlements(limit = 30): Promise<{ settlements: PosSettlement[] }> { return this.#request(`/api/pos/settlements?limit=${limit}`); }
+  closingPreview(): Promise<{ totals: ApiClosingTotals }> { return this.#request("/api/admin/day-closings/preview"); }
+  closeDay(): Promise<{ closing: ApiClosing }> { return this.#request("/api/admin/day-closings", { method: "POST" }); }
+  closings(limit = 30): Promise<{ closings: ApiClosing[] }> { return this.#request(`/api/admin/day-closings?limit=${limit}`); }
+  journal(from: string, to: string): Promise<ApiJournalExport> { return this.#request(`/api/admin/journal?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`); }
 }
 
 export class RestaurantApi {

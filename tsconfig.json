@@ -6,6 +6,7 @@
     { "path": "./packages/api-client/tsconfig.json" },
     { "path": "./packages/native-bridge/tsconfig.json" },
     { "path": "./apps/customer-app/tsconfig.json" },
-    { "path": "./apps/admin-web/tsconfig.json" }
+    { "path": "./apps/admin-web/tsconfig.json" },
+    { "path": "./apps/pos-web/tsconfig.json" }
   ]
 }

@@ -37,7 +37,8 @@ const incremental = [
   // goes through both, and one that applied 0051 gets only 0052.
   { file: "0051_product_schedules.sql", then: "0052_drop_product_schedules.sql", drop: "" },
   { file: "0052_drop_product_schedules.sql", drop: readFileSync(path.join(migrationsDir, "0051_product_schedules.sql"), "utf8") },
-  { file: "0053_order_item_vat_split.sql", drop: "DROP TABLE order_item_vat_splits;" }
+  { file: "0053_order_item_vat_split.sql", drop: "DROP TABLE order_item_vat_splits;" },
+  { file: "0054_register.sql", drop: "DROP INDEX idx_receipts_one_storno; DROP INDEX idx_receipt_items_item; DROP TABLE journal; DROP TABLE staff_settlements; DROP TABLE order_staff; DROP TABLE table_claims; DROP TABLE pos_sessions; DROP TABLE staff; DROP TABLE pos_devices; DROP TABLE day_closings; DROP TABLE vouchers; DROP TABLE receipt_items; DROP TABLE receipts;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")

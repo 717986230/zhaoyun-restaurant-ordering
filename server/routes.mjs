@@ -4,9 +4,10 @@ import path from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import {
-  CategoryRenameBody, CategoryVatBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
+  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
   ProductBody, ServiceRequestBody, ServiceStatusBody, SetPasswordBody, SettingsBody,
-  SignInBody, TableBody, TableLockBody, TableParams
+  SignInBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
+  StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
 // Who outranks whom is the one rule the Worker must not decide differently.
@@ -90,15 +91,17 @@ export function registerRoutes(app, { database, realtime, config }) {
    * that were configured with one, and for getting back in when the password
    * has been forgotten.
    */
-  async function resolveRole(request) {
+  /** Who is asking: a role, and for a waiter on a POS device, who and where. */
+  async function resolveSession(request) {
     const provided = request.headers["x-admin-token"];
     const session = await database.roleForSession(provided);
-    if (session) return session.role;
-    return resolveStaffRole((expected) => tokenMatches(provided, expected), {
+    if (session) return session;
+    const role = resolveStaffRole((expected) => tokenMatches(provided, expected), {
       manager: config.adminToken,
       staff: config.staffToken,
       kitchen: config.kitchenToken
     });
+    return role ? { role } : null;
   }
 
   /**
@@ -136,13 +139,16 @@ export function registerRoutes(app, { database, realtime, config }) {
     return async function guard(request, reply) {
       const throttle = authThrottle(request, reply);
       if (!throttle) return reply;
-      const role = await resolveRole(request);
+      const session = await resolveSession(request);
+      const role = session?.role;
       if (!role) {
         throttle.fail();
         return reply.code(401).send({ error: "Admin authentication required" });
       }
       throttle.pass();
       request.staffRole = role;
+      // A waiter's session carries who they are and which device they are on.
+      request.pos = session.staff ? { staff: session.staff, deviceId: session.deviceId } : null;
       if (ROLE_RANK[role] < required) {
         // A valid token used beyond its role is worth recording, not just refusing.
         request.auditedDenial = true;
@@ -459,13 +465,175 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.get("/api/admin/tables/:table/bill", { preHandler: requireFloor, schema: { params: TableParams } }, async (request) => ({
     bill: database.billForTable(request.params.table)
   }));
-  app.post("/api/admin/tables/:table/bill/settle", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
-    const bill = database.settleTableBill(request.params.table);
-    if (!bill) return errorReply(reply, new Error("Table has no open orders to settle"), 409);
-    realtime.broadcast("bill.settled", { table: bill.table, total: bill.total }, bill.table);
+  // An interim bill for the guest to read. Paying is a receipt (checkout).
+  app.post("/api/admin/tables/:table/bill/print", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
+    const bill = database.printTableBill(request.params.table);
+    if (!bill) return errorReply(reply, new Error("Table has nothing left to pay"), 409);
     realtime.broadcast("print.queued", { jobId: bill.printJobId }, bill.table);
     return { bill };
   });
+
+  // The register (shared/register.mjs): receipts, storno, the day's closing, the journal.
+  app.post("/api/admin/checkout", { preHandler: requireFloor, schema: { body: CheckoutBody } }, async (request, reply) => {
+    try {
+      const receipt = database.checkout(request.body, request.staffRole, request.pos);
+      if (receipt.table) realtime.broadcast("bill.paid", { table: receipt.table, receiptNo: receipt.receiptNo }, receipt.table);
+      return reply.code(201).send({ receipt });
+    } catch (error) {
+      return errorReply(reply, error, error.code === "TABLE_CLAIMED" ? 409 : 400);
+    }
+  });
+  app.get("/api/admin/receipts", { preHandler: requireFloor, schema: { querystring: LimitQuery } }, async (request) => ({
+    receipts: database.listReceipts(request.query.limit)
+  }));
+  app.get("/api/admin/receipts/:id", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => {
+    const receipt = database.getReceipt(request.params.id);
+    return receipt ? { receipt } : errorReply(reply, new Error("Receipt not found"), 404);
+  });
+  app.post("/api/admin/receipts/:id/storno", { preHandler: requireAdmin, schema: { params: IdParams, body: StornoBody } }, async (request, reply) => {
+    try {
+      const receipt = database.stornoReceipt(request.params.id, request.body.reason, request.staffRole, request.pos);
+      if (!receipt) return errorReply(reply, new Error("Receipt not found"), 404);
+      return reply.code(201).send({ receipt });
+    } catch (error) {
+      return errorReply(reply, error, /already been cancelled/.test(error.message) ? 409 : 400);
+    }
+  });
+  app.get("/api/admin/vouchers/:code", { preHandler: requireFloor, schema: { params: VoucherParams } }, async (request, reply) => {
+    const voucher = database.getVoucher(request.params.code);
+    return voucher ? { voucher } : errorReply(reply, new Error("Voucher not found"), 404);
+  });
+  app.get("/api/admin/day-closings/preview", { preHandler: requireAdmin }, async () => ({ totals: database.closingPreview() }));
+  app.get("/api/admin/day-closings", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
+    closings: database.listClosings(request.query.limit)
+  }));
+  app.post("/api/admin/day-closings", { preHandler: requireAdmin }, async (request, reply) => {
+    const closing = database.closeDay(request.staffRole);
+    if (!closing) return errorReply(reply, new Error("No receipts since the last closing"), 409);
+    return reply.code(201).send({ closing });
+  });
+  // ——— The POS (shared/pos.mjs). The manager pairs devices and keeps the
+  // waiters; a paired device lists them and takes a PIN; a waiter's session
+  // does the rest.
+  app.get("/api/admin/staff", { preHandler: requireAdmin }, async () => ({ staff: database.listStaff() }));
+  app.post("/api/admin/staff", { preHandler: requireAdmin, schema: { body: StaffBody } }, async (request, reply) => {
+    try {
+      return reply.code(201).send({ staff: await database.saveStaff(request.body) });
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+  app.put("/api/admin/staff/:id", { preHandler: requireAdmin, schema: { params: IdParams, body: StaffBody } }, async (request, reply) => {
+    try {
+      const staff = await database.saveStaff(request.body, request.params.id);
+      return staff ? { staff } : errorReply(reply, new Error("Waiter not found"), 404);
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+  app.get("/api/admin/pos-devices", { preHandler: requireAdmin }, async () => ({ devices: database.listDevices() }));
+  app.post("/api/admin/pos-devices", { preHandler: requireAdmin, schema: { body: DeviceBody } }, async (request, reply) => {
+    try {
+      return reply.code(201).send(await database.pairDevice(request.body.name));
+    } catch (error) {
+      return errorReply(reply, error);
+    }
+  });
+  app.delete("/api/admin/pos-devices/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) =>
+    (database.deleteDevice(request.params.id) ? reply.code(204).send() : errorReply(reply, new Error("Device not found"), 404)));
+
+  /** A paired device, from its token, or the reply that says it is not one. */
+  async function pairedDevice(request, reply) {
+    const device = await database.deviceForToken(request.headers["x-device-token"]);
+    if (!device) {
+      reply.code(401).send({ error: "This device is not paired with the POS" });
+      return null;
+    }
+    return device;
+  }
+  app.get("/api/pos/staff", async (request, reply) => {
+    if (!(await pairedDevice(request, reply))) return reply;
+    return { staff: database.listStaff(true).map(({ id, name, role }) => ({ id, name, role })) };
+  });
+  app.post("/api/pos/sign-in", { schema: { body: PosSignInBody } }, async (request, reply) => {
+    const throttle = authThrottle(request, reply);
+    if (!throttle) return reply;
+    const device = await pairedDevice(request, reply);
+    if (!device) return reply;
+    const session = await database.posSignIn(device, request.body.staffId, request.body.pin);
+    if (!session) {
+      throttle.fail();
+      return reply.code(401).send({ error: "Wrong PIN" });
+    }
+    throttle.pass();
+    return session;
+  });
+  app.post("/api/pos/sign-out", async (request, reply) => {
+    await database.posSignOut(request.headers["x-admin-token"]);
+    return reply.code(204).send();
+  });
+
+  /** A waiter's own POS session: the routes below act as someone, on some device. */
+  async function requirePos(request, reply) {
+    const denied = await requireFloor(request, reply);
+    if (denied || reply.sent) return denied ?? reply;
+    if (!request.pos) return reply.code(403).send({ error: "Sign in on a POS device" });
+    return undefined;
+  }
+  const claimed = (reply, error) => errorReply(reply, error, error.code === "TABLE_CLAIMED" ? 409 : 400);
+  app.get("/api/pos/floor", { preHandler: requirePos }, async () => ({ tables: database.tablesOverview(), claims: database.liveClaims(), takeawayDiscountPercent: database.getSettings().takeawayDiscountPercent }));
+  app.post("/api/pos/tables/:table/claim", { preHandler: requirePos, schema: { params: TableParams } }, async (request, reply) => {
+    try {
+      return { claim: database.claimTable(request.params.table, request.pos) };
+    } catch (error) {
+      return claimed(reply, error);
+    }
+  });
+  app.delete("/api/pos/tables/:table/claim", { preHandler: requirePos, schema: { params: TableParams } }, async (request, reply) => {
+    database.releaseTable(request.params.table, request.pos, request.staffRole === "manager" && request.query?.force === "1");
+    return reply.code(204).send();
+  });
+  app.post("/api/pos/orders", { preHandler: requirePos, schema: { body: CreateOrderBody } }, async (request, reply) => {
+    try {
+      const order = database.createOrder(request.body, request.pos);
+      realtime.broadcast("order.created", { orderId: order.id, table: order.table }, order.table);
+      return reply.code(201).send({ order });
+    } catch (error) {
+      return claimed(reply, error);
+    }
+  });
+  app.post("/api/pos/takeaway", { preHandler: requirePos }, async (request, reply) => reply.code(201).send(database.newTakeaway(request.pos)));
+  app.post("/api/pos/tables/:table/move", { preHandler: requirePos, schema: { params: TableParams, body: MoveTableBody } }, async (request, reply) => {
+    try {
+      const moved = database.moveTable(request.params.table, request.body.to, request.pos);
+      return moved ?? errorReply(reply, new Error("Nothing open on that table"), 404);
+    } catch (error) {
+      return claimed(reply, error);
+    }
+  });
+  /** A waiter's own settlement; the manager may settle anyone's. */
+  const settlementFor = (request, reply) => {
+    const staffId = request.body?.staffId ?? request.query?.staffId ?? request.pos.staff.id;
+    if (staffId !== request.pos.staff.id && request.staffRole !== "manager") {
+      reply.code(403).send({ error: "Only the manager settles another waiter" });
+      return null;
+    }
+    return staffId;
+  };
+  app.get("/api/pos/settlement", { preHandler: requirePos }, async (request, reply) => {
+    const staffId = settlementFor(request, reply);
+    return staffId ? { totals: database.staffSettlementPreview(staffId) } : reply;
+  });
+  app.post("/api/pos/settlement", { preHandler: requirePos, schema: { body: SettlementBody } }, async (request, reply) => {
+    const staffId = settlementFor(request, reply);
+    if (!staffId) return reply;
+    const settlement = database.settleStaff(staffId, request.staffRole);
+    return settlement ? reply.code(201).send({ settlement }) : errorReply(reply, new Error("No receipts since the last settlement"), 409);
+  });
+  app.get("/api/pos/settlements", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({ settlements: database.listSettlements(request.query.limit) }));
+
+  app.get("/api/admin/journal", { preHandler: requireAdmin, schema: { querystring: JournalQuery } }, async (request) =>
+    database.exportJournal(request.query.from, request.query.to));
 
   app.get("/api/admin/printers", { preHandler: requireAdmin }, async () => ({ printers: database.listPrinters() }));
   app.post("/api/admin/printers", { preHandler: requireAdmin, schema: { body: PrinterBody } }, async (request, reply) => {

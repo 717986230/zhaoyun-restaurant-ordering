@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { photoMenuDishes } from "./photo-menu.mjs";
 import { dishPhotos } from "./dish-photos.mjs";
@@ -9,10 +9,20 @@ import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 import {
   adminGateView, assertPassword, assertSetServed, auditView, billView, hashPassword,
   duplicateInput, hashSessionToken, newSessionToken, normalizeCategoryName, normalizeSettingsInput,
-  mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT, ORDER_ITEMS_SQL,
+  mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT,
   normalizeTableNo, PASSWORD_ITERATIONS, SESSION_TTL_MS, settingsView,
   renamedCategorySettings, tableOverviewView, tableView, verifyPassword
 } from "../shared/rules.mjs";
+import {
+  CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, companyOf, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL, INSERT_RECEIPT_SQL,
+  INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL, ORDER_ITEMS_SQL, ORDER_PAID_SQL,
+  orderJournalPayload, planCheckout, planStorno, plannedReceiptView, receiptPrintPayload, receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL,
+  UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
+} from "../shared/register.mjs";
+import {
+  assertClaim, claimView, CLAIM_TTL_MS, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+} from "../shared/pos.mjs";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
 // password yet still spends the same PBKDF2 work as one that does, so the
@@ -132,6 +142,121 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE TABLE IF NOT EXISTS order_item_vat_splits (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
       split_json TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS receipts (
+      id TEXT PRIMARY KEY,
+      receipt_no INTEGER NOT NULL UNIQUE,
+      client_request_id TEXT NOT NULL UNIQUE,
+      cash_register_id TEXT NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('sale','storno')),
+      table_no TEXT,
+      lines_json TEXT NOT NULL,
+      vat_json TEXT NOT NULL,
+      total_cents INTEGER NOT NULL,
+      payments_json TEXT NOT NULL,
+      refers_to TEXT REFERENCES receipts(id),
+      reason TEXT,
+      staff_role TEXT NOT NULL,
+      fiscal_status TEXT NOT NULL DEFAULT 'unsigned',
+      fiscal_json TEXT,
+      created_at TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS receipt_items (
+      receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      order_item_id TEXT NOT NULL REFERENCES order_items(id),
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      PRIMARY KEY (receipt_id, order_item_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_receipt_items_item ON receipt_items(order_item_id);
+
+    CREATE TABLE IF NOT EXISTS vouchers (
+      code TEXT PRIMARY KEY,
+      value_cents INTEGER NOT NULL,
+      balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
+      sold_receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      voided_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS day_closings (
+      id TEXT PRIMARY KEY,
+      closing_no INTEGER NOT NULL UNIQUE,
+      first_receipt_no INTEGER NOT NULL,
+      last_receipt_no INTEGER NOT NULL UNIQUE,
+      totals_json TEXT NOT NULL,
+      staff_role TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_devices (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      last_seen_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS staff (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL CHECK (role IN ('staff','manager')),
+      pin_hash TEXT NOT NULL,
+      pin_salt TEXT NOT NULL,
+      pin_iterations INTEGER NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_sessions (
+      token_hash TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      device_id TEXT NOT NULL REFERENCES pos_devices(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS table_claims (
+      table_no TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT,
+      expires_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS order_staff (
+      order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      staff_id TEXT,
+      staff_name TEXT,
+      pickup_no INTEGER,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS staff_settlements (
+      id TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL,
+      staff_name TEXT NOT NULL,
+      last_receipt_no INTEGER NOT NULL,
+      totals_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS journal (
+      seq INTEGER PRIMARY KEY,
+      at TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      ref TEXT,
+      payload_json TEXT NOT NULL,
+      prev_hash TEXT NOT NULL,
+      hash TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS service_requests (
@@ -322,10 +447,60 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     orderById: db.prepare("SELECT * FROM orders WHERE id = ?"),
     orderItems: db.prepare(ORDER_ITEMS_SQL),
     insertVatSplit: db.prepare("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)"),
+    lastJournal: db.prepare("SELECT seq, hash FROM journal ORDER BY seq DESC LIMIT 1"),
+    insertOrderStaff: db.prepare("INSERT INTO order_staff (order_id, staff_id, staff_name, pickup_no, created_at) VALUES (?, ?, ?, ?, ?)"),
+    claimByTable: db.prepare("SELECT * FROM table_claims WHERE table_no = ?"),
+    upsertClaim: db.prepare(CLAIM_UPSERT_SQL),
+    releaseClaim: db.prepare("DELETE FROM table_claims WHERE table_no = ? AND (device_id = ? OR ? = 1)"),
+    liveClaims: db.prepare("SELECT * FROM table_claims WHERE expires_at > ?"),
+    insertDevice: db.prepare("INSERT INTO pos_devices (id, name, token_hash, created_at, last_seen_at) VALUES (?, ?, ?, ?, NULL)"),
+    deviceByHash: db.prepare("SELECT * FROM pos_devices WHERE token_hash = ?"),
+    touchDevice: db.prepare("UPDATE pos_devices SET last_seen_at = ? WHERE id = ?"),
+    listDevices: db.prepare("SELECT * FROM pos_devices ORDER BY created_at"),
+    deleteDevice: db.prepare("DELETE FROM pos_devices WHERE id = ?"),
+    staffById: db.prepare("SELECT * FROM staff WHERE id = ?"),
+    listStaff: db.prepare("SELECT * FROM staff ORDER BY active DESC, name"),
+    insertStaff: db.prepare("INSERT INTO staff (id, name, role, pin_hash, pin_salt, pin_iterations, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
+    updateStaff: db.prepare("UPDATE staff SET name = ?, role = ?, active = ?, updated_at = ? WHERE id = ?"),
+    updateStaffPin: db.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ?, pin_iterations = ?, updated_at = ? WHERE id = ?"),
+    deleteStaffSessions: db.prepare("DELETE FROM pos_sessions WHERE staff_id = ?"),
+    insertPosSession: db.prepare("INSERT INTO pos_sessions (token_hash, staff_id, device_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)"),
+    posSessionByHash: db.prepare("SELECT pos_sessions.*, staff.name AS staff_name, staff.role AS staff_role, staff.active AS staff_active FROM pos_sessions JOIN staff ON staff.id = pos_sessions.staff_id WHERE token_hash = ?"),
+    deletePosSession: db.prepare("DELETE FROM pos_sessions WHERE token_hash = ?"),
+    nextPickup: db.prepare(NEXT_PICKUP_SQL),
+    moveTableOrders: db.prepare("UPDATE orders SET table_no = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'"),
+    openStaffReceipts: db.prepare(OPEN_STAFF_RECEIPTS_SQL),
+    insertSettlement: db.prepare("INSERT INTO staff_settlements (id, staff_id, staff_name, last_receipt_no, totals_json, created_at) VALUES (?, ?, ?, ?, ?, ?)"),
+    settlementById: db.prepare("SELECT * FROM staff_settlements WHERE id = ?"),
+    recentSettlements: db.prepare("SELECT * FROM staff_settlements ORDER BY created_at DESC LIMIT ?"),
+    insertJournal: db.prepare(INSERT_JOURNAL_SQL),
+    insertReceipt: db.prepare(INSERT_RECEIPT_SQL),
+    insertReceiptItem: db.prepare("INSERT INTO receipt_items (receipt_id, order_item_id, quantity) VALUES (?, ?, ?)"),
+    receiptById: db.prepare("SELECT * FROM receipts WHERE id = ?"),
+    receiptByRequest: db.prepare("SELECT * FROM receipts WHERE client_request_id = ?"),
+    stornoOf: db.prepare("SELECT * FROM receipts WHERE refers_to = ?"),
+    lastReceiptNo: db.prepare("SELECT MAX(receipt_no) AS no FROM receipts"),
+    recentReceipts: db.prepare("SELECT * FROM receipts ORDER BY receipt_no DESC LIMIT ?"),
+    voucherByCode: db.prepare("SELECT * FROM vouchers WHERE code = ?"),
+    vouchersSoldBy: db.prepare("SELECT * FROM vouchers WHERE sold_receipt_id = ?"),
+    insertVoucher: db.prepare(INSERT_VOUCHER_SQL),
+    debitVoucher: db.prepare(DEBIT_VOUCHER_SQL),
+    creditVoucher: db.prepare(CREDIT_VOUCHER_SQL),
+    voidVoucher: db.prepare(VOID_VOUCHER_SQL),
+    reopenOrders: db.prepare(REOPEN_ORDERS_SQL),
+    settlePaidTable: db.prepare(SETTLE_PAID_TABLE_SQL),
+    unlockPaidTable: db.prepare(UNLOCK_PAID_TABLE_SQL),
+    orderPaid: db.prepare(ORDER_PAID_SQL),
+    openReceipts: db.prepare(OPEN_RECEIPTS_SQL),
+    lastClosingNo: db.prepare("SELECT MAX(closing_no) AS no FROM day_closings"),
+    insertClosing: db.prepare("INSERT INTO day_closings (id, closing_no, first_receipt_no, last_receipt_no, totals_json, staff_role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"),
+    closingById: db.prepare("SELECT * FROM day_closings WHERE id = ?"),
+    recentClosings: db.prepare("SELECT * FROM day_closings ORDER BY closing_no DESC LIMIT ?"),
+    journalBetween: db.prepare("SELECT * FROM journal WHERE at >= ? AND at < ? ORDER BY seq"),
+    journalBySeq: db.prepare("SELECT * FROM journal WHERE seq = ?"),
     listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC, rowid DESC LIMIT ?"),
     openBillOrders: db.prepare("SELECT * FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' ORDER BY created_at"),
     openBillTables: db.prepare("SELECT DISTINCT table_no FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no"),
-    markOrdersBilled: db.prepare("UPDATE orders SET billed_at = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'"),
     insertOrder: db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)"),
     insertOrderItem: db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
     updateOrderStatus: db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"),
@@ -353,7 +528,6 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     `),
     deleteTable: db.prepare("DELETE FROM restaurant_tables WHERE table_no = ?"),
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
-    releaseTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = NULL, updated_at = ? WHERE table_no = ?"),
     openOrdersForTables: db.prepare("SELECT * FROM orders WHERE billed_at IS NULL AND status <> 'cancelled' ORDER BY table_no, created_at"),
     getAdminGate: db.prepare("SELECT * FROM admin_gate WHERE id = 1"),
     setAdminGate: db.prepare(`
@@ -497,6 +671,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         id: item.product_id,
         name: item.product_name,
         qty: item.quantity,
+        paid: item.paid_quantity ?? 0,
         unitPrice: item.unit_price_cents / 100,
         printStation: item.print_station,
         vatPercent: item.vat_percent,
@@ -542,7 +717,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
    * the Worker write the same rows — VAT split and kitchen tickets included.
    * What is left here is reading the products and writing in one transaction.
    */
-  function createOrder(input) {
+  function createOrder(input, pos = null) {
     const requestId = String(input.clientRequestId || randomUUID());
     const existing = statements.orderByClientId.get(requestId);
     if (existing) return orderView(existing);
@@ -555,14 +730,18 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     for (const item of Array.isArray(input.items) ? input.items : []) load(item.id);
     // The dishes inside a set, for its VAT split.
     for (const id of bundleComponentIds(products.values())) if (!products.has(id)) load(id);
-    const plan = planOrder({ ...input, clientRequestId: requestId }, products, getSettings());
+    const pickupNo = pos && isTakeaway(input.table) ? Number(String(input.table).slice(TAKEAWAY_PREFIX.length)) || null : null;
+    const plan = planOrder({ ...input, clientRequestId: requestId }, products, getSettings(), { staffName: pos?.staff?.name, pickupNo });
     const { id, orderNo, table, note, totalCents, timestamp } = plan.order;
 
     // A locked table is one whose bill is being settled. Refusing here is the
     // whole point of the lock: an order that lands mid-settle is either missing
     // from the bill the guest just paid or reopens a table that was released.
     const tableRow = statements.tableByNo.get(table.toUpperCase());
-    if (tableRow?.locked_at) {
+    // The lock is against guests adding to a bill being paid; the floor staff
+    // who set it may still add to it. Another device's open table is theirs.
+    if (pos) assertClaim(statements.claimByTable.get(table.toUpperCase()), pos.deviceId);
+    if (tableRow?.locked_at && !pos) {
       const error = new Error("This table is locked; please ask a waiter");
       error.code = "TABLE_LOCKED";
       throw error;
@@ -580,6 +759,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         if (item.vatSplitJson) statements.insertVatSplit.run(item.id, item.vatSplitJson);
       }
       for (const job of plan.printJobs) statements.insertPrintJob.run(job.id, id, job.printerRole, job.payloadJson, timestamp, timestamp);
+      if (pos) statements.insertOrderStaff.run(id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp);
+      journal("order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}) }, timestamp);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
@@ -619,29 +800,299 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return billView(tableNo, orders, itemsByOrderId, productsById);
   }
 
-  function settleTableBill(tableNo) {
-    const table = String(tableNo);
+  /**
+   * The table's bill on the front printer: what is still to pay, for the
+   * guest to read. An interim bill (Zwischenrechnung), not a receipt — it
+   * frees nothing and marks nothing paid. Paying is a receipt (checkout).
+   */
+  function printTableBill(tableNo) {
+    const bill = billForTable(String(tableNo));
+    if (!bill.items.length) return null;
+    const jobId = randomUUID();
+    const timestamp = now();
+    statements.insertPrintJob.run(jobId, bill.orderIds[0], "front", JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp);
+    return { ...bill, issuedAt: timestamp, printJobId: jobId };
+  }
+
+  const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+
+  /**
+   * Adds an entry to the journal, chained to the one before. Only ever
+   * called inside a transaction, so two entries cannot take the same place.
+   */
+  function journal(kind, ref, payload, at = now()) {
+    const entry = journalEntry(statements.lastJournal.get() ?? null, kind, ref, payload, at);
+    statements.insertJournal.run(entry.seq, entry.at, entry.kind, entry.ref, entry.payloadJson, entry.prevHash, sha256(journalText(entry)));
+  }
+
+  function receiptDetail(row) {
+    if (!row) return null;
+    const storno = statements.stornoOf.get(row.id);
+    const referred = row.refers_to ? statements.receiptById.get(row.refers_to) : null;
+    return receiptView(row, { cancelledBy: storno?.id ?? null, referredNo: referred?.receipt_no ?? null });
+  }
+
+  /** A sale at the register (planCheckout): the receipt, and the table freed once it is all paid. */
+  function checkout(input, role, pos = null) {
+    const requestId = String(input.clientRequestId || randomUUID());
     db.exec("BEGIN IMMEDIATE");
     try {
-      const bill = billForTable(table);
-      if (!bill.orderIds.length) {
+      const existing = statements.receiptByRequest.get(requestId);
+      if (existing) {
         db.exec("COMMIT");
-        return null;
+        return receiptDetail(existing);
       }
-      const timestamp = now();
-      statements.markOrdersBilled.run(timestamp, timestamp, table);
-      // Paying is what frees the table, so the lock a waiter set before
-      // printing the bill does not have to be cleared by hand afterwards.
-      statements.releaseTableLock.run(timestamp, table);
-      const jobId = randomUUID();
-      statements.insertPrintJob.run(jobId, bill.orderIds[0], "front", JSON.stringify({ kind: "bill", ...bill, issuedAt: timestamp }), timestamp, timestamp);
+      const ids = [...new Set((Array.isArray(input.items) ? input.items : []).map((item) => String(item.orderItemId)))];
+      const itemRows = ids.length ? db.prepare(CHECKOUT_ITEMS_SQL.replace("(?)", `(${ids.map(() => "?").join(", ")})`)).all(...ids) : [];
+      const codes = [...new Set((Array.isArray(input.payments) ? input.payments : []).filter((payment) => payment.type === "voucher").map((payment) => normalizeVoucherCode(payment.voucherCode)))];
+      const voucherRows = codes.map((code) => statements.voucherByCode.get(code)).filter(Boolean);
+      // Another device's open table is theirs to pay, before anything else is looked at.
+      const table = input.table || itemRows[0]?.table_no;
+      if (pos && table) assertClaim(statements.claimByTable.get(String(table).toUpperCase()), pos.deviceId);
+      const settings = getSettings();
+      const plan = planCheckout({ ...input, clientRequestId: requestId }, {
+        itemRows, voucherRows, receiptNo: (statements.lastReceiptNo.get()?.no ?? 0) + 1, settings, role, staff: pos?.staff ?? null
+      });
+      const at = plan.receipt.createdAt;
+      statements.insertReceipt.run(...receiptRow(plan.receipt));
+      for (const item of plan.receiptItems) statements.insertReceiptItem.run(plan.receipt.id, item.orderItemId, item.quantity);
+      for (const voucher of plan.vouchers) statements.insertVoucher.run(voucher.code, voucher.valueCents, voucher.valueCents, plan.receipt.id, at, at);
+      for (const debit of plan.voucherDebits) statements.debitVoucher.run(debit.amountCents, at, debit.code);
+      if (plan.receipt.table) {
+        statements.settlePaidTable.run(at, at, plan.receipt.table, plan.receipt.table);
+        statements.unlockPaidTable.run(at, plan.receipt.table.toUpperCase(), plan.receipt.table);
+      }
+      const view = plannedReceiptView(plan.receipt);
+      journal("receipt.issued", plan.receipt.id, view, at);
+      statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, settings)), at, at);
       db.exec("COMMIT");
-      return { ...bill, issuedAt: timestamp, printJobId: jobId };
+      return receiptDetail(statements.receiptById.get(plan.receipt.id));
     } catch (error) {
       db.exec("ROLLBACK");
       throw error;
     }
   }
+
+  /** Cancels a receipt with a storno receipt (planStorno). Null when there is no such receipt. */
+  function stornoReceipt(id, reason, role, pos = null) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const original = statements.receiptById.get(String(id));
+      if (!original) {
+        db.exec("COMMIT");
+        return null;
+      }
+      if (statements.stornoOf.get(original.id)) throw new Error("This receipt has already been cancelled");
+      const settings = getSettings();
+      const plan = planStorno(original, {
+        receiptNo: (statements.lastReceiptNo.get()?.no ?? 0) + 1, reason, soldVoucherRows: statements.vouchersSoldBy.all(original.id), role, staff: pos?.staff ?? null
+      });
+      const at = plan.receipt.createdAt;
+      statements.insertReceipt.run(...receiptRow(plan.receipt));
+      for (const refund of plan.refunds) statements.creditVoucher.run(refund.amountCents, at, refund.code);
+      for (const code of plan.voided) statements.voidVoucher.run(at, at, code);
+      statements.reopenOrders.run(at, original.id);
+      const view = plannedReceiptView(plan.receipt, original.receipt_no);
+      journal("receipt.storno", plan.receipt.id, view, at);
+      statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, settings)), at, at);
+      db.exec("COMMIT");
+      return receiptDetail(statements.receiptById.get(plan.receipt.id));
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /** The day's closing (Z report) over the receipts since the last one. Null when there are none. */
+  function closeDay(role) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const rows = statements.openReceipts.all();
+      if (!rows.length) {
+        db.exec("COMMIT");
+        return null;
+      }
+      const totals = closingTotals(rows);
+      const id = randomUUID();
+      const at = now();
+      const closingNo = (statements.lastClosingNo.get()?.no ?? 0) + 1;
+      statements.insertClosing.run(id, closingNo, totals.firstReceiptNo, totals.lastReceiptNo, JSON.stringify(totals), role, at);
+      const view = closingView(statements.closingById.get(id));
+      journal("day.closed", id, view, at);
+      statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(closingPrintPayload(view, getSettings())), at, at);
+      db.exec("COMMIT");
+      return view;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  // ——— The POS (shared/pos.mjs): devices, waiters, open tables, takeaway, settlement.
+
+  /** Pairs a device (the manager's doing); its token is shown once. */
+  async function pairDevice(nameInput) {
+    const name = normalizeDeviceName(nameInput);
+    const token = newSessionToken();
+    const id = randomUUID();
+    statements.insertDevice.run(id, name, await hashSessionToken(token), now());
+    return { device: deviceView(statements.listDevices.all().find((row) => row.id === id)), token };
+  }
+
+  async function deviceForToken(token) {
+    if (!token) return null;
+    const row = statements.deviceByHash.get(await hashSessionToken(token));
+    if (row) statements.touchDevice.run(now(), row.id);
+    return row ?? null;
+  }
+
+  async function saveStaff(input, id = null) {
+    const current = id ? statements.staffById.get(String(id)) : null;
+    if (id && !current) return null;
+    const staff = normalizeStaffInput(input, current);
+    const at = now();
+    try {
+      if (current) {
+        statements.updateStaff.run(staff.name, staff.role, staff.active ? 1 : 0, at, current.id);
+        if (staff.pin) {
+          const { hash, salt, iterations } = await hashPassword(staff.pin);
+          statements.updateStaffPin.run(hash, salt, iterations, at, current.id);
+        }
+        // A waiter switched off, or given a new PIN, is signed out everywhere.
+        if (!staff.active || staff.pin) statements.deleteStaffSessions.run(current.id);
+        return staffView(statements.staffById.get(current.id));
+      }
+      const { hash, salt, iterations } = await hashPassword(staff.pin);
+      const newId = randomUUID();
+      statements.insertStaff.run(newId, staff.name, staff.role, hash, salt, iterations, staff.active ? 1 : 0, at, at);
+      return staffView(statements.staffById.get(newId));
+    } catch (error) {
+      if (/UNIQUE constraint failed: staff\.name/.test(String(error.message))) throw new Error("There is already a waiter of that name");
+      throw error;
+    }
+  }
+
+  /** A waiter's PIN, on a paired device, for a POS session. Null when either is wrong. */
+  async function posSignIn(device, staffId, pin) {
+    const row = statements.staffById.get(String(staffId ?? ""));
+    const stored = row ? { hash: row.pin_hash, salt: row.pin_salt, iterations: row.pin_iterations } : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
+    const correct = await verifyPassword(String(pin ?? ""), stored);
+    if (!row || !row.active || !correct) return null;
+    const token = newSessionToken();
+    const at = now();
+    statements.insertPosSession.run(await hashSessionToken(token), row.id, device.id, new Date(Date.now() + POS_SESSION_TTL_MS).toISOString(), at);
+    return { token, staff: staffView(row), expiresInMs: POS_SESSION_TTL_MS };
+  }
+
+  async function posSession(token) {
+    if (!token) return null;
+    const row = statements.posSessionByHash.get(await hashSessionToken(token));
+    if (!row) return null;
+    if (row.expires_at <= now() || !row.staff_active) {
+      statements.deletePosSession.run(row.token_hash);
+      return null;
+    }
+    return { role: row.staff_role === "manager" ? "manager" : "staff", staff: { id: row.staff_id, name: row.staff_name }, deviceId: row.device_id };
+  }
+
+  async function posSignOut(token) {
+    if (!token) return false;
+    return statements.deletePosSession.run(await hashSessionToken(token)).changes > 0;
+  }
+
+  /**
+   * Opens a table on a device, or keeps it open: locked to that device for
+   * CLAIM_TTL_MS after its last touch. Throws with who has it when another
+   * device does.
+   */
+  function claimTable(tableInput, pos) {
+    const table = String(tableInput).trim().toUpperCase();
+    const at = now();
+    statements.upsertClaim.run(table, pos.deviceId, pos.staff?.id ?? null, pos.staff?.name ?? null, new Date(Date.now() + CLAIM_TTL_MS).toISOString(), at);
+    const row = statements.claimByTable.get(table);
+    assertClaim(row, pos.deviceId, at);
+    return claimView(row, at);
+  }
+
+  /** Closes a table on this device; a manager may close it on any. */
+  function releaseTable(tableInput, pos, force = false) {
+    return statements.releaseClaim.run(String(tableInput).trim().toUpperCase(), pos.deviceId, force ? 1 : 0).changes > 0;
+  }
+
+  /** A new takeaway: the next pickup number today, opened on this device. */
+  function newTakeaway(pos) {
+    const since = `${now().slice(0, 10)}T00:00:00.000Z`;
+    let next = statements.nextPickup.get(since)?.next ?? 1;
+    // A number another device has open but not yet ordered on is taken too.
+    for (;; next += 1) {
+      try {
+        return { table: `${TAKEAWAY_PREFIX}${next}`, pickupNo: next, claim: claimTable(`${TAKEAWAY_PREFIX}${next}`, pos) };
+      } catch (error) {
+        if (error.code !== "TABLE_CLAIMED") throw error;
+      }
+    }
+  }
+
+  /** Moves a table's open orders to another table (the guests changed tables). */
+  function moveTable(fromInput, toInput, pos) {
+    const from = normalizeTableNo(fromInput);
+    const to = normalizeTableNo(toInput);
+    if (from === to) throw new Error("That is the same table");
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      assertClaim(statements.claimByTable.get(from), pos.deviceId);
+      assertClaim(statements.claimByTable.get(to), pos.deviceId);
+      const at = now();
+      const moved = statements.moveTableOrders.run(to, at, from).changes;
+      if (!moved) {
+        db.exec("COMMIT");
+        return null;
+      }
+      journal("table.moved", from, { from, to, orders: Number(moved), staffName: pos.staff?.name ?? null }, at);
+      statements.releaseClaim.run(from, pos.deviceId, 0);
+      db.exec("COMMIT");
+      return { from, to, moved: Number(moved) };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /** A waiter's settlement at the end of the shift. Null when they took nothing since the last. */
+  function settleStaff(staffId, role) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const staff = statements.staffById.get(String(staffId));
+      const rows = staff ? statements.openStaffReceipts.all(staff.id, staff.id) : [];
+      if (!rows.length) {
+        db.exec("COMMIT");
+        return null;
+      }
+      const totals = settlementTotals(rows);
+      const id = randomUUID();
+      const at = now();
+      statements.insertSettlement.run(id, staff.id, staff.name, totals.lastReceiptNo, JSON.stringify(totals), at);
+      const view = settlementView(statements.settlementById.get(id));
+      journal("staff.settled", id, { ...view, by: role }, at);
+      statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify({ kind: "settlement", company: companyOf(getSettings()), settlement: view }), at, at);
+      db.exec("COMMIT");
+      return view;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
+   * The journal between two days (from inclusive, to exclusive, as ISO
+   * dates), checked link by link from the entry before the first.
+   */
+  async function exportJournal(from, to) {
+    const rows = statements.journalBetween.all(from, to);
+    const before = rows.length && rows[0].seq > 1 ? statements.journalBySeq.get(rows[0].seq - 1) : null;
+    return { entries: rows.map(journalView), verification: await verifyJournal(rows, before) };
+  }
+
 
   function updateOrder(id, status) {
     if (!ORDER_STATUSES.has(status)) throw new Error("Unsupported order status");
@@ -650,7 +1101,19 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     if (current.status !== status && !ORDER_TRANSITIONS.get(current.status)?.has(status)) {
       throw new Error(`Invalid order transition: ${current.status} -> ${status}`);
     }
-    statements.updateOrderStatus.run(status, now(), String(id));
+    if (current.status === status) return orderView(current);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      // A paid line stays paid: cancelling it is a storno of its receipt.
+      if (status === "cancelled" && statements.orderPaid.get(current.id)) throw new Error("This order is on a receipt; cancel the receipt first");
+      const at = now();
+      statements.updateOrderStatus.run(status, at, current.id);
+      journal("order.status", current.id, { orderId: current.id, orderNo: current.order_no, table: current.table_no, from: current.status, to: status }, at);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
     return orderView(statements.orderById.get(String(id)));
   }
 
@@ -759,7 +1222,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
   async function roleForSession(token) {
     if (!token) return null;
     const row = statements.sessionByHash.get(await hashSessionToken(token));
-    if (!row) return null;
+    // Not the console's: a waiter signed in on a POS device, perhaps.
+    if (!row) return posSession(token);
     if (row.expires_at <= now()) {
       statements.deleteSession.run(row.token_hash);
       return null;
@@ -922,7 +1386,36 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     createOrder,
     updateOrder,
     billForTable,
-    settleTableBill,
+    printTableBill,
+    pairDevice,
+    deviceForToken,
+    listDevices: () => statements.listDevices.all().map(deviceView),
+    deleteDevice: (id) => statements.deleteDevice.run(String(id)).changes > 0,
+    listStaff: (activeOnly = false) => statements.listStaff.all().filter((row) => !activeOnly || row.active).map(staffView),
+    saveStaff,
+    posSignIn,
+    posSession,
+    posSignOut,
+    claimTable,
+    releaseTable,
+    liveClaims: () => statements.liveClaims.all(now()).map((row) => claimView(row)),
+    newTakeaway,
+    moveTable,
+    settleStaff,
+    staffSettlementPreview: (staffId) => settlementTotals(statements.openStaffReceipts.all(String(staffId), String(staffId))),
+    listSettlements: (limit = 30) => statements.recentSettlements.all(Math.min(Number(limit) || 30, 200)).map(settlementView),
+    checkout,
+    stornoReceipt,
+    closeDay,
+    exportJournal,
+    closingPreview: () => closingTotals(statements.openReceipts.all()),
+    listClosings: (limit = 30) => statements.recentClosings.all(Math.min(Number(limit) || 30, 366)).map(closingView),
+    listReceipts: (limit = 50) => statements.recentReceipts.all(Math.min(Number(limit) || 50, 500)).map(receiptDetail),
+    getReceipt: (id) => receiptDetail(statements.receiptById.get(String(id))),
+    getVoucher: (code) => {
+      const row = statements.voucherByCode.get(normalizeVoucherCode(code));
+      return row ? { code: row.code, valueCents: row.value_cents, balanceCents: row.balance_cents, voided: Boolean(row.voided_at), createdAt: row.created_at } : null;
+    },
     openBillTables: () => statements.openBillTables.all().map((row) => row.table_no),
     listServiceRequests: (limit = 100) => statements.listRequests.all(Math.min(Number(limit) || 100, 500)).map(serviceRequestView),
     createServiceRequest,

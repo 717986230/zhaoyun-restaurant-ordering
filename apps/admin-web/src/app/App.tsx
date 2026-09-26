@@ -247,19 +247,14 @@ export function App() {
     } catch (error) { failed(error, "billLoadFailed"); }
   }
 
-  async function settleBill(table: string) {
-    setState((current) => ({ ...current, boardBusy: true }));
+  /** The bill on the front printer for the guest to read; paying is at the register. */
+  async function printBill(table: string) {
     try {
-      const { bill } = await adminApi.settleBill(table);
-      setState((current) => ({ ...current, bill: null }));
-      await loadBoard(true);
-      notify(t("billSettled", { table, total: bill.total.toFixed(2) }));
-    } catch (error) {
-      failed(error, "billSettleFailed");
-    } finally {
-      setState((current) => ({ ...current, boardBusy: false }));
-    }
+      await adminApi.printBill(table);
+      notify(t("billPrinted", { table }));
+    } catch (error) { failed(error, "billPrintFailed"); }
   }
+
 
   async function saveProduct(input: AdminProductInput, id: string | null, media: File | null): Promise<boolean> {
     try {
@@ -504,10 +499,13 @@ export function App() {
         onLock={lockTable}
         onOpenBill={openBill}
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
-        onSettleBill={settleBill}
+        onPrintBill={printBill}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "system" && <SettingsPanel
+        api={adminApi}
+        notify={notify}
+        failed={(error) => failed(error, "saveFailed")}
         storage={storage}
         settings={state.settings}
         products={state.products}

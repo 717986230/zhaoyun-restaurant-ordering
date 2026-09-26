@@ -1,96 +1,51 @@
-# Anbindung an das Kassensystem / POS integration
+# POS（点餐收银）
 
-This app takes orders. It is not a Registrierkasse and must not become one:
-under the RKSV a cash register needs a signature creation unit, a DEP, a start
-receipt registered with FinanzOnline, and receipts carrying a machine-readable
-code. None of that is here, deliberately. The bill this app prints says so —
-`Interne Rechnung, kein Kassenbeleg` — and the receipt a guest is legally owed
-still comes from the existing POS.
+`pos.html` 是跑堂和前台用的点餐收银应用，按奥地利中餐馆常用的 Gastro-Kassa
+（Orderman / ready2order / JK Kasse 一类）的流程做：配对设备 → 跑堂 PIN 登录 →
+桌台 → 点单送厨 → 结账（一起结 / 分开结）→ 跑堂结算 → 日结。顾客菜单
+（`index.html`）不受影响；管理台（`admin.html`）只管菜品、打印机和设置，包括跑堂和设备。
 
-So the integration has one shape, whatever the transport turns out to be:
-**orders leave this system and arrive in the POS; the POS issues the receipt.**
-Nothing flows back except, optionally, "this table is paid".
+代码：`apps/pos-web`（界面），`shared/pos.mjs`（桌号锁、跑堂、结算），
+`shared/register.mjs`（小票、冲销、日志、日结），`shared/rules.mjs`（税率、下单、账单）。
+Node 服务器和 Cloudflare Worker 共用这三个模块，`shared/contract-suite.mjs` 对两边跑同一套检查。
 
-## What this system can already hand over
+## 开始使用
 
-Everything a POS needs is already computed and already reachable:
+1. 管理台 → 设置 → 「跑堂与 POS 设备」：添加跑堂，每人一个 4–6 位 PIN；经理角色可以冲销、日结、强制接管桌台。
+2. 平板 / 手机打开 `pos.html`，输入设备名称和经理密码配对（每台设备一次）。丢失的设备在管理台取消配对。
+3. 跑堂点自己的名字、输入 PIN。登录 14 小时有效；停用的跑堂立即登出。
+4. 设置 → 公司：填公司名称、地址、UID（ATU + 8 位）、收银机编号，以及外带折扣（0–50%）。
+5. 打印机：后厨打印机语言选中文、编码 GB18030；前台打印机选 Deutsch。
+
+## 功能
 
 | | |
 |---|---|
-| One table's open bill | `GET /api/admin/tables/{table}/bill` |
-| Every table, with what is on it | `GET /api/admin/tables/overview` |
-| All orders | `GET /api/orders?limit=n` |
-| One order, as placed | inside the bill, grouped by `orderNo` |
+| 点单 | 菜号（SKU）+ 回车快速点单，也可按分类 / 搜索点；带选项的菜弹出选项；整单备注 |
+| 送厨 | 后厨单按出单档口拆分，**不带价格和税**，印桌号、跑堂名、外带取餐号 |
+| 桌号锁（Tischsperre） | 一张桌同一时间只在一台设备上打开；30 秒心跳续期，90 秒无心跳自动释放；别的设备打开时提示是谁在用，经理可强制接管 |
+| 外带 / 自取 | 「+ 外带自取」生成当天的取餐号（虚拟桌 `TA-n`），结账时自动带外带折扣 |
+| 转桌 | 客人换桌时把未结订单整体移过去 |
+| 账单 | 打印给客人看的账单（不是收据） |
+| 结账 | **一起结**：整桌一张小票。**分开结**（getrennt）：每位客人选自己的菜，一人一张小票，直到整桌结清。现金（自动算找零）、银行卡（外部刷卡机）、代金券，可混合支付；折扣按税率分摊 |
+| 小票 | 不可修改；错了用冲销（Storno）另开一张负数小票，只有经理能做 |
+| 跑堂结算（Kellnerabrechnung） | 每个跑堂自上次结算以来开的小票：营业额、各税率、各支付方式、应交现金；打印结算单 |
+| 日结（Tagesabschluss） | Z 报表：销售 / 冲销笔数、各税率、各支付方式，打印 |
+| 交易日志（DEP） | 每个下单、状态变化、小票、冲销、日结都进哈希链日志（SHA-256，前后相连）；按日期导出 JSON / CSV，导出时校验链条是否完整 |
 
-The bill is gross-priced per line with the VAT rate on each line and a split
-per rate, which is the part a POS integration most often gets wrong.
-`docs/samples/bill.json` is a real payload produced by the server's own code
-(ids and order numbers replaced with fixed ones so the file does not change on
-every regeneration), spanning both rates. The arithmetic lives once, in
-`shared/rules.mjs`, so the Node server and the Worker cannot compute a bill two
-different ways, and `shared/contract-suite.mjs` asserts the split against both:
+## 税率
 
-```
-10 %  brutto 39.90   netto 36.27   USt 3.63
-20 %  brutto  7.60   netto  6.33   USt 1.27
-                                  Summe 47.50
-```
+菜品按 10% / 13% / 20% 维护，管理台可以按分类一次设置。套餐按组成菜的价格比例拆税。
+小票按税率分别列出含税、净额和税额。默认：餐食 10%，酒水 20%；上线前请税务顾问确认。
 
-Dish names come trilingual (`names.zh/de/en`), so the POS can be fed whichever
-language its receipts and reports are in.
+## RKSV 状态
 
-## What is still unknown
+在接入 fiskaly（签名设备）之前，小票印 `TESTBELEG – NICHT SIGNIERT`，不是合规的
+Registrierkassa 收据，不能用于正式营业。接入需要：
 
-Which interface **JK Kasse** offers. That decides everything else, and it is the
-one thing that cannot be guessed. Ask the vendor for the
-*Schnittstellen-Dokumentation*.
+1. 注册 fiskaly，拿到 sandbox 的 API key / secret，放进 Cloudflare secrets（不要发在聊天里）。
+2. 公司资料：名称、地址、UID、收银机编号。
+3. 前台打印机型号和连接方式（网络 / USB / 蓝牙），用于打印签名二维码。
 
-Four shapes are possible, in descending order of how well they work:
-
-1. **HTTP API.** Vendor supplies a base URL and a token; this system POSTs
-   orders or bills. An adapter plus a retry queue — the print-job queue in
-   `print_jobs` is already exactly that pattern and would be copied.
-2. **File import (CSV/XML).** The POS watches a directory or polls. Same queue,
-   different sink; common with older systems and perfectly workable.
-3. **Direct database access.** Possible, and the most fragile: a vendor update
-   can break it silently, and a wrong write lands in data the tax office cares
-   about. If it is the only option, writes go to one staging table the vendor
-   names, never to their live tables.
-4. **No interface.** Then staff re-key, and the useful work here is making the
-   internal bill fast to copy — or evaluating a POS that does have an API.
-
-## Fragen an den Hersteller
-
-Diese Fragen an JK Kasse weiterleiten; die Antworten genügen, um die Anbindung
-zu bauen.
-
-1. Gibt es eine dokumentierte Schnittstelle (REST-API, Datei-Import, Datenbank)?
-   Bitte um die Schnittstellen-Dokumentation.
-2. Können Bestellungen von außen angelegt werden — also ein Tisch eröffnen,
-   Artikel nachbuchen und später abrechnen? Oder nimmt die Kassa nur eine
-   fertige Rechnung entgegen?
-3. Wie werden Artikel identifiziert: über eine Artikelnummer der Kassa, über
-   einen PLU-Code, oder über den Namen? Falls über eine Artikelnummer: wie
-   bekommen wir die Artikelstammdaten (Export, API)?
-4. Wie werden Steuersätze übergeben — als Prozentsatz (10 / 20) oder als
-   Steuerschlüssel der Kassa? Werden Preise brutto oder netto erwartet?
-5. Wie werden Zusatzwünsche / Beilagen abgebildet (eigene Artikel, Modifier,
-   Textzeile)?
-6. Wie werden Storni und Änderungen übergeben, wenn eine Bestellung schon
-   übermittelt wurde?
-7. Läuft die Kassa im Lokal oder in der Cloud? Ist sie aus dem Internet
-   erreichbar, oder muss die Anbindung im selben Netz laufen?
-8. Gibt es eine Testinstanz, gegen die wir entwickeln können?
-
-Frage 2 entscheidet, ob pro Bestellung oder erst bei der Abrechnung übergeben
-wird. Frage 3 ist der Aufwandstreiber: ohne gemeinsame Artikelnummern muss eine
-Zuordnung zwischen unserem Katalog und dem Kassen-Artikelstamm gepflegt werden,
-und die gehört dann in die Verwaltung.
-
-## Wenn die Antworten da sind
-
-The catalogue would gain an optional `posArticleId` per product, the bill would
-gain a delivery record per table, and a queue would carry the handover with the
-same lease-and-backoff behaviour the printers already use — a restaurant network
-drops, and an order that reached the kitchen must not be lost on the way to the
-till. None of that is worth building against a guessed interface.
+之后要做的：每张小票签名并印二维码、开始 / 月 / 年 / 结束小票（Start-, Monats-,
+Jahres-, Schlussbeleg）、DEP7 导出、签名设备失效时的处理。

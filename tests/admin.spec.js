@@ -56,6 +56,9 @@ test.beforeEach(async ({ page }) => {
   }] }) }));
   await page.route("**/api/admin/print-jobs*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jobs: [] }) }));
   await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [] }) }));
+  // The POS's waiters and devices, on the settings page.
+  await page.route("**/api/admin/staff", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff: [] }) }));
+  await page.route("**/api/admin/pos-devices", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ devices: [] }) }));
   await page.goto("/admin.html");
 });
 
@@ -258,7 +261,7 @@ test("a waiter tablet only gets the board, never the catalog", async ({ page }) 
 
   await expect(page.getByText("服务员")).toBeVisible();
   // A waiter runs the floor, so the board and the room are theirs; the menu,
-  // the printers and the table tokens are not.
+  // the printers and the table tokens are not. Taking payment is the POS's.
   await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单桌位");
   await expect(page.getByRole("button", { name: "菜品", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打印", exact: true })).toHaveCount(0);
@@ -350,7 +353,7 @@ test("the table page shows what is on each table, and locking stops it ordering"
   await expect.poll(() => lockedWith).toEqual({ locked: true });
 });
 
-test("settling a table releases it, and the guest is told why the table refused", async ({ page }) => {
+test("a table's bill prints for the guest, and payment is taken at the POS", async ({ page }) => {
   const table = {
     table: "07", label: "", enabled: true, locked: true, lockedAt: new Date().toISOString(), registered: true,
     state: "locked", total: 12.5, since: new Date().toISOString(),
@@ -363,25 +366,28 @@ test("settling a table releases it, and the guest is told why the table refused"
   await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [table] }) }));
   await page.route("**/api/admin/tables/07/bill", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bill: {
     table: "07", orderNos: ["260902-001"], orderIds: ["order-1"],
-    items: [{ orderNo: "260902-001", name: "蔬菜拉面", qty: 1, unitPrice: 12.5, lineTotal: 12.5, vatPercent: 10 }],
+    items: [{ orderItemId: "item-1", orderNo: "260902-001", name: "蔬菜拉面", qty: 1, unitPrice: 12.5, lineTotal: 12.5, vatPercent: 10 }],
     vatBreakdown: [{ percent: 10, gross: 12.5, net: 11.36, vat: 1.14 }],
     total: 12.5, issuedAt: new Date().toISOString(), fiscalReceipt: false
   } }) }));
-  let settled = false;
-  await page.route("**/api/admin/tables/07/bill/settle", (route) => {
-    settled = true;
+  let printed = false;
+  await page.route("**/api/admin/tables/07/bill/print", (route) => {
+    printed = true;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bill: { table: "07", orderNos: [], orderIds: [], items: [], vatBreakdown: [], total: 12.5, issuedAt: new Date().toISOString(), fiscalReceipt: false, printJobId: "job-1" } }) });
   });
   await page.goto("/admin.html");
   await page.getByRole("button", { name: "桌位" }).click();
   await page.locator(".table-tile", { hasText: "桌 07" }).getByRole("button", { name: "结账" }).click();
 
+  // The bill is for the guest to read; printing it pays nothing.
   const bill = page.getByRole("dialog", { name: "账单" });
   await expect(bill).toContainText("€12.50");
-  await expect(bill).toContainText("结账后这桌会自动解除锁定");
-  await bill.getByRole("button", { name: "打印账单并结账" }).click();
-  await expect.poll(() => settled).toBe(true);
-  await expect(page.getByRole("status")).toContainText("桌位已释放");
+  await expect(bill).toContainText("不是收据");
+  await bill.getByRole("button", { name: "打印账单" }).click();
+  await expect.poll(() => printed).toBe(true);
+
+  // Paying is at the POS, where the receipt is issued.
+  await expect(bill.getByRole("link", { name: "去收银" })).toHaveAttribute("href", "pos.html");
 });
 
 test("the console says Admin, and switches its own language without touching the menu's", async ({ page }) => {
@@ -872,4 +878,42 @@ test("the header fits on the narrowest phone, every button inside the screen and
     const flags = await page.locator(".admin-head .admin-languages").boundingBox();
     expect(flags.x + flags.width).toBeLessThanOrEqual(width);
   }
+});
+
+test("the manager adds a waiter with a PIN, switches one off, and unpairs a lost tablet", async ({ page }) => {
+  let staff = [{ id: "s-1", name: "Li", role: "staff", active: true }];
+  let devices = [{ id: "d-1", name: "Tablet A", createdAt: new Date().toISOString(), lastSeenAt: null }];
+  const sent = [];
+  await page.route("**/api/admin/staff**", (route) => {
+    const request = route.request();
+    if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff }) });
+    const body = request.postDataJSON();
+    sent.push({ method: request.method(), url: new URL(request.url()).pathname, body });
+    const person = request.method() === "POST" ? { id: "s-2", active: true, ...body } : { ...staff[0], ...body };
+    staff = request.method() === "POST" ? [...staff, { id: person.id, name: person.name, role: person.role, active: true }] : [person, ...staff.slice(1)];
+    return route.fulfill({ status: request.method() === "POST" ? 201 : 200, contentType: "application/json", body: JSON.stringify({ staff: person }) });
+  });
+  await page.route("**/api/admin/pos-devices**", (route) => {
+    if (route.request().method() === "DELETE") devices = [];
+    return route.request().method() === "DELETE" ? route.fulfill({ status: 204 }) : route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ devices }) });
+  });
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const card = page.locator(".staff-card");
+  await expect(card.locator('li[data-staff="Li"]')).toBeVisible();
+
+  await card.getByLabel("姓名").fill("Wang");
+  await card.getByLabel(/^PIN/).fill("9876");
+  await card.locator(".staff-add").getByLabel("角色").selectOption("manager");
+  await card.getByRole("button", { name: "添加跑堂" }).click();
+  await expect(page.locator("#adminToast")).toHaveText("已添加 Wang");
+  expect(sent[0]).toEqual({ method: "POST", url: "/api/admin/staff", body: { name: "Wang", pin: "9876", role: "manager" } });
+  await expect(card.locator('li[data-staff="Wang"]')).toBeVisible();
+
+  await card.locator('li[data-staff="Li"]').getByRole("button", { name: "停用" }).click();
+  await expect.poll(() => sent[1]).toEqual({ method: "PUT", url: "/api/admin/staff/s-1", body: { active: false } });
+  await expect(card.locator('li[data-staff="Li"]')).toContainText("已停用");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await card.getByRole("button", { name: "取消配对" }).click();
+  await expect(card).toContainText("还没有配对的设备");
 });

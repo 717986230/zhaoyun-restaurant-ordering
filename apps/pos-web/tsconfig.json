@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "jsx": "react-jsx", "emitDeclarationOnly": true },
+  "references": [
+    { "path": "../../packages/domain/tsconfig.json" },
+    { "path": "../../packages/contracts/tsconfig.json" },
+    { "path": "../../packages/api-client/tsconfig.json" }
+  ],
+  "include": ["src", "../../src/env.d.ts"]
+}

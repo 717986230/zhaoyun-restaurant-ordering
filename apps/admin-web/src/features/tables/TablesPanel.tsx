@@ -21,7 +21,8 @@ interface Props {
   onLock: (table: string, locked: boolean) => Promise<void>;
   onOpenBill: (table: string) => Promise<void>;
   onCloseBill: () => void;
-  onSettleBill: (table: string) => Promise<void>;
+  /** The bill on the front printer, for the guest to read; it marks nothing paid. */
+  onPrintBill: (table: string) => Promise<void>;
 }
 
 /**
@@ -35,8 +36,8 @@ interface Props {
  * not make its bill go away.
  *
  * Locking is service state: it stops the table adding to a bill that is about
- * to be settled, and settling releases it, so nobody has to remember to unlock
- * anything afterwards.
+ * to be paid, and the receipt that pays the last of it releases it, so nobody
+ * has to remember to unlock anything afterwards.
  */
 export function TablesPanel(props: Props) {
   const { t, language } = useI18n();
@@ -97,7 +98,11 @@ export function TablesPanel(props: Props) {
         <div className="bill-total"><span>{t("billTotal")}</span><b>{formatMoney(euro(props.bill.total), language)}</b></div>
         <table className="bill-vat"><thead><tr><th>{t("billRate")}</th><th>{t("billNet")}</th><th>{t("billVat")}</th><th>{t("billGross")}</th></tr></thead><tbody>{props.bill.vatBreakdown.map((group) => <tr key={group.percent}><td>{group.percent}%</td><td>{group.net.toFixed(2)}</td><td>{group.vat.toFixed(2)}</td><td>{group.gross.toFixed(2)}</td></tr>)}</tbody></table>
         <p className="bill-disclaimer">{t("billDisclaimer")}</p>
-        <button className="primary-action" disabled={props.busy} onClick={() => void props.onSettleBill(props.bill!.table)}>{t("billSettle")}</button>
+        <div className="board-actions">
+          <button className="ghost-action" disabled={props.busy} onClick={() => void props.onPrintBill(props.bill!.table)}>{t("billPrint")}</button>
+          {/* Paying is at the POS, where the waiter's receipt is theirs. */}
+          <a className="primary-action" href="pos.html" target="_blank" rel="noopener">{t("billTakePayment")}</a>
+        </div>
       </> : <div className="admin-empty">{t("billEmpty")}</div>}
     </div>}
   </section>;

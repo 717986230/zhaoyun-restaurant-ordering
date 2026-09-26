@@ -2754,3 +2754,105 @@ h2 {
     flex: 1;
   }
 }
+
+/* Waiters and POS devices. */
+.staff-card {
+  display: grid;
+  gap: 12px;
+}
+
+.staff-open-pos {
+  justify-self: start;
+  text-decoration: none;
+}
+
+.staff-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staff-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-sunken);
+}
+
+.staff-list li.inactive {
+  color: var(--a-muted);
+}
+
+.staff-list li em {
+  grid-column: 1 / -1;
+  color: var(--a-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.staff-list select {
+  min-height: 36px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font: inherit;
+}
+
+.staff-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.staff-list .ghost-action {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.staff-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.staff-add label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--a-ink-2);
+  font-size: 12px;
+}
+
+.staff-add input,
+.staff-add select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+@media (max-width: 640px) {
+  .staff-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .staff-list li .staff-actions {
+    grid-column: 1 / -1;
+  }
+
+  .staff-add {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -65,7 +65,7 @@ export interface ApiOrder {
   status: OrderStatus;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
+  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for. */ paid?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
   createdAt: string;
   updatedAt?: string;
   billedAt?: string | null;
@@ -81,9 +81,12 @@ export interface ApiBill {
   orderNos: string[];
   orderIds: string[];
   items: Array<{
+    /** The order line, for the register to pay (part of) it. */
+    orderItemId: string;
     orderNo: string;
     name: string;
     names?: { zh: string; de: string; en: string };
+    /** What is still to pay of the line. */
     qty: number;
     unitPrice: number;
     lineTotal: number;
@@ -99,6 +102,82 @@ export interface ApiBill {
   fiscalReceipt: false;
   printJobId?: string;
 }
+
+export type PaymentType = "cash" | "card" | "voucher";
+
+/** A receipt of the register (shared/register.mjs). Amounts in cents. */
+export interface ApiReceipt {
+  id: string;
+  receiptNo: number;
+  cashRegisterId: string;
+  type: "sale" | "storno";
+  table: string | null;
+  lines: Array<{
+    kind: "item" | "voucher" | "discount";
+    names?: { zh: string; de: string; en: string };
+    orderItemId?: string;
+    code?: string;
+    name: string;
+    modifiers?: string[];
+    quantity: number;
+    unitPriceCents: number;
+    totalCents: number;
+    vatSplit: Array<{ percent: number; cents: number }>;
+  }>;
+  vat: Array<{ percent: number; grossCents: number; netCents: number; vatCents: number }>;
+  totalCents: number;
+  payments: Array<{ type: PaymentType; amountCents: number; tenderedCents?: number; changeCents?: number; voucherCode?: string }>;
+  refersTo: string | null;
+  refersToNo: number | null;
+  reason: string | null;
+  /** The storno that cancelled this receipt, if one did. */
+  cancelledBy: string | null;
+  /** "unsigned" until the register signs (fiskaly). */
+  fiscalStatus: "unsigned" | "signed" | "failed";
+  staffRole: string;
+  /** The waiter who took it, on the POS. */
+  staffId?: string | null;
+  staffName?: string | null;
+  createdAt: string;
+}
+
+export interface CheckoutCommand {
+  clientRequestId?: string;
+  table?: string;
+  /** Off the dishes, per VAT rate: a takeaway's pickup discount, say. */
+  discountPercent?: number;
+  items?: Array<{ orderItemId: string; quantity: number }>;
+  vouchers?: Array<{ amount: number }>;
+  payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string }>;
+}
+
+export interface ApiVoucher { code: string; valueCents: number; balanceCents: number; voided: boolean; createdAt: string }
+
+export interface ApiClosingTotals {
+  sales: number;
+  stornos: number;
+  firstReceiptNo: number | null;
+  lastReceiptNo: number | null;
+  grossCents: number;
+  vat: Array<{ percent: number; grossCents: number; netCents: number; vatCents: number }>;
+  payments: Record<PaymentType, number>;
+  vouchersSoldCents: number;
+  discountCents?: number;
+  cashCents: number;
+}
+
+export interface ApiClosing { id: string; closingNo: number; totals: ApiClosingTotals; createdAt: string }
+
+/** One entry of the journal (DEP 131), chained to the one before by its hash. */
+export interface ApiJournalEntry { seq: number; at: string; kind: string; ref: string | null; payload: unknown; prevHash: string; hash: string }
+export interface ApiJournalExport { entries: ApiJournalEntry[]; verification: { ok: boolean; brokenAt: number | null; reason: "chain" | "content" | null } }
+
+/** The POS (shared/pos.mjs). */
+export interface PosStaff { id: string; name: string; role: "staff" | "manager"; active?: boolean }
+export interface PosDevice { id: string; name: string; createdAt: string; lastSeenAt: string | null }
+/** A table open on a device, locked to it until closed or left alone. */
+export interface PosClaim { table: string; deviceId: string; staffId: string | null; staffName: string | null; expiresAt: string }
+export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number }; createdAt: string }
 
 export interface ApiServiceRequest {
   id: string;
@@ -150,6 +229,15 @@ export interface ApiSettings {
   /** The owner's own names for the tabs ("ALLE", "__sets__", a category), per
    *  menu language; a missing name keeps the menu's own wording. */
   navLabels: NavLabels;
+  /** Who issues the receipts (§ 132a BAO); an empty name is the restaurant's. */
+  companyName: string;
+  companyAddress: string;
+  /** ATU and eight digits, or empty. */
+  companyUid: string;
+  /** The register's id printed on each receipt. */
+  cashRegisterId: string;
+  /** The discount a takeaway gets at the POS, percent. */
+  takeawayDiscountPercent: number;
 }
 
 /** Tab → language → the name the guest sees. */

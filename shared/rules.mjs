@@ -224,7 +224,8 @@ export function tableOverviewView(row, orders = [], fallbackTable = "") {
     registered: Boolean(row),
     state: view.locked ? "locked" : open.length ? "seated" : "free",
     orders: open,
-    total: Math.round(open.reduce((sum, order) => sum + Math.round(order.total * 100), 0)) / 100,
+    // What is still to pay: a line a receipt paid for is off the table's total.
+    total: open.reduce((sum, order) => sum + order.items.reduce((part, item) => part + Math.round(item.unitPrice * 100) * (item.qty - (item.paid ?? 0)), 0), 0) / 100,
     since: open.length ? open.map((order) => order.createdAt).sort()[0] : null
   };
 }
@@ -386,6 +387,8 @@ export function orderView(row, itemRows = []) {
       id: item.product_id,
       name: item.product_name,
       qty: item.quantity,
+      // How much of the line receipts have paid for (ORDER_ITEMS_SQL).
+      paid: item.paid_quantity ?? 0,
       unitPrice: item.unit_price_cents / 100,
       printStation: item.print_station,
       modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
@@ -582,10 +585,41 @@ function normalizeFeaturedIds(value) {
  * Values are stored as JSON, and read back leniently: a stored value that no
  * longer passes its check is the default, never an error on the guest menu.
  */
+/** An Austrian VAT number: ATU and eight digits, or none. */
+function normalizeUid(value) {
+  const uid = String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  if (uid && !/^ATU\d{8}$/.test(uid)) throw new Error("A VAT number (UID) is ATU and eight digits");
+  return uid;
+}
+
+function normalizeCashRegisterId(value) {
+  const id = String(value ?? "").trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9_-]{0,31}$/.test(id)) throw new Error("A register id is letters, digits, - or _");
+  return id;
+}
+
 export const APP_SETTINGS = {
   menuLanguages: { key: "menu_languages", fallback: () => [...DEFAULT_MENU_LANGUAGES], normalize: normalizeMenuLanguages },
   // The name on the admin console, the browser tab and the printed table card.
   restaurantName: { key: "restaurant_name", fallback: () => "赵云", normalize: boundedText("Restaurant name", 40) },
+  // Who issues the receipts, as the receipt has to say (§ 132a BAO): the
+  // business's legal name and address, and its VAT number (UID) when it has
+  // one. Empty name: the restaurant's name.
+  companyName: { key: "company_name", fallback: () => "", normalize: optionalText("Company name", 80) },
+  companyAddress: { key: "company_address", fallback: () => "", normalize: optionalText("Company address", 160) },
+  companyUid: { key: "company_uid", fallback: () => "", normalize: normalizeUid },
+  // The discount a takeaway gets at the POS, in percent (0: none).
+  takeawayDiscountPercent: {
+    key: "takeaway_discount_percent",
+    fallback: () => 0,
+    normalize: (value) => {
+      const percent = Number(value);
+      if (!Number.isInteger(percent) || percent < 0 || percent > 50) throw new Error("The takeaway discount is 0 to 50 percent");
+      return percent;
+    }
+  },
+  // The register's id (Kassen-ID) printed on each receipt; unique per business.
+  cashRegisterId: { key: "cash_register_id", fallback: () => "KASSE-1", normalize: normalizeCashRegisterId },
   // The heading of the guest menu.
   menuTitle: { key: "menu_title", fallback: () => "La Carte", normalize: boundedText("Menu title", 24) },
   // What a guest sees before they touch the sun/moon; their own pick wins.
@@ -830,9 +864,6 @@ function mainVatPercent(split) {
   return split.reduce((main, part) => (part.cents > main.cents ? part : main)).percent;
 }
 
-/** Order lines with the VAT split kept for them, as billView reads them. */
-export const ORDER_ITEMS_SQL = "SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json FROM order_items LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id WHERE order_items.order_id = ?";
-
 /**
  * Turns an order command plus the product rows it names into the exact rows to
  * write: one order, its items, and one print job per station. Validation and
@@ -841,9 +872,10 @@ export const ORDER_ITEMS_SQL = "SELECT order_items.*, order_item_vat_splits.spli
  * (bundleComponentIds), for the set's VAT split.
  *
  * A kitchen ticket carries no prices and no tax: it is not a receipt, and
- * says so when printed.
+ * says so when printed. `meta` is what the POS adds: the waiter's name and a
+ * takeaway's pickup number, for the ticket.
  */
-export function planOrder(input, productRows, hours = {}) {
+export function planOrder(input, productRows, hours = {}, meta = {}) {
   const clientRequestId = String(input.clientRequestId || uuid());
   const table = String(input.table || "").trim();
   if (!table) throw new Error("Order requires a table number");
@@ -899,7 +931,13 @@ export function planOrder(input, productRows, hours = {}) {
     id: uuid(),
     orderId: id,
     printerRole: station,
-    payloadJson: JSON.stringify({ orderNo, table, note: String(input.note || ""), items: stationItems })
+    // Who ordered it and the takeaway number come from the server (meta),
+    // never from the order a guest sends.
+    payloadJson: JSON.stringify({
+      orderNo, table, note: String(input.note || ""), items: stationItems,
+      ...(meta.staffName ? { staffName: meta.staffName } : {}),
+      ...(meta.pickupNo ? { pickupNo: meta.pickupNo } : {})
+    })
   }));
 
   return {
@@ -934,25 +972,29 @@ export function billView(tableNo, orderRows, itemsByOrderId, productsById, issue
 
   for (const order of orderRows) {
     for (const row of itemsByOrderId.get(order.id) ?? []) {
-      const lineCents = row.unit_price_cents * row.quantity;
+      // What receipts have paid for is off the bill; a line paid in full is gone.
+      const quantity = row.quantity - (row.paid_quantity ?? 0);
+      if (quantity <= 0) continue;
+      const lineCents = row.unit_price_cents * quantity;
       const vatPercent = row.vat_percent;
       // A line with no split kept is all at its own rate.
       const split = parseJson(row.vat_split_json, null) ?? [{ percent: vatPercent, cents: row.unit_price_cents }];
       // Guests read the bill: keep the localized names next to the snapshot name.
       const product = productsById.get(row.product_id);
       items.push({
+        orderItemId: row.id,
         orderNo: order.order_no,
         name: row.product_name,
         names: product ? { zh: product.name_zh, de: product.name_de, en: product.name_en } : undefined,
-        qty: row.quantity,
+        qty: quantity,
         unitPrice: row.unit_price_cents / 100,
         lineTotal: lineCents / 100,
         vatPercent,
         // A set menu over more than one rate shows each part.
-        ...(split.length > 1 ? { vatSplit: split.map((part) => ({ percent: part.percent, amount: (part.cents * row.quantity) / 100 })) } : {}),
+        ...(split.length > 1 ? { vatSplit: split.map((part) => ({ percent: part.percent, amount: (part.cents * quantity) / 100 })) } : {}),
         modifiers: parseJson(row.modifiers_json, []).map((modifier) => ({ name: modifier.name, names: modifier.names }))
       });
-      for (const part of split) groups.set(part.percent, (groups.get(part.percent) || 0) + part.cents * row.quantity);
+      for (const part of split) groups.set(part.percent, (groups.get(part.percent) || 0) + part.cents * quantity);
       totalCents += lineCents;
     }
   }
