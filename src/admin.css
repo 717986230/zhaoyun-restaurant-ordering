@@ -909,6 +909,11 @@ h2 {
   background: var(--a-ok);
 }
 
+em.voided {
+  color: var(--a-danger);
+  font-style: normal;
+}
+
 .table-open-on {
   align-self: flex-start;
   border-radius: 999px;

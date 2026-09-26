@@ -65,7 +65,7 @@ export interface ApiOrder {
   status: OrderStatus;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for. */ paid?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
+  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for, and was voided. */ paid?: number; voided?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
   createdAt: string;
   updatedAt?: string;
   billedAt?: string | null;
@@ -196,10 +196,14 @@ export interface PosStaffActivity extends PosStaff {
   /** The tables they have open now. */
   tables: string[];
   /** Since their last settlement: what they took, the cash they hold included. */
-  shift: ApiClosingTotals & { receipts: number };
+  shift: ApiClosingTotals & { receipts: number; voids: PosVoidTotals };
 }
 
-export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number }; createdAt: string }
+/** What a waiter voided since their last settlement (退菜). */
+export interface PosVoidTotals { count: number; cents: number }
+/** Dishes taken off a bill after they went to the kitchen. */
+export interface PosVoid { id: string; orderItemId: string; quantity: number; amountCents: number; reason: string; staffName: string | null; createdAt: string }
+export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number; voids?: PosVoidTotals }; createdAt: string }
 
 export interface ApiServiceRequest {
   id: string;

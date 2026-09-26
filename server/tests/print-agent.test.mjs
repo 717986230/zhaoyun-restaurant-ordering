@@ -128,3 +128,20 @@ test("the kitchen reads Chinese and the pickup number; the guest's receipt reads
   assert.match(receipt, /Kellner: Li/);
   assert.doesNotMatch(receipt, /蔬菜/);
 });
+
+test("a void ticket tells the kitchen to stop, with the quantity taken back and why", () => {
+  const text = renderReceipt({ kind: "void", orderNo: "A-1", table: "08", reason: "Gast storniert", staffName: "Li", items: [{ name: "Ramen", names: { de: "Ramen", zh: "拉面" }, quantity: 2, modifiers: [] }] }, { capabilities: { printLanguage: "de" } }).toString("utf8");
+  assert.match(text, /STORNO – NICHT ZUBEREITEN/);
+  assert.match(text, /-2 x Ramen/);
+  assert.match(text, /Grund: Gast storniert/);
+  assert.doesNotMatch(text, /EUR|\d+\.\d{2}/, "no price on a kitchen ticket");
+});
+
+test("a receipt printed again says it is a copy; a settlement shows the voids", () => {
+  const receipt = { receiptNo: 7, cashRegisterId: "KASSE-1", type: "sale", fiscalStatus: "unsigned", createdAt: "2026-09-26T10:00:00.000Z", lines: [], vat: [], totalCents: 0, payments: [] };
+  assert.match(renderReceipt({ kind: "receipt", copy: true, company: {}, receipt }, { capabilities: { printLanguage: "de" } }).toString("utf8"), /BELEGKOPIE/);
+  assert.doesNotMatch(renderReceipt({ kind: "receipt", company: {}, receipt }, { capabilities: { printLanguage: "de" } }).toString("utf8"), /BELEGKOPIE/);
+  const totals = { firstReceiptNo: 1, lastReceiptNo: 2, sales: 2, stornos: 0, grossCents: 2500, payments: { cash: 2500, card: 0, voucher: 0 }, voids: { count: 1, cents: 950 } };
+  const settlement = renderReceipt({ kind: "settlement", company: {}, settlement: { staffName: "Li", createdAt: "2026-09-26T22:00:00.000Z", totals } }, { capabilities: { printLanguage: "de" } }).toString("utf8");
+  assert.match(settlement, /Stornos 1x\s+-9\.50/);
+});

@@ -25,6 +25,8 @@ export interface Pos {
   live: boolean;
   /** Hears every change on the floor as it happens; returns the way to stop. */
   onLive: (listener: (event: RealtimeEnvelope) => void) => () => void;
+  /** Loads the menu again (a dish sold out here, say). */
+  refreshMenu: () => void;
 }
 
 type LiveListener = (event: RealtimeEnvelope) => void;
@@ -121,7 +123,7 @@ export function App() {
   if (!paired) body = <Pair t={t} onPaired={() => setPaired(true)} />;
   else if (!staff) body = <SignIn t={t} onSignedIn={setStaff} onUnpair={unpair} failed={failed} />;
   else {
-    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive };
+    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive, refreshMenu: loadCatalog };
     body = screen.name === "order" ? <OrderScreen pos={pos} table={screen.table} pickupNo={screen.pickupNo} go={setScreen} />
       : screen.name === "pay" ? <PayScreen pos={pos} table={screen.table} go={setScreen} />
       : screen.name === "records" ? <Records pos={pos} go={setScreen} />

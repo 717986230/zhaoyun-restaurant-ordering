@@ -1064,6 +1064,79 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       }
     }],
 
+    ["a dish sent to the kitchen is voided with a reason, a receipt printed again as a copy, and a dish sold out", async () => {
+      const device = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Tablet V" } })).json.token;
+      const zhou = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Zhou", pin: "4321" } })).json.staff;
+      const asZhou = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: device, body: { staffId: zhou.id, pin: "4321" } })).json.token };
+      const [food] = (await call("GET", "/api/catalog")).json.products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
+      const cents = Math.round(food.price * 100);
+      assert.equal((await call("POST", "/api/pos/tables/V1/claim", asZhou)).status, 200);
+      const order = (await call("POST", "/api/pos/orders", { ...asZhou, body: { clientRequestId: "contract-void-1", table: "V1", note: "", items: [{ id: food.id, qty: 3 }] } })).json.order;
+      const line = (await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill.items[0];
+
+      // 退菜: one of three, with a reason. The order stays as sent; the bill loses one.
+      const voidOne = (body) => call("POST", "/api/pos/tables/V1/void", { ...asZhou, body: { orderItemId: line.orderItemId, ...body } });
+      assert.equal((await voidOne({ quantity: 1 })).status, 400, "a void says why");
+      assert.equal((await voidOne({ quantity: 4, reason: "zu viel" })).status, 400, "no more than is open");
+      assert.equal((await call("POST", "/api/pos/tables/V1/void", { ...asZhou, body: { orderItemId: "no-such-line", quantity: 1, reason: "x" } })).status, 404);
+      const voided = await voidOne({ quantity: 1, reason: "Gast hat storniert" });
+      assert.equal(voided.status, 201, JSON.stringify(voided.json));
+      assert.deepEqual({ quantity: voided.json.void.quantity, amountCents: voided.json.void.amountCents, staffName: voided.json.void.staffName }, { quantity: 1, amountCents: cents, staffName: "Zhou" });
+      const after = (await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill;
+      assert.equal(after.items[0].qty, 2);
+      assert.equal(Math.round(after.total * 100), cents * 2);
+      const listed = (await call("GET", "/api/orders?limit=50", { admin: true })).json.orders.find((entry) => entry.id === order.id);
+      assert.equal(listed.items[0].qty, 3, "the order as it was sent");
+      assert.equal(listed.items[0].voided, 1);
+      assert.equal(Math.round(listed.total * 100), cents * 2, "its total, less the void");
+      // The kitchen stops cooking it: a void ticket, without a price.
+      const ticket = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.find((job) => job.payload.kind === "void" && job.orderId === order.id);
+      assert.equal(ticket.printerRole, food.printStation ?? "kitchen");
+      assert.deepEqual({ reason: ticket.payload.reason, quantity: ticket.payload.items[0].quantity, staffName: ticket.payload.staffName }, { reason: "Gast hat storniert", quantity: 1, staffName: "Zhou" });
+      assert.ok(!/price|Cents/i.test(JSON.stringify(ticket.payload)), "no price on a kitchen ticket");
+      // In the journal, and on Zhou's shift.
+      const day = new Date().toISOString().slice(0, 10);
+      const next = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+      assert.ok((await call("GET", `/api/admin/journal?from=${day}&to=${next}`, { admin: true })).json.entries.some((entry) => entry.kind === "item.voided" && entry.payload.reason === "Gast hat storniert"));
+      assert.deepEqual((await call("GET", "/api/pos/settlement", asZhou)).json.totals.voids, { count: 1, cents });
+
+      // Paid, then printed again for the guest: the same receipt, marked a copy.
+      const paid = (await call("POST", "/api/admin/checkout", { ...asZhou, body: { table: "V1", items: [{ orderItemId: line.orderItemId, quantity: 2 }], payments: [{ type: "card", amount: after.total }] } })).json.receipt;
+      assert.equal(paid.totalCents, cents * 2);
+      assert.equal((await voidOne({ quantity: 1, reason: "zu spät" })).status, 404, "nothing open to void once paid");
+      assert.equal((await call("POST", `/api/admin/receipts/${paid.id}/print`, asZhou)).status, 204);
+      assert.equal((await call("POST", "/api/admin/receipts/no-such-receipt/print", asZhou)).status, 404);
+      const copy = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.find((job) => job.payload.kind === "receipt" && job.payload.copy && job.payload.receipt.id === paid.id);
+      assert.ok(copy, "the copy is on the front printer's queue");
+
+      // The last open dish voided, the rest paid: the table is settled and free.
+      await call("POST", "/api/pos/orders", { ...asZhou, body: { clientRequestId: "contract-void-2", table: "V1", note: "", items: [{ id: food.id, qty: 1 }] } });
+      const last = (await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill.items[0];
+      assert.equal((await call("POST", "/api/pos/tables/V1/void", { ...asZhou, body: { orderItemId: last.orderItemId, quantity: 1, reason: "falscher Tisch" } })).status, 201);
+      assert.equal((await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill.items.length, 0);
+      const v1 = (await call("GET", "/api/admin/tables/overview", { admin: true })).json.tables.find((entry) => entry.table === "V1");
+      assert.ok(!v1 || v1.state === "free", "nothing left on V1");
+
+      // 沽清: sold out on the POS, off the guests' menu at once; the POS still sees it, to switch back on.
+      assert.equal((await call("PUT", `/api/pos/products/${food.id}/availability`, { ...asZhou, body: { available: "no" } })).status, 400);
+      assert.equal((await call("PUT", "/api/pos/products/no-such-dish/availability", { ...asZhou, body: { available: false } })).status, 404);
+      const soldOut = await call("PUT", `/api/pos/products/${food.id}/availability`, { ...asZhou, body: { available: false } });
+      assert.equal(soldOut.status, 200);
+      assert.equal(soldOut.json.product.available, false);
+      assert.ok(!(await call("GET", "/api/catalog")).json.products.some((product) => product.id === food.id), "gone from the guests' menu");
+      const posMenu = (await call("GET", "/api/pos/catalog", asZhou)).json.products;
+      assert.equal(posMenu.find((product) => product.id === food.id).available, false, "the POS keeps it, marked");
+      assert.ok(posMenu.every((product) => product.published));
+      assert.equal((await call("POST", "/api/pos/orders", { ...asZhou, body: { clientRequestId: "contract-void-3", table: "V1", note: "", items: [{ id: food.id, qty: 1 }] } })).status, 400, "and it cannot be ordered");
+      assert.equal((await call("PUT", `/api/pos/products/${food.id}/availability`, { ...asZhou, body: { available: true } })).json.product.available, true);
+      assert.ok((await call("GET", "/api/catalog")).json.products.some((product) => product.id === food.id));
+
+      // Leave the room as it was found.
+      await call("DELETE", "/api/pos/tables/V1/claim", asZhou);
+      await call("PUT", `/api/admin/staff/${zhou.id}`, { admin: true, body: { active: false } });
+      for (const paired of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${paired.id}`, { admin: true });
+    }],
+
     ["every write tells the console and the POS at once, and the menus only about the dishes", async () => {
       const staff = await listen(`${liveBase}/ws?role=staff`);
       const guest = await listen(`${liveBase}/ws?table=05`);

@@ -27,11 +27,11 @@ import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
   ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, receiptPrintPayload,
-  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
+  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
 } from "../shared/register.mjs";
 import {
   assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
-  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, OPEN_STAFF_VOIDS_SQL, SET_AVAILABLE_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
 import {
   ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
@@ -677,13 +677,52 @@ export function createStore(db) {
     });
   }
 
+  async function reprintReceipt(id) {
+    const view = await receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", String(id)));
+    if (!view) return false;
+    const at = now();
+    await printStatement(receiptPrintPayload(view, await getSettings(), { copy: true }), at).run();
+    return true;
+  }
+
+  async function setAvailable(id, available) {
+    if (!(await run(SET_AVAILABLE_SQL, available ? 1 : 0, now(), String(id)))) return null;
+    return getProduct(String(id));
+  }
+
+  /**
+   * Takes dishes sent to the kitchen off this table's bill (shared/register.mjs,
+   * planVoid). Two voids of the same dish at once read the same journal entry;
+   * the second batch fails on its number and is worked out again.
+   */
+  async function voidItem(tableInput, input, pos, role) {
+    const table = normalizeTableNo(tableInput);
+    return retrying(async () => {
+      const last = await lastJournal();
+      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", table), pos.deviceId);
+      const at = now();
+      const plan = planVoid(input, await first(VOID_ITEM_SQL, String(input?.orderItemId ?? "")), { table, staff: pos.staff, role, at });
+      const entry = plan.void;
+      await db.batch([
+        db.prepare(INSERT_VOID_SQL).bind(entry.id, entry.orderItemId, entry.orderId, entry.table, entry.quantity, entry.amountCents, entry.reason, entry.staffId, entry.staffName, at),
+        db.prepare("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)")
+          .bind(plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at),
+        await journalStatement(last, plan.journal.kind, plan.journal.ref, plan.journal.payload, at),
+        // The last open dish voided, and the rest paid: the table is settled.
+        db.prepare(SETTLE_PAID_TABLE_SQL).bind(at, at, table, table),
+        db.prepare(UNLOCK_PAID_TABLE_SQL).bind(at, table, table)
+      ]);
+      return { id: entry.id, orderItemId: entry.orderItemId, quantity: entry.quantity, amountCents: entry.amountCents, reason: entry.reason, staffName: entry.staffName, createdAt: at };
+    });
+  }
+
   async function settleStaff(staffId, role) {
     return retrying(async () => {
       const last = await lastJournal();
       const staff = await first("SELECT * FROM staff WHERE id = ?", String(staffId));
       const rows = staff ? await all(OPEN_STAFF_RECEIPTS_SQL, staff.id, staff.id) : [];
       if (!rows.length) return null;
-      const totals = settlementTotals(rows);
+      const totals = settlementTotals(rows, await all(OPEN_STAFF_VOIDS_SQL, staff.id, staff.id));
       const id = uuid();
       const at = now();
       const view = settlementView({ id, staff_id: staff.id, staff_name: staff.name, totals_json: JSON.stringify(totals), created_at: at });
@@ -772,13 +811,16 @@ export function createStore(db) {
     posSignOut: async (token) => (token ? (await run("DELETE FROM pos_sessions WHERE token_hash = ?", await hashSessionToken(token))) > 0 : false),
     claimTable,
     holdsTable,
+    voidItem,
+    reprintReceipt,
+    setAvailable,
     releaseTable: async (table, pos, force = false) =>
       (await run("DELETE FROM table_claims WHERE table_no = ? AND (device_id = ? OR ? = 1)", String(table).trim().toUpperCase(), pos.deviceId, force ? 1 : 0)) > 0,
     liveClaims: async () => (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row)),
     newTakeaway,
     moveTable,
     settleStaff,
-    staffSettlementPreview: async (staffId) => settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, String(staffId), String(staffId))),
+    staffSettlementPreview: async (staffId) => settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, String(staffId), String(staffId)), await all(OPEN_STAFF_VOIDS_SQL, String(staffId), String(staffId))),
     listSettlements: async (limit = 30) => (await all("SELECT * FROM staff_settlements ORDER BY created_at DESC LIMIT ?", Math.min(Number(limit) || 30, 200))).map(settlementView),
     listPrintJobs: async (status = "queued", limit = 100) =>
       (await all("SELECT * FROM print_jobs WHERE status = ? ORDER BY created_at LIMIT ?", String(status), boundedLimit(limit)))
@@ -884,7 +926,7 @@ export function createStore(db) {
     staffActivity: async () => {
       const staffRows = await all("SELECT * FROM staff ORDER BY active DESC, name");
       const shifts = new Map();
-      for (const row of staffRows) shifts.set(row.id, settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, row.id, row.id)));
+      for (const row of staffRows) shifts.set(row.id, settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, row.id, row.id), await all(OPEN_STAFF_VOIDS_SQL, row.id, row.id)));
       const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
       return staffActivityView(staffRows, await all(LIVE_POS_SESSIONS_SQL, now()), claims, shifts);
     },

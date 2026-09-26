@@ -246,3 +246,48 @@ test("the manager cancels a receipt with a reason, closes the day, and exports a
   expect((await download).suggestedFilename()).toMatch(/^journal-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/);
   await expect(records.locator(".pos-journal")).toHaveText(/^已校验 \d+ 条，链条完整$/);
 });
+
+test("a sent dish is voided with a reason, a dish sold out and back, and a receipt printed again", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const [dish, other] = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
+  await pairAndSignIn(page, "Tablet void", "Li", "1234");
+  await page.getByLabel("打开桌号").fill("12");
+  await page.getByRole("button", { name: "打开", exact: true }).click();
+  for (let n = 0; n < 2; n += 1) {
+    await page.locator(`.pos-dishes button[data-sku="${dish.sku}"]`).click();
+    await confirmOptions(page);
+  }
+  await page.getByRole("button", { name: "送厨" }).click();
+  await expect(page.locator(".pos-lines.sent li")).toContainText("2 ×");
+
+  // 退菜: one of the two, with a reason; the kitchen gets a void ticket.
+  await page.getByRole("button", { name: `退菜：${dish.names.zh}` }).click();
+  const dialog = page.getByRole("dialog", { name: "退菜" });
+  await expect(dialog.getByRole("button", { name: "确认退菜" })).toBeDisabled();
+  await dialog.getByRole("button", { name: "客人取消" }).click();
+  await dialog.getByRole("button", { name: "确认退菜" }).click();
+  await expect(page.locator(".pos-toast")).toContainText(`已退 1 份 ${dish.names.zh}`);
+  await expect(page.locator(".pos-lines.sent li")).toContainText("1 ×");
+  const jobs = (await (await admin(request, "get", "/api/admin/print-jobs?status=queued&limit=200")).json()).jobs;
+  expect(jobs.some((job) => job.payload.kind === "void" && job.payload.table === "12" && job.payload.reason === "客人取消")).toBe(true);
+
+  // 沽清: the other dish off, the guests' menu without it, then back on.
+  await page.getByRole("button", { name: "沽清 / 恢复" }).click();
+  await page.locator(`.pos-dishes button[data-sku="${other.sku}"]`).click();
+  await expect(page.locator(".pos-toast")).toContainText(`${other.names.zh} 已沽清`);
+  await expect(page.locator(`.pos-dishes button[data-sku="${other.sku}"]`)).toHaveClass(/soldout/);
+  expect((await (await request.get(`${API}/api/catalog`)).json()).products.some((product) => product.id === other.id)).toBe(false);
+  await page.locator(`.pos-dishes button[data-sku="${other.sku}"]`).click();
+  await expect(page.locator(`.pos-dishes button[data-sku="${other.sku}"]`)).not.toHaveClass(/soldout/);
+  await page.getByRole("button", { name: /完成/ }).click();
+
+  // Paid, and the receipt printed again for the guest as a copy.
+  await page.getByRole("button", { name: "结账" }).click();
+  await page.getByRole("button", { name: "+ 银行卡" }).click();
+  await page.getByRole("button", { name: "收款并开小票" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("桌 12 已结清");
+  await page.getByRole("button", { name: "记录与结算" }).click();
+  await page.locator(".pos-receipts li").first().getByRole("button", { name: "补打" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已补打");
+  await expect(page.locator(".pos-voids")).toContainText("退菜 1 份");
+});

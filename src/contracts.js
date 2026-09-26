@@ -208,6 +208,15 @@ export const PosSignInBody = Type.Object({ staffId: Type.String({ minLength: 1, 
 export const MoveTableBody = Type.Object({ to: Type.String({ minLength: 1, maxLength: 8 }) }, { additionalProperties: false });
 export const SettlementBody = Type.Object({ staffId: Type.Optional(Type.String({ maxLength: 64 })) }, { additionalProperties: false });
 
+// A dish taken off a bill after it went to the kitchen; a void always says why.
+export const VoidBody = Type.Object({
+  orderItemId: Type.String({ minLength: 1, maxLength: 64 }),
+  quantity: Type.Integer({ minimum: 1, maximum: 999 }),
+  reason: Type.String({ minLength: 1, maxLength: 200 })
+}, { additionalProperties: false });
+// Sold out (沽清), or back on.
+export const AvailabilityBody = Type.Object({ available: Type.Boolean() }, { additionalProperties: false });
+
 // A storno always says why.
 export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false });
 

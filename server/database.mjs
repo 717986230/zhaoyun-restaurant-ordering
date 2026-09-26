@@ -17,11 +17,11 @@ import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, companyOf, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL, INSERT_RECEIPT_SQL,
   INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL, ORDER_ITEMS_SQL, ORDER_PAID_SQL,
   orderJournalPayload, planCheckout, planStorno, plannedReceiptView, receiptPrintPayload, receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL,
-  UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL
+  UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
 } from "../shared/register.mjs";
 import {
   assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
-  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
+  normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, OPEN_STAFF_VOIDS_SQL, SET_AVAILABLE_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "../shared/pos.mjs";
 import {
   ACCOUNT_BY_ID_SQL, ACCOUNT_BY_LOGIN_SQL, ACCOUNT_COUNT_SQL, ACCOUNT_SESSION_SQL, ACCOUNT_SESSION_TTL_MS, accountView, DELETE_ACCOUNT_SESSION_SQL,
@@ -245,6 +245,22 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- Dishes taken off a bill after they went to the kitchen (退菜), each
+    -- with its reason and who did it; the order stays as it was sent
+    -- (shared/register.mjs, planVoid). See migrations/0056_item_voids.sql.
+    CREATE TABLE IF NOT EXISTS order_item_voids (
+      id TEXT PRIMARY KEY,
+      order_item_id TEXT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+      order_id TEXT NOT NULL,
+      table_no TEXT NOT NULL,
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      amount_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS staff_settlements (
       id TEXT PRIMARY KEY,
       staff_id TEXT NOT NULL,
@@ -414,6 +430,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_account_sessions_expiry ON account_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_order_item_voids_item ON order_item_voids(order_item_id);
+    CREATE INDEX IF NOT EXISTS idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
@@ -565,6 +583,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     setTableLock: db.prepare("UPDATE restaurant_tables SET locked_at = ?, updated_at = ? WHERE table_no = ?"),
     openOrdersForTables: db.prepare(OPEN_TABLE_ORDERS_SQL),
     livePosSessions: db.prepare(LIVE_POS_SESSIONS_SQL),
+    openStaffVoids: db.prepare(OPEN_STAFF_VOIDS_SQL),
+    setAvailable: db.prepare(SET_AVAILABLE_SQL),
+    voidItem: db.prepare(VOID_ITEM_SQL),
+    insertVoid: db.prepare(INSERT_VOID_SQL),
     accountCount: db.prepare(ACCOUNT_COUNT_SQL),
     accountById: db.prepare(ACCOUNT_BY_ID_SQL),
     accountByLogin: db.prepare(ACCOUNT_BY_LOGIN_SQL),
@@ -1073,6 +1095,44 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     }
   }
 
+  /** A receipt on the front printer again, marked as a copy (Belegkopie). False when there is no such receipt. */
+  function reprintReceipt(id) {
+    const view = receiptDetail(statements.receiptById.get(String(id)));
+    if (!view) return false;
+    const at = now();
+    statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, getSettings(), { copy: true })), at, at);
+    return true;
+  }
+
+  /** Sold out, or back on (沽清). Null for a dish that is not on the menu. */
+  function setAvailable(id, available) {
+    if (!statements.setAvailable.run(available ? 1 : 0, now(), String(id)).changes) return null;
+    return getProduct(String(id));
+  }
+
+  /** Takes dishes sent to the kitchen off this table's bill (shared/register.mjs, planVoid). */
+  function voidItem(tableInput, input, pos, role) {
+    const table = normalizeTableNo(tableInput);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      assertClaim(statements.claimByTable.get(table), pos.deviceId);
+      const at = now();
+      const plan = planVoid(input, statements.voidItem.get(String(input?.orderItemId ?? "")), { table, staff: pos.staff, role, at });
+      const entry = plan.void;
+      statements.insertVoid.run(entry.id, entry.orderItemId, entry.orderId, entry.table, entry.quantity, entry.amountCents, entry.reason, entry.staffId, entry.staffName, at);
+      statements.insertPrintJob.run(plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at);
+      journal(plan.journal.kind, plan.journal.ref, plan.journal.payload, at);
+      // The last open dish voided, and the rest paid: the table is settled.
+      statements.settlePaidTable.run(at, at, table, table);
+      statements.unlockPaidTable.run(at, table, table);
+      db.exec("COMMIT");
+      return { id: entry.id, orderItemId: entry.orderItemId, quantity: entry.quantity, amountCents: entry.amountCents, reason: entry.reason, staffName: entry.staffName, createdAt: at };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   /** A waiter's settlement at the end of the shift. Null when they took nothing since the last. */
   function settleStaff(staffId, role) {
     db.exec("BEGIN IMMEDIATE");
@@ -1083,7 +1143,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         db.exec("COMMIT");
         return null;
       }
-      const totals = settlementTotals(rows);
+      const totals = settlementTotals(rows, statements.openStaffVoids.all(staff.id, staff.id));
       const id = randomUUID();
       const at = now();
       statements.insertSettlement.run(id, staff.id, staff.name, totals.lastReceiptNo, JSON.stringify(totals), at);
@@ -1427,11 +1487,14 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     claimTable,
     releaseTable,
     holdsTable,
+    voidItem,
+    reprintReceipt,
+    setAvailable,
     liveClaims: () => statements.liveClaims.all(now()).map((row) => claimView(row)),
     newTakeaway,
     moveTable,
     settleStaff,
-    staffSettlementPreview: (staffId) => settlementTotals(statements.openStaffReceipts.all(String(staffId), String(staffId))),
+    staffSettlementPreview: (staffId) => settlementTotals(statements.openStaffReceipts.all(String(staffId), String(staffId)), statements.openStaffVoids.all(String(staffId), String(staffId))),
     listSettlements: (limit = 30) => statements.recentSettlements.all(Math.min(Number(limit) || 30, 200)).map(settlementView),
     checkout,
     stornoReceipt,
@@ -1467,7 +1530,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     ),
     staffActivity: () => {
       const staffRows = statements.listStaff.all();
-      const shifts = new Map(staffRows.map((row) => [row.id, settlementTotals(statements.openStaffReceipts.all(row.id, row.id))]));
+      const shifts = new Map(staffRows.map((row) => [row.id, settlementTotals(statements.openStaffReceipts.all(row.id, row.id), statements.openStaffVoids.all(row.id, row.id))]));
       return staffActivityView(staffRows, statements.livePosSessions.all(now()), statements.liveClaims.all(now()).map((row) => claimView(row)), shifts);
     },
     setTableLock: (table, locked) => {

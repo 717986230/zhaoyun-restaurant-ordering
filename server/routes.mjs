@@ -6,7 +6,7 @@ import { pipeline } from "node:stream/promises";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
   ProductBody, ServiceRequestBody, ServiceStatusBody, SettingsBody,
-  RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
+  RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
   StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody
 } from "./schemas.mjs";
 import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
@@ -503,6 +503,10 @@ export function registerRoutes(app, { database, realtime, config }) {
     const receipt = database.getReceipt(request.params.id);
     return receipt ? { receipt } : errorReply(reply, new Error("Receipt not found"), 404);
   });
+  // A receipt printed again for the guest, marked as a copy (Belegkopie).
+  app.post("/api/admin/receipts/:id/print", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => (
+    database.reprintReceipt(request.params.id) ? reply.code(204).send() : errorReply(reply, new Error("No such receipt"), 404)
+  ));
   app.post("/api/admin/receipts/:id/storno", { preHandler: requireAdmin, schema: { params: IdParams, body: StornoBody } }, async (request, reply) => {
     try {
       const receipt = database.stornoReceipt(request.params.id, request.body.reason, request.staffRole, request.pos);
@@ -626,6 +630,21 @@ export function registerRoutes(app, { database, realtime, config }) {
     } catch (error) {
       return claimed(reply, error);
     }
+  });
+  // 退菜: dishes sent to the kitchen taken off the bill, with a reason; the kitchen gets a void ticket.
+  app.post("/api/pos/tables/:table/void", { preHandler: requirePos, schema: { params: TableParams, body: VoidBody } }, async (request, reply) => {
+    try {
+      return reply.code(201).send({ void: database.voidItem(request.params.table, request.body, request.pos, request.staffRole) });
+    } catch (error) {
+      return error.code === "NOT_FOUND" ? errorReply(reply, error, 404) : claimed(reply, error);
+    }
+  });
+  // The menu as the POS needs it: every published dish, the sold-out ones too, to switch back on.
+  app.get("/api/pos/catalog", { preHandler: requirePos }, async () => ({ products: database.listProducts(false).filter((product) => product.published) }));
+  // 沽清: sold out, or back on — the guests' menus follow at once.
+  app.put("/api/pos/products/:id/availability", { preHandler: requirePos, schema: { params: IdParams, body: AvailabilityBody } }, async (request, reply) => {
+    const product = database.setAvailable(request.params.id, request.body.available);
+    return product ? { product } : errorReply(reply, new Error("No such dish on the menu"), 404);
   });
   /** A waiter's own settlement; the manager may settle anyone's. */
   const settlementFor = (request, reply) => {

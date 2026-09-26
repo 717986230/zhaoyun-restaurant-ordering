@@ -92,6 +92,7 @@ export function TablesPanel(props: Props) {
           </div>
           <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>
             {item.qty} × {item.name || item.id}
+            {item.voided ? <em className="voided"> {t("voidedCount", { count: item.voided })}</em> : null}
             {item.modifiers?.length ? <em> ({item.modifiers.map((modifier) => modifier.name).join(" · ")})</em> : null}
           </li>)}</ul>
           {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}

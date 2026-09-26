@@ -26,6 +26,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [choosing, setChoosing] = useState<Product | null>(null);
+  // 退菜: the sent line being voided. 沽清: tapping a dish switches it off or on instead of adding it.
+  const [voiding, setVoiding] = useState<ApiBill["items"][number] | null>(null);
+  const [soldOutMode, setSoldOutMode] = useState(false);
   const [busy, setBusy] = useState(false);
   // One id per batch sent: a retried tap is the same order, not a second one.
   const requestId = useRef(crypto.randomUUID());
@@ -45,7 +48,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // A guest ordering at this table by QR, a move to it: the sent lines follow.
   useLiveReload(pos, (event) => event.type === "floor.changed" && (!event.table || event.table === table), () => void loadBill());
 
-  const menu = useMemo(() => pos.products.filter((product) => product.published && product.available), [pos.products]);
+  const menu = useMemo(() => pos.products.filter((product) => product.published), [pos.products]);
   const categories = useMemo(() => [...new Set(menu.map((product) => product.category))], [menu]);
   const shown = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -59,7 +62,27 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       ? current.map((line) => (line.key === key ? { ...line, quantity: Math.min(99, line.quantity + 1) } : line))
       : [...current, { key, product, quantity: 1, modifiers }]);
   }
-  const pick = (product: Product) => (product.modifiers?.length ? setChoosing(product) : add(product));
+  const pick = (product: Product) => {
+    if (!product.available) return pos.notify(t("soldOutNote", { name: name(product) }), "error");
+    return product.modifiers?.length ? setChoosing(product) : add(product);
+  };
+
+  async function toggleSoldOut(product: Product) {
+    try {
+      await api.setAvailable(product.id, !product.available);
+      pos.notify(t(product.available ? "soldOutDone" : "backOnDone", { name: name(product) }));
+      pos.refreshMenu();
+    } catch (error) { pos.failed(error); }
+  }
+
+  async function voidLine(item: ApiBill["items"][number], quantity: number, reason: string) {
+    try {
+      await api.voidItem(table, item.orderItemId, quantity, reason);
+      pos.notify(t("voidDone", { count: quantity, name: item.names?.[language] || item.name }));
+      setVoiding(null);
+      await loadBill();
+    } catch (error) { pos.failed(error); }
+  }
   const change = (key: string, by: number) => setCart((current) => current.flatMap((line) => {
     if (line.key !== key) return [line];
     const quantity = line.quantity + by;
@@ -126,6 +149,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       {bill?.items.length ? <ul className="pos-lines sent">{bill.items.map((item) => <li key={item.orderItemId}>
         <span>{item.qty} × {item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}</span>
         <b>{money(Math.round(item.lineTotal * 100))}</b>
+        <button type="button" className="pos-void" aria-label={t("voidOf", { name: item.names?.[language] || item.name })} onClick={() => setVoiding(item)}>{t("void")}</button>
       </li>)}</ul> : <p className="pos-muted">{t("nothingSent")}</p>}
       <h2>{t("newItems")} <span>{money(cartCents)}</span></h2>
       {cart.length ? <ul className="pos-lines new">{cart.map((line) => <li key={line.key}>
@@ -149,19 +173,47 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       <form className="pos-number" onSubmit={byNumber}>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("dishNumber")} aria-label={t("dishNumber")} autoFocus />
       </form>
+      <button type="button" className={`pos-soldout-mode ${soldOutMode ? "on" : ""}`} aria-pressed={soldOutMode} onClick={() => setSoldOutMode((on) => !on)}>{t(soldOutMode ? "soldOutModeOn" : "soldOutMode")}</button>
       <nav className="pos-categories">
         <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
         {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>{entry}</button>)}
       </nav>
-      <div className="pos-dishes">{shown.map((product) => <button key={product.id} type="button" data-sku={product.sku} onClick={() => pick(product)}>
+      <div className={`pos-dishes ${soldOutMode ? "choosing-soldout" : ""}`}>{shown.map((product) => <button key={product.id} type="button" data-sku={product.sku}
+        className={product.available ? "" : "soldout"} aria-disabled={!product.available && !soldOutMode}
+        onClick={() => void (soldOutMode ? toggleSoldOut(product) : pick(product))}>
         <small>{product.sku}</small>
         <b>{name(product)}</b>
-        <span>{money(product.priceCents)}</span>
+        <span>{product.available ? money(product.priceCents) : t("soldOut")}</span>
       </button>)}</div>
     </div>
 
+    {voiding && <VoidDialog pos={pos} item={voiding} onCancel={() => setVoiding(null)} onVoid={(quantity, reason) => void voidLine(voiding, quantity, reason)} />}
     {choosing && <ModifierPicker pos={pos} product={choosing} onCancel={() => setChoosing(null)} onAdd={(modifiers) => { add(choosing, modifiers); setChoosing(null); }} />}
   </section>;
+}
+
+/** 退菜: how many of a sent dish go back, and why — the kitchen gets a void ticket. */
+function VoidDialog({ pos, item, onVoid, onCancel }: { pos: Pos; item: ApiBill["items"][number]; onVoid: (quantity: number, reason: string) => void; onCancel: () => void }) {
+  const { t, language } = pos;
+  const [quantity, setQuantity] = useState(1);
+  const [reason, setReason] = useState("");
+  const reasons = [t("voidReasonGuest"), t("voidReasonWrong"), t("voidReasonKitchen"), t("voidReasonWait")];
+  return <div className="pos-modal" role="dialog" aria-label={t("void")}>
+    <form className="pos-card pos-void-form" onSubmit={(event) => { event.preventDefault(); if (reason.trim()) onVoid(quantity, reason.trim()); }}>
+      <h2>{t("voidOf", { name: item.names?.[language] || item.name })}</h2>
+      <span className="pos-stepper">
+        <button type="button" aria-label="−" disabled={quantity <= 1} onClick={() => setQuantity(quantity - 1)}>−</button>
+        <b>{quantity}/{item.qty}</b>
+        <button type="button" aria-label="+" disabled={quantity >= item.qty} onClick={() => setQuantity(quantity + 1)}>+</button>
+      </span>
+      <div className="pos-options">{reasons.map((option) => <button key={option} type="button" className={reason === option ? "on" : ""} aria-pressed={reason === option} onClick={() => setReason(option)}>{option}</button>)}</div>
+      <label><span>{t("voidReason")}</span><input value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} /></label>
+      <div className="pos-modal-actions">
+        <button type="button" onClick={onCancel}>{t("cancel")}</button>
+        <button type="submit" className="pos-primary pos-danger" disabled={!reason.trim()}>{t("voidConfirm")}</button>
+      </div>
+    </form>
+  </div>;
 }
 
 /** A dish's options: one of a "single" group, any of a "multi" group. */

@@ -61,6 +61,12 @@ export function Records({ pos, go }: { pos: Pos; go: (screen: Screen) => void })
       await load();
     } catch (error) { pos.failed(error); }
   }
+  async function reprint(receipt: ApiReceipt) {
+    try {
+      await api.reprintReceipt(receipt.id);
+      pos.notify(t("reprinted", { no: receipt.receiptNo }));
+    } catch (error) { pos.failed(error); }
+  }
   async function settle() {
     try {
       const { settlement } = await api.settle(whose === pos.staff.id ? undefined : whose);
@@ -110,6 +116,7 @@ export function Records({ pos, go }: { pos: Pos; go: (screen: Screen) => void })
         {mine && mine.receipts ? <>
           <p>{t("settlementOf", { name: whoseName })} · {t("settlementLead", { count: mine.receipts, first: mine.firstReceiptNo ?? "", last: mine.lastReceiptNo ?? "" })}</p>
           {figures(mine)}
+          {mine.voids?.count ? <p className="pos-voids">{t("voidsLine", { count: mine.voids.count, amount: money(mine.voids.cents) })}</p> : null}
           <p className="pos-cash">{t("cashToHandIn")}: <b>{money(mine.payments.cash)}</b></p>
           <button type="button" className="pos-primary" onClick={() => void settle()}>{t("settle")}</button>
         </> : <p className="pos-muted">{t("settlementNothing")}</p>}
@@ -150,7 +157,10 @@ export function Records({ pos, go }: { pos: Pos; go: (screen: Screen) => void })
           {receipt.cancelledBy && <em>{t("cancelled")}</em>}
         </span>
         <strong>{money(receipt.totalCents)}</strong>
-        {manager && receipt.type === "sale" && !receipt.cancelledBy ? <button type="button" onClick={() => void storno(receipt)}>{t("storno")}</button> : <span />}
+        <span className="pos-receipt-actions">
+          <button type="button" onClick={() => void reprint(receipt)}>{t("reprint")}</button>
+          {manager && receipt.type === "sale" && !receipt.cancelledBy ? <button type="button" onClick={() => void storno(receipt)}>{t("storno")}</button> : null}
+        </span>
       </li>)}</ul>
     </article>
   </section>;

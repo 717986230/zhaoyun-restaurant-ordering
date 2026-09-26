@@ -248,7 +248,7 @@ export function tableOverviewView(row, orders = [], fallbackTable = "", claim = 
     state: view.locked ? "locked" : open.length ? "seated" : "free",
     orders: open,
     // What is still to pay: a line a receipt paid for is off the table's total.
-    total: open.reduce((sum, order) => sum + order.items.reduce((part, item) => part + Math.round(item.unitPrice * 100) * (item.qty - (item.paid ?? 0)), 0), 0) / 100,
+    total: open.reduce((sum, order) => sum + order.items.reduce((part, item) => part + Math.round(item.unitPrice * 100) * (item.qty - (item.paid ?? 0) - (item.voided ?? 0)), 0), 0) / 100,
     since: open.length ? open.map((order) => order.createdAt).sort()[0] : null,
     // Open on a POS right now, and by whom.
     openOn: claim ? { staffId: claim.staffId, staffName: claim.staffName } : null
@@ -407,13 +407,15 @@ export function orderView(row, itemRows = []) {
     table: row.table_no,
     status: row.status,
     note: row.note,
-    total: row.total_cents / 100,
+    // As ordered, less what was voided since.
+    total: (row.total_cents - itemRows.reduce((sum, item) => sum + item.unit_price_cents * (item.voided_quantity ?? 0), 0)) / 100,
     items: itemRows.map((item) => ({
       id: item.product_id,
       name: item.product_name,
       qty: item.quantity,
-      // How much of the line receipts have paid for (ORDER_ITEMS_SQL).
+      // How much of the line receipts have paid for, and how much was voided (ORDER_ITEMS_SQL).
       paid: item.paid_quantity ?? 0,
+      voided: item.voided_quantity ?? 0,
       unitPrice: item.unit_price_cents / 100,
       printStation: item.print_station,
       vatPercent: item.vat_percent,
@@ -1002,8 +1004,8 @@ export function billView(tableNo, orderRows, itemsByOrderId, productsById, issue
 
   for (const order of orderRows) {
     for (const row of itemsByOrderId.get(order.id) ?? []) {
-      // What receipts have paid for is off the bill; a line paid in full is gone.
-      const quantity = row.quantity - (row.paid_quantity ?? 0);
+      // What receipts have paid for, or a void took back, is off the bill; a line settled in full is gone.
+      const quantity = row.quantity - (row.paid_quantity ?? 0) - (row.voided_quantity ?? 0);
       if (quantity <= 0) continue;
       const lineCents = row.unit_price_cents * quantity;
       const vatPercent = row.vat_percent;

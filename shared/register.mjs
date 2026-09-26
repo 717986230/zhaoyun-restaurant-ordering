@@ -37,8 +37,13 @@ const PAID_QUANTITY = `(SELECT COALESCE(SUM(receipt_items.quantity), 0) FROM rec
     WHERE receipt_items.order_item_id = order_items.id
       AND NOT EXISTS (SELECT 1 FROM receipts AS storno WHERE storno.refers_to = receipt_items.receipt_id))`;
 
-/** An order's lines, with their VAT split and how much of each is paid. */
-export const ORDER_ITEMS_SQL = `SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity
+/** How much of an order line was voided after it went to the kitchen (order_item_voids). */
+const VOIDED_QUANTITY = `(SELECT COALESCE(SUM(order_item_voids.quantity), 0) FROM order_item_voids
+    WHERE order_item_voids.order_item_id = order_items.id)`;
+
+/** An order's lines, with their VAT split and how much of each is paid, and voided. */
+export const ORDER_ITEMS_SQL = `SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity,
+  ${VOIDED_QUANTITY} AS voided_quantity
 FROM order_items LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id
 WHERE order_items.order_id = ?`;
 
@@ -48,7 +53,7 @@ WHERE order_items.order_id = ?`;
  * while the kitchen ticket was in the kitchen's.
  */
 export const CHECKOUT_ITEMS_SQL = `SELECT order_items.*, orders.table_no, orders.status, orders.billed_at, orders.order_no,
-  order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity,
+  order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity, ${VOIDED_QUANTITY} AS voided_quantity,
   products.name_zh AS name_zh, products.name_de AS name_de, products.name_en AS name_en
 FROM order_items JOIN orders ON orders.id = order_items.order_id
 LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id
@@ -76,13 +81,61 @@ export const OPEN_RECEIPTS_SQL = "SELECT * FROM receipts WHERE receipt_no > COAL
 export const TABLE_PAID_SQL = `NOT EXISTS (
   SELECT 1 FROM order_items JOIN orders AS open_orders ON open_orders.id = order_items.order_id
   WHERE open_orders.table_no = ? AND open_orders.billed_at IS NULL AND open_orders.status <> 'cancelled'
-    AND order_items.quantity > (SELECT COALESCE(SUM(receipt_items.quantity), 0) FROM receipt_items
-      WHERE receipt_items.order_item_id = order_items.id
-        AND NOT EXISTS (SELECT 1 FROM receipts AS storno WHERE storno.refers_to = receipt_items.receipt_id)))`;
+    AND order_items.quantity > ${PAID_QUANTITY} + ${VOIDED_QUANTITY})`;
 export const SETTLE_PAID_TABLE_SQL = `UPDATE orders SET billed_at = ?, updated_at = ?
   WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled' AND ${TABLE_PAID_SQL}`;
 export const UNLOCK_PAID_TABLE_SQL = `UPDATE restaurant_tables SET locked_at = NULL, updated_at = ?
   WHERE table_no = ? AND ${TABLE_PAID_SQL}`;
+
+/** What of an order line is still to pay: ordered, less paid, less voided. */
+export function openQuantity(row) {
+  return row.quantity - (row.paid_quantity ?? 0) - (row.voided_quantity ?? 0);
+}
+
+/** An order line as a void needs it: its order, what is paid and voided, and the dish's names for the kitchen. */
+export const VOID_ITEM_SQL = CHECKOUT_ITEMS_SQL.replace("WHERE order_items.id IN (?)", "WHERE order_items.id = ?");
+export const INSERT_VOID_SQL = `INSERT INTO order_item_voids (id, order_item_id, order_id, table_no, quantity, amount_cents, reason, staff_id, staff_name, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+/**
+ * Takes dishes already sent to the kitchen off a table's bill (退菜 /
+ * Storno vor Bezahlung): the guest changed their mind, or the dish went
+ * wrong. Nothing is rewritten — the order stays as it was sent, and the void
+ * is a record of its own, with its reason and who did it — and the kitchen
+ * gets a void ticket, so it stops cooking. Only what is still open (not
+ * paid, not voided) may go.
+ */
+export function planVoid(input, row, { table, staff = null, role, at = now() }) {
+  if (!row || row.table_no !== table || row.billed_at || row.status === "cancelled") {
+    throw Object.assign(new Error("That dish is not open on this table"), { code: "NOT_FOUND" });
+  }
+  const reason = String(input?.reason ?? "").trim().slice(0, 200);
+  if (!reason) throw new Error("A void says why");
+  const open = openQuantity(row);
+  const quantity = Number(input?.quantity);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > open) throw new Error(`Only ${open} of this dish can be voided`);
+  const amountCents = row.unit_price_cents * quantity;
+  const staffName = staff?.name ?? null;
+  const modifiers = parseJson(row.modifiers_json, []);
+  return {
+    void: { id: uuid(), orderItemId: row.id, orderId: row.order_id, table, quantity, amountCents, reason, staffId: staff?.id ?? null, staffName, at },
+    printJob: {
+      id: uuid(),
+      orderId: row.order_id,
+      printerRole: row.print_station,
+      payloadJson: JSON.stringify({
+        kind: "void", orderNo: row.order_no, table, reason,
+        items: [{ name: row.product_name, names: { zh: row.name_zh, de: row.name_de, en: row.name_en }, quantity, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names })) }],
+        ...(staffName ? { staffName } : {})
+      })
+    },
+    journal: {
+      kind: "item.voided",
+      ref: row.order_id,
+      payload: { orderItemId: row.id, orderNo: row.order_no, table, productId: row.product_id, name: row.product_name, quantity, unitPriceCents: row.unit_price_cents, amountCents, reason, staffName, role }
+    }
+  };
+}
 
 /** What the journal keeps of a new order: every line, at its price and rates. */
 export function orderJournalPayload(plan) {
@@ -223,7 +276,7 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
     if (table && String(row.table_no).toUpperCase() !== table.toUpperCase()) throw new Error("A receipt is for one table");
     table = String(row.table_no);
     const quantity = Number(request.quantity);
-    const open = row.quantity - (row.paid_quantity ?? 0);
+    const open = openQuantity(row);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > open) throw new Error(`Only ${open} of ${row.product_name} are left to pay`);
     const unitSplit = parseJson(row.vat_split_json, null) ?? [{ percent: row.vat_percent, cents: row.unit_price_cents }];
     const split = unitSplit.map((part) => ({ percent: part.percent, cents: part.cents * quantity }));
@@ -423,8 +476,9 @@ export function companyOf(settings) {
 }
 
 /** What goes to the front printer for a receipt. */
-export function receiptPrintPayload(view, settings) {
-  return { kind: "receipt", company: companyOf(settings), receipt: view };
+/** `copy`: a receipt printed again (Belegkopie), marked so on paper. */
+export function receiptPrintPayload(view, settings, { copy = false } = {}) {
+  return { kind: "receipt", company: companyOf(settings), receipt: view, ...(copy ? { copy: true } : {}) };
 }
 
 /** What goes to the front printer for a day's closing. */

@@ -18,16 +18,16 @@ import { Value } from "@sinclair/typebox/value";
 import { createStore } from "./store.mjs";
 import { openLive, publishLive } from "./live.mjs";
 import { liveEvent } from "../shared/live.mjs";
+import {
+  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
+  SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody
+} from "../src/contracts.js";
+import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
 export { LiveHub } from "./live.mjs";
 
 /** Responses that changed nothing anyone watches (a POS keeping its table): no live event. */
 const QUIET = new WeakSet();
-import {
-  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
-  SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody
-} from "../src/contracts.js";
-import { menuSettingsView, resolveStaffRole, roleAllows } from "../shared/rules.mjs";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 
@@ -386,6 +386,25 @@ async function handle(request, env) {
         const moved = await store.moveTable(path[3], value.to, pos);
         return moved ? json(moved) : fail("Nothing open on that table", 404);
       }
+      if (path.length === 5 && path[2] === "tables" && path[4] === "void" && method === "POST") {
+        const { value, invalid } = await body(request, VoidBody);
+        if (invalid) return invalid;
+        try {
+          return json({ void: await store.voidItem(path[3], value, pos, role) }, 201);
+        } catch (error) {
+          if (error.code === "NOT_FOUND") return fail(error.message, 404);
+          throw error;
+        }
+      }
+      if (path.length === 3 && path[2] === "catalog" && method === "GET") {
+        return json({ products: (await store.listProducts(false)).filter((product) => product.published) });
+      }
+      if (path.length === 5 && path[2] === "products" && path[4] === "availability" && method === "PUT") {
+        const { value, invalid } = await body(request, AvailabilityBody);
+        if (invalid) return invalid;
+        const product = await store.setAvailable(path[3], value.available);
+        return product ? json({ product }) : fail("No such dish on the menu", 404);
+      }
       if (path.length === 3 && path[2] === "settlement") {
         const { value } = method === "POST" ? await body(request, SettlementBody) : { value: {} };
         const staffId = value?.staffId ?? url.searchParams.get("staffId") ?? pos.staff.id;
@@ -522,6 +541,12 @@ async function handle(request, env) {
       } catch (error) {
         return fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400);
       }
+    }
+    // A receipt printed again for the guest, marked as a copy (Belegkopie).
+    if (path.length === 5 && path[2] === "receipts" && path[4] === "print" && method === "POST") {
+      const { denied } = await gate("staff");
+      if (denied) return denied;
+      return (await store.reprintReceipt(path[3])) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("No such receipt", 404);
     }
     if (path[2] === "receipts" && method === "GET" && path.length <= 4) {
       const { denied } = await gate("staff");

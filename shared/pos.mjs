@@ -96,9 +96,10 @@ export function assertClaim(row, deviceId, at = now()) {
  * A waiter's settlement: the receipts they took since their last one — how
  * much in cash they hand in, by card, by voucher, the sales and stornos.
  */
-export function settlementTotals(rows) {
+/** A waiter's receipts since their last settlement, and the dishes they voided (OPEN_STAFF_VOIDS_SQL). */
+export function settlementTotals(rows, voidRows = []) {
   const totals = closingTotals(rows);
-  return { ...totals, receipts: rows.length };
+  return { ...totals, receipts: rows.length, voids: { count: voidRows.length, cents: voidRows.reduce((sum, row) => sum + row.amount_cents, 0) } };
 }
 
 export function settlementView(row) {
@@ -115,6 +116,13 @@ export function settlementView(row) {
 /** The receipts a waiter took since their last settlement. */
 export const OPEN_STAFF_RECEIPTS_SQL = `SELECT * FROM receipts WHERE staff_id = ?
   AND receipt_no > COALESCE((SELECT MAX(last_receipt_no) FROM staff_settlements WHERE staff_id = ?), 0) ORDER BY receipt_no`;
+
+/** Sold out (沽清) or back on: a published dish only. Guests' menus drop it at once (catalog.changed). */
+export const SET_AVAILABLE_SQL = "UPDATE products SET available = ?, updated_at = ? WHERE id = ? AND published = 1";
+
+/** The dishes a waiter voided since their last settlement. */
+export const OPEN_STAFF_VOIDS_SQL = `SELECT * FROM order_item_voids WHERE staff_id = ?
+  AND created_at > COALESCE((SELECT MAX(created_at) FROM staff_settlements WHERE staff_id = ?), '') ORDER BY created_at`;
 
 /** Who is signed in on which device right now. */
 export const LIVE_POS_SESSIONS_SQL = `SELECT pos_sessions.staff_id, pos_devices.name AS device_name

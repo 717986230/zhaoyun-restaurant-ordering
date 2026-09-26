@@ -1,7 +1,7 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosDevice, PosClaim, PosSettlement,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
@@ -385,7 +385,16 @@ export class PosApi {
     try { await this.#request("/api/pos/sign-out", { method: "POST" }); } finally { localStorage.removeItem("zy_pos_session"); }
   }
 
-  catalog(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/catalog"); }
+  /** Every published dish, the sold-out ones too (marked), so they can be switched back on. */
+  catalog(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/pos/catalog"); }
+  /** 沽清: sold out, or back on. The guests' menus follow at once. */
+  setAvailable(productId: string, available: boolean): Promise<{ product: ApiCatalogProduct }> {
+    return this.#request(`/api/pos/products/${encodeURIComponent(productId)}/availability`, { method: "PUT", body: JSON.stringify({ available }) });
+  }
+  /** 退菜: dishes sent to the kitchen taken off the bill, with a reason; the kitchen gets a void ticket. */
+  voidItem(table: string, orderItemId: string, quantity: number, reason: string): Promise<{ void: PosVoid }> {
+    return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/void`, { method: "POST", body: JSON.stringify({ orderItemId, quantity, reason }) });
+  }
   floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
   /** The POS's live channel: every change on the floor, whoever made it. */
   live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
@@ -401,6 +410,8 @@ export class PosApi {
   checkout(command: CheckoutCommand): Promise<{ receipt: ApiReceipt }> { return this.#request("/api/admin/checkout", { method: "POST", body: JSON.stringify(command) }); }
   receipts(limit = 50): Promise<{ receipts: ApiReceipt[] }> { return this.#request(`/api/admin/receipts?limit=${limit}`); }
   stornoReceipt(id: string, reason: string): Promise<{ receipt: ApiReceipt }> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/storno`, { method: "POST", body: JSON.stringify({ reason }) }); }
+  /** The receipt on the front printer again, marked as a copy (Belegkopie). */
+  reprintReceipt(id: string): Promise<void> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/print`, { method: "POST" }); }
   voucher(code: string): Promise<{ voucher: ApiVoucher }> { return this.#request(`/api/admin/vouchers/${encodeURIComponent(code)}`); }
   settlement(staffId?: string): Promise<{ totals: PosSettlement["totals"] }> { return this.#request(`/api/pos/settlement${staffId ? `?staffId=${encodeURIComponent(staffId)}` : ""}`); }
   settle(staffId?: string): Promise<{ settlement: PosSettlement }> { return this.#request("/api/pos/settlement", { method: "POST", body: JSON.stringify(staffId ? { staffId } : {}) }); }

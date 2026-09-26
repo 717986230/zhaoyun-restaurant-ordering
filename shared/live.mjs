@@ -26,10 +26,12 @@ const SILENT = [
   /^\/api\/admin\/(staff|pos-devices|printers)(\/|$)/,
   // A print agent asks for work every few seconds; what it takes is nobody's news.
   /^\/api\/admin\/print-jobs\/[^/]+\/(claim|complete)$/,
-  /^\/api\/admin\/print-jobs\/claim$/
+  /^\/api\/admin\/print-jobs\/claim$/,
+  // A receipt printed again changes nothing.
+  /^\/api\/admin\/receipts\/[^/]+\/print$/
 ];
 
-const CATALOG = /^\/api\/admin\/(products|categories|settings)(\/|$)/;
+const CATALOG = /^\/api\/(admin\/(products|categories|settings)|pos\/products)(\/|$)/;
 const TABLE_IN_PATH = /\/tables\/([^/]+)(\/|$)/;
 
 /**
