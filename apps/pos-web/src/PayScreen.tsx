@@ -70,7 +70,9 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const remaining = totalCents - paidCents;
   const cash = payments.find((payment) => payment.type === "cash" && payment.tendered);
   const change = cash ? toCents(cash.tendered) - toCents(cash.amount) : 0;
-  const canIssue = totalCents > 0 && remaining === 0 && change >= 0 && !busy;
+  // A reward bought with points is a receipt of nothing to pay: no payment on it.
+  const picked = Object.values(picks).some((count) => count > 0);
+  const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && !busy;
 
   const setMode = (next: boolean) => {
     setSeparate(next);
@@ -160,6 +162,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
         <button type="button" aria-label={t("remove")} onClick={() => setPayments((current) => current.filter((_, at) => at !== index))}>✕</button>
       </li>)}</ul>
       {change > 0 && <p className="pos-change">{t("change", { amount: money(change) })}</p>}
+      {picked && totalCents === 0 && <p className="pos-remaining">{t("payNothing")}</p>}
       {totalCents > 0 && remaining !== 0 && <p className="pos-remaining">{remaining > 0 ? t("remaining", { amount: money(remaining) }) : t("over", { amount: money(-remaining) })}</p>}
       <button type="button" className="pos-primary pos-issue" disabled={!canIssue} onClick={() => void issue()}>{t("issue")}</button>
     </div>

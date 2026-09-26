@@ -20,6 +20,7 @@ Node 服务器和 Cloudflare Worker 共用这些模块，`shared/contract-suite.
 | 点单 | `GET /api/pos/catalog` · `POST /api/pos/orders` · `POST /api/pos/tables/:table/void` · `PUT /api/pos/products/:id/availability` |
 | 结账 | `GET /api/admin/tables/:table/bill` · `POST /api/admin/tables/:table/bill/print` · `POST /api/admin/checkout` · `GET /api/admin/receipts` · `POST /api/admin/receipts/:id/print` · `POST /api/admin/receipts/:id/storno` |
 | 结算与日志 | `GET/POST /api/pos/settlement` · `GET /api/pos/settlements` · `GET/POST /api/admin/day-closings` · `GET /api/admin/journal` |
+| 开台（顾客扫码点餐） | `POST /api/admin/tables/:table/ordering`，见 `docs/GUESTS.md` |
 | 实时 | `GET /ws?role=staff`（管理台、POS）· `GET /ws`（顾客菜单）：`{ type: "connected" \| "floor.changed" \| "catalog.changed", table?, at }` |
 
 ## 开始使用
@@ -43,6 +44,7 @@ Node 服务器和 Cloudflare Worker 共用这些模块，`shared/contract-suite.
 | 沽清 | 点「沽清 / 恢复」再点菜品：顾客菜单立即下架，POS 上划掉显示、不能再点；再点一次恢复 |
 | 实时同步 | 任何一台设备下单、开桌、结账、退菜，客人扫码下单，其他 POS 和管理台立即刷新（`/ws`，推送只带「哪桌有变化」，不带数据）；断线时自动重连并定时刷新 |
 | 桌号锁（Tischsperre） | 一张桌同一时间只在一台设备上打开；30 秒心跳续期，90 秒无心跳自动释放；别的设备打开时提示是谁在用，经理可强制接管 |
+| 开台扫码 | 点单界面「开台扫码」：这桌的客人可以用手机扫码点餐，直接出单；结清、到时或「关闭扫码」后关闭。桌台上标「扫码」，线上外带单标「线上自取」。见 `docs/GUESTS.md` |
 | 外带 / 自取 | 「+ 外带自取」生成当天的取餐号（虚拟桌 `TA-n`），结账时自动带外带折扣 |
 | 转桌 | 客人换桌时把未结订单整体移过去 |
 | 账单 | 打印给客人看的账单（不是收据） |

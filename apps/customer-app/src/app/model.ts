@@ -1,12 +1,25 @@
 import { useEffect, useReducer } from "react";
-import type { CreateOrderCommand } from "@zhaoyun/contracts";
-import type { CartLine, Order, OrderStatus, SelectedModifier, ServiceRequest } from "@zhaoyun/domain";
+import type { ApiOrder, GuestChannel } from "@zhaoyun/contracts";
+import type { SelectedModifier } from "@zhaoyun/domain";
+import { cartKey } from "./cart";
+import type { Cart } from "./cart";
 import { tableNo } from "./table";
 
-export type Screen = "home" | "menu" | "cart" | "orders" | "service" | "staff";
+/** The sheets that open over the menu: the cart, the guest's account, their orders. */
+export type Sheet = "cart" | "account" | "orders" | null;
+
+/** An order this phone placed: enough to follow it, with or without an account. */
+export interface PlacedOrder {
+  clientRequestId: string;
+  id: string;
+  no: string;
+  channel: GuestChannel;
+  table: string;
+  pickupNo?: number;
+  createdAt: string;
+}
 
 export interface CustomerState {
-  screen: Screen;
   table: string;
   category: string;
   query: string;
@@ -15,21 +28,17 @@ export interface CustomerState {
   productFlipped: boolean;
   detailQuantity: number;
   detailModifiers: SelectedModifier[];
-  cart: Record<string, CartLine>;
-  orders: Order[];
-  pendingOrders: Record<string, { command: CreateOrderCommand; attempts: number; nextAttemptAt: number }>;
-  requests: ServiceRequest[];
+  cart: Cart;
+  placed: PlacedOrder[];
+  sheet: Sheet;
   language: "zh" | "de" | "en";
   /** Whether `language` is the guest's own pick. Until it is, the menu follows
    *  the phone's language among the ones the restaurant offers. */
   languageChosen: boolean;
-  /** Last service the guest called, resolved to a name at render time. */
-  lastServiceType: string | null;
   toast: string;
 }
 
 type Action =
-  | { type: "navigate"; screen: Screen }
   | { type: "category"; category: string }
   | { type: "query"; query: string }
   | { type: "toggle-search" }
@@ -38,27 +47,19 @@ type Action =
   | { type: "toggle-product-flip" }
   | { type: "detail-quantity"; quantity: number }
   | { type: "detail-modifiers"; modifiers: SelectedModifier[] }
-  | { type: "add-to-cart"; productId: string; quantity: number; modifiers: SelectedModifier[] }
+  | { type: "add-to-cart"; productId: string; quantity: number; modifiers: SelectedModifier[]; reward?: boolean }
+  | { type: "cart-quantity"; key: string; quantity: number }
   | { type: "clear-cart" }
-  | { type: "order-created"; order: Order }
-  | { type: "order-queued"; order: Order; command: CreateOrderCommand }
-  | { type: "order-synced"; clientRequestId: string }
-  | { type: "order-retry-scheduled"; clientRequestId: string }
-  | { type: "order-status"; orderId: string; clientRequestId?: string; status: OrderStatus; totalCents?: number }
-  | { type: "advance-order"; orderId: string; status: OrderStatus }
-  | { type: "service-created"; request: ServiceRequest }
-  | { type: "service-done"; requestId: string }
+  | { type: "order-placed"; order: ApiOrder; channel: GuestChannel }
+  | { type: "sheet"; sheet: Sheet }
   | { type: "language"; language: CustomerState["language"] }
   | { type: "toast"; message: string };
 
-const storageKey = "zy_customer_state_v4";
-const maxStoredOrders = 50;
-// The menu is the whole guest app now; "home" and the screens it used to lead
-// to (cart, orders, service, staff) stay in the Screen union and the reducer
-// below so ordering can be switched back on without a reducer rewrite, but
-// nothing navigates away from "menu" any more.
+const storageKey = "zy_customer_state_v5";
+const MAX_PLACED = 20;
+const MAX_LINE_QUANTITY = 99;
+
 const initialState: CustomerState = {
-  screen: "menu",
   table: tableNo(),
   category: "ALLE",
   query: "",
@@ -68,27 +69,26 @@ const initialState: CustomerState = {
   detailQuantity: 1,
   detailModifiers: [],
   cart: {},
-  orders: [],
-  pendingOrders: {},
-  requests: [],
+  placed: [],
+  sheet: null,
   language: "de",
   languageChosen: false,
-  lastServiceType: null,
   toast: ""
 };
 
 function hydrate(): CustomerState {
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey) || "null") as Partial<CustomerState> | null;
+    // The version before kept the guest's language too; it comes along once.
+    const stored = JSON.parse(localStorage.getItem(storageKey) || localStorage.getItem("zy_customer_state_v4") || "null") as Partial<CustomerState> | null;
     if (!stored) return initialState;
-    const cart = Object.fromEntries(Object.entries(stored.cart || {}).map(([key, value]) => [key, typeof value === "number" ? { productId: key, quantity: value, modifiers: [] } : value]));
     return {
-      ...initialState, ...stored, cart, pendingOrders: stored.pendingOrders || {},
-      orders: (stored.orders || []).slice(0, maxStoredOrders),
-      table: tableNo(), screen: "menu", activeProductId: null, productFlipped: false, detailModifiers: [], toast: "",
-      // The search box opens closed, so a search left behind would filter the
-      // menu invisibly: a visit starts without one.
-      query: ""
+      ...initialState,
+      category: stored.category ?? initialState.category,
+      language: stored.language ?? initialState.language,
+      languageChosen: stored.languageChosen ?? false,
+      cart: stored.cart && typeof stored.cart === "object" ? Object.fromEntries(Object.entries(stored.cart).filter(([, entry]) => entry && typeof entry === "object" && Array.isArray(entry.modifiers))) : {},
+      placed: Array.isArray(stored.placed) ? stored.placed.slice(0, MAX_PLACED) : [],
+      table: tableNo()
     };
   } catch {
     return initialState;
@@ -97,7 +97,6 @@ function hydrate(): CustomerState {
 
 function reducer(state: CustomerState, action: Action): CustomerState {
   switch (action.type) {
-    case "navigate": return { ...state, screen: action.screen, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "category": return { ...state, category: action.category };
     case "query": return { ...state, query: action.query };
     // Closing the search ends it: a query left behind would go on filtering
@@ -106,42 +105,31 @@ function reducer(state: CustomerState, action: Action): CustomerState {
     case "open-product": return { ...state, activeProductId: action.productId, productFlipped: false, detailQuantity: 1, detailModifiers: [] };
     case "close-product": return { ...state, activeProductId: null, productFlipped: false, detailModifiers: [] };
     case "toggle-product-flip": return { ...state, productFlipped: !state.productFlipped };
-    case "detail-quantity": return { ...state, detailQuantity: Math.max(1, Math.min(99, action.quantity)) };
+    case "detail-quantity": return { ...state, detailQuantity: Math.max(1, Math.min(MAX_LINE_QUANTITY, action.quantity)) };
     case "detail-modifiers": return { ...state, detailModifiers: action.modifiers };
     case "add-to-cart": {
-      const modifierKey = action.modifiers.map((modifier) => modifier.id).sort().join(",");
-      const key = `${action.productId}::${modifierKey}`;
-      const quantity = Math.min(99, (state.cart[key]?.quantity ?? 0) + action.quantity);
-      return { ...state, cart: { ...state.cart, [key]: { productId: action.productId, quantity, modifiers: action.modifiers } } };
+      const key = cartKey(action.productId, action.modifiers, action.reward);
+      const quantity = Math.min(MAX_LINE_QUANTITY, (state.cart[key]?.quantity ?? 0) + action.quantity);
+      return { ...state, cart: { ...state.cart, [key]: { productId: action.productId, quantity, modifiers: action.modifiers, ...(action.reward ? { reward: true } : {}) } } };
+    }
+    case "cart-quantity": {
+      const entry = state.cart[action.key];
+      if (!entry) return state;
+      const cart = { ...state.cart };
+      if (action.quantity <= 0) delete cart[action.key];
+      else cart[action.key] = { ...entry, quantity: Math.min(MAX_LINE_QUANTITY, action.quantity) };
+      return { ...state, cart };
     }
     case "clear-cart": return { ...state, cart: {} };
-    case "order-created": return { ...state, cart: {}, orders: [action.order, ...state.orders].slice(0, maxStoredOrders) };
-    case "order-queued": return {
-      ...state,
-      cart: {},
-      orders: [action.order, ...state.orders].slice(0, maxStoredOrders),
-      pendingOrders: { ...state.pendingOrders, [action.command.clientRequestId]: { command: action.command, attempts: 0, nextAttemptAt: 0 } }
-    };
-    case "order-synced": {
-      const pendingOrders = { ...state.pendingOrders };
-      delete pendingOrders[action.clientRequestId];
-      return { ...state, pendingOrders };
+    case "order-placed": {
+      const { order } = action;
+      const placed: PlacedOrder = {
+        clientRequestId: order.clientRequestId, id: order.id, no: order.no, channel: action.channel, table: order.table, createdAt: order.createdAt,
+        ...(order.pickupNo ? { pickupNo: order.pickupNo } : {})
+      };
+      return { ...state, cart: {}, sheet: "orders", placed: [placed, ...state.placed.filter((entry) => entry.id !== order.id)].slice(0, MAX_PLACED) };
     }
-    case "order-retry-scheduled": {
-      const pending = state.pendingOrders[action.clientRequestId];
-      if (!pending) return state;
-      const attempts = pending.attempts + 1;
-      return { ...state, pendingOrders: { ...state.pendingOrders, [action.clientRequestId]: { ...pending, attempts, nextAttemptAt: Date.now() + Math.min(60_000, 2_000 * 2 ** Math.min(attempts, 5)) } } };
-    }
-    case "order-status": return {
-      ...state,
-      orders: state.orders.map((order) => order.id === action.orderId || (action.clientRequestId && order.clientRequestId === action.clientRequestId)
-        ? { ...order, status: action.status, totalCents: action.totalCents ?? order.totalCents }
-        : order)
-    };
-    case "advance-order": return { ...state, orders: state.orders.map((order) => order.id === action.orderId ? { ...order, status: action.status } : order) };
-    case "service-created": return { ...state, requests: [action.request, ...state.requests], lastServiceType: action.request.serviceType };
-    case "service-done": return { ...state, requests: state.requests.map((request) => request.id === action.requestId ? { ...request, status: "completed" } : request) };
+    case "sheet": return { ...state, sheet: action.sheet };
     case "language": return { ...state, language: action.language, languageChosen: true };
     case "toast": return { ...state, toast: action.message };
   }
@@ -150,12 +138,14 @@ function reducer(state: CustomerState, action: Action): CustomerState {
 export function useCustomerState() {
   const [state, dispatch] = useReducer(reducer, undefined, hydrate);
   useEffect(() => {
-    const { toast: _toast, activeProductId: _active, productFlipped: _flipped, searchOpen: _search, ...persistent } = state;
-    localStorage.setItem(storageKey, JSON.stringify(persistent));
+    const { category, language, languageChosen, cart, placed } = state;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ category, language, languageChosen, cart, placed }));
+    } catch { /* Private browsing keeps it for this visit only. */ }
   }, [state]);
   useEffect(() => {
     if (!state.toast) return undefined;
-    const timer = window.setTimeout(() => dispatch({ type: "toast", message: "" }), 1600);
+    const timer = window.setTimeout(() => dispatch({ type: "toast", message: "" }), 2200);
     return () => window.clearTimeout(timer);
   }, [state.toast]);
   return { state, dispatch };

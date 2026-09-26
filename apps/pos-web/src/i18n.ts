@@ -132,7 +132,15 @@ const zh = {
   journalOk: "已校验 {count} 条，链条完整",
   journalBroken: "第 {seq} 条起链条断裂！",
   failed: "操作没有成功",
-  offline: "连不上服务器"
+  offline: "连不上服务器",
+  guestOrderingOpen: "开台扫码",
+  guestOrderingClose: "关闭扫码",
+  guestOrderingOn: "可扫码点餐至 {time}",
+  guestOrderingOpened: "{table} 桌已开台，客人可以扫码点餐",
+  guestOrderingClosed: "{table} 桌已关闭扫码点餐",
+  qrBadge: "扫码",
+  pickupBadge: "线上自取",
+  payNothing: "积分兑换，无需付款",
 };
 
 type Copy = typeof zh;
@@ -263,7 +271,15 @@ const de: Copy = {
   journalOk: "{count} Einträge geprüft, Kette intakt",
   journalBroken: "Kette ab Eintrag {seq} unterbrochen!",
   failed: "Das hat nicht geklappt",
-  offline: "Server nicht erreichbar"
+  offline: "Server nicht erreichbar",
+  guestOrderingOpen: "QR-Bestellung frei",
+  guestOrderingClose: "QR-Bestellung schließen",
+  guestOrderingOn: "Gäste bestellen bis {time}",
+  guestOrderingOpened: "Tisch {table}: Gäste können per QR bestellen",
+  guestOrderingClosed: "Tisch {table}: QR-Bestellung geschlossen",
+  qrBadge: "QR",
+  pickupBadge: "Online",
+  payNothing: "Prämie, nichts zu zahlen",
 };
 
 const en: Copy = {
@@ -392,7 +408,15 @@ const en: Copy = {
   journalOk: "{count} entries checked, the chain is intact",
   journalBroken: "The chain is broken from entry {seq}!",
   failed: "That did not work",
-  offline: "Cannot reach the server"
+  offline: "Cannot reach the server",
+  guestOrderingOpen: "Open for QR orders",
+  guestOrderingClose: "Close QR orders",
+  guestOrderingOn: "Guests order until {time}",
+  guestOrderingOpened: "Table {table}: guests may order by QR",
+  guestOrderingClosed: "Table {table}: QR ordering closed",
+  qrBadge: "QR",
+  pickupBadge: "Online",
+  payNothing: "Reward, nothing to pay",
 };
 
 const copies: Record<PosLanguage, Copy> = { zh, de, en };

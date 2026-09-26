@@ -2939,3 +2939,189 @@ em.voided {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ——— Guests: ordering from the menu, accounts, points (features/guests). */
+.table-ordering {
+  align-self: flex-start;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  color: var(--a-accent-ink);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.guest-ordering .settings-switch + .settings-switch {
+  margin-top: 2px;
+}
+
+.hours-list,
+.reward-rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hours-list li,
+.reward-rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-sunken);
+}
+
+.hours-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hours-row input[type="time"],
+.reward-rows input,
+.reward-add select,
+.customer-search {
+  min-height: 36px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font: inherit;
+  padding: 4px 8px;
+}
+
+.reward-rows li span {
+  flex: 1 1 180px;
+}
+
+.reward-rows input {
+  width: 96px;
+}
+
+.reward-add {
+  display: flex;
+  gap: 8px;
+}
+
+.reward-add select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.customer-list {
+  display: grid;
+  gap: 10px;
+}
+
+.customer-search {
+  width: 100%;
+}
+
+.customer-list .staff-list li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.customer-list .staff-actions {
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+}
+
+.customer-name {
+  display: grid;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--a-ink);
+  text-align: left;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.customer-name small,
+.customer-history small {
+  color: var(--a-muted);
+}
+
+.customer-points {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ghost-action.danger {
+  color: var(--a-danger);
+  border-color: var(--a-danger-line);
+}
+
+.customer-history {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+}
+
+.customer-history ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.customer-history li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* A switch inside a form reads as one line, like everywhere else on the settings page. */
+.editor-form .settings-switch {
+  display: flex;
+  grid-template-columns: none;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.editor-form .settings-switch span {
+  color: var(--a-ink);
+}
+
+.hours-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.hours-list li .settings-hint {
+  grid-column: 1 / 2;
+  margin: 0;
+}
+
+.hours-list li .ghost-action {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+
+.hours-row .schedule-days {
+  flex: 1 1 280px;
+}
+
+.hours-row .schedule-days button {
+  min-width: 34px;
+}
+
+.editor-form .hours-row input[type="time"] {
+  width: auto;
+  min-width: 120px;
+}

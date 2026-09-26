@@ -22,6 +22,9 @@ export const LIVE_ROLES = ["staff", "guest"];
 /** Writes that change nothing anyone else is looking at. */
 const SILENT = [
   /^\/api\/account(\/|$)/,
+  // A guest's account, favourites and points are theirs alone; the console's list of guests too.
+  /^\/api\/customer(\/|$)/,
+  /^\/api\/admin\/customers(\/|$)/,
   /^\/api\/pos\/(sign-in|sign-out)$/,
   /^\/api\/admin\/(staff|pos-devices|printers)(\/|$)/,
   // A print agent asks for work every few seconds; what it takes is nobody's news.

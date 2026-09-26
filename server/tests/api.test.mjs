@@ -3,8 +3,28 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { buildServer } from "../index.mjs";
+import { buildServer as build } from "../index.mjs";
 import { renderReceipt } from "../print-agent.mjs";
+
+/**
+ * These tests order the way a guest's phone does. Ordering from the menu is
+ * off until the owner switches it on, and limited when it is
+ * (shared/ordering.mjs, with checks of its own in the contract suite); here it
+ * is on, with the limits out of the way.
+ */
+async function buildServer(options) {
+  const app = await build(options);
+  if (!options.isProduction && options.adminToken) {
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/api/admin/settings",
+      headers: { "x-admin-token": options.adminToken },
+      payload: { guestOrdering: { enabled: true, requireOpenTable: false, minIntervalSeconds: 0, maxItems: 200, maxOrderCents: 1_000_000 } }
+    });
+    assert.equal(saved.statusCode, 200);
+  }
+  return app;
+}
 
 test("catalog, orders, service requests and print routing work together", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-api-"));

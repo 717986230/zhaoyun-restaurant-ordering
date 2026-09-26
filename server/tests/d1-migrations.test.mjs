@@ -40,7 +40,8 @@ const incremental = [
   { file: "0053_order_item_vat_split.sql", drop: "DROP TABLE order_item_vat_splits;" },
   { file: "0054_register.sql", drop: "DROP INDEX idx_receipts_one_storno; DROP INDEX idx_receipt_items_item; DROP TABLE journal; DROP TABLE staff_settlements; DROP TABLE order_staff; DROP TABLE table_claims; DROP TABLE pos_sessions; DROP TABLE staff; DROP TABLE pos_devices; DROP TABLE day_closings; DROP TABLE vouchers; DROP TABLE receipt_items; DROP TABLE receipts;" },
   { file: "0055_accounts.sql", drop: "DROP INDEX idx_account_sessions_expiry; DROP TABLE account_sessions; DROP TABLE accounts;" },
-  { file: "0056_item_voids.sql", drop: "DROP INDEX idx_order_item_voids_staff; DROP INDEX idx_order_item_voids_item; DROP TABLE order_item_voids;" }
+  { file: "0056_item_voids.sql", drop: "DROP INDEX idx_order_item_voids_staff; DROP INDEX idx_order_item_voids_item; DROP TABLE order_item_voids;" },
+  { file: "0057_customers.sql", drop: "DROP INDEX idx_guest_orders_customer; DROP INDEX idx_guest_orders_table; DROP INDEX idx_points_ledger_ref; DROP INDEX idx_points_ledger_customer; DROP INDEX idx_customer_sessions_expiry; DROP TABLE table_sessions; DROP TABLE guest_orders; DROP TABLE points_ledger; DROP TABLE customer_favorites; DROP TABLE customer_sessions; DROP TABLE customers;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")

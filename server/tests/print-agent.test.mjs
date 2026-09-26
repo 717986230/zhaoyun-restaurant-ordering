@@ -70,6 +70,17 @@ test("a kitchen ticket says it is no receipt and carries no price, even from an 
   assert.doesNotMatch(ticket, /2\.50/);
 });
 
+test("a guest's own order says so on the kitchen ticket, and a pickup whose it is", () => {
+  const items = [{ quantity: 1, name: "Ramen", modifiers: [{ name: "积分兑换", names: { zh: "积分兑换", de: "Prämie (Punkte)" } }] }];
+  const atTable = renderReceipt({ orderNo: "A", table: "G1", items, guest: { channel: "dine-in" } }, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(atTable, /GAST-BESTELLUNG \(QR\)/);
+  assert.match(atTable, /Prämie \(Punkte\)/, "a reward is marked as one");
+  const pickup = renderReceipt({ orderNo: "B", table: "TA-7", pickupNo: 7, items, guest: { channel: "pickup", name: "Tao" } }, { capabilities: { printLanguage: "zh", encoding: "utf8" } }).toString("utf8");
+  assert.match(pickup, /线上自取/);
+  assert.match(pickup, /外带 取餐号 7/);
+  assert.match(pickup, /Tao/);
+});
+
 test("a bill line of a set menu split over two rates shows both", () => {
   const bill = {
     kind: "bill", table: "08", total: 12,

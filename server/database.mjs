@@ -11,7 +11,7 @@ import {
   duplicateInput, hashSessionToken, newSessionToken, normalizeCategoryName, normalizeSettingsInput,
   mapProduct, normalizeProduct, planOrder, bundleComponentIds, normalizeVatPercent, DEFAULT_VAT_PERCENT,
   normalizeTableNo, PASSWORD_ITERATIONS, settingsView,
-  orderView as sharedOrderView, renamedCategorySettings, tablesOverviewView, tableView, verifyPassword, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL
+  orderView as sharedOrderView, renamedCategorySettings, tablesOverviewView, tableView, verifyPassword, RECENT_ORDERS_SQL, OPEN_TABLE_ORDERS_SQL, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL
 } from "../shared/rules.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, companyOf, closingView, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL, INSERT_RECEIPT_SQL,
@@ -28,6 +28,12 @@ import {
   DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
   normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
 } from "../shared/account.mjs";
+import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "../shared/customer.mjs";
+import { createCustomerStore } from "../shared/customer-store.mjs";
+import {
+  CLOSE_TABLE_SESSION_SQL, closePaidTableStatements, guestOrderError, LAST_CUSTOMER_PICKUP_SQL, LAST_TABLE_GUEST_ORDER_SQL, LIVE_TABLE_SESSIONS_SQL,
+  moveTableSessionStatements, NEXT_GUEST_PICKUP_SQL, OPEN_PICKUPS_SQL, openTableStatements, pickupDayStart, planGuestOrder, TABLE_SESSION_SQL, tableSessionView
+} from "../shared/ordering.mjs";
 
 // 16 zero bytes. A salt for nobody: signing in against a console that has no
 // password yet still spends the same PBKDF2 work as one that does, so the
@@ -417,6 +423,67 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- Guests' own accounts (shared/customer.mjs): an email and a password,
+    -- their favourite dishes and their points. The balance may never go below
+    -- zero: two orders spending the same points cannot both be written.
+    -- See migrations/0057_customers.sql.
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL DEFAULT '',
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_iterations INTEGER NOT NULL,
+      points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_sessions (
+      token_hash TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_favorites (
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      product_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (customer_id, product_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS points_ledger (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      delta INTEGER NOT NULL,
+      reason TEXT NOT NULL CHECK (reason IN ('earn','reverse','redeem','refund','adjust')),
+      ref TEXT,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    -- A guest's own order from the menu (shared/ordering.mjs): at the table or
+    -- for pickup, by whom when signed in, and the points it spent.
+    CREATE TABLE IF NOT EXISTS guest_orders (
+      order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+      channel TEXT NOT NULL CHECK (channel IN ('dine-in','pickup')),
+      table_no TEXT NOT NULL,
+      pickup_no INTEGER,
+      payment TEXT NOT NULL DEFAULT 'in-store',
+      points_spent INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    -- Tables a waiter opened for guests to order from (开台).
+    CREATE TABLE IF NOT EXISTS table_sessions (
+      table_no TEXT PRIMARY KEY,
+      opened_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      staff_name TEXT
+    );
+
     INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at)
     SELECT 'owner', 'admin', 'Admin', password_hash, password_salt, password_iterations, updated_at, updated_at
     FROM admin_gate WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM accounts);
@@ -433,6 +500,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_order_item_voids_item ON order_item_voids(order_item_id);
     CREATE INDEX IF NOT EXISTS idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_customer_sessions_expiry ON customer_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_points_ledger_customer ON points_ledger(customer_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_points_ledger_ref ON points_ledger(ref, reason);
+    CREATE INDEX IF NOT EXISTS idx_guest_orders_table ON guest_orders(table_no, created_at);
+    CREATE INDEX IF NOT EXISTS idx_guest_orders_customer ON guest_orders(customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
   `);
@@ -496,8 +568,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deleteProduct: db.prepare("DELETE FROM products WHERE id = ?"),
     insertMedia: db.prepare("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"),
     deleteMedia: db.prepare("DELETE FROM product_media WHERE id = ?"),
-    orderByClientId: db.prepare("SELECT * FROM orders WHERE client_request_id = ?"),
-    orderById: db.prepare("SELECT * FROM orders WHERE id = ?"),
+    orderByClientId: db.prepare(ORDER_BY_REQUEST_SQL),
+    orderById: db.prepare(ORDER_BY_ID_SQL),
     orderItems: db.prepare(ORDER_ITEMS_SQL),
     insertVatSplit: db.prepare("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)"),
     lastJournal: db.prepare("SELECT seq, hash FROM journal ORDER BY seq DESC LIMIT 1"),
@@ -711,6 +783,37 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     return getProduct(productId);
   }
 
+  // Statements the shared modules hand over as [sql, params], prepared once each.
+  const prepared = new Map();
+  function prepare(sql) {
+    let statement = prepared.get(sql);
+    if (!statement) {
+      statement = db.prepare(sql);
+      prepared.set(sql, statement);
+    }
+    return statement;
+  }
+  /** Runs [sql, params] pairs inside the caller's transaction. */
+  function runAll(list) {
+    for (const [sql, params] of list) prepare(sql).run(...params);
+  }
+  /** What shared/customer-store.mjs needs of a database (its `driver`). */
+  const driver = {
+    first: async (sql, ...params) => prepare(sql).get(...params) ?? null,
+    all: async (sql, ...params) => prepare(sql).all(...params),
+    run: async (sql, ...params) => Number(prepare(sql).run(...params).changes),
+    batch: async (list) => {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        runAll(list);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    }
+  };
+
   /** The shared view (shared/rules.mjs), with the order's lines read here. */
   function orderView(row) {
     return row ? sharedOrderView(row, statements.orderItems.all(row.id)) : null;
@@ -750,7 +853,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
    * the Worker write the same rows — VAT split and kitchen tickets included.
    * What is left here is reading the products and writing in one transaction.
    */
-  function createOrder(input, pos = null) {
+  function createOrder(input, pos = null, guest = null) {
     const requestId = String(input.clientRequestId || randomUUID());
     const existing = statements.orderByClientId.get(requestId);
     if (existing) return orderView(existing);
@@ -763,8 +866,12 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     for (const item of Array.isArray(input.items) ? input.items : []) load(item.id);
     // The dishes inside a set, for its VAT split.
     for (const id of bundleComponentIds(products.values())) if (!products.has(id)) load(id);
-    const pickupNo = pos && isTakeaway(input.table) ? Number(String(input.table).slice(TAKEAWAY_PREFIX.length)) || null : null;
-    const plan = planOrder({ ...input, clientRequestId: requestId }, products, getSettings(), { staffName: pos?.staff?.name, pickupNo });
+    const settings = getSettings();
+    // A guest's own order is planned with its limits and rewards (shared/ordering.mjs).
+    // Synchronous from here to COMMIT, so nothing else is written between the reads and the write.
+    const guestPlan = guest ? planGuestOrder({ ...input, clientRequestId: requestId }, products, settings, guest, guestReads(input, guest)) : null;
+    const pickupNo = guestPlan ? guestPlan.pickupNo : pos && isTakeaway(input.table) ? Number(String(input.table).slice(TAKEAWAY_PREFIX.length)) || null : null;
+    const plan = guestPlan?.plan ?? planOrder({ ...input, clientRequestId: requestId }, products, settings, { staffName: pos?.staff?.name, pickupNo });
     const { id, orderNo, table, note, totalCents, timestamp } = plan.order;
 
     // A locked table is one whose bill is being settled. Refusing here is the
@@ -792,14 +899,45 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
         if (item.vatSplitJson) statements.insertVatSplit.run(item.id, item.vatSplitJson);
       }
       for (const job of plan.printJobs) statements.insertPrintJob.run(job.id, id, job.printerRole, job.payloadJson, timestamp, timestamp);
-      if (pos) statements.insertOrderStaff.run(id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp);
-      journal("order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}) }, timestamp);
+      if (pos) {
+        statements.insertOrderStaff.run(id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp);
+        // The guests are seated: their phones may order too.
+        runAll(openTableStatements(table, settings, pos.staff?.name));
+      }
+      if (guestPlan) runAll(guestPlan.statements);
+      journal("order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}), ...(guestPlan ? guestPlan.journal : {}) }, timestamp);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
+      if (isOverdrawn(error)) throw guestOrderError("NOT_ENOUGH_POINTS", "Not enough points for this reward", 409);
       throw error;
     }
     return orderView(statements.orderById.get(id));
+  }
+
+  /** What a guest's order is checked against (shared/ordering.mjs, assertGuestOrder). */
+  function guestReads(input, guest) {
+    const at = new Date();
+    const table = String(input.table ?? "").toUpperCase();
+    const dineIn = guest.channel === "dine-in";
+    const last = dineIn ? prepare(LAST_TABLE_GUEST_ORDER_SQL).get(table) : guest.customer ? prepare(LAST_CUSTOMER_PICKUP_SQL).get(guest.customer.id) : null;
+    return {
+      tableSession: dineIn ? prepare(TABLE_SESSION_SQL).get(table) ?? null : null,
+      lastOrderAt: last?.at ?? null,
+      openPickups: guest.customer ? Number(prepare(OPEN_PICKUPS_SQL).get(guest.customer.id).n) : 0,
+      nextPickupNo: dineIn ? null : Number(prepare(NEXT_GUEST_PICKUP_SQL).get(pickupDayStart(at), at.toISOString()).next)
+    };
+  }
+
+  /** A table opened for its guests to order from (开台), or kept open longer. */
+  function openTable(tableInput, pos) {
+    const table = normalizeTableNo(tableInput);
+    runAll(openTableStatements(table, getSettings(), pos?.staff?.name));
+    return tableSessionView(prepare(TABLE_SESSION_SQL).get(table));
+  }
+
+  function closeTable(tableInput) {
+    return prepare(CLOSE_TABLE_SESSION_SQL).run(normalizeTableNo(tableInput)).changes > 0;
   }
 
   /**
@@ -894,7 +1032,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       if (plan.receipt.table) {
         statements.settlePaidTable.run(at, at, plan.receipt.table, plan.receipt.table);
         statements.unlockPaidTable.run(at, plan.receipt.table.toUpperCase(), plan.receipt.table);
+        runAll(closePaidTableStatements(plan.receipt.table));
       }
+      // Points for the signed-in guests whose orders this paid (shared/customer.mjs).
+      runAll(earnPointsStatements(plan.receipt.id, settings.loyalty, at));
       const view = plannedReceiptView(plan.receipt);
       journal("receipt.issued", plan.receipt.id, view, at);
       statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, settings)), at, at);
@@ -925,6 +1066,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       for (const refund of plan.refunds) statements.creditVoucher.run(refund.amountCents, at, refund.code);
       for (const code of plan.voided) statements.voidVoucher.run(at, at, code);
       statements.reopenOrders.run(at, original.id);
+      runAll(reversePointsStatements(plan.receipt.id, original.id, at));
       const view = plannedReceiptView(plan.receipt, original.receipt_no);
       journal("receipt.storno", plan.receipt.id, view, at);
       statements.insertPrintJob.run(randomUUID(), null, "front", JSON.stringify(receiptPrintPayload(view, settings)), at, at);
@@ -1087,6 +1229,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       }
       journal("table.moved", from, { from, to, orders: Number(moved), staffName: pos.staff?.name ?? null }, at);
       statements.releaseClaim.run(from, pos.deviceId, 0);
+      runAll(moveTableSessionStatements(from, to, getSettings(), pos.staff?.name));
       db.exec("COMMIT");
       return { from, to, moved: Number(moved) };
     } catch (error) {
@@ -1183,6 +1326,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       if (status === "cancelled" && statements.orderPaid.get(current.id)) throw new Error("This order is on a receipt; cancel the receipt first");
       const at = now();
       statements.updateOrderStatus.run(status, at, current.id);
+      // A reward's points come back with the order it was in.
+      if (status === "cancelled") runAll(refundPointsStatements(current.id, at));
       journal("order.status", current.id, { orderId: current.id, orderNo: current.order_no, table: current.table_no, from: current.status, to: status }, at);
       db.exec("COMMIT");
     } catch (error) {
@@ -1458,6 +1603,9 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
   seedSetMenus();
   seedPhotos();
 
+  // Guests' accounts, favourites and points: the one implementation both backends share.
+  const customers = createCustomerStore(driver, { ordersFor: async (rows) => rows.map((row) => orderView(row)) });
+
   return {
     close: () => db.close(),
     listProducts,
@@ -1472,6 +1620,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     deleteMedia: (id) => statements.deleteMedia.run(String(id)).changes > 0,
     listOrders: (limit = 100) => statements.listOrders.all(Math.min(Number(limit) || 100, 500)).map(orderView),
     createOrder,
+    /** A guest's own order from the menu (shared/ordering.mjs): `guest` is { channel, customer, payment }. */
+    placeGuestOrder: (input, guest) => createOrder(input, null, guest),
     updateOrder,
     billForTable,
     printTableBill,
@@ -1526,8 +1676,12 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     tablesOverview: () => tablesOverviewView(
       statements.listTables.all(),
       statements.openOrdersForTables.all().map((row) => orderView(row)),
-      statements.liveClaims.all(now()).map((row) => claimView(row))
+      statements.liveClaims.all(now()).map((row) => claimView(row)),
+      prepare(LIVE_TABLE_SESSIONS_SQL).all(now())
     ),
+    openTable,
+    closeTable,
+    customers,
     staffActivity: () => {
       const staffRows = statements.listStaff.all();
       const shifts = new Map(staffRows.map((row) => [row.id, settlementTotals(statements.openStaffReceipts.all(row.id, row.id), statements.openStaffVoids.all(row.id, row.id))]));

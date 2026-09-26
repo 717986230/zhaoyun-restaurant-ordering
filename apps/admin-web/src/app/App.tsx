@@ -14,6 +14,7 @@ import { TablesPanel } from "../features/tables/TablesPanel";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
+import { GuestsPanel } from "../features/guests/GuestsPanel";
 import { BackToTop } from "./BackToTop";
 
 const adminApi = new AdminApi();
@@ -54,7 +55,7 @@ const LIVE_SETTLE_MS = 250;
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
   if (role === "staff") return ["board", "tables"];
-  return showOrdering ? ["catalog", "board", "tables", "printers", "system"] : ["catalog", "system"];
+  return showOrdering ? ["catalog", "board", "tables", "printers", "guests", "system"] : ["catalog", "guests", "system"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
@@ -62,6 +63,7 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
   board: "tabBoard",
   tables: "tabTables",
   printers: "tabPrinters",
+  guests: "tabGuests",
   system: "tabSettings"
 };
 
@@ -531,8 +533,10 @@ export function App() {
         onOpenBill={openBill}
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
         onPrintBill={printBill}
+        onOrdering={(table: string, open: boolean) => runBoardAction(() => adminApi.setTableOrdering(table, open), t(open ? "openForOrdering" : "closeForOrdering"))}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
+      {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel
         api={adminApi}
         notify={notify}

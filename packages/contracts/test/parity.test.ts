@@ -1,10 +1,10 @@
 import { Value } from "@sinclair/typebox/value";
 import { describe, expect, it } from "vitest";
 import {
-  CreateOrderBody, MENU_LANGUAGES, MENU_THEMES, ORDER_STATUSES, OrderStatusBody, PRINT_STATIONS, ProductBody,
+  CreateOrderBody, GuestOrderBody, CheckoutBody, MENU_LANGUAGES, MENU_THEMES, ORDER_STATUSES, OrderStatusBody, PRINT_STATIONS, ProductBody,
   SERVICE_STATUSES, ServiceRequestBody, ServiceStatusBody, SettingsBody, TableBody
 } from "../../../src/contracts.js";
-import type { CreateOrderCommand, CreateServiceRequestCommand, OrderStatus, ServiceStatus } from "../src/index";
+import type { CheckoutCommand, CreateOrderCommand, CreateServiceRequestCommand, GuestOrderCommand, OrderStatus, ServiceStatus } from "../src/index";
 import type { AdminProductInput } from "../../api-client/src/index";
 import { MENU_THEME_IDS } from "../../domain/src/themes";
 import { FEATURED_TEMPLATE_IDS } from "../../domain/src/featured";
@@ -42,6 +42,20 @@ describe("Wire contract parity", () => {
     expect(Value.Check(CreateOrderBody, { ...order, table: "TERRASSE-2" })).toBe(false);
     expect(Value.Check(ServiceRequestBody, { table: "TERRASSE-2", type: "water" })).toBe(false);
     expect(Value.Check(TableBody, { table: "TERRASSE-2" })).toBe(false);
+  });
+
+  it("accepts a guest's order the client type allows, at the table or for pickup", () => {
+    const atTable: GuestOrderCommand = { clientRequestId: "b0d5f2c1-8e4a-4f2a", channel: "dine-in", table: "G5", note: "", payment: "in-store", items: [{ id: "photo-r1", qty: 1, modifiers: [{ id: "extra-noodles" }] }, { id: "photo-n1-6", qty: 1, reward: true }] };
+    const pickup: GuestOrderCommand = { clientRequestId: "b0d5f2c1-8e4a-4f2b", channel: "pickup", note: "", items: [{ id: "photo-r1", qty: 1 }] };
+    expect(Value.Check(GuestOrderBody, atTable)).toBe(true);
+    expect(Value.Check(GuestOrderBody, pickup)).toBe(true);
+    expect(Value.Check(GuestOrderBody, { ...pickup, channel: "delivery" })).toBe(false);
+    expect(Value.Check(GuestOrderBody, { ...pickup, payment: "cash" })).toBe(false);
+  });
+
+  it("takes a receipt of nothing to pay without a payment", () => {
+    const reward: CheckoutCommand = { table: "TA-3", items: [{ orderItemId: "line-1", quantity: 1 }], payments: [] };
+    expect(Value.Check(CheckoutBody, reward)).toBe(true);
   });
 
   it("accepts a service request the client type allows", () => {
