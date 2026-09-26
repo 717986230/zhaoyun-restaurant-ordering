@@ -9,8 +9,8 @@ import { generate, committed } from "../../scripts/bundle-catalog.mjs";
  * server may have stopped issuing, which is the failure the bundled menu exists
  * to avoid. Fail here instead: `npm run catalog:bundle`.
  */
-test("the bundled catalogue matches the seed the server would serve", () => {
-  assert.equal(committed(), generate(), "apps/customer-app/src/app/bundled-catalog.json is stale — run: npm run catalog:bundle");
+test("the bundled catalogue matches the seed the server would serve", async () => {
+  assert.equal(committed(), await generate(), "apps/customer-app/src/app/bundled-catalog.json is stale — run: npm run catalog:bundle");
 });
 
 test("every bundled product carries the fields the app maps", () => {

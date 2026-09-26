@@ -19,7 +19,7 @@
  *   the kitchen, the bill and paying work for it exactly as for a table.
  */
 
-import { now, parseJson } from "./rules.mjs";
+import { now, parseJson } from "./core.mjs";
 import { closingTotals } from "./register.mjs";
 
 export const STAFF_ROLES = ["staff", "manager"];

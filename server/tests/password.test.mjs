@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   assertPassword, hashPassword, PASSWORD_ITERATIONS, verifyPassword, WORKERS_PBKDF2_MAX_ITERATIONS
-} from "../../shared/rules.mjs";
+} from "../../shared/auth.mjs";
 
 /**
  * Deployed Workers refuse PBKDF2 above 100,000 iterations; local `wrangler

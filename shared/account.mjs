@@ -8,9 +8,9 @@
  * that condition itself, so two people registering at once cannot both win.
  *
  * Both backends run these statements and these rules; only the way they
- * reach the database differs (server/database.mjs, workers/store.mjs).
+ * reach the database differs (shared/store.mjs, over each backend's driver).
  */
-import { assertPassword, SESSION_TTL_MS } from "./rules.mjs";
+import { assertPassword, SESSION_TTL_MS } from "./auth.mjs";
 
 export const ACCOUNT_SESSION_TTL_MS = SESSION_TTL_MS;
 /** What a password set at the old one-password door becomes: an account named this. */

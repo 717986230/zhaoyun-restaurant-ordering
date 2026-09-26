@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { hashPassword } from "../../shared/rules.mjs";
+import { hashPassword } from "../../shared/auth.mjs";
 
 const migration = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "migrations", "0055_accounts.sql"), "utf8");
 
@@ -37,7 +37,7 @@ test("a password set at the old door becomes the account admin, on Node and on D
   raw.close();
 
   const database = createDatabase(file);
-  assert.deepEqual(database.accountStatus(), { registered: true });
+  assert.deepEqual(await database.accountStatus(), { registered: true });
   const session = await database.signInAccount("admin", "altes-passwort-1");
   assert.equal(session.account.login, "admin");
   assert.equal((await database.signInAccount("admin", "falsch-falsch")), null);
@@ -63,6 +63,6 @@ test("two registrations at once: one account, the other refused", () => withDire
     database.registerAccount({ login: "second", password: "passwort-zwei" })
   ]);
   assert.equal(results.filter(Boolean).length, 1);
-  assert.equal(database.accountStatus().registered, true);
+  assert.equal((await database.accountStatus()).registered, true);
   database.close();
 }));

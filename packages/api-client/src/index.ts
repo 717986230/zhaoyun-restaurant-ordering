@@ -41,7 +41,7 @@ export function toProduct(product: ApiCatalogProduct): Product {
  * and one newer than the server it talks to would otherwise meet a setting
  * the server has never heard of as `undefined` — and a settings page that
  * lists it would not render. The defaults are the servers' own
- * (shared/rules.mjs, APP_SETTINGS).
+ * (shared/settings.mjs, APP_SETTINGS).
  */
 export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings {
   return {

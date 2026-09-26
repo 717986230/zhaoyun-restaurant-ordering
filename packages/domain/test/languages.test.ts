@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, resolveMenuLanguage } from "../src/languages";
-import { DEFAULT_MENU_LANGUAGES as RULE_DEFAULT, MENU_LANGUAGES as RULE_LANGUAGES } from "../../../shared/rules.mjs";
+import { DEFAULT_MENU_LANGUAGES as RULE_DEFAULT, MENU_LANGUAGES as RULE_LANGUAGES } from "../../../shared/settings.mjs";
 
 describe("menu languages", () => {
   it("agree with the backend's list and default", () => {

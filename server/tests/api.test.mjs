@@ -260,8 +260,8 @@ test("API rejects malformed commands before reaching the database", async (conte
     payload: { clientRequestId: "short", table: "08", note: "", items: [] }
   });
   assert.equal(invalidOrder.statusCode, 400);
-  assert.match(invalidOrder.json().error, /Invalid request/);
-  assert.ok(invalidOrder.json().requestId);
+  // Which field and why, the same words whichever backend answers (shared/http.mjs).
+  assert.match(invalidOrder.json().error, /^Invalid request: body\/clientRequestId /);
 
   const invalidProduct = await app.inject({
     method: "POST",

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { vatSplit } from "../../shared/rules.mjs";
+import { vatSplit } from "../../shared/products.mjs";
 
 /**
  * The journal is only worth anything if a change to it shows. Each entry
@@ -17,8 +17,8 @@ test("the journal shows an entry changed or removed afterwards", async () => {
   const file = path.join(directory, "db.sqlite");
   try {
     const database = createDatabase(file);
-    const dish = database.listProducts().find((product) => product.sku === "R1");
-    for (const n of [1, 2, 3]) database.createOrder({ clientRequestId: `journal-${n}`, table: "05", note: "", items: [{ id: dish.id, qty: n }] });
+    const dish = (await database.listProducts()).find((product) => product.sku === "R1");
+    for (const n of [1, 2, 3]) await database.createOrder({ clientRequestId: `journal-${n}`, table: "05", note: "", items: [{ id: dish.id, qty: n }] });
     const day = new Date().toISOString().slice(0, 10);
     const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
     const intact = await database.exportJournal(day, tomorrow);

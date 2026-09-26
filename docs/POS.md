@@ -6,7 +6,7 @@
 （`index.html`）不受影响；管理台（`admin.html`）只管菜品、打印机和设置，包括跑堂和设备。
 
 代码：`apps/pos-web`（界面），`shared/pos.mjs`（桌号锁、跑堂、结算、沽清），
-`shared/register.mjs`（小票、冲销、退菜、日志、日结），`shared/rules.mjs`（税率、下单、账单），
+`shared/register.mjs`（小票、冲销、退菜、日志、日结），`shared/products.mjs`（税率）、`shared/orders.mjs`（下单、账单），
 `shared/account.mjs`（餐厅账户），`shared/live.mjs`（实时同步：什么变化推给谁）。
 Node 服务器和 Cloudflare Worker 共用这些模块，`shared/contract-suite.mjs` 对两边跑同一套检查。
 

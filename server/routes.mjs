@@ -1,20 +1,19 @@
-import { createWriteStream, existsSync } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import {
-  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, IdParams, LimitQuery, OrderStatusBody, PrinterBody, PrintJobsQuery,
-  ProductBody, ServiceRequestBody, ServiceStatusBody, SettingsBody,
-  RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody, StornoBody, TableBody, TableLockBody, TableParams, JournalQuery, VoucherParams,
-  StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody,
-  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody
-} from "./schemas.mjs";
-import { createRateLimiter, rateLimitGuard } from "./rate-limit.mjs";
-// Who outranks whom is the one rule the Worker must not decide differently.
-import { customerAccountsOn, menuSettingsView, ROLE_RANK, resolveStaffRole } from "../shared/rules.mjs";
-import { liveEvent, liveRole } from "../shared/live.mjs";
+import { existsSync } from "node:fs";
+import { createApi, createApiState } from "../shared/http.mjs";
+import { liveRole } from "../shared/live.mjs";
 
+/**
+ * The Node server's routes: every /api route is shared/http.mjs's — the same
+ * code the Worker runs — handed the request as the web's own Request. What is
+ * the Node server's own is here: the live channel's sockets, uploads written
+ * to disk (videos too, up to 50 MB), and the built web app.
+ */
 const MEDIA_TYPES = new Map([
   ["image/jpeg", { type: "image", extension: ".jpg" }],
   ["image/png", { type: "image", extension: ".png" }],
@@ -22,803 +21,83 @@ const MEDIA_TYPES = new Map([
   ["video/mp4", { type: "video", extension: ".mp4" }],
   ["video/webm", { type: "video", extension: ".webm" }]
 ]);
-
-const TABLE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,7}$/;
-const AUTH_WINDOW_MS = 5 * 60 * 1000;
-const AUTH_MAX_FAILURES = 5;
-const AUTH_MAX_TRACKED_SOURCES = 10_000;
-
-function tokenMatches(provided, expected) {
-  const providedBytes = Buffer.from(typeof provided === "string" ? provided : "", "utf8");
-  const expectedBytes = Buffer.from(expected, "utf8");
-  const candidate = providedBytes.length === expectedBytes.length ? providedBytes : Buffer.alloc(expectedBytes.length);
-  return providedBytes.length === expectedBytes.length && timingSafeEqual(candidate, expectedBytes);
-}
-
-function errorReply(reply, error, statusCode = 400) {
-  return reply.code(statusCode).send({ error: error.message || "Request failed" });
-}
-
-// Manager can do everything; staff runs the floor; kitchen only moves orders along.
+const API_BODY_LIMIT = 2 * 1024 * 1024;
+const UPLOAD_BODY_LIMIT = 51 * 1024 * 1024;
+const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+const API_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"];
 
 export function registerRoutes(app, { database, realtime, config }) {
-  const authFailures = new Map();
-  // Guests signing in keep a budget of their own: a restaurant's Wi-Fi is one
-  // address for the guests and the staff tablets alike, and a guest mistyping
-  // their password must not lock the POS out.
-  const customerFailures = new Map();
-
-  /** The failure table is keyed by client address, so it grows without a bound
-   *  of its own. Drop expired entries before it can become one. */
-  function pruneAuthFailures(moment, failures = authFailures) {
-    for (const [source, entry] of failures) {
-      if (entry.resetAt <= moment) failures.delete(source);
-    }
-  }
-  const orderLimiter = createRateLimiter({ windowMs: config.publicRateLimitWindowMs, max: config.orderRateLimitMax });
-  const serviceLimiter = createRateLimiter({ windowMs: config.publicRateLimitWindowMs, max: config.serviceRateLimitMax });
-  const guardOrders = rateLimitGuard(orderLimiter, "Too many orders from this device");
-  const guardServiceRequests = rateLimitGuard(serviceLimiter, "Too many service requests from this device");
-
-  /**
-   * Guest devices declare their own table. Once tables are registered the server
-   * only accepts a known table plus its token; an empty registry stays open so a
-   * fresh install works before any table has been set up.
-   */
-  function requireTable(request, reply, done) {
-    const table = String(request.body?.table ?? "").trim().toUpperCase();
-    // Validated even in open mode: a table that cannot be registered later
-    // would otherwise be accepted now and become unbillable.
-    if (!TABLE_PATTERN.test(table)) {
-      reply.code(400).send({ error: "Table number must be 1-8 letters or digits" });
-      return;
-    }
-    request.body.table = table;
-    if (!database.hasTables()) {
-      done();
-      return;
-    }
-    const registered = database.getTable(table);
-    if (!registered || !registered.enabled) {
-      reply.code(403).send({ error: "Unknown table" });
-      return;
-    }
-    if (!tokenMatches(request.headers["x-table-token"], registered.token)) {
-      reply.code(403).send({ error: "Table token is invalid" });
-      return;
-    }
-    done();
-  }
-
-  /**
-   * The header carries one of two things: a session token the console got by
-   * typing the password, or one of the configured tokens. The session is asked
-   * first because it is what everyone uses; the tokens stay for the tablets
-   * that were configured with one, and for getting back in when the password
-   * has been forgotten.
-   */
-  /** Who is asking: a role, and for a waiter on a POS device, who and where. */
-  async function resolveSession(request) {
-    const provided = request.headers["x-admin-token"];
-    const session = await database.roleForSession(provided);
-    if (session) return session;
-    const role = resolveStaffRole((expected) => tokenMatches(provided, expected), {
-      manager: config.adminToken,
-      staff: config.staffToken,
-      kitchen: config.kitchenToken
-    });
-    return role ? { role } : null;
-  }
-
-  /**
-   * One budget per client address, shared by the guards and the sign-in route,
-   * so guessing the password and guessing a token are counted together. Returns
-   * null once the budget is spent, having already sent the 429.
-   */
-  function authThrottle(request, reply, failuresBySource = authFailures) {
-    const moment = Date.now();
-    const key = request.ip || "unknown";
-    const current = failuresBySource.get(key);
-    if (current && current.resetAt <= moment) failuresBySource.delete(key);
-    const active = failuresBySource.get(key);
-    if (active && active.failures >= AUTH_MAX_FAILURES) {
-      const retryAfter = Math.max(1, Math.ceil((active.resetAt - moment) / 1000));
-      reply.header("retry-after", retryAfter);
-      reply.code(429).send({ error: "Too many authentication attempts", retryAfter });
-      return null;
-    }
-    return {
-      fail() {
-        const failures = (active?.failures ?? 0) + 1;
-        if (!active && failuresBySource.size >= AUTH_MAX_TRACKED_SOURCES) pruneAuthFailures(moment, failuresBySource);
-        failuresBySource.set(key, { failures, resetAt: moment + AUTH_WINDOW_MS });
-      },
-      pass() {
-        failuresBySource.delete(key);
-      }
-    };
-  }
-
-  /** @param {"manager"|"staff"|"kitchen"} minimumRole */
-  function requireRole(minimumRole) {
-    const required = ROLE_RANK[minimumRole];
-    return async function guard(request, reply) {
-      const throttle = authThrottle(request, reply);
-      if (!throttle) return reply;
-      const session = await resolveSession(request);
-      const role = session?.role;
-      if (!role) {
-        throttle.fail();
-        return reply.code(401).send({ error: "Admin authentication required" });
-      }
-      throttle.pass();
-      request.staffRole = role;
-      // A waiter's session carries who they are and which device they are on.
-      request.pos = session.staff ? { staff: session.staff, deviceId: session.deviceId } : null;
-      request.account = session.account ?? null;
-      if (ROLE_RANK[role] < required) {
-        // A valid token used beyond its role is worth recording, not just refusing.
-        request.auditedDenial = true;
-        database.recordAudit({ role, ip: request.ip, method: request.method, route: request.url, status: 403, detail: { denied: minimumRole } });
-        return reply.code(403).send({ error: `This role may not perform ${minimumRole} actions` });
-      }
-      return undefined;
-    };
-  }
-
-  const requireAdmin = requireRole("manager");
-  const requireFloor = requireRole("staff");
-  const requireKitchen = requireRole("kitchen");
-
-  // Business fields worth keeping; the request body is never stored wholesale.
-  const AUDIT_FIELDS = ["status", "table", "sku", "price", "vatPercent", "published", "available", "name", "role", "enabled", "rotateToken"];
-
-  /**
-   * Every write made with a staff token is recorded. One shared token per role
-   * means the log cannot name a person, but it does answer what changed, when,
-   * from which device and under which role.
-   */
-  app.addHook("onResponse", async (request, reply) => {
-    if (!request.staffRole || request.auditedDenial) return;
-    if (request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS") return;
-    const detail = { params: request.params ?? {} };
-    const body = request.body;
-    if (body && typeof body === "object" && !Buffer.isBuffer(body)) {
-      for (const field of AUDIT_FIELDS) {
-        if (body[field] !== undefined) detail[field] = body[field];
-      }
-    }
+  /** An upload on disk, served at /media/<file>; the dish gets the URL. */
+  async function saveUpload(productId, file) {
+    const accepted = MEDIA_TYPES.get(file.type);
+    if (!accepted) return { error: "Only JPEG, PNG, WebP, MP4 and WebM are supported" };
+    if (file.size > UPLOAD_MAX_BYTES) return { error: "Media file exceeds 50 MB", status: 413 };
+    if (!(await database.getProduct(productId))) return { product: null };
+    const filename = `${randomUUID()}${accepted.extension}`;
+    const target = path.join(config.uploadDir, filename);
     try {
-      database.recordAudit({
-        role: request.staffRole,
-        ip: request.ip,
-        method: request.method,
-        route: request.routeOptions?.url ?? request.url,
-        status: reply.statusCode,
-        detail
-      });
+      await pipeline(Readable.fromWeb(file.stream()), createWriteStream(target, { flags: "wx" }));
+      const product = await database.addMedia(productId, { type: accepted.type, url: `/media/${filename}` });
+      if (!product) await unlink(target).catch(() => undefined);
+      return { product };
     } catch (error) {
-      request.log.error({ err: error }, "audit write failed");
+      await unlink(target).catch(() => undefined);
+      throw error;
     }
+  }
+
+  const api = createApi({
+    store: database,
+    state: createApiState({ publicWindowMs: config.publicRateLimitWindowMs, orderMax: config.orderRateLimitMax, serviceMax: config.serviceRateLimitMax }),
+    tokens: { manager: config.adminToken, staff: config.staffToken, kitchen: config.kitchenToken },
+    uploads: saveUpload,
+    publish: (event) => realtime.publish(event),
+    realtimeClients: () => realtime.size()
   });
 
-  app.get("/api/health", async () => ({
-    ok: true,
-    realtimeClients: realtime.size(),
-    timestamp: new Date().toISOString()
-  }));
+  /** A Fastify request as the web's Request, for shared/http.mjs. */
+  function toRequest(request) {
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(request.headers)) {
+      if (value === undefined) continue;
+      for (const item of Array.isArray(value) ? value : [value]) headers.append(name, String(item));
+    }
+    const hasBody = !["GET", "HEAD"].includes(request.method) && request.body !== undefined && request.body !== null;
+    return new Request(`http://${request.headers.host || "localhost"}${request.url}`, { method: request.method, headers, ...(hasBody ? { body: request.body } : {}) });
+  }
+
+  /** The Response back through Fastify's reply. */
+  async function send(reply, response) {
+    reply.code(response.status);
+    for (const [name, value] of response.headers) reply.header(name, value);
+    if (response.status === 204 || response.status === 304) return reply.send();
+    return reply.send(Buffer.from(await response.arrayBuffer()));
+  }
+
+  // Every body reaches shared/http.mjs as it came: it parses and checks it.
+  app.removeAllContentTypeParsers();
+  app.addContentTypeParser("*", { parseAs: "buffer" }, (request, bodyBytes, done) => done(null, bodyBytes));
+
+  async function forward(request, reply) {
+    const response = await api(toRequest(request), { ip: request.ip });
+    if (!response) return reply.code(404).send({ error: "API route not found" });
+    return send(reply, response);
+  }
+
+  app.route({ method: API_METHODS, url: "/api/*", bodyLimit: API_BODY_LIMIT, handler: forward });
+  // A dish's photo or video, larger than any other body.
+  app.route({ method: ["POST"], url: "/api/admin/products/:id/media", bodyLimit: UPLOAD_BODY_LIMIT, handler: forward });
 
   app.get("/ws", { websocket: true }, (socket, request) => {
     realtime.connect(socket, liveRole(new URLSearchParams(request.query ?? {})));
   });
 
-  /**
-   * Every successful write says so on the live channel (shared/live.mjs):
-   * the console and the POS reload at once. A route that changed nothing
-   * anyone watches — a POS keeping its table — sets `request.liveQuiet`.
-   */
-  app.addHook("onResponse", async (request, reply) => {
-    if (request.liveQuiet) return;
-    const event = liveEvent(request.method, request.url.split("?")[0], reply.statusCode, request.body?.table);
-    if (event) realtime.publish(event);
-  });
-
   // A picture kept in the database answers first; anything else is an upload
   // on disk. The id carries a hash of the bytes, so it can be cached for good.
   app.get("/media/:file", async (request, reply) => {
-    const stored = database.getMediaFile(request.params.file);
-    if (stored) {
-      return reply
-        .header("cache-control", "public, max-age=31536000, immutable")
-        .type(stored.contentType)
-        .send(stored.bytes);
-    }
+    const response = await api(toRequest(request), { ip: request.ip });
+    if (response) return send(reply, response);
     return reply.sendFile(request.params.file);
-  });
-
-  app.get("/api/catalog", async () => {
-    const settings = database.getSettings();
-    return { products: database.listProducts(true), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) };
-  });
-  app.get("/api/admin/settings", { preHandler: requireAdmin }, async () => database.getSettings());
-  app.put("/api/admin/settings", { preHandler: requireAdmin, schema: { body: SettingsBody } }, async (request, reply) => {
-    try {
-      return database.saveSettings(request.body || {});
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.get("/api/admin/products", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async () => ({ products: database.listProducts(false) }));
-  app.get("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
-    const product = database.getProduct(request.params.id);
-    return product || errorReply(reply, new Error("Product not found"), 404);
-  });
-  app.post("/api/admin/products", { preHandler: requireAdmin, schema: { body: ProductBody } }, async (request, reply) => {
-    try {
-      const product = database.saveProduct(request.body || {});
-      return reply.code(201).send({ product });
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.put("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams, body: ProductBody } }, async (request, reply) => {
-    try {
-      const product = database.saveProduct(request.body || {}, request.params.id);
-      if (!product) return errorReply(reply, new Error("Product not found"), 404);
-      return { product };
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.delete("/api/admin/products/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
-    if (!database.deleteProduct(request.params.id)) return errorReply(reply, new Error("Product not found"), 404);
-    return reply.code(204).send();
-  });
-
-  app.post("/api/admin/categories/rename", { preHandler: requireAdmin, schema: { body: CategoryRenameBody } }, async (request, reply) => {
-    try {
-      const result = database.renameCategory(request.body.from, request.body.to);
-      if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
-      return result;
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-
-  app.post("/api/admin/categories/vat", { preHandler: requireAdmin, schema: { body: CategoryVatBody } }, async (request, reply) => {
-    try {
-      const result = database.setCategoryVat(request.body.category, request.body.vatPercent);
-      if (!result) return errorReply(reply, new Error("No dish is in that category"), 404);
-      return result;
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-
-  app.post("/api/admin/products/:id/duplicate", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
-    const product = database.duplicateProduct(request.params.id);
-    if (!product) return errorReply(reply, new Error("Product not found"), 404);
-    return reply.code(201).send({ product });
-  });
-
-  app.post("/api/admin/products/:id/media", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
-    const part = await request.file({ limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
-    if (!part) return errorReply(reply, new Error("Media file is required"));
-    const accepted = MEDIA_TYPES.get(part.mimetype);
-    if (!accepted) {
-      part.file.resume();
-      return errorReply(reply, new Error("Only JPEG, PNG, WebP, MP4 and WebM are supported"));
-    }
-    const filename = `${randomUUID()}${accepted.extension}`;
-    const target = path.join(config.uploadDir, filename);
-    try {
-      await pipeline(part.file, createWriteStream(target, { flags: "wx" }));
-      if (part.file.truncated) {
-        await unlink(target).catch(() => undefined);
-        return errorReply(reply, new Error("Media file exceeds 50 MB"), 413);
-      }
-      const product = database.addMedia(request.params.id, {
-        type: accepted.type,
-        url: `/media/${filename}`
-      });
-      if (!product) {
-        await unlink(target).catch(() => undefined);
-        return errorReply(reply, new Error("Product not found"), 404);
-      }
-      return reply.code(201).send({ product });
-    } catch (error) {
-      await unlink(target).catch(() => undefined);
-      return errorReply(reply, error);
-    }
-  });
-
-  app.get("/api/orders", { preHandler: requireKitchen, schema: { querystring: LimitQuery } }, async (request) => ({
-    orders: database.listOrders(request.query.limit)
-  }));
-  /**
-   * A guest's own order (shared/ordering.mjs): switched off until the owner
-   * switches it on, and within its limits. The older route takes an order at
-   * the table in the older shape, under the same rules — there is no way to
-   * the kitchen around them.
-   */
-  async function placeGuestOrder(request, reply, { channel, payment, ...order }) {
-    try {
-      const customer = await database.customers.session(request.headers["x-customer-token"]);
-      return reply.code(201).send({ order: database.placeGuestOrder(order, { channel, payment, customer }) });
-    } catch (error) {
-      // A locked or closed table, a pause between orders: states the guest can
-      // wait out or ask a waiter about, not a cart that is wrong. The code
-      // says which, so the menu can say what to do.
-      if (error.retryAfter) reply.header("retry-after", error.retryAfter);
-      const status = error.status ?? (error.code === "TABLE_LOCKED" ? 409 : 400);
-      return reply.code(status).send({ error: error.message || "Request failed", ...(error.code ? { code: error.code } : {}) });
-    }
-  }
-  app.post("/api/orders", { preHandler: [guardOrders, requireTable], schema: { body: CreateOrderBody } }, async (request, reply) =>
-    placeGuestOrder(request, reply, { ...request.body, channel: "dine-in" }));
-  // A pickup names no table; an order at the table names its own, with its card's token.
-  function requireGuestTable(request, reply, done) {
-    if (request.body?.channel !== "pickup") return requireTable(request, reply, done);
-    delete request.body.table;
-    return done();
-  }
-  app.post("/api/guest/orders", { preHandler: [guardOrders, requireGuestTable], schema: { body: GuestOrderBody } }, async (request, reply) =>
-    placeGuestOrder(request, reply, request.body));
-  // A guest without an account follows the orders their phone placed, by the ids it made up for them.
-  app.get("/api/guest/orders", async (request) => ({
-    orders: await database.customers.ordersByRequest(String(request.query?.ids ?? "").split(",").map((id) => id.trim()).filter((id) => id.length >= 8 && id.length <= 128))
-  }));
-  app.patch("/api/orders/:id/status", { preHandler: requireKitchen, schema: { params: IdParams, body: OrderStatusBody } }, async (request, reply) => {
-    try {
-      const order = database.updateOrder(request.params.id, request.body?.status);
-      if (!order) return errorReply(reply, new Error("Order not found"), 404);
-      return { order };
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-
-  app.get("/api/service-requests", { preHandler: requireFloor, schema: { querystring: LimitQuery } }, async (request) => ({
-    requests: database.listServiceRequests(request.query.limit)
-  }));
-  app.post("/api/service-requests", { preHandler: [guardServiceRequests, requireTable], schema: { body: ServiceRequestBody } }, async (request, reply) => {
-    try {
-      const serviceRequest = database.createServiceRequest(request.body || {});
-      return reply.code(201).send({ request: serviceRequest });
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.patch("/api/service-requests/:id/status", { preHandler: requireFloor, schema: { params: IdParams, body: ServiceStatusBody } }, async (request, reply) => {
-    try {
-      const serviceRequest = database.updateServiceRequest(request.params.id, request.body?.status);
-      if (!serviceRequest) return errorReply(reply, new Error("Service request not found"), 404);
-      return { request: serviceRequest };
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-
-  /**
-   * The restaurant's account (shared/account.mjs).
-   *
-   * `GET /api/account` is deliberately open: it answers one bit — is there an
-   * account yet — which the console needs to know whether to show the
-   * registration or the sign-in, and which anyone who tried either would learn.
-   * Registration, sign-in and recovery share the auth throttle, so guessing a
-   * password and guessing a token are counted together.
-   */
-  app.get("/api/account", async () => database.accountStatus());
-
-  app.post("/api/account/register", { schema: { body: RegisterBody } }, async (request, reply) => {
-    const throttle = authThrottle(request, reply);
-    if (!throttle) return reply;
-    try {
-      const session = await database.registerAccount(request.body);
-      if (!session) return reply.code(409).send({ error: "This restaurant already has an account: sign in" });
-      throttle.pass();
-      return reply.code(201).send(session);
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-
-  app.post("/api/account/sign-in", { schema: { body: AccountSignInBody } }, async (request, reply) => {
-    const throttle = authThrottle(request, reply);
-    if (!throttle) return reply;
-    const session = await database.signInAccount(request.body.login, request.body.password);
-    if (!session) {
-      throttle.fail();
-      return reply.code(401).send({ error: "Wrong account name or password" });
-    }
-    throttle.pass();
-    return session;
-  });
-
-  app.put("/api/account", { preHandler: requireAdmin, schema: { body: AccountUpdateBody } }, async (request, reply) => {
-    if (!request.account) return reply.code(403).send({ error: "Sign in with the account to change it" });
-    try {
-      const updated = await database.updateAccount(request.account.id, request.body);
-      if (!updated) return reply.code(401).send({ error: "Wrong password" });
-      return updated;
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-
-  /**
-   * The way back in when the password is forgotten: ADMIN_TOKEN, and only the
-   * token — not a live session, which a stolen tablet would carry.
-   */
-  app.post("/api/account/recover", { schema: { body: AccountRecoverBody } }, async (request, reply) => {
-    const throttle = authThrottle(request, reply);
-    if (!throttle) return reply;
-    if (!config.adminToken || !tokenMatches(request.headers["x-admin-token"], config.adminToken)) {
-      throttle.fail();
-      return reply.code(401).send({ error: "ADMIN_TOKEN required" });
-    }
-    try {
-      throttle.pass();
-      return await database.recoverAccount(request.body);
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-
-  app.post("/api/account/sign-out", { preHandler: requireKitchen }, async (request, reply) => {
-    await database.signOut(request.headers["x-admin-token"]);
-    return reply.code(204).send();
-  });
-
-  /**
-   * Guests' own accounts (shared/customer.mjs, shared/customer-store.mjs). A
-   * session travels in `x-customer-token` and opens nothing but these routes
-   * and the guest's own order. Registering and signing in share a throttle of
-   * their own (customerFailures).
-   */
-  async function requireCustomer(request, reply) {
-    const customer = await database.customers.session(request.headers["x-customer-token"]);
-    if (!customer) return reply.code(401).send({ error: "Please sign in", code: "SIGN_IN_REQUIRED" });
-    request.customer = customer;
-    return undefined;
-  }
-  const codedReply = (reply, error) => reply.code(error.status ?? 400).send({ error: error.message || "Request failed", ...(error.code ? { code: error.code } : {}) });
-
-  app.post("/api/customer/register", { schema: { body: CustomerRegisterBody } }, async (request, reply) => {
-    if (!customerAccountsOn(database.getSettings())) return reply.code(403).send({ error: "Guest accounts are not available", code: "ACCOUNTS_OFF" });
-    const throttle = authThrottle(request, reply, customerFailures);
-    if (!throttle) return reply;
-    try {
-      return reply.code(201).send(await database.customers.register(request.body));
-    } catch (error) {
-      return codedReply(reply, error);
-    }
-  });
-  app.post("/api/customer/sign-in", { schema: { body: CustomerSignInBody } }, async (request, reply) => {
-    const throttle = authThrottle(request, reply, customerFailures);
-    if (!throttle) return reply;
-    const session = await database.customers.signIn(request.body.email, request.body.password);
-    if (!session) {
-      throttle.fail();
-      return reply.code(401).send({ error: "Wrong email or password" });
-    }
-    throttle.pass();
-    return session;
-  });
-  app.post("/api/customer/sign-out", async (request, reply) => {
-    await database.customers.signOut(request.headers["x-customer-token"]);
-    return reply.code(204).send();
-  });
-  app.get("/api/customer", { preHandler: requireCustomer }, async (request) => database.customers.profile(request.customer.id));
-  app.put("/api/customer", { preHandler: requireCustomer, schema: { body: CustomerUpdateBody } }, async (request, reply) => {
-    try {
-      const updated = await database.customers.update(request.customer.id, request.body);
-      return updated ?? reply.code(401).send({ error: "Wrong password" });
-    } catch (error) {
-      return codedReply(reply, error);
-    }
-  });
-  app.post("/api/customer/delete", { preHandler: requireCustomer, schema: { body: CustomerDeleteBody } }, async (request, reply) =>
-    (await database.customers.deleteOwn(request.customer.id, request.body.password)) ? reply.code(204).send() : reply.code(401).send({ error: "Wrong password" }));
-  app.put("/api/customer/favorites/:id", { preHandler: requireCustomer, schema: { params: IdParams } }, async (request, reply) => {
-    try {
-      return { favorites: await database.customers.setFavorite(request.customer.id, request.params.id, true) };
-    } catch (error) {
-      return codedReply(reply, error);
-    }
-  });
-  app.delete("/api/customer/favorites/:id", { preHandler: requireCustomer, schema: { params: IdParams } }, async (request) =>
-    ({ favorites: await database.customers.setFavorite(request.customer.id, request.params.id, false) }));
-  app.get("/api/customer/points", { preHandler: requireCustomer }, async (request) => ({ entries: await database.customers.points(request.customer.id) }));
-  app.get("/api/customer/orders", { preHandler: requireCustomer }, async (request) => ({ orders: await database.customers.orders(request.customer.id) }));
-
-  // The console's side: the manager looks a guest up, changes their points with a reason, sets a new password, removes the account.
-  app.get("/api/admin/customers", { preHandler: requireAdmin }, async (request) =>
-    ({ customers: await database.customers.list(String(request.query?.q ?? ""), request.query?.limit) }));
-  app.get("/api/admin/customers/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) =>
-    (await database.customers.get(request.params.id)) ?? errorReply(reply, new Error("Guest not found"), 404));
-  app.post("/api/admin/customers/:id/points", { preHandler: requireAdmin, schema: { params: IdParams, body: PointsAdjustBody } }, async (request, reply) => {
-    try {
-      const customer = await database.customers.adjustPoints(request.params.id, request.body);
-      return customer ? { customer } : errorReply(reply, new Error("Guest not found"), 404);
-    } catch (error) {
-      return codedReply(reply, error);
-    }
-  });
-  app.post("/api/admin/customers/:id/password", { preHandler: requireAdmin, schema: { params: IdParams, body: CustomerPasswordBody } }, async (request, reply) => {
-    try {
-      const customer = await database.customers.resetPassword(request.params.id, request.body.password);
-      return customer ? { customer } : errorReply(reply, new Error("Guest not found"), 404);
-    } catch (error) {
-      return codedReply(reply, error);
-    }
-  });
-  app.delete("/api/admin/customers/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) =>
-    (await database.customers.remove(request.params.id)) ? reply.code(204).send() : errorReply(reply, new Error("Guest not found"), 404));
-
-  app.get("/api/admin/session", { preHandler: requireKitchen }, async (request) => (request.account ? { role: request.staffRole, account: request.account } : { role: request.staffRole }));
-  app.get("/api/admin/audit", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
-    entries: database.listAudit(request.query.limit)
-  }));
-  app.get("/api/admin/tables", { preHandler: requireAdmin }, async () => ({ tables: database.listTables() }));
-  app.get("/api/admin/tables/open", { preHandler: requireFloor }, async () => ({ tables: database.openBillTables() }));
-
-  /**
-   * The floor's view of the room: every table, what is on it, and whether it
-   * is taking orders. The entry tokens are not in here — those stay on
-   * `/api/admin/tables`, which is the manager's.
-   */
-  app.get("/api/admin/tables/overview", { preHandler: requireFloor }, async () => ({ tables: database.tablesOverview() }));
-
-  app.post("/api/admin/tables/:table/lock", { preHandler: requireFloor, schema: { params: TableParams, body: TableLockBody } }, async (request, reply) => {
-    try {
-      const table = database.setTableLock(request.params.table, request.body.locked);
-      if (!table) return errorReply(reply, new Error("Table not found"), 404);
-      return { table };
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  // Open a table for its guests to order from their phones (开台), or close it.
-  app.post("/api/admin/tables/:table/ordering", { preHandler: requireFloor, schema: { params: TableParams, body: TableOrderingBody } }, async (request, reply) => {
-    try {
-      if (request.body.open) return { session: database.openTable(request.params.table, request.pos) };
-      database.closeTable(request.params.table);
-      return { session: null };
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.post("/api/admin/tables", { preHandler: requireAdmin, schema: { body: TableBody } }, async (request, reply) => {
-    try {
-      return reply.code(201).send({ table: database.saveTable(request.body || {}) });
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.delete("/api/admin/tables/:table", { preHandler: requireAdmin, schema: { params: TableParams } }, async (request, reply) => {
-    if (!database.deleteTable(request.params.table)) return errorReply(reply, new Error("Table not found"), 404);
-    return reply.code(204).send();
-  });
-  app.get("/api/admin/tables/:table/bill", { preHandler: requireFloor, schema: { params: TableParams } }, async (request) => ({
-    bill: database.billForTable(request.params.table)
-  }));
-  // An interim bill for the guest to read. Paying is a receipt (checkout).
-  app.post("/api/admin/tables/:table/bill/print", { preHandler: requireFloor, schema: { params: TableParams } }, async (request, reply) => {
-    const bill = database.printTableBill(request.params.table);
-    if (!bill) return errorReply(reply, new Error("Table has nothing left to pay"), 409);
-    return { bill };
-  });
-
-  // The register (shared/register.mjs): receipts, storno, the day's closing, the journal.
-  app.post("/api/admin/checkout", { preHandler: requireFloor, schema: { body: CheckoutBody } }, async (request, reply) => {
-    try {
-      const receipt = database.checkout(request.body, request.staffRole, request.pos);
-      return reply.code(201).send({ receipt });
-    } catch (error) {
-      return errorReply(reply, error, error.code === "TABLE_CLAIMED" ? 409 : 400);
-    }
-  });
-  app.get("/api/admin/receipts", { preHandler: requireFloor, schema: { querystring: LimitQuery } }, async (request) => ({
-    receipts: database.listReceipts(request.query.limit)
-  }));
-  app.get("/api/admin/receipts/:id", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => {
-    const receipt = database.getReceipt(request.params.id);
-    return receipt ? { receipt } : errorReply(reply, new Error("Receipt not found"), 404);
-  });
-  // A receipt printed again for the guest, marked as a copy (Belegkopie).
-  app.post("/api/admin/receipts/:id/print", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => (
-    database.reprintReceipt(request.params.id) ? reply.code(204).send() : errorReply(reply, new Error("No such receipt"), 404)
-  ));
-  app.post("/api/admin/receipts/:id/storno", { preHandler: requireAdmin, schema: { params: IdParams, body: StornoBody } }, async (request, reply) => {
-    try {
-      const receipt = database.stornoReceipt(request.params.id, request.body.reason, request.staffRole, request.pos);
-      if (!receipt) return errorReply(reply, new Error("Receipt not found"), 404);
-      return reply.code(201).send({ receipt });
-    } catch (error) {
-      return errorReply(reply, error, /already been cancelled/.test(error.message) ? 409 : 400);
-    }
-  });
-  app.get("/api/admin/vouchers/:code", { preHandler: requireFloor, schema: { params: VoucherParams } }, async (request, reply) => {
-    const voucher = database.getVoucher(request.params.code);
-    return voucher ? { voucher } : errorReply(reply, new Error("Voucher not found"), 404);
-  });
-  app.get("/api/admin/day-closings/preview", { preHandler: requireAdmin }, async () => ({ totals: database.closingPreview() }));
-  app.get("/api/admin/day-closings", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({
-    closings: database.listClosings(request.query.limit)
-  }));
-  app.post("/api/admin/day-closings", { preHandler: requireAdmin }, async (request, reply) => {
-    const closing = database.closeDay(request.staffRole);
-    if (!closing) return errorReply(reply, new Error("No receipts since the last closing"), 409);
-    return reply.code(201).send({ closing });
-  });
-  // ——— The POS (shared/pos.mjs). The manager pairs devices and keeps the
-  // waiters; a paired device lists them and takes a PIN; a waiter's session
-  // does the rest.
-  app.get("/api/admin/staff", { preHandler: requireAdmin }, async () => ({ staff: database.listStaff() }));
-  // The floor as the manager watches it: each waiter, where they are signed in, their open tables and their shift.
-  app.get("/api/admin/staff/activity", { preHandler: requireAdmin }, async () => ({ staff: database.staffActivity() }));
-  app.post("/api/admin/staff", { preHandler: requireAdmin, schema: { body: StaffBody } }, async (request, reply) => {
-    try {
-      return reply.code(201).send({ staff: await database.saveStaff(request.body) });
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.put("/api/admin/staff/:id", { preHandler: requireAdmin, schema: { params: IdParams, body: StaffBody } }, async (request, reply) => {
-    try {
-      const staff = await database.saveStaff(request.body, request.params.id);
-      return staff ? { staff } : errorReply(reply, new Error("Waiter not found"), 404);
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.get("/api/admin/pos-devices", { preHandler: requireAdmin }, async () => ({ devices: database.listDevices() }));
-  app.post("/api/admin/pos-devices", { preHandler: requireAdmin, schema: { body: DeviceBody } }, async (request, reply) => {
-    try {
-      return reply.code(201).send(await database.pairDevice(request.body.name));
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.delete("/api/admin/pos-devices/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) =>
-    (database.deleteDevice(request.params.id) ? reply.code(204).send() : errorReply(reply, new Error("Device not found"), 404)));
-
-  /** A paired device, from its token, or the reply that says it is not one. */
-  async function pairedDevice(request, reply) {
-    const device = await database.deviceForToken(request.headers["x-device-token"]);
-    if (!device) {
-      reply.code(401).send({ error: "This device is not paired with the POS" });
-      return null;
-    }
-    return device;
-  }
-  app.get("/api/pos/staff", async (request, reply) => {
-    if (!(await pairedDevice(request, reply))) return reply;
-    return { staff: database.listStaff(true).map(({ id, name, role }) => ({ id, name, role })) };
-  });
-  app.post("/api/pos/sign-in", { schema: { body: PosSignInBody } }, async (request, reply) => {
-    const throttle = authThrottle(request, reply);
-    if (!throttle) return reply;
-    const device = await pairedDevice(request, reply);
-    if (!device) return reply;
-    const session = await database.posSignIn(device, request.body.staffId, request.body.pin);
-    if (!session) {
-      throttle.fail();
-      return reply.code(401).send({ error: "Wrong PIN" });
-    }
-    throttle.pass();
-    return session;
-  });
-  app.post("/api/pos/sign-out", async (request, reply) => {
-    await database.posSignOut(request.headers["x-admin-token"]);
-    return reply.code(204).send();
-  });
-
-  /** A waiter's own POS session: the routes below act as someone, on some device. */
-  async function requirePos(request, reply) {
-    const denied = await requireFloor(request, reply);
-    if (denied || reply.sent) return denied ?? reply;
-    if (!request.pos) return reply.code(403).send({ error: "Sign in on a POS device" });
-    return undefined;
-  }
-  const claimed = (reply, error) => errorReply(reply, error, error.code === "TABLE_CLAIMED" ? 409 : 400);
-  app.get("/api/pos/floor", { preHandler: requirePos }, async () => ({ tables: database.tablesOverview(), claims: database.liveClaims(), takeawayDiscountPercent: database.getSettings().takeawayDiscountPercent }));
-  app.post("/api/pos/tables/:table/claim", { preHandler: requirePos, schema: { params: TableParams } }, async (request, reply) => {
-    try {
-      // A POS keeps its table every half minute; only taking it is news.
-      request.liveQuiet = database.holdsTable(request.params.table, request.pos.deviceId);
-      return { claim: database.claimTable(request.params.table, request.pos) };
-    } catch (error) {
-      return claimed(reply, error);
-    }
-  });
-  app.delete("/api/pos/tables/:table/claim", { preHandler: requirePos, schema: { params: TableParams } }, async (request, reply) => {
-    database.releaseTable(request.params.table, request.pos, request.staffRole === "manager" && request.query?.force === "1");
-    return reply.code(204).send();
-  });
-  app.post("/api/pos/orders", { preHandler: requirePos, schema: { body: CreateOrderBody } }, async (request, reply) => {
-    try {
-      const order = database.createOrder(request.body, request.pos);
-      return reply.code(201).send({ order });
-    } catch (error) {
-      return claimed(reply, error);
-    }
-  });
-  app.post("/api/pos/takeaway", { preHandler: requirePos }, async (request, reply) => reply.code(201).send(database.newTakeaway(request.pos)));
-  app.post("/api/pos/tables/:table/move", { preHandler: requirePos, schema: { params: TableParams, body: MoveTableBody } }, async (request, reply) => {
-    try {
-      const moved = database.moveTable(request.params.table, request.body.to, request.pos);
-      return moved ?? errorReply(reply, new Error("Nothing open on that table"), 404);
-    } catch (error) {
-      return claimed(reply, error);
-    }
-  });
-  // 退菜: dishes sent to the kitchen taken off the bill, with a reason; the kitchen gets a void ticket.
-  app.post("/api/pos/tables/:table/void", { preHandler: requirePos, schema: { params: TableParams, body: VoidBody } }, async (request, reply) => {
-    try {
-      return reply.code(201).send({ void: database.voidItem(request.params.table, request.body, request.pos, request.staffRole) });
-    } catch (error) {
-      return error.code === "NOT_FOUND" ? errorReply(reply, error, 404) : claimed(reply, error);
-    }
-  });
-  // The menu as the POS needs it: every published dish, the sold-out ones too, to switch back on.
-  app.get("/api/pos/catalog", { preHandler: requirePos }, async () => ({ products: database.listProducts(false).filter((product) => product.published) }));
-  // 沽清: sold out, or back on — the guests' menus follow at once.
-  app.put("/api/pos/products/:id/availability", { preHandler: requirePos, schema: { params: IdParams, body: AvailabilityBody } }, async (request, reply) => {
-    const product = database.setAvailable(request.params.id, request.body.available);
-    return product ? { product } : errorReply(reply, new Error("No such dish on the menu"), 404);
-  });
-  /** A waiter's own settlement; the manager may settle anyone's. */
-  const settlementFor = (request, reply) => {
-    const staffId = request.body?.staffId ?? request.query?.staffId ?? request.pos.staff.id;
-    if (staffId !== request.pos.staff.id && request.staffRole !== "manager") {
-      reply.code(403).send({ error: "Only the manager settles another waiter" });
-      return null;
-    }
-    return staffId;
-  };
-  app.get("/api/pos/settlement", { preHandler: requirePos }, async (request, reply) => {
-    const staffId = settlementFor(request, reply);
-    return staffId ? { totals: database.staffSettlementPreview(staffId) } : reply;
-  });
-  app.post("/api/pos/settlement", { preHandler: requirePos, schema: { body: SettlementBody } }, async (request, reply) => {
-    const staffId = settlementFor(request, reply);
-    if (!staffId) return reply;
-    const settlement = database.settleStaff(staffId, request.staffRole);
-    return settlement ? reply.code(201).send({ settlement }) : errorReply(reply, new Error("No receipts since the last settlement"), 409);
-  });
-  app.get("/api/pos/settlements", { preHandler: requireAdmin, schema: { querystring: LimitQuery } }, async (request) => ({ settlements: database.listSettlements(request.query.limit) }));
-
-  app.get("/api/admin/journal", { preHandler: requireAdmin, schema: { querystring: JournalQuery } }, async (request) =>
-    database.exportJournal(request.query.from, request.query.to));
-
-  app.get("/api/admin/printers", { preHandler: requireAdmin }, async () => ({ printers: database.listPrinters() }));
-  app.post("/api/admin/printers", { preHandler: requireAdmin, schema: { body: PrinterBody } }, async (request, reply) => {
-    try {
-      return reply.code(201).send({ printer: database.savePrinter(request.body || {}) });
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.put("/api/admin/printers/:id", { preHandler: requireAdmin, schema: { params: IdParams, body: PrinterBody } }, async (request, reply) => {
-    try {
-      const printer = database.savePrinter(request.body || {}, request.params.id);
-      return printer ? { printer } : errorReply(reply, new Error("Printer not found"), 404);
-    } catch (error) {
-      return errorReply(reply, error);
-    }
-  });
-  app.delete("/api/admin/printers/:id", { preHandler: requireAdmin, schema: { params: IdParams } }, async (request, reply) => {
-    if (!database.deletePrinter(request.params.id)) return errorReply(reply, new Error("Printer not found"), 404);
-    return reply.code(204).send();
-  });
-  app.get("/api/admin/print-jobs", { preHandler: requireFloor, schema: { querystring: PrintJobsQuery } }, async (request) => ({
-    jobs: database.listPrintJobs(request.query.status, request.query.limit)
-  }));
-  app.post("/api/admin/print-jobs/:id/retry", { preHandler: requireFloor, schema: { params: IdParams } }, async (request, reply) => {
-    if (!database.retryPrintJob(request.params.id)) return errorReply(reply, new Error("Only failed print jobs can be retried"), 409);
-    return { ok: true, id: request.params.id };
   });
 
   app.setNotFoundHandler((request, reply) => {

@@ -16,11 +16,11 @@ import { createDatabase } from "../server/database.mjs";
 
 const target = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "apps", "customer-app", "src", "app", "bundled-catalog.json");
 
-export function generate() {
+export async function generate() {
   const directory = mkdtempSync(path.join(tmpdir(), "zy-catalog-"));
   try {
     const database = createDatabase(path.join(directory, "catalog.sqlite"));
-    const products = database.listProducts(true);
+    const products = await database.listProducts(true);
     database.close();
     // Row timestamps are the moment this ran, so keeping them would make the
     // file differ on every generation and never settle. They also say nothing
@@ -37,7 +37,7 @@ export function committed() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const contents = generate();
+  const contents = await generate();
   writeFileSync(target, contents);
   console.log(`wrote ${JSON.parse(contents).length} products to ${path.relative(process.cwd(), target)}`);
 }

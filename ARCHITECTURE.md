@@ -11,7 +11,7 @@ TypeScript 迁移、实体打印机和 Device Owner 验证仍需单独完成。
 
 - 顾客 App：React + TypeScript + Vite + Capacitor。
 - 管理台：React + TypeScript + Vite，独立入口和权限边界。
-- 服务端：Fastify + ESM JavaScript，使用 TypeBox schema、模块化路由、SQLite 事务和集成测试；TypeScript API 迁移仍是后续工程，不把文档愿景当成已完成事实。
+- 服务端：一套 API 两处运行。路由在 `shared/http.mjs`（标准 Request/Response，TypeBox 校验），读写在 `shared/store.mjs`（经驱动：Node 上是 `node:sqlite`，Cloudflare 上是 D1），业务规则按主题分在 `shared/` 的 core / auth / products / settings / orders / printing / register / pos / ordering / customer 模块。Node 只剩 Fastify 适配、建表和种子数据，Worker 只剩 D1、Durable Object 和静态资源。仍是 ESM JavaScript，TypeScript 化是后续工程。
 - API 契约：TypeBox/JSON Schema 作为单一事实来源，由服务端验证并被客户端共享。
 - 服务端状态：TanStack Query 管理请求、缓存、失效和重连。
 - 本地交互状态：React reducer/context；只有真正跨页面且长期存在的 UI 状态才进入小型 store。
@@ -47,14 +47,16 @@ packages/
   contracts/                TypeBox schema 与 DTO
   api-client/               类型化 HTTP/WebSocket 客户端
   native-bridge/            Capacitor Printer/Kiosk 类型声明与适配器
-server/                     Fastify 组合根、SQLite、路由、打印代理（仍是 ESM JavaScript）
+shared/                     两个后端共用：API 路由、数据层、业务规则、契约测试（ESM JavaScript）
+server/                     Node：Fastify 适配、SQLite 建表与种子、打印代理
+workers/                    Cloudflare Worker：D1 驱动、实时同步 Durable Object
 android/                    Capacitor 生成工程及原生插件实现
 docs/adr/                   关键架构决策
 ```
 
 尚未建立、属于后续阶段的目录：`apps/api`（服务端 TypeScript 化）、`packages/application`、
-`packages/infrastructure`、`packages/ui`、`packages/test-kit`。当前服务端的组合根、仓储和用例
-仍集中在 `server/` 的模块化 ESM JavaScript 里。
+`packages/infrastructure`、`packages/ui`、`packages/test-kit`。当前服务端的路由、仓储和用例
+集中在 `shared/` 的模块化 ESM JavaScript 里，Node 和 Worker 共用。
 
 首轮迁移不引入 Nx/Turborepo。npm workspaces 和 TypeScript project references 已足够；当构建时间或 CI 任务图产生实际问题后再引入构建编排器。
 
@@ -208,7 +210,7 @@ Admin web
 3. [x] 建立类型化 `api-client`、`native-bridge` 和离线状态模型。
 4. [x] 用 React 迁移顾客端：shell -> catalog -> detail/flip -> cart -> checkout -> orders/service。
 5. [x] 迁移管理台：catalog/media -> printers/settings -> 后端订单与服务呼叫看板。
-6. 将 Fastify 路由按模块迁移到 TypeScript plugins 和 repositories。
+6. [x] 两个后端共用一套路由（`shared/http.mjs`）和数据层（`shared/store.mjs`）；下一步是 TypeScript 化。
 7. 增加 transactional outbox 与 print-agent，完成打印回执和重试。
 8. 完成 Android 回归、响应式矩阵、APK 构建和旧 JS 删除。
 

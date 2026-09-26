@@ -20,9 +20,9 @@
  *  - adjust:  the manager, by hand, with a note.
  *
  * Both backends run these statements and these rules; only the way they
- * reach the database differs (server/database.mjs, workers/store.mjs).
+ * reach the database differs (shared/store.mjs, over each backend's driver).
  */
-import { assertPassword } from "./rules.mjs";
+import { assertPassword } from "./auth.mjs";
 
 /** A guest stays signed in on their phone for a month. */
 export const CUSTOMER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
