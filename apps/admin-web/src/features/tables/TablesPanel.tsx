@@ -23,8 +23,6 @@ interface Props {
   onCloseBill: () => void;
   /** The bill on the front printer, for the guest to read; it marks nothing paid. */
   onPrintBill: (table: string) => Promise<void>;
-  /** To the register with this table, where paying is a receipt. */
-  onTakePayment: (table: string) => void;
 }
 
 /**
@@ -102,7 +100,8 @@ export function TablesPanel(props: Props) {
         <p className="bill-disclaimer">{t("billDisclaimer")}</p>
         <div className="board-actions">
           <button className="ghost-action" disabled={props.busy} onClick={() => void props.onPrintBill(props.bill!.table)}>{t("billPrint")}</button>
-          <button className="primary-action" disabled={props.busy} onClick={() => props.onTakePayment(props.bill!.table)}>{t("billTakePayment")}</button>
+          {/* Paying is at the POS, where the waiter's receipt is theirs. */}
+          <a className="primary-action" href="pos.html" target="_blank" rel="noopener">{t("billTakePayment")}</a>
         </div>
       </> : <div className="admin-empty">{t("billEmpty")}</div>}
     </div>}

@@ -136,6 +136,7 @@ export const SettingsBody = Type.Object({
   companyAddress: Type.Optional(Type.String({ maxLength: 160 })),
   companyUid: Type.Optional(Type.String({ maxLength: 16 })),
   cashRegisterId: Type.Optional(Type.String({ minLength: 1, maxLength: 32 })),
+  takeawayDiscountPercent: Type.Optional(Type.Number()),
   menuDefaultScheme: Type.Optional(literals(COLOR_SCHEMES)),
   showTableNumber: Type.Optional(Type.Boolean()),
   showOrdering: Type.Optional(Type.Boolean()),

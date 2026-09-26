@@ -2,7 +2,7 @@ import type { ApiBill, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings } f
 import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
-export type AdminTab = "catalog" | "board" | "tables" | "cashier" | "printers" | "system";
+export type AdminTab = "catalog" | "board" | "tables" | "printers" | "system";
 /** "sets" is every dish that packages others, whatever its kind. */
 export type ProductFilter = "all" | "food" | "drink" | "sushi" | "sets";
 
@@ -38,8 +38,6 @@ export interface AdminState {
   bill: ApiBill | null;
   tables: RestaurantTable[];
   tableOverview: TableOverview[];
-  /** The table the register opens on, when a waiter came from its card. */
-  cashierTable: string | null;
   boardBusy: boolean;
   printers: PrinterProfile[];
   discoveredPrinters: DiscoveredPrinter[];

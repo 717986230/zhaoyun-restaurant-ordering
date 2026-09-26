@@ -83,7 +83,7 @@ function corsHeaders(request, env) {
   return {
     "access-control-allow-origin": allow,
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "access-control-allow-headers": "content-type,x-admin-token,x-table-token",
+    "access-control-allow-headers": "content-type,x-admin-token,x-table-token,x-device-token",
     "access-control-max-age": "86400",
     ...(allow === "*" ? {} : { vary: "origin" })
   };
@@ -352,7 +352,7 @@ async function handle(request, env) {
     const claimed = (error) => fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400);
     try {
       if (path.length === 3 && path[2] === "floor" && method === "GET") {
-        return json({ tables: await store.tablesOverview(), claims: await store.liveClaims() });
+        return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
       }
       if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
         if (method === "POST") return json({ claim: await store.claimTable(path[3], pos) });

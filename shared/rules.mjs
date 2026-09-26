@@ -608,6 +608,16 @@ export const APP_SETTINGS = {
   companyName: { key: "company_name", fallback: () => "", normalize: optionalText("Company name", 80) },
   companyAddress: { key: "company_address", fallback: () => "", normalize: optionalText("Company address", 160) },
   companyUid: { key: "company_uid", fallback: () => "", normalize: normalizeUid },
+  // The discount a takeaway gets at the POS, in percent (0: none).
+  takeawayDiscountPercent: {
+    key: "takeaway_discount_percent",
+    fallback: () => 0,
+    normalize: (value) => {
+      const percent = Number(value);
+      if (!Number.isInteger(percent) || percent < 0 || percent > 50) throw new Error("The takeaway discount is 0 to 50 percent");
+      return percent;
+    }
+  },
   // The register's id (Kassen-ID) printed on each receipt; unique per business.
   cashRegisterId: { key: "cash_register_id", fallback: () => "KASSE-1", normalize: normalizeCashRegisterId },
   // The heading of the guest menu.

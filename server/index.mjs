@@ -24,7 +24,9 @@ export async function buildServer(overrides = {}) {
 
   await app.register(cors, {
     origin: settings.isProduction ? settings.corsOrigin : true,
-    allowedHeaders: ["content-type", "x-admin-token", "x-table-token"]
+    // The same as the Worker's: @fastify/cors allows only GET, HEAD and POST by default.
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["content-type", "x-admin-token", "x-table-token", "x-device-token"]
   });
   await app.register(websocket);
   await app.register(multipart);

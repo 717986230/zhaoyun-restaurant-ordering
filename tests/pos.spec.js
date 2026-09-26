@@ -1,0 +1,204 @@
+import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { expect, test } from "@playwright/test";
+
+/**
+ * The POS against the real Node server, not stubs: pairing, a waiter's PIN,
+ * ordering by dish number, the kitchen, paying separately and then together,
+ * the table lock between two devices, a takeaway with its discount, and the
+ * waiter's settlement. One project runs it; the rest of the matrix is the
+ * other specs' job, and one server on the API port is all there can be.
+ */
+const PROJECT = "android-tablet-landscape";
+const API = "http://127.0.0.1:8787";
+const ADMIN = "pos-e2e-admin-token";
+const PASSWORD = "chef-password";
+
+test.describe.configure({ mode: "serial" });
+test.use({ locale: "zh-CN" });
+
+let server;
+let directory;
+const admin = (request, method, url, data) => request[method](`${API}${url}`, { headers: { "x-admin-token": ADMIN }, ...(data ? { data } : {}) });
+
+test.beforeAll(async ({ request }, testInfo) => {
+  if (testInfo.project.name !== PROJECT) return;
+  directory = mkdtempSync(path.join(tmpdir(), "zy-pos-e2e-"));
+  server = spawn(process.execPath, ["server/index.mjs"], {
+    env: { ...process.env, HOST: "127.0.0.1", PORT: "8787", ADMIN_TOKEN: ADMIN, DATABASE_PATH: path.join(directory, "db.sqlite"), UPLOAD_DIR: path.join(directory, "media"), NODE_ENV: "test" },
+    stdio: "ignore"
+  });
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try { if ((await request.get(`${API}/api/health`)).ok()) break; } catch { /* not up yet */ }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  expect((await request.post(`${API}/api/admin/gate/password`, { headers: { "x-admin-token": ADMIN }, data: { password: PASSWORD } })).ok()).toBe(true);
+  for (const [name, pin, role] of [["Li", "1234", "staff"], ["Wang", "9876", "manager"]]) {
+    expect((await admin(request, "post", "/api/admin/staff", { name, pin, role })).ok()).toBe(true);
+  }
+  expect((await admin(request, "put", "/api/admin/settings", { takeawayDiscountPercent: 10 })).ok()).toBe(true);
+});
+
+test.afterAll(() => {
+  server?.kill();
+  if (directory) rmSync(directory, { recursive: true, force: true });
+});
+
+/** A dish with options opens the options first; "加入" takes it as it comes. */
+async function confirmOptions(page) {
+  const dialog = page.getByRole("dialog", { name: "请选择" });
+  if (await dialog.isVisible()) await dialog.getByRole("button", { name: "加入" }).click();
+}
+
+async function pairAndSignIn(page, device, name, pin) {
+  await page.goto("/pos.html");
+  await page.getByLabel(/设备名称/).fill(device);
+  await page.getByLabel("经理密码").fill(PASSWORD);
+  await page.getByRole("button", { name: "配对" }).click();
+  await page.getByRole("button", { name, exact: true }).click();
+  for (const digit of pin) await page.locator(".pos-keypad").getByRole("button", { name: digit, exact: true }).click();
+  await page.getByRole("button", { name: "OK" }).click();
+  await expect(page.locator(".pos-who")).toContainText(name);
+}
+
+test("a waiter orders by number, the kitchen gets it, and the table pays separately, then together", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const products = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => !product.bundleItems?.length);
+  const [first, second] = products.filter((product) => product.kind === "food");
+
+  await pairAndSignIn(page, "Tablet counter", "Li", "1234");
+  await page.getByLabel("打开桌号").fill("5");
+  await page.getByRole("button", { name: "打开", exact: true }).click();
+  await expect(page.locator(".pos-ticket h1")).toHaveText("桌 5");
+
+  // By number, the way the menu is read out; and by tapping.
+  await page.getByLabel("菜号 / 搜索").fill(first.sku.toLowerCase());
+  await page.getByLabel("菜号 / 搜索").press("Enter");
+  await confirmOptions(page);
+  await page.getByLabel("菜号 / 搜索").fill(first.sku);
+  await page.getByLabel("菜号 / 搜索").press("Enter");
+  await confirmOptions(page);
+  await page.locator(`.pos-dishes button[data-sku="${second.sku}"]`).click();
+  await confirmOptions(page);
+  await expect(page.locator(".pos-lines.new li")).toHaveCount(2);
+  await expect(page.locator(".pos-lines.new li").first()).toContainText("2");
+  await page.getByPlaceholder(/备注/).fill("少辣");
+  await page.getByRole("button", { name: "送厨" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已送厨：3 道菜");
+  await expect(page.locator(".pos-lines.sent li")).toHaveCount(2);
+
+  const jobs = (await (await admin(request, "get", "/api/admin/print-jobs?status=queued&limit=50")).json()).jobs;
+  const ticket = jobs.find((job) => job.payload.table === "5");
+  expect(ticket.payload.staffName).toBe("Li");
+  expect(ticket.payload.note).toBe("少辣");
+  expect(JSON.stringify(ticket.payload)).not.toContain("price");
+
+  // Separately: the first guest pays one bowl in cash, with a 50 note.
+  await page.getByRole("button", { name: "结账" }).click();
+  await page.getByRole("button", { name: "分开结" }).click();
+  await page.locator(".pos-lines.pay li", { hasText: first.names.zh }).getByRole("button", { name: "+" }).click();
+  await expect(page.locator(".pos-total b")).toHaveText(new RegExp(first.price.toFixed(2).replace(".", "\\.")));
+  await page.getByRole("button", { name: "+ 现金" }).click();
+  await page.getByLabel("收到现金").fill("50");
+  await expect(page.locator(".pos-change")).toContainText(`找零 €${(50 - first.price).toFixed(2)}`);
+  await page.getByRole("button", { name: "收款并开小票" }).click();
+  await expect(page.locator(".pos-toast")).toContainText(`找零 €${(50 - first.price).toFixed(2)}`);
+  await expect(page.locator(".pos-lines.pay li", { hasText: first.names.zh })).toContainText("0/1");
+
+  // Together: the rest by card; the table is paid and the floor shows it free.
+  await page.getByRole("button", { name: "一起结" }).click();
+  const rest = first.price + second.price;
+  await expect(page.locator(".pos-total b")).toHaveText(new RegExp(rest.toFixed(2).replace(".", "\\.")));
+  await page.getByRole("button", { name: "+ 银行卡" }).click();
+  await page.getByRole("button", { name: "收款并开小票" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("桌 5 已结清");
+  await expect(page.locator(".pos-floor")).toBeVisible();
+
+  const receipts = (await (await admin(request, "get", "/api/admin/receipts?limit=10")).json()).receipts;
+  expect(receipts.map((receipt) => receipt.staffName)).toEqual(["Li", "Li"]);
+  expect(receipts[1].payments[0]).toMatchObject({ type: "cash", tenderedCents: 5000 });
+});
+
+test("a table open on one device is locked to it; the manager may take it over", async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const counter = await browser.newPage({ locale: "zh-CN" });
+  const phone = await browser.newPage({ locale: "zh-CN" });
+  await pairAndSignIn(counter, "Tablet A", "Li", "1234");
+  await pairAndSignIn(phone, "Phone B", "Wang", "9876");
+
+  await counter.getByLabel("打开桌号").fill("8");
+  await counter.getByRole("button", { name: "打开", exact: true }).click();
+  await expect(counter.locator(".pos-ticket h1")).toHaveText("桌 8");
+
+  // Wang is the manager: asked first, and refusing leaves Li's table alone.
+  phone.once("dialog", (dialog) => dialog.dismiss());
+  await phone.getByLabel("打开桌号").fill("8");
+  await phone.getByRole("button", { name: "打开", exact: true }).click();
+  await expect(phone.locator(".pos-toast")).toContainText("Li");
+  await expect(phone.locator(".pos-floor")).toBeVisible();
+
+  phone.once("dialog", (dialog) => dialog.accept());
+  await phone.getByRole("button", { name: "打开", exact: true }).click();
+  await expect(phone.locator(".pos-ticket h1")).toHaveText("桌 8");
+  await counter.close();
+  await phone.close();
+});
+
+test("a takeaway gets a pickup number and its discount; the waiter settles the shift", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const [dish] = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
+  await pairAndSignIn(page, "Tablet takeaway", "Li", "1234");
+
+  await page.getByRole("button", { name: "+ 外带自取" }).click();
+  await expect(page.locator(".pos-ticket h1")).toHaveText(/取餐号 \d+/);
+  await page.locator(`.pos-dishes button[data-sku="${dish.sku}"]`).click();
+  await confirmOptions(page);
+  await page.getByRole("button", { name: "送厨" }).click();
+  await expect(page.locator(".pos-lines.sent li")).toHaveCount(1);
+  const job = (await (await admin(request, "get", "/api/admin/print-jobs?status=queued&limit=100")).json()).jobs.find((entry) => /^TA-/.test(entry.payload.table ?? ""));
+  expect(job.payload.pickupNo).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "结账" }).click();
+  await expect(page.getByLabel("折扣 %")).toHaveValue("10");
+  const cents = Math.round(dish.price * 100);
+  const due = cents - Math.round(cents * 0.1);
+  await expect(page.locator(".pos-total b")).toHaveText(new RegExp((due / 100).toFixed(2).replace(".", "\\.")));
+  await page.getByRole("button", { name: "+ 现金" }).click();
+  await page.getByRole("button", { name: "收款并开小票" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已结清");
+
+  // The shift's end: the cash Li took, handed in.
+  await page.getByRole("button", { name: "记录与结算" }).click();
+  await expect(page.locator(".pos-records")).toContainText("应交现金");
+  await page.getByRole("button", { name: "结算并打印" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("Li 已结算");
+  await expect(page.locator(".pos-records")).toContainText("上次结算以后没有小票");
+  const receipt = (await (await admin(request, "get", "/api/admin/receipts?limit=1")).json()).receipts[0];
+  expect(receipt.lines.find((line) => line.kind === "discount").totalCents).toBe(-(cents - due));
+});
+
+test("the manager cancels a receipt with a reason, closes the day, and exports a journal that checks out", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  await pairAndSignIn(page, "Tablet office", "Wang", "9876");
+  await page.getByRole("button", { name: "记录与结算" }).click();
+  const records = page.locator(".pos-records");
+
+  // The takeaway's receipt (the third today), cancelled by a storno of its own.
+  page.once("dialog", (dialog) => dialog.accept("wrong order"));
+  await records.locator('.pos-receipts li[data-receipt="3"]').getByRole("button", { name: "冲销" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("小票 3 已冲销");
+  await expect(records.locator('.pos-receipts li[data-receipt="4"]')).toContainText("冲销小票 3 · wrong order");
+  await expect(records.locator('.pos-receipts li[data-receipt="3"]')).toContainText("已冲销");
+
+  await expect(records).toContainText("3 笔销售、1 笔冲销，小票 1–4");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "日结并打印" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("日结 Z 1 已完成");
+
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出 CSV" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^journal-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/);
+  await expect(records.locator(".pos-journal")).toHaveText(/^已校验 \d+ 条，链条完整$/);
+});

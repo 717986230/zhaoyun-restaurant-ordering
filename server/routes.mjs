@@ -581,7 +581,7 @@ export function registerRoutes(app, { database, realtime, config }) {
     return undefined;
   }
   const claimed = (reply, error) => errorReply(reply, error, error.code === "TABLE_CLAIMED" ? 409 : 400);
-  app.get("/api/pos/floor", { preHandler: requirePos }, async () => ({ tables: database.tablesOverview(), claims: database.liveClaims() }));
+  app.get("/api/pos/floor", { preHandler: requirePos }, async () => ({ tables: database.tablesOverview(), claims: database.liveClaims(), takeawayDiscountPercent: database.getSettings().takeawayDiscountPercent }));
   app.post("/api/pos/tables/:table/claim", { preHandler: requirePos, schema: { params: TableParams } }, async (request, reply) => {
     try {
       return { claim: database.claimTable(request.params.table, request.pos) };
