@@ -78,6 +78,8 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       <b>{table.table}</b>
       <span>{table.total > 0 ? money(Math.round(table.total * 100)) : t(table.state === "locked" ? "lockedByGuest" : "free")}</span>
       {busy && <small>{t("openOn", { name: claim.staffName ?? "?" })}</small>}
+      {table.orderingUntil && <em className="pos-qr-badge">{t("qrBadge")}</em>}
+      {table.orders.some((order) => order.channel === "pickup") && <em className="pos-qr-badge">{t("pickupBadge")}</em>}
     </button>;
   };
 

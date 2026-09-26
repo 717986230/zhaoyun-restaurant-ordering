@@ -1102,6 +1102,8 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("POST", "/api/pos/tables/V1/claim", asZhou)).status, 200);
       const order = (await call("POST", "/api/pos/orders", { ...asZhou, body: { clientRequestId: "contract-void-1", table: "V1", note: "", items: [{ id: food.id, qty: 3 }] } })).json.order;
       const line = (await call("GET", "/api/admin/tables/V1/bill", asZhou)).json.bill.items[0];
+      // A waiter's order seats the table: its guests may order from their phones too (shared/ordering.mjs).
+      assert.ok((await call("GET", "/api/pos/floor", asZhou)).json.tables.find((table) => table.table === "V1").orderingUntil, "a POS order opens the table");
 
       // 退菜: one of three, with a reason. The order stays as sent; the bill loses one.
       const voidOne = (body) => call("POST", "/api/pos/tables/V1/void", { ...asZhou, body: { orderItemId: line.orderItemId, ...body } });

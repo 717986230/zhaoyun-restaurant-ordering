@@ -290,3 +290,8 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   .pos-receipts li { grid-template-columns: minmax(0, 1fr) auto; }
   .pos-receipts li > span { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Guests ordering from their phones (开台): the table says so, and so does a pickup ordered online. */
+.pos-qr-badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1px solid var(--p-accent); border-radius: 999px; color: var(--p-accent); font-size: 11px; font-style: normal; }
+.pos-ticket-actions .pos-on { border-color: var(--p-accent); color: var(--p-accent); }
+.pos-guest-ordering { margin: 6px 0 0; font-size: 12px; }

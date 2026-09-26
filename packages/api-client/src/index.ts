@@ -2,7 +2,8 @@ import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
-  AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand
+  AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
+  ApiCustomer, ApiGuestOrdering, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -65,9 +66,22 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     companyUid: "",
     cashRegisterId: "KASSE-1",
     takeawayDiscountPercent: 0,
+    customerAccounts: false,
+    guestOrdering: { ...GUEST_ORDERING_DEFAULTS, hours: [] },
+    loyalty: { ...LOYALTY_DEFAULTS, rewards: [] },
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
   } as ApiSettings;
 }
+
+/** The servers' own defaults (shared/ordering.mjs, shared/customer.mjs). */
+export const GUEST_ORDERING_DEFAULTS: ApiGuestOrdering = {
+  enabled: false, dineIn: true, pickup: false, hours: [], requireOpenTable: true, tableSessionHours: 4,
+  maxItems: 30, maxOrderCents: 30_000, minIntervalSeconds: 60, maxOpenPickups: 2
+};
+export const LOYALTY_DEFAULTS: ApiLoyalty = { enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 };
+
+/** A guest in the console's list, and their points' history. */
+export interface CustomerDetail { customer: ApiCustomer; points: ApiPointsEntry[] }
 
 export interface RestaurantApiOptions {
   baseUrl: () => string;
@@ -135,6 +149,8 @@ export interface TableOverview {
   since: string | null;
   /** Open on a POS right now, and by whom. */
   openOn?: { staffId: string | null; staffName: string | null } | null;
+  /** Open for its guests to order from their phones (开台), until then; null when not. */
+  orderingUntil?: string | null;
 }
 
 export interface AdminStorage {
@@ -144,11 +160,17 @@ export interface AdminStorage {
 
 export class ApiError extends Error {
   readonly status: number;
+  /** What the refusal was, when the server says (a guest's order, a guest's account). */
+  readonly code: string | undefined;
+  /** For a pause (429): how many seconds. */
+  readonly retryAfter: number | undefined;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string, retryAfter?: number) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -167,15 +189,18 @@ export class ApiError extends Error {
  */
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const body = await response.text();
-  let payload: { error?: string } = {};
+  let payload: { error?: string; code?: string } = {};
   if (body) {
     try {
-      payload = JSON.parse(body) as { error?: string };
+      payload = JSON.parse(body) as { error?: string; code?: string };
     } catch {
       throw new ApiError(`Request failed (${response.status})`, response.status);
     }
   }
-  if (!response.ok) throw new ApiError(payload.error || `Request failed (${response.status})`, response.status);
+  if (!response.ok) {
+    const retryAfter = Number(response.headers.get("retry-after")) || undefined;
+    throw new ApiError(payload.error || `Request failed (${response.status})`, response.status, payload.code, retryAfter);
+  }
   return payload as T;
 }
 
@@ -313,6 +338,23 @@ export class AdminApi {
   /** Either setting may be saved alone; the one left out keeps its value. */
   updateSettings(settings: Partial<ApiSettings>): Promise<ApiSettings> { return this.#request<Partial<ApiSettings>>("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) }).then(withSettingDefaults); }
 
+  /** Open a table for its guests' phones (开台), or close it. */
+  setTableOrdering(table: string, open: boolean): Promise<{ session: ApiTableSession | null }> {
+    return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/ordering`, { method: "POST", body: JSON.stringify({ open }) });
+  }
+  // Guests' accounts, the manager's side.
+  customers(query = "", limit = 50): Promise<{ customers: ApiCustomer[] }> { return this.#request(`/api/admin/customers?q=${encodeURIComponent(query)}&limit=${limit}`); }
+  customer(id: string): Promise<CustomerDetail> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}`); }
+  /** Points changed by hand, always with a reason; the balance never goes below zero. */
+  adjustPoints(id: string, delta: number, note: string): Promise<{ customer: ApiCustomer }> {
+    return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/points`, { method: "POST", body: JSON.stringify({ delta, note }) });
+  }
+  /** A new password for a guest who forgot theirs; their sessions end. */
+  resetCustomerPassword(id: string, password: string): Promise<{ customer: ApiCustomer }> {
+    return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/password`, { method: "POST", body: JSON.stringify({ password }) });
+  }
+  deleteCustomer(id: string): Promise<void> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+
   /** The console's live channel: every change on the floor and in the menu. */
   live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
     return openLive(this.storage.baseUrl, { role: "staff" }, onEvent, onStatus);
@@ -404,6 +446,10 @@ export class PosApi {
   live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
     return openLive(this.baseUrl, { role: "staff" }, onEvent, onStatus);
   }
+  /** Open a table for its guests' phones (开台), or close it. */
+  setTableOrdering(table: string, open: boolean): Promise<{ session: ApiTableSession | null }> {
+    return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/ordering`, { method: "POST", body: JSON.stringify({ open }) });
+  }
   claim(table: string): Promise<{ claim: PosClaim }> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim`, { method: "POST" }); }
   release(table: string, force = false): Promise<void> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim${force ? "?force=1" : ""}`, { method: "DELETE" }); }
   order(command: CreateOrderCommand): Promise<{ order: ApiOrder }> { return this.#request("/api/pos/orders", { method: "POST", body: JSON.stringify(command) }); }
@@ -451,6 +497,36 @@ export class RestaurantApi {
     return this.#request("/api/orders", { method: "POST", body: JSON.stringify(command) });
   }
 
+  /** A guest's own order: at the table (with its card's token) or for pickup (signed in). */
+  placeOrder(command: GuestOrderCommand): Promise<{ order: ApiOrder }> {
+    return this.#request("/api/guest/orders", { method: "POST", body: JSON.stringify(command) });
+  }
+
+  /** The orders this phone placed, by the ids it made up for them; no account needed. */
+  trackOrders(clientRequestIds: string[]): Promise<{ orders: ApiOrder[] }> {
+    return this.#request(`/api/guest/orders?ids=${clientRequestIds.map(encodeURIComponent).join(",")}`);
+  }
+
+  // A guest's own account: the session token travels in the headers the app gives (x-customer-token).
+  registerCustomer(command: CustomerRegisterCommand): Promise<CustomerSession> {
+    return this.#request("/api/customer/register", { method: "POST", body: JSON.stringify(command) });
+  }
+  signInCustomer(email: string, password: string): Promise<CustomerSession> {
+    return this.#request("/api/customer/sign-in", { method: "POST", body: JSON.stringify({ email, password }) });
+  }
+  signOutCustomer(): Promise<void> { return this.#request("/api/customer/sign-out", { method: "POST" }); }
+  customer(): Promise<{ customer: ApiCustomer; favorites: string[] }> { return this.#request("/api/customer"); }
+  /** A new password answers with a fresh session: every other one has ended. */
+  updateCustomer(command: CustomerUpdateCommand): Promise<{ customer: ApiCustomer; token?: string }> {
+    return this.#request("/api/customer", { method: "PUT", body: JSON.stringify(command) });
+  }
+  deleteCustomer(password: string): Promise<void> { return this.#request("/api/customer/delete", { method: "POST", body: JSON.stringify({ password }) }); }
+  setFavorite(productId: string, on: boolean): Promise<{ favorites: string[] }> {
+    return this.#request(`/api/customer/favorites/${encodeURIComponent(productId)}`, { method: on ? "PUT" : "DELETE" });
+  }
+  customerPoints(): Promise<{ entries: ApiPointsEntry[] }> { return this.#request("/api/customer/points"); }
+  customerOrders(): Promise<{ orders: ApiOrder[] }> { return this.#request("/api/customer/orders"); }
+
   createServiceRequest(command: CreateServiceRequestCommand): Promise<{ request: { id: string } }> {
     return this.#request("/api/service-requests", { method: "POST", body: JSON.stringify(command) });
   }
@@ -466,6 +542,7 @@ export class RestaurantApi {
       if (value) headers.set(name, value);
     }
     const response = await this.#fetch(`${this.#baseUrl()}${path}`, { ...options, headers });
+    if (response.status === 204) return undefined as T;
     return parseJsonResponse<T>(response);
   }
 }

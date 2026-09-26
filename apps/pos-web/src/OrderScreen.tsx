@@ -34,8 +34,11 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const requestId = useRef(crypto.randomUUID());
 
   const name = (product: Product) => product.names[language] || product.names.zh || product.names.de;
+  // Open for its guests to order from their phones (开台), and until when.
+  const [orderingUntil, setOrderingUntil] = useState<string | null>(null);
   const loadBill = useCallback(async () => {
     try { setBill((await api.bill(table)).bill); } catch (error) { pos.failed(error); }
+    api.floor().then((floor) => setOrderingUntil(floor.tables.find((entry) => entry.table === table)?.orderingUntil ?? null)).catch(() => undefined);
   }, [table, pos.failed]);
 
   useEffect(() => {
@@ -126,6 +129,13 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   async function printBill() {
     try { await api.printBill(table); pos.notify(t("billPrinted")); } catch (error) { pos.failed(error); }
   }
+  async function toggleGuestOrdering() {
+    try {
+      const { session } = await api.setTableOrdering(table, !orderingUntil);
+      setOrderingUntil(session?.expiresAt ?? null);
+      pos.notify(t(session ? "guestOrderingOpened" : "guestOrderingClosed", { table }));
+    } catch (error) { pos.failed(error); }
+  }
   async function move() {
     const to = window.prompt(t("moveTo"))?.trim().toUpperCase();
     if (!to) return;
@@ -166,7 +176,11 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         <button type="button" disabled={!bill?.items.length} onClick={() => void printBill()}>{t("printBill")}</button>
         <button type="button" className="pos-pay" disabled={!bill?.items.length} onClick={() => leave({ name: "pay", table })}>{t("pay")}</button>
         {!pickupNo && <button type="button" disabled={!bill?.items.length} onClick={() => void move()}>{t("moveTable")}</button>}
+        {!pickupNo && !/^TA-/i.test(table) && <button type="button" className={orderingUntil ? "pos-on" : ""} onClick={() => void toggleGuestOrdering()}>
+          {orderingUntil ? t("guestOrderingClose") : t("guestOrderingOpen")}
+        </button>}
       </div>
+      {orderingUntil && <p className="pos-muted pos-guest-ordering">{t("guestOrderingOn", { time: new Date(orderingUntil).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) })}</p>}
     </aside>
 
     <div className="pos-menu">

@@ -20,6 +20,70 @@ export interface CreateOrderCommand {
   }>;
 }
 
+/** How a guest's own order came in: at their table, or to pick up (shared/ordering.mjs). */
+export type GuestChannel = "dine-in" | "pickup";
+export type GuestPayment = "in-store" | "online";
+
+/** A guest's own order from the menu (POST /api/guest/orders). A reward is a dish bought with points. */
+export interface GuestOrderCommand {
+  clientRequestId: string;
+  channel: GuestChannel;
+  /** The table, for an order at it; a pickup names none. */
+  table?: string;
+  note: string;
+  payment?: GuestPayment;
+  items: Array<{
+    id: string;
+    qty: number;
+    modifiers?: Array<{ id: string }>;
+    reward?: boolean;
+  }>;
+}
+
+/** Why a guest's order was refused, for the menu to say what to do. */
+export type GuestOrderRefusal =
+  | "ORDERING_OFF" | "ORDERING_CLOSED" | "TABLE_NOT_OPEN" | "TABLE_LOCKED" | "TOO_SOON" | "ORDER_TOO_LARGE"
+  | "SIGN_IN_REQUIRED" | "TOO_MANY_PICKUPS" | "NOT_ENOUGH_POINTS" | "PAYMENT_UNAVAILABLE" | "BAD_CHANNEL";
+
+/** A guest's own account (shared/customer.mjs). */
+export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string }
+export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer }
+export interface CustomerRegisterCommand { email: string; name?: string; password: string }
+/** Every change is made against the password in force. */
+export interface CustomerUpdateCommand { currentPassword: string; name?: string; password?: string }
+export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
+export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string }
+
+/** Ordering from the menu and its limits, as the owner sets them. */
+export interface ApiGuestOrdering {
+  enabled: boolean;
+  dineIn: boolean;
+  pickup: boolean;
+  /** When guests may order; empty: whenever it is switched on. */
+  hours: ApiSchedule[];
+  /** Only at a table a waiter opened (开台). */
+  requireOpenTable: boolean;
+  /** An open table closes for ordering after this long, paid or not. */
+  tableSessionHours: number;
+  maxItems: number;
+  maxOrderCents: number;
+  /** One order per table (per guest, for pickup) this often. */
+  minIntervalSeconds: number;
+  /** Pickups a guest may have waiting at once. */
+  maxOpenPickups: number;
+}
+
+/** Points for what guests pay, and the dishes they buy with them. */
+export interface ApiLoyalty {
+  enabled: boolean;
+  pointsPerEuro: number;
+  rewards: Array<{ productId: string; points: number }>;
+  maxRewardsPerOrder: number;
+}
+
+/** A table open for its guests' phones (开台). */
+export interface ApiTableSession { table: string; openedAt: string; expiresAt: string; staffName: string | null }
+
 export interface CreateServiceRequestCommand {
   table: string;
   type: string;
@@ -65,7 +129,7 @@ export interface ApiOrder {
   status: OrderStatus;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for, and was voided. */ paid?: number; voided?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; price: number }> }>;
+  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for, and was voided. */ paid?: number; voided?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; names?: { zh: string; de: string; en: string }; price: number }> }>;
   createdAt: string;
   updatedAt?: string;
   billedAt?: string | null;
@@ -73,6 +137,10 @@ export interface ApiOrder {
   staffName?: string;
   /** A takeaway's pickup number. */
   pickupNo?: number;
+  /** A guest's own order from the menu: at the table or for pickup. */
+  channel?: GuestChannel;
+  /** The points its rewards took. */
+  pointsSpent?: number;
 }
 
 export type PrintStationName = "kitchen" | "bar" | "sushi" | "front";
@@ -264,6 +332,10 @@ export interface ApiSettings {
   cashRegisterId: string;
   /** The discount a takeaway gets at the POS, percent. */
   takeawayDiscountPercent: number;
+  /** Guests' own accounts on the menu (favourites); pickup and points need them too. */
+  customerAccounts: boolean;
+  guestOrdering: ApiGuestOrdering;
+  loyalty: ApiLoyalty;
 }
 
 /** Tab → language → the name the guest sees. */
@@ -286,6 +358,12 @@ export interface ApiMenuSettings {
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */
   featured?: { title: string; productIds: string[]; template: FeaturedTemplateId; schedule?: ApiSchedule | null } | null;
+  /** Guests can have accounts (favourites, pickup, points); absent from an older server. */
+  accounts?: boolean;
+  /** Ordering from the menu, when the owner switched it on. */
+  ordering?: Pick<ApiGuestOrdering, "dineIn" | "pickup" | "hours" | "maxItems" | "maxOrderCents" | "requireOpenTable"> | null;
+  /** The points programme, when it is on. */
+  loyalty?: Omit<ApiLoyalty, "enabled"> | null;
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

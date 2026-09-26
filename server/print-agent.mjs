@@ -19,7 +19,8 @@ const labels = {
     sum: "合计", cash: "现金", card: "银行卡", voucher: "代金券", tendered: "收", change: "找零", gross: "含税",
     voucherCode: "代金券码", closing: "日结", sales: "销售", stornos: "冲销", receipts: "小票", vouchersSold: "售出代金券", uid: "UID",
     waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣",
-    voidTicket: "*** 退菜 · 停止制作 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***"
+    voidTicket: "*** 退菜 · 停止制作 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***",
+    guestDineIn: "*** 顾客扫码点餐 ***", guestPickup: "*** 线上自取 ***"
   },
   de: {
     title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz",
@@ -30,7 +31,8 @@ const labels = {
     sum: "SUMME", cash: "Bar", card: "Karte", voucher: "Gutschein", tendered: "gegeben", change: "Rückgeld", gross: "Brutto",
     voucherCode: "Gutschein-Code", closing: "TAGESABSCHLUSS", sales: "Verkäufe", stornos: "Stornos", receipts: "Belege", vouchersSold: "Gutscheine verkauft", uid: "UID",
     waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt",
-    voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***"
+    voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***",
+    guestDineIn: "*** GAST-BESTELLUNG (QR) ***", guestPickup: "*** ONLINE – ABHOLUNG ***"
   },
   en: {
     title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note",
@@ -41,7 +43,8 @@ const labels = {
     sum: "TOTAL", cash: "Cash", card: "Card", voucher: "Voucher", tendered: "given", change: "change", gross: "Gross",
     voucherCode: "Voucher code", closing: "DAY CLOSING", sales: "sales", stornos: "cancellations", receipts: "Receipts", vouchersSold: "Vouchers sold", uid: "UID",
     waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount",
-    voidTicket: "*** VOID – STOP COOKING ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***"
+    voidTicket: "*** VOID – STOP COOKING ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***",
+    guestDineIn: "*** GUEST ORDER (QR) ***", guestPickup: "*** ONLINE PICKUP ***"
   }
 };
 
@@ -58,12 +61,15 @@ function orderLines(payload, copy, language) {
   const voiding = payload.kind === "void";
   const lines = [
     ...(voiding ? [copy.voidTicket] : []),
+    // A guest ordered it from their phone: nobody at the pass took it down.
+    ...(payload.guest ? [payload.guest.channel === "pickup" ? copy.guestPickup : copy.guestDineIn] : []),
     copy.kitchen,
     copy.title,
     // A takeaway's pickup number is what the kitchen calls out; big on the ticket.
     ...(payload.pickupNo ? [`${copy.pickup} ${payload.pickupNo}`] : []),
     `${copy.order} ${payload.orderNo || ""}  ${copy.table} ${payload.table || ""}`,
     ...(payload.staffName ? [`${copy.waiter}: ${payload.staffName}`] : []),
+    ...(payload.guest?.name ? [payload.guest.name] : []),
     RULE
   ];
   for (const item of payload.items || []) {

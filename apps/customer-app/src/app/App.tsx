@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeEnvelope } from "@zhaoyun/contracts";
 import { restaurantApi } from "./api";
@@ -11,19 +12,25 @@ import { CatalogScreen } from "../features/catalog/CatalogScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
 import { useMinuteClock } from "./useMinuteClock";
 import { DEFAULT_TIME_ZONE, isOnSchedule } from "../../../../src/schedule.js";
+import { summarize } from "./cart";
+import { orderingState } from "./ordering";
+import { assignedTableNo } from "./table";
+import { useCustomer } from "../features/account/useCustomer";
+import { AccountSheet } from "../features/account/AccountSheet";
+import { CartSheet } from "../features/cart/CartSheet";
+import { OrdersSheet } from "../features/orders/OrdersSheet";
 
 /**
- * The guest app is a menu, and nothing else.
+ * The guest app is the menu. Everything else opens over it as a sheet, and
+ * only when the restaurant switched it on (served with the catalogue):
  *
- * A tap on an NFC tag or a scanned table card used to open a home screen with
- * four things to choose between — ordering, service, order status, staff —
- * because the app once took orders. It no longer does for guests: cart,
- * checkout, service calls and the local order board are still here as code
- * (`features/cart`, `features/service`, `features/orders`, `features/staff`,
- * and every reducer case in `model.ts`), one wire away from coming back the
- * day the restaurant wants ordering again, but nothing in this file routes a
- * guest to any of them. `CatalogScreen` is the whole app; admin access is a
- * tap-sequence on its title, handled by `useKiosk`, not a screen of its own.
+ *  - the guest's account — favourites, points and rewards (features/account);
+ *  - the cart, and the order it becomes, at the table or for pickup,
+ *    straight to the kitchen within the owner's limits (features/cart);
+ *  - the guest's orders and where they are (features/orders).
+ *
+ * With none of it on, it is the menu it always was. Admin access is a
+ * tap-sequence on the title, handled by `useKiosk`, not a screen of its own.
  */
 export function App() {
   const { state, dispatch } = useCustomerState();
@@ -65,6 +72,16 @@ export function App() {
     [catalog.products, setsOpen]
   );
 
+  // Ordering from the menu and guests' accounts, as the owner switched them on.
+  const ordering = orderingState(catalog.menu, assignedTableNo(), new Date(minute * 60_000), timeZone);
+  const accountsOn = Boolean(catalog.menu?.accounts);
+  const account = useCustomer(accountsOn);
+  const loyalty = catalog.menu?.loyalty ?? null;
+  const rewardPoints = useMemo(() => new Map((loyalty?.rewards ?? []).map((reward) => [reward.productId, reward.points])), [loyalty]);
+  const cart = summarize(state.cart, catalog.products, rewardPoints);
+  // A sheet whose feature was switched off while it was open closes.
+  const sheet = state.sheet === "account" && !accountsOn ? null : state.sheet === "cart" && !ordering.open && !ordering.closed ? null : state.sheet;
+
   // The promotions page's dishes, in the owner's order; a dish since taken off
   // the menu is skipped, and a page left with nothing on it is not shown.
   const featuredSettings = featuredOpen ? catalog.menu?.featured : null;
@@ -91,6 +108,15 @@ export function App() {
       featured={featured}
       navPinned={catalog.menu?.navPinned ?? []}
       navLabels={catalog.menu?.navLabels ?? {}}
+      ordering={ordering}
+      account={accountsOn ? account : null}
+      cart={cart}
     />
+    <AnimatePresence>
+      {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} />}
+      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} />}
+      {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}
+    </AnimatePresence>
+    <div className={`toast ${state.toast ? "show" : ""}`} role="status" aria-live="polite">{state.toast}</div>
   </main>;
 }

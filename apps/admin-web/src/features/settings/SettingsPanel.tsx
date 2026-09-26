@@ -90,7 +90,7 @@ function readFolded(): string[] {
  * what is set in it. Open until the owner folds it; which cards are folded
  * is remembered on this device, so the page opens the way they left it.
  */
-function Section({ title, hint, children, id, wide = false, summary }: { title: string; hint?: string; children: ReactNode; id: string; wide?: boolean; summary?: string }) {
+export function Section({ title, hint, children, id, wide = false, summary }: { title: string; hint?: string; children: ReactNode; id: string; wide?: boolean; summary?: string }) {
   const [open, setOpen] = useState(() => !readFolded().includes(id));
   function toggle(next: boolean) {
     setOpen(next);
@@ -113,7 +113,7 @@ function Section({ title, hint, children, id, wide = false, summary }: { title: 
 
 /** A switch that saves on change: the setting is on screen the moment it is
  *  flipped, and the console puts it back if the save fails. */
-function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
+export function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
   return <label className="settings-switch">
     <input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     <span>{label}</span>

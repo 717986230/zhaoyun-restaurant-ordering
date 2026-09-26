@@ -25,6 +25,8 @@ interface Props {
   onCloseBill: () => void;
   /** The bill on the front printer, for the guest to read; it marks nothing paid. */
   onPrintBill: (table: string) => Promise<void>;
+  /** Open a table for its guests to order from their phones (开台), or close it. */
+  onOrdering: (table: string, open: boolean) => Promise<void>;
 }
 
 /**
@@ -77,6 +79,7 @@ export function TablesPanel(props: Props) {
         <span className={`status ${table.state}`}>{t(STATE_KEYS[table.state])}</span>
       </div>
       {table.openOn?.staffName && <span className="table-open-on">{t("openOnPos", { name: table.openOn.staffName })}</span>}
+      {table.orderingUntil && <span className="table-ordering">{t("tableOrderingUntil", { time: formatTime(table.orderingUntil, language) })}</span>}
       <small className="table-tile-meta">
         {table.label || "—"}
         {table.since ? ` · ${t("tableSince", { time: formatTime(table.since, language) })}` : ""}
@@ -87,7 +90,7 @@ export function TablesPanel(props: Props) {
       {table.orders.length ? <>
         <ul className="table-tile-orders">{table.orders.map((order) => <li key={order.id}>
           <div className="table-tile-order-head">
-            <span>{order.no}{order.staffName ? ` · ${order.staffName}` : ""}{order.pickupNo ? ` · ${t("pickupShort", { no: order.pickupNo })}` : ""}</span>
+            <span>{order.no}{order.staffName ? ` · ${order.staffName}` : ""}{order.channel ? ` · ${t(order.channel === "pickup" ? "channelPickup" : "channelDineIn")}` : ""}{order.pickupNo ? ` · ${t("pickupShort", { no: order.pickupNo })}` : ""}</span>
             <span className={`status ${order.status}`}>{t(ORDER_STATUS_KEYS[order.status])}</span>
           </div>
           <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>
@@ -107,6 +110,9 @@ export function TablesPanel(props: Props) {
           title={table.registered ? "" : t("tableRegisterFirst")}
           onClick={() => void props.onLock(table.table, !table.locked)}
         >{t(table.locked ? "tableUnlock" : "tableLock")}</button>
+        {!table.table.startsWith("TA-") && <button className="ghost-action" disabled={props.busy} onClick={() => void props.onOrdering(table.table, !table.orderingUntil)}>
+          {t(table.orderingUntil ? "closeForOrdering" : "openForOrdering")}
+        </button>}
         {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>}
       </div>
     </article>) : <div className="admin-empty">{t("tablesEmpty")}</div>}</div>

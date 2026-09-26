@@ -2,7 +2,7 @@ import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, LANGUAGE_INFO, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
-import type { DishPart, FeaturedTemplateId, MenuLanguage, Product } from "@zhaoyun/domain";
+import type { DishPart, FeaturedTemplateId, MenuLanguage, Product, SelectedModifier } from "@zhaoyun/domain";
 import type { NavLabels } from "@zhaoyun/contracts";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
@@ -12,6 +12,10 @@ import { formatPrice, productName, secondaryName, t } from "../../app/i18n";
 import type { ColorScheme } from "../../app/useColorScheme";
 import { usePageTurn } from "./usePageTurn";
 import type { TurnDirection } from "./usePageTurn";
+import { g } from "../../app/guest-i18n";
+import type { OrderingState } from "../../app/ordering";
+import type { CartSummary } from "../../app/cart";
+import type { CustomerAccount } from "../account/useCustomer";
 
 interface Props {
   state: CustomerState;
@@ -38,12 +42,20 @@ interface Props {
   /** The owner's names for the tabs, per language; a tab without one keeps
    *  the menu's own wording. */
   navLabels?: NavLabels;
+  /** What the guest may order now; nothing to add to a cart while it is closed. */
+  ordering: OrderingState;
+  /** The guest's account, when the restaurant offers them. */
+  account: CustomerAccount | null;
+  /** The cart as it stands, for the bar at the bottom. */
+  cart: CartSummary;
 }
 
 /** The promotions page's place among the categories; no real category is called this. */
 export const FEATURED_PAGE = NAV_FEATURED;
 /** The set menus' page: every dish that packages others, whatever its category. */
 export const SETS_PAGE = NAV_SETS;
+/** The signed-in guest's favourites; no real category is called this. */
+export const FAVORITES_PAGE = "__favorites__";
 
 /** A set menu is a dish made of other dishes; nothing else marks one. */
 export function isSet(product: Product): boolean {
@@ -194,6 +206,14 @@ function SunIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></svg>;
 }
 
+function PersonIcon() {
+  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" /><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6" /></svg>;
+}
+
+function ReceiptIcon() {
+  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z" /><path d="M9 8.5h6M9 12h6M9 15.5h3.5" /></svg>;
+}
+
 function MoonIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2z" /></svg>;
 }
@@ -251,8 +271,33 @@ function Deconstruction({ product, language, reduceMotion, showing }: { product:
  * text. "加面 +2,50" tells a guest what they can ask the waiter for without
  * pretending a tap here does anything.
  */
-function DishOptions({ product, language }: { product: Product; language: CustomerState["language"] }) {
+function DishOptions({ product, language, selected, onChange }: { product: Product; language: CustomerState["language"]; selected?: SelectedModifier[]; onChange?: (modifiers: SelectedModifier[]) => void }) {
   if (!product.modifiers?.length) return null;
+  // The guest may order: the same options, to choose from — one of a "single"
+  // group, any of a "multi" one — and the price follows.
+  if (selected && onChange) {
+    const chosen = new Set(selected.map((modifier) => modifier.id));
+    const pick = (groupId: string, option: { id: string; names: Product["names"]; priceCents: number }, single: boolean) => {
+      const group = product.modifiers?.find((candidate) => candidate.id === groupId);
+      const siblings = new Set(single ? group?.options.map((candidate) => candidate.id) : []);
+      const rest = selected.filter((modifier) => modifier.id !== option.id && !siblings.has(modifier.id));
+      onChange(chosen.has(option.id) ? rest : [...rest, { id: option.id, name: localized(option.names, language), priceCents: option.priceCents }]);
+    };
+    return <div className="dish-options choosing" onClick={(event) => event.stopPropagation()}>
+      <p className="modifier-heading">{t(language, "customize")}</p>
+      {product.modifiers.map((group) => <fieldset className="dish-options-group" key={group.id}>
+        <legend>{localized(group.names, language)}</legend>
+        {group.options.map((option) => <label key={option.id} className={chosen.has(option.id) ? "on" : ""}>
+          <input type={group.selection === "single" ? "radio" : "checkbox"} name={`${product.id}-${group.id}`} checked={chosen.has(option.id)}
+            onChange={() => pick(group.id, option, group.selection === "single")} onClick={(event) => {
+              // A radio cannot be unticked by itself; a second tap takes the option off.
+              if (group.selection === "single" && chosen.has(option.id)) { event.preventDefault(); pick(group.id, option, true); }
+            }} />
+          <span>{localized(option.names, language)}{option.priceCents > 0 ? ` +${formatPrice(option.priceCents, language)}` : ""}</span>
+        </label>)}
+      </fieldset>)}
+    </div>;
+  }
   return <div className="dish-options">
     <p className="modifier-heading">{t(language, "customize")}</p>
     {product.modifiers.map((group) => <p className="dish-options-group" key={group.id}>
@@ -264,9 +309,35 @@ function DishOptions({ product, language }: { product: Product; language: Custom
   </div>;
 }
 
-function ProductDetail({ product, categoryName, byId, state, dispatch }: { product: Product; categoryName: string; byId: ProductIndex; state: CustomerState; dispatch: CustomerDispatch }) {
+/** A heart: the guest keeps the dish; signed out, it asks them to sign in first. */
+function FavoriteButton({ product, account, language, dispatch }: { product: Product; account: CustomerAccount; language: CustomerState["language"]; dispatch: CustomerDispatch }) {
+  const on = account.favorites.includes(product.id);
+  return <button type="button" className={`favorite-toggle ${on ? "on" : ""}`} aria-pressed={on}
+    aria-label={g(language, on ? "unfavorite" : "favorite")} title={g(language, account.signedIn ? (on ? "unfavorite" : "favorite") : "signInToFavorite")}
+    onClick={(event) => {
+      event.stopPropagation();
+      if (!account.signedIn) {
+        dispatch({ type: "toast", message: g(language, "signInToFavorite") });
+        dispatch({ type: "sheet", sheet: "account" });
+        return;
+      }
+      void account.toggleFavorite(product.id);
+    }}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z" /></svg>
+  </button>;
+}
+
+function ProductDetail({ product, categoryName, byId, state, dispatch, ordering, account }: { product: Product; categoryName: string; byId: ProductIndex; state: CustomerState; dispatch: CustomerDispatch; ordering: OrderingState; account: CustomerAccount | null }) {
   const reduceMotion = useReducedMotion();
   const seconds = (value: number) => (reduceMotion ? 0 : value);
+  const optionsCents = state.detailModifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);
+  const lineCents = (product.priceCents + optionsCents) * state.detailQuantity;
+  function addToCart(event: React.MouseEvent) {
+    event.stopPropagation();
+    dispatch({ type: "add-to-cart", productId: product.id, quantity: state.detailQuantity, modifiers: state.detailModifiers });
+    dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
+    dispatch({ type: "close-product" });
+  }
 
   return <motion.div id="dishOverlay" className="dish-overlay open" aria-hidden="false"
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -297,13 +368,24 @@ function ProductDetail({ product, categoryName, byId, state, dispatch }: { produ
           <div className="detail-scroll">
             {/* The photo takes the whole width. The description is on the
                 back with the rest of the facts, and so is the photo credit. */}
-            <figure className="feature-media"><DishPicture product={product} byId={byId} /></figure>
-            <DishOptions product={product} language={state.language} />
+            <figure className="feature-media"><DishPicture product={product} byId={byId} />
+              {account && <FavoriteButton product={product} account={account} language={state.language} dispatch={dispatch} />}
+            </figure>
+            {ordering.open
+              ? <DishOptions product={product} language={state.language} selected={state.detailModifiers} onChange={(modifiers) => dispatch({ type: "detail-modifiers", modifiers })} />
+              : <DishOptions product={product} language={state.language} />}
             <SetList product={product} byId={byId} language={state.language} />
             {facts(product).length > 0 && <div className="meta">{facts(product).map((fact) => <span key={fact}>{fact}</span>)}</div>}
           </div>
           <div className="detail-buy">
-            <div className="buyline"><strong>{formatPrice(product.priceCents, state.language)}</strong></div>
+            <div className="buyline"><strong>{formatPrice(ordering.open ? product.priceCents + optionsCents : product.priceCents, state.language)}</strong>
+              {ordering.open && <div className="qty" role="group" onClick={(event) => event.stopPropagation()}>
+                <button type="button" aria-label="−" onClick={() => dispatch({ type: "detail-quantity", quantity: state.detailQuantity - 1 })}>−</button>
+                <span>{state.detailQuantity}</span>
+                <button type="button" aria-label="+" onClick={() => dispatch({ type: "detail-quantity", quantity: state.detailQuantity + 1 })}>+</button>
+              </div>}
+            </div>
+            {ordering.open && <button type="button" className="primary add-to-cart" onClick={addToCart}>{g(state.language, "addToCart")} · {formatPrice(lineCents, state.language)}</button>}
           </div>
         </section>
         <section className="detail-face detail-back" aria-label={t(state.language, "detailRegion")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
@@ -384,7 +466,7 @@ function FeaturedPage({ title, eyebrow, template, products, byId, language, onOp
   </div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {} }: Props) {
+export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {}, ordering, account, cart }: Props) {
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
@@ -394,15 +476,21 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const sets = useMemo(() => products.filter(isSet), [products]);
   const dishes = useMemo(() => products.filter((product) => !isSet(product)), [products]);
   const onSets = sets.length > 0 && state.category === SETS_PAGE && !query;
+  // The guest's favourites, sets among them, in the order they were kept.
+  const favoriteIds = account?.signedIn ? account.favorites : [];
+  const favorites = useMemo(() => favoriteIds.flatMap((id) => products.find((product) => product.id === id) ?? []), [favoriteIds, products]);
+  const onFavorites = favorites.length > 0 && state.category === FAVORITES_PAGE && !query;
   // A search looks through everything, sets included; a page shows its own.
-  const visible = (query ? products : dishes).filter((product) => {
-    const categoryMatch = query || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE || product.category === state.category;
+  const visible = (query ? products : onFavorites ? favorites : dishes).filter((product) => {
+    const categoryMatch = query || onFavorites || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE || product.category === state.category;
     const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category, ...Object.values(navLabels[product.category] ?? {})].join(" ").toLowerCase();
     return categoryMatch && (!query || text.includes(query));
   });
   // The owner's three first, the rest in their usual order: the promotions
   // page, the set menus, everything, then the categories.
-  const categories = orderNavTabs([...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))], navPinned);
+  const ordered = orderNavTabs([...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))], navPinned);
+  // The guest's own page goes just before everything, whatever the owner pinned.
+  const categories = favorites.length ? [...ordered.slice(0, ordered.indexOf("ALLE")), FAVORITES_PAGE, ...ordered.slice(ordered.indexOf("ALLE"))] : ordered;
   const activeProduct = state.activeProductId ? byId.get(state.activeProductId) : undefined;
   const table = assignedTableNo();
   const reduceMotion = useReducedMotion();
@@ -414,6 +502,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const prevPage = paging && pageIndex > 0 ? categories[pageIndex - 1] : undefined;
   const pageName = (category: string) => (category === FEATURED_PAGE
     ? `✦ ${featured?.title || t(state.language, "featuredDefault")}`
+    : category === FAVORITES_PAGE ? g(state.language, "favoritesPage")
     : navLabels[category]?.[state.language]
       || (category === SETS_PAGE ? t(state.language, "setsPage") : category === "ALLE" ? t(state.language, "allCategories") : category));
 
@@ -550,6 +639,10 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           aria-label={t(state.language, scheme === "dark" ? "lightMode" : "darkMode")}
           onClick={onToggleScheme}
         >{scheme === "dark" ? <SunIcon /> : <MoonIcon />}</button>
+        {/* The guest's account; without accounts, the orders this phone placed. */}
+        {account
+          ? <button id="accountBtn" className={`icon-btn guest-toggle ${account.signedIn ? "on" : ""}`} aria-label={g(state.language, "account")} onClick={() => dispatch({ type: "sheet", sheet: "account" })}><PersonIcon /></button>
+          : state.placed.length > 0 && <button id="ordersBtn" className="icon-btn guest-toggle" aria-label={g(state.language, "myOrders")} onClick={() => dispatch({ type: "sheet", sheet: "orders" })}><ReceiptIcon /></button>}
       </div>
     </header>
     <div id="searchBox" className={`search-box ${state.searchOpen ? "open" : ""}`}>
@@ -580,6 +673,13 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
               </div>
               {/* A menu without prices sends a guest into every dish to find one. */}
               <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
+              {/* One tap from the list to the cart; options are chosen on the card. */}
+              {ordering.open && <button type="button" className="quick-add" aria-label={`${g(state.language, "addToCart")}: ${productName(product, state.language)}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [] });
+                  dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
+                }}>+</button>}
             </div>
           </article>) : query && products.length
             // A search that found nothing says what was looked for and offers the way back.
@@ -601,15 +701,18 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     <InstallOffer language={state.language} />
     {/* Outside the list: the list is transformed while a page turns, and a
         fixed button inside it would move with the page. */}
+    {ordering.open && cart.count > 0 && !activeProduct && <button type="button" id="cartBar" className="cartbar" onClick={() => dispatch({ type: "sheet", sheet: "cart" })}>
+      <span>{g(state.language, "cart")}</span><b>{cart.count}</b><em>{formatPrice(cart.totalCents, state.language)}</em>
+    </button>}
     <button
       type="button"
-      className={`to-top ${farDown && !activeProduct ? "on" : ""}`}
+      className={`to-top ${farDown && !activeProduct ? "on" : ""} ${ordering.open && cart.count > 0 ? "above-cart" : ""}`}
       aria-label={t(state.language, "backToTop")}
       title={t(state.language, "backToTop")}
       aria-hidden={!farDown || Boolean(activeProduct)}
       tabIndex={farDown && !activeProduct ? 0 : -1}
       onClick={() => stackRef.current?.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })}
     ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" /></svg></button>
-    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} categoryName={pageName(activeProduct.category)} byId={byId} state={state} dispatch={dispatch} />}</AnimatePresence>
+    <AnimatePresence>{activeProduct && <ProductDetail key={activeProduct.id} product={activeProduct} categoryName={pageName(activeProduct.category)} byId={byId} state={state} dispatch={dispatch} ordering={ordering} account={account} />}</AnimatePresence>
   </section>;
 }
