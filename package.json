@@ -19,7 +19,7 @@
     "print-agent": "node server/print-agent.mjs",
     "print-agent:once": "node server/print-agent.mjs --once",
     "server:test": "node --test server/tests/*.test.mjs",
-    "build": "npm run typecheck && vite build",
+    "build": "npm run typecheck && vite build && vite build -c vite.bridge.config.js",
     "typecheck": "tsc -b",
     "unit": "vitest run",
     "test": "playwright test",

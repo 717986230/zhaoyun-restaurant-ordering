@@ -42,7 +42,8 @@ const incremental = [
   { file: "0055_accounts.sql", drop: "DROP INDEX idx_account_sessions_expiry; DROP TABLE account_sessions; DROP TABLE accounts;" },
   { file: "0056_item_voids.sql", drop: "DROP INDEX idx_order_item_voids_staff; DROP INDEX idx_order_item_voids_item; DROP TABLE order_item_voids;" },
   { file: "0057_customers.sql", drop: "DROP INDEX idx_guest_orders_customer; DROP INDEX idx_guest_orders_table; DROP INDEX idx_points_ledger_ref; DROP INDEX idx_points_ledger_customer; DROP INDEX idx_customer_sessions_expiry; DROP TABLE table_sessions; DROP TABLE guest_orders; DROP TABLE points_ledger; DROP TABLE customer_favorites; DROP TABLE customer_sessions; DROP TABLE customers;" },
-  { file: "0058_print_bridge.sql", drop: "DROP TABLE printer_status; DROP TABLE print_bridges;" }
+  { file: "0058_print_bridge.sql", drop: "DROP TABLE printer_status; DROP TABLE print_bridges;" },
+  { file: "0059_discovered_printers.sql", drop: "DROP TABLE discovered_printers;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")

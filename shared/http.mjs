@@ -912,8 +912,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       if (path[2] === "printers") {
         if (path.length === 3 && method === "GET") {
           // The printers, what the bridge last found at each, the bridges themselves and what is waiting.
-          const [printers, bridges, queue] = await Promise.all([store.listPrinters(), store.listPrintBridges(), store.printQueue()]);
-          return json({ printers, bridges, queue });
+          const [printers, bridges, queue, discovered] = await Promise.all([store.listPrinters(), store.listPrintBridges(), store.printQueue(), store.listDiscoveredPrinters()]);
+          return json({ printers, bridges, queue, discovered });
         }
         if (path.length === 5 && path[4] === "test" && method === "POST") {
           const queued = await store.queueTestPrint(path[3]);

@@ -958,12 +958,16 @@ test("printers: the bridge and each printer's state, pairing a bridge, a test pa
   const bridge = page.locator(".print-bridge");
   await expect(bridge).toContainText("在线 · Kassen-PC · 刚刚");
   await expect(bridge).toContainText("等待打印 2 · 失败 1");
+  // Every station with dishes has a printer here, so nothing to warn about.
+  await expect(page.locator(".print-warning")).toHaveCount(0);
   await expect(page.locator(".printer-entry").nth(0).locator(".printer-status")).toHaveText("在线");
-  await expect(page.locator(".printer-entry").nth(1).locator(".printer-status")).toHaveText("离线 · connect ETIMEDOUT");
+  await expect(page.locator(".printer-entry").nth(1).locator(".printer-status")).toHaveText("离线 · 连不上（检查电源、网线和 IP）");
   await expect(page.locator(".printer-entry").nth(1)).toContainText("Deutsch + English");
 
-  await bridge.getByRole("button", { name: "连接打印桥" }).click();
-  await expect(bridge.locator("code")).toHaveText(/^npm run print-bridge -- --url=\S+ --token=bridge-token-123$/);
+  await bridge.locator("summary").click();
+  await bridge.getByRole("button", { name: "生成连接命令" }).click();
+  await expect(bridge.locator("code")).toHaveText(/^node print-bridge\.mjs --url=\S+ --token=bridge-token-123$/);
+  await expect(bridge.getByRole("link", { name: /下载打印桥/ })).toHaveAttribute("href", /print-bridge\.mjs$/);
 
   await page.locator(".printer-entry").nth(1).getByRole("button", { name: "测试打印" }).click();
   await expect.poll(() => tested).toMatch(/\/api\/admin\/printers\/printer-3\/test$/);
@@ -975,13 +979,23 @@ test("printers: the bridge and each printer's state, pairing a bridge, a test pa
   await form.locator("input[name=address]").fill("192.168.1.91");
   await form.locator("select[name=printLanguage]").selectOption("de");
   await form.locator("select[name=secondLanguage]").selectOption("zh");
+  await form.locator(".printer-more summary").click();
   await form.locator("select[name=copies]").selectOption("2");
   await form.locator("select[name=backupPrinterId]").selectOption("printer-1");
   await form.locator("input[name=splitItems]").check();
   await form.getByRole("button", { name: "添加打印机" }).click();
   await expect.poll(() => saved?.capabilities).toEqual({
-    printLanguage: "de", secondLanguage: "zh", encoding: "utf8", paperWidth: 80, copies: 2,
+    printLanguage: "de", secondLanguage: "zh", encoding: "auto", paperWidth: 80, copies: 2,
     largeText: false, beep: false, splitItems: true, backupPrinterId: "printer-1"
   });
   expect(saved.role).toBe("bar");
+});
+
+test("a station with dishes and no printer is called out, and the setup steps show until a bridge is connected", async ({ page }) => {
+  await page.route("**/api/admin/printers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ printers: [], bridges: [], queue: { waiting: 0, failed: 0 }, discovered: [] }) }));
+  await page.reload();
+  await page.locator(".admin-tabs button", { hasText: "打印" }).click();
+  await expect(page.locator(".print-warning")).toHaveText("⚠ 厨房有 1 道菜，但还没有能用的网口打印机，这些菜的制作单打不出来。");
+  await expect(page.locator(".print-bridge")).toContainText("还没有连接打印桥");
+  await expect(page.locator(".bridge-steps > li")).toHaveCount(4);
 });

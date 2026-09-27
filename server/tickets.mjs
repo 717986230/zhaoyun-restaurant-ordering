@@ -16,7 +16,7 @@
  * columns wide.
  */
 import iconv from "iconv-lite";
-import { printerOptions } from "../shared/printing.mjs";
+import { printerOptions, resolvedEncoding } from "../shared/printing.mjs";
 
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -144,6 +144,8 @@ function forEncoding(text, encoding) {
 // ——— Bytes.
 
 const SIZE = { normal: 0x00, tall: 0x01, big: 0x11 };
+const FS = 0x1c;
+const MODE = { gb18030: [FS, 0x26], cp437: [FS, 0x2e, ESC, 0x74, 0x00] };
 
 function encodeLines(lines, { width, encoding }) {
   const chunks = [];
@@ -360,7 +362,7 @@ function testLines(payload, context) {
     `${copy.testPrinter}: ${payload.printerName ?? ""}`,
     `${copy.testStation}: ${copy.stations[payload.station] ?? payload.station ?? ""}`,
     `${copy.testLanguage}: ${LANGUAGE_NAMES[options.printLanguage]}${options.secondLanguage ? ` + ${LANGUAGE_NAMES[options.secondLanguage]}` : ""}`,
-    `${copy.testEncoding}: ${options.encoding}  ${copy.testPaper}: ${options.paperWidth} mm`,
+    `${copy.testEncoding}: ${options.encoding === "auto" ? `auto → ${resolvedEncoding(options)}` : options.encoding}  ${copy.testPaper}: ${options.paperWidth} mm`,
     rule,
     ruler,
     "中文：宫保鸡丁 加辣 · 寿司拼盘",
@@ -384,8 +386,9 @@ const KITCHEN = new Set([undefined, "order", "void"]);
  */
 export function renderTickets(payload, printer = {}, { station = null, standInFor = null } = {}) {
   const options = printerOptions(printer.capabilities);
+  const encodingUsed = resolvedEncoding(options);
   // A code page without Chinese prints the English names rather than question marks.
-  const latinOnly = options.encoding === "cp437";
+  const latinOnly = encodingUsed === "cp437";
   const language = latinOnly && options.printLanguage === "zh" ? "en" : options.printLanguage;
   const second = latinOnly && options.secondLanguage === "zh" ? null : options.secondLanguage;
   const width = COLUMNS[options.paperWidth] ?? COLUMNS[58];
@@ -404,8 +407,11 @@ export function renderTickets(payload, printer = {}, { station = null, standInFo
     tickets = [(BUILDERS[payload.kind] ?? orderLines)(payload, context)];
   }
 
-  const encoding = { width, encoding: options.encoding };
-  const chunks = [Buffer.from([ESC, 0x40])];
+  const encoding = { width, encoding: encodingUsed };
+  // Reset, then put the printer in the mode these bytes are written for,
+  // whatever it was left in: Chinese (FS &) for GB18030, code page 437 with
+  // Chinese off (FS . and ESC t 0) otherwise.
+  const chunks = [Buffer.from([ESC, 0x40]), Buffer.from(MODE[encodingUsed] ?? [])];
   // A beep on a kitchen ticket, for the printers that have one (ESC B n t).
   if (options.beep && (kitchen || payload.kind === "test")) chunks.push(Buffer.from([ESC, 0x42, 0x03, 0x02]));
   for (const lines of tickets) {

@@ -141,7 +141,7 @@ test("the kitchen reads Chinese and the pickup number; the guest's receipt reads
 });
 
 test("a void ticket tells the kitchen to stop, with the quantity taken back and why", () => {
-  const text = renderReceipt({ kind: "void", orderNo: "A-1", table: "08", reason: "Gast storniert", staffName: "Li", items: [{ name: "Ramen", names: { de: "Ramen", zh: "拉面" }, quantity: 2, modifiers: [] }] }, { capabilities: { printLanguage: "de" } }).toString("utf8");
+  const text = renderReceipt({ kind: "void", orderNo: "A-1", table: "08", reason: "Gast storniert", staffName: "Li", items: [{ name: "Ramen", names: { de: "Ramen", zh: "拉面" }, quantity: 2, modifiers: [] }] }, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
   assert.match(text, /STORNO – NICHT ZUBEREITEN/);
   assert.match(text, /-2 x Ramen/);
   assert.match(text, /Grund: Gast storniert/);

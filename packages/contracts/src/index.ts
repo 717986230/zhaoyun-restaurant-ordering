@@ -397,6 +397,8 @@ export type ApiServiceRequestStatus = ServiceStatus;
  */
 /** A print bridge in the restaurant, as it last checked in. */
 export interface ApiPrintBridge { id: string; name: string; version: string; lastSeenAt: string }
+/** A printer a bridge found on the shop's network, not set up yet; `escpos` when it answers like a receipt printer. */
+export interface ApiDiscoveredPrinter { address: string; port: number; escpos: boolean; bridgeId: string; seenAt: string }
 /** Tickets not printed yet, and those given up on. */
 export interface ApiPrintQueue { waiting: number; failed: number }
 

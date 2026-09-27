@@ -1,4 +1,4 @@
-import type { PosStaffActivity, ApiAccount, ApiBill, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
+import type { PosStaffActivity, ApiAccount, ApiBill, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
 import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
@@ -48,6 +48,8 @@ export interface AdminState {
   /** The print bridges in the restaurant, and the tickets not printed yet. */
   printBridges: ApiPrintBridge[];
   printQueue: ApiPrintQueue | null;
+  /** What the print bridge found on the shop's network, not set up yet. */
+  printFound: ApiDiscoveredPrinter[];
   discoveredPrinters: DiscoveredPrinter[];
   editingProduct: Product | null;
   editingPrinter: PrinterProfile | null;

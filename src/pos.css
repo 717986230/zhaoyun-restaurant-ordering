@@ -295,3 +295,54 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-qr-badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1px solid var(--p-accent); border-radius: 999px; color: var(--p-accent); font-size: 11px; font-style: normal; }
 .pos-ticket-actions .pos-on { border-color: var(--p-accent); color: var(--p-accent); }
 .pos-guest-ordering { margin: 6px 0 0; font-size: 12px; }
+
+/* Tickets the kitchen never got: at the top of the floor until sent again. */
+.pos-print-failed {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--p-warn);
+  border-radius: 10px;
+  background: var(--p-warn-wash);
+  color: var(--p-ink);
+}
+
+.pos-floor .pos-print-failed h2 {
+  margin: 0 0 8px;
+  color: var(--p-warn);
+  font-size: 16px;
+}
+
+.pos-print-failed ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pos-print-failed li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pos-print-failed li span {
+  display: grid;
+  min-width: 0;
+}
+
+.pos-print-failed small {
+  color: var(--p-muted);
+}
+
+.pos-print-failed button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--p-warn);
+  color: #fff;
+  font-weight: 650;
+}

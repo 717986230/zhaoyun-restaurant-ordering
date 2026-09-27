@@ -336,6 +336,14 @@ CREATE TABLE printer_status (
       error TEXT,
       checked_at TEXT NOT NULL
     );
+CREATE TABLE discovered_printers (
+      address TEXT NOT NULL,
+      port INTEGER NOT NULL,
+      escpos INTEGER NOT NULL DEFAULT 0,
+      bridge_id TEXT NOT NULL,
+      seen_at TEXT NOT NULL,
+      PRIMARY KEY (address, port)
+    );
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
