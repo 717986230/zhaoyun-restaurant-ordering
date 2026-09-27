@@ -1516,6 +1516,26 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 20 } });
     }],
 
+    ["tables 1 to N set up in one go for their cards, each with its own code, and a table already there keeps its code", async () => {
+      const kept = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "2", label: "Fenster" } })).json.table;
+      assert.equal((await call("POST", "/api/admin/tables/numbered", { role: "staff", body: { count: 3 } })).status, 403, "the manager's");
+      assert.equal((await call("POST", "/api/admin/tables/numbered", { admin: true, body: { count: 0 } })).status, 400);
+      assert.equal((await call("POST", "/api/admin/tables/numbered", { admin: true, body: { count: 201 } })).status, 400);
+      const made = await call("POST", "/api/admin/tables/numbered", { admin: true, body: { count: 3 } });
+      assert.equal(made.status, 201, JSON.stringify(made.json));
+      assert.equal(made.json.created, 2, "only the ones not there yet");
+      assert.deepEqual(made.json.tables.map((table) => table.table), ["1", "2", "3"]);
+      const tokens = made.json.tables.map((table) => table.token);
+      assert.equal(new Set(tokens).size, 3, "a code of its own for each table");
+      assert.ok(tokens.every((token) => token.length >= 16));
+      const two = made.json.tables.find((table) => table.table === "2");
+      assert.deepEqual([two.token, two.label], [kept.token, "Fenster"], "the card already on table 2 still works");
+      const again = await call("POST", "/api/admin/tables/numbered", { admin: true, body: { count: 3 } });
+      assert.equal(again.json.created, 0);
+      assert.deepEqual(again.json.tables.map((table) => table.token), tokens, "asking twice changes no card");
+      for (const table of ["1", "2", "3"]) await call("DELETE", `/api/admin/tables/${table}`, { admin: true });
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

@@ -500,6 +500,18 @@ export function App() {
     }
   }
 
+  async function registerNumberedTables(count: number) {
+    try {
+      const { tables, created } = await adminApi.registerNumberedTables(count);
+      await loadTables();
+      notify(t("numberedTablesDone", { count: tables.length, created }));
+      return tables;
+    } catch (error) {
+      failed(error, "tableSaveFailed");
+      return null;
+    }
+  }
+
   async function deleteTable(table: string) {
     try {
       await adminApi.deleteTable(table);
@@ -605,6 +617,7 @@ export function App() {
         onSaveConnection={saveConnection}
         onSaveTable={saveTable}
         onDeleteTable={deleteTable}
+        onRegisterNumberedTables={registerNumberedTables}
         account={state.account}
         onUpdateAccount={updateAccount}
         onRecoverAccount={recoverAccount}

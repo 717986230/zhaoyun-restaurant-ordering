@@ -331,6 +331,9 @@ export const TableLockBody = Type.Object({
 // A table opened for its guests to order from their phones (开台), or closed.
 export const TableOrderingBody = Type.Object({ open: Type.Boolean() }, { additionalProperties: false });
 
+// Tables 1 to count set up at once, each with a code of its own; those already there keep theirs.
+export const NumberedTablesBody = Type.Object({ count: Type.Integer({ minimum: 1, maximum: 200 }) }, { additionalProperties: false });
+
 export const TableBody = Type.Object({
   table: TableNo,
   label: Type.Optional(Type.String({ maxLength: 64 })),

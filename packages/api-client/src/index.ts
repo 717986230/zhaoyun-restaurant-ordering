@@ -329,6 +329,8 @@ export class AdminApi {
   setTableLock(table: string, locked: boolean): Promise<{ table: RestaurantTable }> {
     return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/lock`, { method: "POST", body: JSON.stringify({ locked }) });
   }
+  /** Tables 1 to count set up at once, each with its own code; those already there keep theirs. */
+  registerNumberedTables(count: number): Promise<{ tables: RestaurantTable[]; created: number }> { return this.#request("/api/admin/tables/numbered", { method: "POST", body: JSON.stringify({ count }) }); }
   saveTable(input: { table: string; label?: string; enabled?: boolean; rotateToken?: boolean }): Promise<{ table: RestaurantTable }> { return this.#request("/api/admin/tables", { method: "POST", body: JSON.stringify(input) }); }
   deleteTable(table: string): Promise<void> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}`, { method: "DELETE" }); }
   printers(): Promise<{ printers: PrinterProfile[]; bridges?: ApiPrintBridge[]; queue?: ApiPrintQueue; discovered?: ApiDiscoveredPrinter[] }> { return this.#request("/api/admin/printers"); }

@@ -995,6 +995,26 @@ export function createStore(driver) {
       );
       return tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", table));
     },
+    /**
+     * Tables 1 to `count` set up in one go, for the table cards: each gets an
+     * entry code of its own, and a table already there keeps the code on the
+     * card that stands on it.
+     */
+    registerNumberedTables: async (count) => {
+      const numbers = Array.from({ length: count }, (_, index) => String(index + 1));
+      const existing = new Set((await all("SELECT table_no FROM restaurant_tables")).map((row) => row.table_no));
+      const missing = numbers.filter((table) => !existing.has(table));
+      const timestamp = now();
+      if (missing.length) {
+        await batch(missing.map((table) => sql(
+          "INSERT INTO restaurant_tables (table_no, label, token, enabled, created_at, updated_at) VALUES (?, '', ?, 1, ?, ?) ON CONFLICT(table_no) DO NOTHING",
+          table, entryToken(), timestamp, timestamp
+        )));
+      }
+      const wanted = new Set(numbers);
+      const tables = (await all("SELECT * FROM restaurant_tables ORDER BY length(table_no), table_no")).filter((row) => wanted.has(row.table_no)).map(tableView);
+      return { tables, created: missing.length };
+    },
     deleteTable: async (table) => (await run("DELETE FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))) > 0,
     setTableLock: async (table, locked) => {
       const tableNo = normalizeTableNo(table);
