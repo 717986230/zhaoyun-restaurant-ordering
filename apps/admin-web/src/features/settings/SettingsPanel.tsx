@@ -416,11 +416,11 @@ export function SettingsPanel(props: Props) {
       {/* Who the receipts say issued them. The console's own fields; the
           server checks the UID's form and the register id's. */}
       <Section id="company" title={t("sectionCompany")} hint={t("companyHint")} summary={[settings.companyName || settings.restaurantName, settings.companyUid, settings.cashRegisterId].filter(Boolean).join(" · ")}>
-        <form key={`${settings.companyName}|${settings.companyAddress}|${settings.companyUid}|${settings.cashRegisterId}|${settings.takeawayDiscountPercent}`} className="editor-form" onSubmit={(event) => {
+        <form key={`${settings.companyName}|${settings.companyAddress}|${settings.companyUid}|${settings.cashRegisterId}|${settings.takeawayDiscountPercent}|${settings.floorTables}`} className="editor-form" onSubmit={(event) => {
           event.preventDefault();
           const data = new FormData(event.currentTarget);
           const text = (name: string) => String(data.get(name) || "").trim();
-          void props.onSaveSettings({ companyName: text("companyName"), companyAddress: text("companyAddress"), companyUid: text("companyUid").toUpperCase(), cashRegisterId: text("cashRegisterId").toUpperCase(), takeawayDiscountPercent: Number(text("takeawayDiscountPercent")) || 0 }, "companySaved");
+          void props.onSaveSettings({ companyName: text("companyName"), companyAddress: text("companyAddress"), companyUid: text("companyUid").toUpperCase(), cashRegisterId: text("cashRegisterId").toUpperCase(), takeawayDiscountPercent: Number(text("takeawayDiscountPercent")) || 0, floorTables: Math.max(0, Math.min(200, Math.round(Number(text("floorTables")) || 0))) }, "companySaved");
         }}>
           <label><span>{t("companyName")}</span><input name="companyName" maxLength={80} defaultValue={settings.companyName} placeholder={settings.restaurantName} /><small>{t("companyNameHint")}</small></label>
           <label><span>{t("companyAddress")}</span><input name="companyAddress" maxLength={160} defaultValue={settings.companyAddress} autoComplete="street-address" /></label>
@@ -428,6 +428,7 @@ export function SettingsPanel(props: Props) {
             <label><span>{t("companyUid")}</span><input name="companyUid" maxLength={16} defaultValue={settings.companyUid} placeholder="ATU12345678" pattern="(ATU|atu)[0-9]{8}" /><small>{t("companyUidHint")}</small></label>
             <label><span>{t("cashRegisterId")}</span><input name="cashRegisterId" required maxLength={32} defaultValue={settings.cashRegisterId} /></label>
           </div>
+          <label><span>{t("floorTables")}</span><input name="floorTables" type="number" min={0} max={200} step={1} inputMode="numeric" defaultValue={settings.floorTables} /><small>{t("floorTablesHint")}</small></label>
           <label><span>{t("takeawayDiscount")}</span><input name="takeawayDiscountPercent" type="number" min={0} max={50} step={1} inputMode="numeric" defaultValue={settings.takeawayDiscountPercent} /><small>{t("takeawayDiscountHint")}</small></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>

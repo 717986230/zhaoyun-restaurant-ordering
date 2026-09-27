@@ -66,6 +66,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     companyUid: "",
     cashRegisterId: "KASSE-1",
     takeawayDiscountPercent: 0,
+    floorTables: 20,
     customerAccounts: false,
     guestOrdering: { ...GUEST_ORDERING_DEFAULTS, hours: [] },
     loyalty: { ...LOYALTY_DEFAULTS, rewards: [] },

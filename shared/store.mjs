@@ -973,7 +973,8 @@ export function createStore(driver) {
      * place of `node:crypto`.
      */
     hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables LIMIT 1")),
-    listTables: async () => (await all("SELECT * FROM restaurant_tables ORDER BY table_no")).map(tableView),
+    // 2 before 10: numbers in the order a waiter counts them.
+    listTables: async () => (await all("SELECT * FROM restaurant_tables ORDER BY length(table_no), table_no")).map(tableView),
     getTable: async (table) => tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))),
     saveTable: async (input) => {
       const table = normalizeTableNo(input.table);
@@ -1014,7 +1015,8 @@ export function createStore(driver) {
       const orders = [];
       for (const row of await all(OPEN_TABLE_ORDERS_SQL)) orders.push(await viewOrder(row));
       const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
-      return tablesOverviewView(await all("SELECT * FROM restaurant_tables ORDER BY table_no"), orders, claims, await all(LIVE_TABLE_SESSIONS_SQL, now()));
+      const { floorTables } = await getSettings();
+      return tablesOverviewView(await all("SELECT * FROM restaurant_tables ORDER BY table_no"), orders, claims, await all(LIVE_TABLE_SESSIONS_SQL, now()), floorTables);
     },
     staffActivity: async () => {
       const staffRows = await all("SELECT * FROM staff ORDER BY active DESC, name");

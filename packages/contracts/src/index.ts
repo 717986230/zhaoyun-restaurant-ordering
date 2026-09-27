@@ -332,6 +332,8 @@ export interface ApiSettings {
   cashRegisterId: string;
   /** The discount a takeaway gets at the POS, percent. */
   takeawayDiscountPercent: number;
+  /** Tables the floor shows by number, 1 to this. */
+  floorTables: number;
   /** Guests' own accounts on the menu (favourites); pickup and points need them too. */
   customerAccounts: boolean;
   guestOrdering: ApiGuestOrdering;
