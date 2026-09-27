@@ -3125,3 +3125,178 @@ em.voided {
   width: auto;
   min-width: 120px;
 }
+
+/* ——— Printers: the print bridge, and what it last found at each printer. */
+.print-bridge {
+  padding: 20px clamp(20px, 4vw, 48px);
+  border-bottom: 1px solid var(--a-line);
+  background: var(--a-stripe);
+}
+
+.print-bridge-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.print-bridge h2 {
+  font-size: 16px;
+}
+
+.print-bridge-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--a-ink-2);
+  font-size: 13px;
+}
+
+.print-bridge-state i {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--a-idle);
+}
+
+.print-bridge.live .print-bridge-state i {
+  background: var(--a-ok);
+  box-shadow: 0 0 0 3px var(--a-ok-ring);
+}
+
+.print-bridge.stale .print-bridge-state i {
+  background: var(--a-danger);
+}
+
+.print-bridge.stale .print-bridge-state {
+  color: var(--a-danger);
+}
+
+.print-queue,
+.print-bridge-lead,
+.field-hint {
+  margin-top: 6px;
+  color: var(--a-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.print-bridge-lead {
+  max-width: 72ch;
+}
+
+.print-bridge-command {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--a-accent-line);
+  border-radius: 5px;
+  background: var(--a-card);
+  font-size: 13px;
+}
+
+.print-bridge-command code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: 4px;
+  background: var(--a-sunken);
+  color: var(--a-ink);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  user-select: all;
+}
+
+.print-bridge-command .ghost-action {
+  justify-self: start;
+  padding: 7px 12px;
+}
+
+.printer-entry {
+  border-bottom: 1px solid var(--a-line);
+}
+
+.printer-entry .printer-row {
+  border-bottom: 0;
+}
+
+.printer-row.selected {
+  background: var(--a-rail);
+}
+
+.printer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 12px 65px;
+}
+
+.printer-actions .test-printer {
+  margin: 0;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.printer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--a-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.printer-status::before {
+  content: "";
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--a-idle);
+}
+
+.printer-status.online {
+  color: var(--a-ink-2);
+}
+
+.printer-status.online::before {
+  background: var(--a-ok);
+}
+
+.printer-status.offline {
+  color: var(--a-danger);
+}
+
+.printer-status.offline::before {
+  background: var(--a-danger);
+}
+
+.form-subtitle {
+  margin: 8px 0 -2px;
+  padding-top: 14px;
+  border-top: 1px solid var(--a-line);
+  color: var(--a-ink-2);
+  font-size: 13px;
+}
+
+/* A printer's long address and options line must not widen the page on a phone. */
+.printer-entry .printer-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto 12px;
+}
+
+@media (max-width: 800px) {
+  .printer-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .printer-actions {
+    padding-left: 10px;
+  }
+}

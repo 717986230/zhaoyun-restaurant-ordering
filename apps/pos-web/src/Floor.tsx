@@ -49,7 +49,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
     const timer = window.setInterval(() => void load(), pos.live ? REFRESH_LIVE_MS : REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [load, pos.live]);
-  useLiveReload(pos, (event) => event.type !== "catalog.changed", () => void load());
+  useLiveReload(pos, (event) => event.type !== "catalog.changed" && event.type !== "print.queued", () => void load());
 
   const claimOf = (table: string) => claims.find((claim) => claim.table === table.toUpperCase());
   const room = tables.filter((table) => !TAKEAWAY.test(table.table));

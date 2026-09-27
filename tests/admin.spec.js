@@ -926,3 +926,62 @@ test("the manager adds a waiter with a PIN, switches one off, and unpairs a lost
   await card.getByRole("button", { name: "取消配对" }).click();
   await expect(card).toContainText("还没有配对的设备");
 });
+
+test("printers: the bridge and each printer's state, pairing a bridge, a test page, and a printer's options saved", async ({ page }) => {
+  const now = new Date().toISOString();
+  let saved = null;
+  let tested = null;
+  await page.route("**/api/admin/printers", async (route) => {
+    if (route.request().method() === "POST") {
+      saved = route.request().postDataJSON();
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ printer: { id: "printer-2", ...saved } }) });
+    }
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      printers: [
+        { id: "printer-1", name: "厨房打印机", transport: "lan", address: "192.168.1.88", port: 9100, role: "kitchen", enabled: true, capabilities: { printLanguage: "zh", encoding: "gb18030", paperWidth: 80 }, status: { online: true, error: null, checkedAt: now, bridgeId: "b1" } },
+        { id: "printer-3", name: "Bar", transport: "lan", address: "192.168.1.89", port: 9100, role: "bar", enabled: true, capabilities: { printLanguage: "de", secondLanguage: "en" }, status: { online: false, error: "connect ETIMEDOUT", checkedAt: now, bridgeId: "b1" } }
+      ],
+      bridges: [{ id: "b1", name: "Kassen-PC", version: "2", lastSeenAt: now }],
+      queue: { waiting: 2, failed: 1 }
+    }) });
+  });
+  await page.route("**/api/admin/printers/*/test", (route) => {
+    tested = route.request().url();
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ jobId: "job-1" }) });
+  });
+  await page.route("**/api/admin/pos-devices", (route) => route.request().method() === "POST"
+    ? route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ device: { id: "d1", name: "打印桥", createdAt: now, lastSeenAt: null }, token: "bridge-token-123" }) })
+    : route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ devices: [] }) }));
+  await page.reload();
+  await page.locator(".admin-tabs button", { hasText: "打印" }).click();
+
+  const bridge = page.locator(".print-bridge");
+  await expect(bridge).toContainText("在线 · Kassen-PC · 刚刚");
+  await expect(bridge).toContainText("等待打印 2 · 失败 1");
+  await expect(page.locator(".printer-entry").nth(0).locator(".printer-status")).toHaveText("在线");
+  await expect(page.locator(".printer-entry").nth(1).locator(".printer-status")).toHaveText("离线 · connect ETIMEDOUT");
+  await expect(page.locator(".printer-entry").nth(1)).toContainText("Deutsch + English");
+
+  await bridge.getByRole("button", { name: "连接打印桥" }).click();
+  await expect(bridge.locator("code")).toHaveText(/^npm run print-bridge -- --url=\S+ --token=bridge-token-123$/);
+
+  await page.locator(".printer-entry").nth(1).getByRole("button", { name: "测试打印" }).click();
+  await expect.poll(() => tested).toMatch(/\/api\/admin\/printers\/printer-3\/test$/);
+
+  // A new printer: the bar, German with Chinese under it, 80 mm, two copies, the kitchen's printer as its backup.
+  const form = page.locator("#printerForm");
+  await form.locator("input[name=name]").fill("吧台 2");
+  await form.locator("select[name=role]").selectOption("bar");
+  await form.locator("input[name=address]").fill("192.168.1.91");
+  await form.locator("select[name=printLanguage]").selectOption("de");
+  await form.locator("select[name=secondLanguage]").selectOption("zh");
+  await form.locator("select[name=copies]").selectOption("2");
+  await form.locator("select[name=backupPrinterId]").selectOption("printer-1");
+  await form.locator("input[name=splitItems]").check();
+  await form.getByRole("button", { name: "添加打印机" }).click();
+  await expect.poll(() => saved?.capabilities).toEqual({
+    printLanguage: "de", secondLanguage: "zh", encoding: "utf8", paperWidth: 80, copies: 2,
+    largeText: false, beep: false, splitItems: true, backupPrinterId: "printer-1"
+  });
+  expect(saved.role).toBe("bar");
+});

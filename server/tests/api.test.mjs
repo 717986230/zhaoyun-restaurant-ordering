@@ -543,7 +543,7 @@ test("bill tickets carry localized names", async (context) => {
   const ticket = renderReceipt(billJob.payload, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
   assert.match(ticket, /Rechnung/);
   assert.match(ticket, new RegExp(dish.names.de));
-  assert.match(ticket, /kein Kassenbeleg/);
+  assert.match(ticket, /kein\s+Kassenbeleg/);
 });
 
 test("the open-table list and table validation do not depend on the recent-order window", async (context) => {

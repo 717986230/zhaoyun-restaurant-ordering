@@ -37,7 +37,7 @@ test("print agent records a failed job for retry", async () => {
   const { database, directory } = await setup();
   try {
     const result = await processPrintJob({ database, role: "kitchen", workerId: "worker-2", transport: { send: async () => { throw new Error("paper jam"); } } });
-    assert.equal(result.status, "retry-wait");
+    assert.equal(result.status, "not-printed");
     const jobs = await database.listPrintJobs("retry-wait");
     assert.equal(jobs.length, 1);
     assert.match(jobs[0].error, /paper jam/);

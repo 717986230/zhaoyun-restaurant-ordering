@@ -1,5 +1,5 @@
 import type {
-  ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintJob, ApiServiceRequest, ApiSettings, CreateOrderCommand,
+  ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
@@ -330,7 +330,11 @@ export class AdminApi {
   }
   saveTable(input: { table: string; label?: string; enabled?: boolean; rotateToken?: boolean }): Promise<{ table: RestaurantTable }> { return this.#request("/api/admin/tables", { method: "POST", body: JSON.stringify(input) }); }
   deleteTable(table: string): Promise<void> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}`, { method: "DELETE" }); }
-  printers(): Promise<{ printers: PrinterProfile[] }> { return this.#request("/api/admin/printers"); }
+  printers(): Promise<{ printers: PrinterProfile[]; bridges?: ApiPrintBridge[]; queue?: ApiPrintQueue }> { return this.#request("/api/admin/printers"); }
+  /** A test page through the print bridge, on that printer. */
+  testPrinter(id: string): Promise<{ jobId: string }> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}/test`, { method: "POST" }); }
+  /** Pairs a print bridge like a POS device; its token is shown once. */
+  pairDevice(name: string): Promise<{ device: PosDevice; token: string }> { return this.#request("/api/admin/pos-devices", { method: "POST", body: JSON.stringify({ name }) }); }
   createPrinter(profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request("/api/admin/printers", { method: "POST", body: JSON.stringify(profile) }); }
   updatePrinter(id: string, profile: Omit<PrinterProfile, "id">): Promise<{ printer: PrinterProfile }> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(profile) }); }
   retryPrintJob(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }

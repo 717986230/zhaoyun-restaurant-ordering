@@ -35,7 +35,7 @@ const initialState: AdminState = {
   tab: "catalog", role: null, account: null,
   gate: { checking: true, registered: false, busy: false, error: null, reachable: true },
   auditEntries: [],
-  connected: false, connectionError: null, products: [], printers: [],
+  connected: false, connectionError: null, products: [], printers: [], printBridges: [], printQueue: null,
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], staffActivity: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", settings: null, toast: null
 };
@@ -112,6 +112,8 @@ export function App() {
           connectionError: null,
           products: catalog.products.map(toProduct),
           printers: printerList.printers,
+          printBridges: "bridges" in printerList ? printerList.bridges ?? [] : [],
+          printQueue: "queue" in printerList ? printerList.queue ?? null : null,
           settings: settings ?? current.settings,
           tab: tabs.includes(current.tab) ? current.tab : tabs[0] ?? "board"
         };
@@ -229,7 +231,7 @@ export function App() {
     if (!state.role || !floorTab) return undefined;
     let pending: number | undefined;
     const stop = adminApi.live((event) => {
-      if (event.type === "catalog.changed") return;
+      if (event.type === "catalog.changed" || event.type === "print.queued") return;
       window.clearTimeout(pending);
       pending = window.setTimeout(() => void loadBoard(true), LIVE_SETTLE_MS);
     }, setLive);
@@ -352,6 +354,40 @@ export function App() {
       await connect();
       notify(t("printerSaved"));
     } catch (error) { failed(error, "saveFailed"); }
+  }
+
+  /** The printers again, with what the print bridge last found at each. */
+  const loadPrinters = useCallback(async () => {
+    try {
+      const { printers, bridges = [], queue = null } = await adminApi.printers();
+      setState((current) => ({ ...current, printers, printBridges: bridges, printQueue: queue }));
+    } catch { /* The next round tries again. */ }
+  }, []);
+
+  // While the printers are on screen, their state follows the bridge's checks.
+  useEffect(() => {
+    if (state.tab !== "printers" || state.role !== "manager") return undefined;
+    void loadPrinters();
+    const timer = window.setInterval(() => void loadPrinters(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [state.tab, state.role, loadPrinters]);
+
+  async function testPrinterRemote(profile: PrinterProfile) {
+    try {
+      await adminApi.testPrinter(profile.id);
+      notify(t("printerTestQueued"));
+      window.setTimeout(() => void loadPrinters(), 4_000);
+    } catch (error) { failed(error, "printerTestFailed"); }
+  }
+
+  async function pairPrintBridge(): Promise<string | null> {
+    try {
+      const { token } = await adminApi.pairDevice(`${t("printerBridgeTitle")} ${new Date().toLocaleDateString()}`);
+      return token;
+    } catch (error) {
+      failed(error, "saveFailed");
+      return null;
+    }
   }
 
   async function testPrinter(profile: PrinterProfile) {
@@ -535,7 +571,7 @@ export function App() {
         onPrintBill={printBill}
         onOrdering={(table: string, open: boolean) => runBoardAction(() => adminApi.setTableOrdering(table, open), t(open ? "openForOrdering" : "closeForOrdering"))}
       />}
-      {state.tab === "printers" && <PrintersPanel printers={state.printers} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
+      {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} apiBase={adminApi.storage.baseUrl} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel
         api={adminApi}

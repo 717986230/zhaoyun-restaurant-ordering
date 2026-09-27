@@ -17,7 +17,8 @@ import { Value } from "@sinclair/typebox/value";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
-  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody
+  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
+  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
@@ -211,6 +212,10 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
 
   /** Responses that changed nothing anyone watches (a POS keeping its table): no live event, no audit. */
   const QUIET = new WeakSet();
+  const quiet = (response) => {
+    QUIET.add(response);
+    return response;
+  };
 
   async function handle(request, ctx) {
     const url = new URL(request.url);
@@ -390,6 +395,43 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return fail(error.message);
         }
       }
+    }
+
+    // ——— The print bridge in the restaurant (server/print-agent.mjs). It signs in
+    // as a paired device (the console pairs it like a POS) or with a staff
+    // token, reads the printers, takes the tickets for the stations it serves
+    // and says what it found at each printer.
+    if (path[0] === "api" && path[1] === "print-bridge") {
+      if (!(await store.deviceForToken(request.headers.get("x-device-token")))) {
+        const { denied } = await gate("staff");
+        if (denied) return denied;
+      }
+      if (path.length === 3 && path[2] === "printers" && method === "GET") {
+        return json({ printers: (await store.listPrinters()).filter((printer) => printer.enabled) });
+      }
+      if (path.length === 3 && path[2] === "claim" && method === "POST") {
+        const { value, invalid } = await body(request, PrintBridgeClaimBody);
+        if (invalid) return invalid;
+        // Asked every few seconds: neither news for anyone nor worth an audit line.
+        return quiet(json({ jobs: await store.claimPrintJobs(value.roles, value.workerId, value.leaseMs ?? 30_000, value.max ?? 5) }));
+      }
+      if (path.length === 5 && path[2] === "jobs" && path[4] === "complete" && method === "POST") {
+        const { value, invalid } = await body(request, PrintBridgeDoneBody);
+        if (invalid) return invalid;
+        return quiet(json({ ok: await store.completePrintJob(path[3], value.workerId) }));
+      }
+      // A failure is news: the console's board shows it.
+      if (path.length === 5 && path[2] === "jobs" && path[4] === "fail" && method === "POST") {
+        const { value, invalid } = await body(request, PrintBridgeFailBody);
+        if (invalid) return invalid;
+        return json({ ok: await store.failPrintJob(path[3], value.workerId, value.error) });
+      }
+      if (path.length === 3 && path[2] === "status" && method === "POST") {
+        const { value, invalid } = await body(request, PrintBridgeReportBody);
+        if (invalid) return invalid;
+        return quiet(json(await store.recordBridgeReport(value)));
+      }
+      return fail("Not found", 404);
     }
 
     // ——— The POS (shared/pos.mjs). A paired device lists the waiters and takes
@@ -868,7 +910,15 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
 
       // /api/admin/printers[/:id]
       if (path[2] === "printers") {
-        if (path.length === 3 && method === "GET") return json({ printers: await store.listPrinters() });
+        if (path.length === 3 && method === "GET") {
+          // The printers, what the bridge last found at each, the bridges themselves and what is waiting.
+          const [printers, bridges, queue] = await Promise.all([store.listPrinters(), store.listPrintBridges(), store.printQueue()]);
+          return json({ printers, bridges, queue });
+        }
+        if (path.length === 5 && path[4] === "test" && method === "POST") {
+          const queued = await store.queueTestPrint(path[3]);
+          return queued ? json(queued, 201) : fail("Printer not found", 404);
+        }
         if (path.length === 3 && method === "POST") {
           try {
             const { value, invalid } = await body(request, PrinterBody);

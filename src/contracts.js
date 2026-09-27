@@ -296,6 +296,28 @@ export const PrinterBody = Type.Object({
   capabilities: Type.Optional(Type.Record(Type.String({ maxLength: 80 }), Type.Unknown()))
 });
 
+// The print bridge in the restaurant (server/print-agent.mjs): who it is, the
+// stations it serves, and what it found at each printer.
+const BridgeWorker = Type.String({ minLength: 1, maxLength: 80 });
+export const PrintBridgeClaimBody = Type.Object({
+  workerId: BridgeWorker,
+  roles: Type.Array(PrintStationSchema, { minItems: 1, maxItems: 4, uniqueItems: true }),
+  max: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+  leaseMs: Type.Optional(Type.Integer({ minimum: 5_000, maximum: 120_000 }))
+}, { additionalProperties: false });
+export const PrintBridgeDoneBody = Type.Object({ workerId: BridgeWorker, printerId: Type.Optional(Type.String({ maxLength: 80 })) }, { additionalProperties: false });
+export const PrintBridgeFailBody = Type.Object({ workerId: BridgeWorker, error: Type.String({ maxLength: 1000 }) }, { additionalProperties: false });
+export const PrintBridgeReportBody = Type.Object({
+  bridgeId: BridgeWorker,
+  name: Type.Optional(Type.String({ maxLength: 80 })),
+  version: Type.Optional(Type.String({ maxLength: 40 })),
+  printers: Type.Array(Type.Object({
+    id: Type.String({ minLength: 1, maxLength: 80 }),
+    ok: Type.Boolean(),
+    error: Type.Optional(Type.String({ maxLength: 300 }))
+  }, { additionalProperties: false }), { maxItems: 50 })
+}, { additionalProperties: false });
+
 export const TableLockBody = Type.Object({
   locked: Type.Boolean()
 });

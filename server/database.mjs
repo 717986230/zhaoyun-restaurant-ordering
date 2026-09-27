@@ -429,6 +429,23 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       staff_name TEXT
     );
 
+    -- The print bridges in the restaurant (server/print-agent.mjs) and what
+    -- each last found at its printers. See migrations/0058_print_bridge.sql.
+    CREATE TABLE IF NOT EXISTS print_bridges (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      version TEXT NOT NULL DEFAULT '',
+      last_seen_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS printer_status (
+      printer_id TEXT PRIMARY KEY REFERENCES printer_profiles(id) ON DELETE CASCADE,
+      bridge_id TEXT NOT NULL,
+      ok INTEGER NOT NULL,
+      error TEXT,
+      checked_at TEXT NOT NULL
+    );
+
     INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at)
     SELECT 'owner', 'admin', 'Admin', password_hash, password_salt, password_iterations, updated_at, updated_at
     FROM admin_gate WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM accounts);

@@ -17,3 +17,4 @@ playwright-report/
 *.tsbuildinfo
 .wrangler/
 .dev.vars
+print-bridge.config.json

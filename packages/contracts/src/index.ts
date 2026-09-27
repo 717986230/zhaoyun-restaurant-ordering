@@ -395,8 +395,13 @@ export type ApiServiceRequestStatus = ServiceStatus;
  * `connected` comes first on every (re)connection — a cue to fetch, since
  * anything may have changed while the socket was away.
  */
+/** A print bridge in the restaurant, as it last checked in. */
+export interface ApiPrintBridge { id: string; name: string; version: string; lastSeenAt: string }
+/** Tickets not printed yet, and those given up on. */
+export interface ApiPrintQueue { waiting: number; failed: number }
+
 export interface RealtimeEnvelope {
-  type: "connected" | "catalog.changed" | "floor.changed";
+  type: "connected" | "catalog.changed" | "floor.changed" | "print.queued";
   table?: string;
   at: string;
 }

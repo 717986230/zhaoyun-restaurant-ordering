@@ -29,7 +29,7 @@ import { normalizeCategoryName, normalizeMenuTheme, normalizeSettingsInput, rena
 import {
   assertOrderTransition, assertRequestTransition, billView, normalizeTableNo, OPEN_TABLE_ORDERS_SQL, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL, orderProductIds, orderView, planOrder, RECENT_ORDERS_SQL, serviceRequestView, tablesOverviewView, tableView
 } from "./orders.mjs";
-import { normalizePrinter, planPrintFailure, printerView, printJobView } from "./printing.mjs";
+import { normalizeBridgeReport, normalizePrinter, PRINT_STATIONS, planPrintFailure, planTestPrint, printBridgeView, printerView, printJobView } from "./printing.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
@@ -77,6 +77,12 @@ export function productInsertParams(product, timestamp) {
 
 /** One statement for a batch. */
 const sql = (text, ...params) => [text, params];
+
+/** The printers, with what the print bridge last found at each. */
+const PRINTERS_WITH_STATUS_SQL = `SELECT printer_profiles.*, printer_status.ok AS status_ok, printer_status.error AS status_error,
+    printer_status.checked_at AS status_checked_at, printer_status.bridge_id AS status_bridge_id
+  FROM printer_profiles LEFT JOIN printer_status ON printer_status.printer_id = printer_profiles.id
+  ORDER BY printer_profiles.role, printer_profiles.name`;
 
 export function createStore(driver) {
   const { first, all, run } = driver;
@@ -529,6 +535,8 @@ export function createStore(driver) {
     const current = id ? await first("SELECT * FROM printer_profiles WHERE id = ?", String(id)) : null;
     if (id && !current) return null;
     const printer = normalizePrinter({ ...input, id: id || input.id }, current);
+    const backup = JSON.parse(printer.capabilities).backupPrinterId;
+    if (backup && !(await first("SELECT id FROM printer_profiles WHERE id = ?", backup))) throw new Error("The backup printer does not exist");
     const timestamp = now();
     if (current) {
       await run(
@@ -846,7 +854,7 @@ export function createStore(driver) {
       (await all("SELECT * FROM service_requests ORDER BY created_at DESC LIMIT ?", boundedLimit(limit))).map(serviceRequestView),
     createServiceRequest,
     updateServiceRequest,
-    listPrinters: async () => (await all("SELECT * FROM printer_profiles ORDER BY role, name")).map(printerView),
+    listPrinters: async () => (await all(PRINTERS_WITH_STATUS_SQL)).map(printerView),
     savePrinter,
     deletePrinter: async (id) => (await run("DELETE FROM printer_profiles WHERE id = ?", String(id))) > 0,
     getSettings,
@@ -894,6 +902,34 @@ export function createStore(driver) {
      * stops two agents printing the same ticket: the UPDATE only lands if the
      * job is still claimable, so a loser gets 0 changes and asks again.
      */
+    /**
+     * The print bridge's way in: up to `max` jobs across the stations it
+     * serves, oldest first, each claimed the way claimPrintJob claims one.
+     */
+    claimPrintJobs: async (roles, workerId, leaseMs = 30_000, max = 5) => {
+      const stations = [...new Set((Array.isArray(roles) ? roles : []).map(String))].filter((role) => PRINT_STATIONS.has(role));
+      if (!stations.length) return [];
+      const timestamp = now();
+      const leaseUntil = new Date(Date.now() + leaseMs).toISOString();
+      const candidates = await all(
+        `SELECT * FROM print_jobs WHERE printer_role IN (${stations.map(() => "?").join(", ")})
+           AND ((status = 'queued')
+             OR (status = 'retry-wait' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+             OR (status = 'claimed' AND lease_until <= ?))
+         ORDER BY created_at LIMIT ?`,
+        ...stations, timestamp, timestamp, Math.min(20, Math.max(1, Number(max) || 5))
+      );
+      const claimed = [];
+      for (const job of candidates) {
+        const changed = await run(
+          `UPDATE print_jobs SET status = 'claimed', claimed_by = ?, lease_until = ?, updated_at = ?
+           WHERE id = ? AND (status = 'queued' OR status = 'retry-wait' OR (status = 'claimed' AND lease_until <= ?))`,
+          String(workerId), leaseUntil, timestamp, job.id, timestamp
+        );
+        if (changed) claimed.push(printJobView({ ...job, status: "claimed", claimed_by: String(workerId), lease_until: leaseUntil }));
+      }
+      return claimed;
+    },
     claimPrintJob: async (role, workerId, leaseMs = 30_000) => {
       const timestamp = now();
       const leaseUntil = new Date(Date.now() + leaseMs).toISOString();
@@ -1045,6 +1081,37 @@ export function createStore(driver) {
     listAudit: async (limit = 100) =>
       (await all("SELECT * FROM audit_log ORDER BY at DESC, rowid DESC LIMIT ?", boundedLimit(limit))).map(auditView),
 
+    /** A test page for one printer, through the bridge like any ticket. */
+    queueTestPrint: async (id) => {
+      const printer = await first("SELECT * FROM printer_profiles WHERE id = ?", String(id));
+      if (!printer) return null;
+      const at = now();
+      const job = planTestPrint(printer, at);
+      await run("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, NULL, ?, ?, 'queued', ?, ?)", job.id, job.printerRole, job.payloadJson, at, at);
+      return { jobId: job.id };
+    },
+    /** A print bridge checking in: itself, and what it found at each printer. */
+    recordBridgeReport: async (input) => {
+      const report = normalizeBridgeReport(input);
+      const at = now();
+      const known = new Set((await all("SELECT id FROM printer_profiles")).map((row) => row.id));
+      await batch([
+        sql(`INSERT INTO print_bridges (id, name, version, last_seen_at) VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, version = excluded.version, last_seen_at = excluded.last_seen_at`, report.id, report.name, report.version, at),
+        ...report.printers.filter((printer) => known.has(printer.id)).map((printer) => sql(
+          `INSERT INTO printer_status (printer_id, bridge_id, ok, error, checked_at) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(printer_id) DO UPDATE SET bridge_id = excluded.bridge_id, ok = excluded.ok, error = excluded.error, checked_at = excluded.checked_at`,
+          printer.id, report.id, printer.ok ? 1 : 0, printer.error, at
+        ))
+      ]);
+      return { ok: true, at };
+    },
+    listPrintBridges: async () => (await all("SELECT * FROM print_bridges ORDER BY last_seen_at DESC LIMIT 20")).map(printBridgeView),
+    printQueue: async () => {
+      const rows = await all("SELECT status, COUNT(*) AS count FROM print_jobs WHERE status IN ('queued', 'claimed', 'retry-wait', 'failed') GROUP BY status");
+      const count = (status) => Number(rows.find((row) => row.status === status)?.count ?? 0);
+      return { waiting: count("queued") + count("claimed") + count("retry-wait"), failed: count("failed") };
+    },
     printerForRole: async (role) => {
       const row = await first("SELECT * FROM printer_profiles WHERE role = ? AND enabled = 1 ORDER BY name LIMIT 1", String(role));
       return printerView(row);
