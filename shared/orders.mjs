@@ -64,14 +64,17 @@ export const OPEN_TABLE_ORDERS_SQL = `${ORDERS_WITH_STAFF} WHERE orders.billed_a
  * a POS. `sessions` are the tables open for guests to order (table_sessions
  * rows, still live).
  */
-export function tablesOverviewView(tableRows, orders, claims = [], sessions = []) {
+export function tablesOverviewView(tableRows, orders, claims = [], sessions = [], floorTables = 0) {
   const byTable = new Map();
   for (const order of orders) byTable.set(order.table, [...(byTable.get(order.table) ?? []), order]);
   const claimOf = new Map(claims.map((claim) => [claim.table, claim]));
   const sessionOf = new Map(sessions.map((session) => [session.table_no, session]));
   const overview = tableRows.map((row) => tableOverviewView(row, byTable.get(row.table_no) ?? [], "", claimOf.get(row.table_no), sessionOf.get(row.table_no)));
   const known = new Set(tableRows.map((row) => row.table_no));
-  for (const tableNo of new Set([...byTable.keys(), ...sessionOf.keys()])) {
+  // The floor's own numbers (1 to floorTables), there to tap whether or not
+  // anyone set them up one by one.
+  const numbered = Array.from({ length: floorTables }, (_, index) => String(index + 1));
+  for (const tableNo of new Set([...numbered, ...byTable.keys(), ...sessionOf.keys()])) {
     if (!known.has(tableNo)) overview.push(tableOverviewView(null, byTable.get(tableNo) ?? [], tableNo, claimOf.get(tableNo), sessionOf.get(tableNo)));
   }
   return overview.sort((left, right) => left.table.localeCompare(right.table, "en", { numeric: true }));

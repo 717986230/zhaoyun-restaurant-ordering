@@ -204,6 +204,9 @@ function normalizeCashRegisterId(value) {
   return id;
 }
 
+export const DEFAULT_FLOOR_TABLES = 20;
+export const MAX_FLOOR_TABLES = 200;
+
 export const APP_SETTINGS = {
   menuLanguages: { key: "menu_languages", fallback: () => [...DEFAULT_MENU_LANGUAGES], normalize: normalizeMenuLanguages },
   // The name on the admin console, the browser tab and the printed table card.
@@ -222,6 +225,17 @@ export const APP_SETTINGS = {
       const percent = Number(value);
       if (!Number.isInteger(percent) || percent < 0 || percent > 50) throw new Error("The takeaway discount is 0 to 50 percent");
       return percent;
+    }
+  },
+  // How many tables the floor shows by number (1 to this) before any is set up
+  // one by one: a waiter opens table 7 with a tap, not by typing it.
+  floorTables: {
+    key: "floor_tables",
+    fallback: () => DEFAULT_FLOOR_TABLES,
+    normalize: (value) => {
+      const count = Number(value);
+      if (!Number.isInteger(count) || count < 0 || count > MAX_FLOOR_TABLES) throw new Error(`The floor has 0 to ${MAX_FLOOR_TABLES} tables`);
+      return count;
     }
   },
   // The register's id (Kassen-ID) printed on each receipt; unique per business.

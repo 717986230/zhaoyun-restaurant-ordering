@@ -1497,6 +1497,25 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true });
     }],
 
+    ["the floor shows tables 1 to 20 to tap before any is set up, and the manager changes how many", async () => {
+      const numbers = async () => (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.map((table) => table.table);
+      const floor = await numbers();
+      for (let n = 1; n <= 20; n += 1) assert.ok(floor.includes(String(n)), `table ${n} is on the floor`);
+      assert.equal((await call("GET", "/api/admin/settings", { admin: true })).json.floorTables, 20, "twenty by default");
+      const overview = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables;
+      const untouched = overview.filter((table) => /^\d+$/.test(table.table) && Number(table.table) <= 20 && !table.orders.length);
+      assert.ok(untouched.length > 0 && untouched.every((table) => !table.registered && table.state === "free" && table.total === 0), "there to tap, not set up one by one");
+      assert.ok(floor.indexOf("2") < floor.indexOf("10"), "counted as a waiter counts: 2 before 10");
+
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 500 } })).status, 400);
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 12 } })).json.floorTables, 12);
+      const fewer = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables;
+      assert.ok(fewer.some((table) => table.table === "12"), "twelve now");
+      assert.ok(fewer.filter((table) => /^\d+$/.test(table.table) && Number(table.table) > 12).every((table) => table.orders.length || table.registered), "past twelve, only a table someone ordered at or set up stays");
+      assert.ok((await call("GET", "/api/pos/floor", { role: "staff" })).status !== 404);
+      await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 20 } });
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);
