@@ -1429,7 +1429,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const bar = await add({ capabilities: { printLanguage: "de", secondLanguage: "zh", paperWidth: 80, copies: 2, largeText: true, backupPrinterId: spare.id, model: "TM-T20" } });
       assert.equal(bar.status, 201, JSON.stringify(bar.json));
       assert.deepEqual(bar.json.printer.capabilities, {
-        model: "TM-T20", printLanguage: "de", secondLanguage: "zh", encoding: "utf8", paperWidth: 80,
+        model: "TM-T20", printLanguage: "de", secondLanguage: "zh", encoding: "auto", paperWidth: 80,
         copies: 2, largeText: true, beep: false, splitItems: false, backupPrinterId: spare.id
       }, "the known options checked, a device's own kept");
       const own = await call("PUT", `/api/admin/printers/${spare.id}`, { admin: true, body: { name: "Kitchen spare", transport: "lan", address: "192.168.1.62", port: 9100, role: "kitchen", enabled: true, capabilities: { backupPrinterId: spare.id } } });
@@ -1470,13 +1470,22 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("POST", "/api/print-bridge/status", { deviceToken: token, body: { printers: [] } })).status, 400, "a bridge names itself");
       const report = await call("POST", "/api/print-bridge/status", {
         deviceToken: token,
-        body: { bridgeId: "bridge-1", name: "Kasse PC", version: "2", printers: [{ id: bar.json.printer.id, ok: false, error: "connect ETIMEDOUT" }, { id: spare.id, ok: true }, { id: "gone", ok: true }] }
+        body: {
+          bridgeId: "bridge-1", name: "Kasse PC", version: "2",
+          printers: [{ id: bar.json.printer.id, ok: false, error: "connect ETIMEDOUT" }, { id: spare.id, ok: true, error: "paper-low" }, { id: "gone", ok: true }],
+          // What it found on the network: one of them is the bar printer, already set up.
+          discovered: [{ address: "192.168.1.61", port: 9100, escpos: true }, { address: "192.168.1.77", port: 9100, escpos: true }, { address: "192.168.1.20", port: 9100, escpos: false }]
+        }
       });
       assert.equal(report.status, 200, JSON.stringify(report.json));
       const console = (await call("GET", "/api/admin/printers", { admin: true })).json;
       const statusOf = (id) => console.printers.find((printer) => printer.id === id).status;
       assert.deepEqual([statusOf(bar.json.printer.id).online, statusOf(bar.json.printer.id).error, statusOf(bar.json.printer.id).bridgeId], [false, "connect ETIMEDOUT", "bridge-1"]);
-      assert.deepEqual([statusOf(spare.id).online, statusOf(spare.id).error], [true, null]);
+      assert.deepEqual([statusOf(spare.id).online, statusOf(spare.id).error], [true, "paper-low"], "printing, with a note");
+      assert.deepEqual(console.discovered.map((entry) => [entry.address, entry.escpos]), [["192.168.1.77", true], ["192.168.1.20", false]], "found and not set up yet, receipt printers first");
+      // A later search replaces what the bridge found before.
+      await call("POST", "/api/print-bridge/status", { deviceToken: token, body: { bridgeId: "bridge-1", printers: [], discovered: [] } });
+      assert.deepEqual((await call("GET", "/api/admin/printers", { admin: true })).json.discovered, []);
       assert.ok(console.bridges.some((bridge) => bridge.id === "bridge-1" && bridge.name === "Kasse PC" && bridge.version === "2" && bridge.lastSeenAt));
       assert.ok(console.queue.waiting >= 1 && typeof console.queue.failed === "number");
 

@@ -315,7 +315,12 @@ export const PrintBridgeReportBody = Type.Object({
     id: Type.String({ minLength: 1, maxLength: 80 }),
     ok: Type.Boolean(),
     error: Type.Optional(Type.String({ maxLength: 300 }))
-  }, { additionalProperties: false }), { maxItems: 50 })
+  }, { additionalProperties: false }), { maxItems: 50 }),
+  discovered: Type.Optional(Type.Array(Type.Object({
+    address: Type.String({ minLength: 1, maxLength: 64 }),
+    port: Type.Integer({ minimum: 1, maximum: 65535 }),
+    escpos: Type.Boolean()
+  }, { additionalProperties: false }), { maxItems: 50 }))
 }, { additionalProperties: false });
 
 export const TableLockBody = Type.Object({

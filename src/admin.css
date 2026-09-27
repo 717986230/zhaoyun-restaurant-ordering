@@ -3300,3 +3300,170 @@ em.voided {
     padding-left: 10px;
   }
 }
+
+/* ——— Printers, second pass: the setup steps, stations without a printer, grouped list. */
+.printer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.printer-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.printer-toolbar-actions .primary-action {
+  width: auto;
+  margin: 0;
+  padding: 11px 16px;
+}
+
+.bridge-steps {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: bridge-step;
+}
+
+.bridge-steps li {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px 12px 50px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  counter-increment: bridge-step;
+}
+
+.bridge-steps li::before {
+  content: counter(bridge-step);
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bridge-steps b {
+  font-size: 14px;
+}
+
+.bridge-steps span {
+  color: var(--a-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bridge-steps .ghost-action {
+  justify-self: start;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.bridge-steps .print-bridge-command {
+  margin-top: 4px;
+}
+
+.print-bridge-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bridge-setup {
+  margin-top: 10px;
+}
+
+.bridge-setup summary {
+  cursor: pointer;
+  color: var(--a-accent-ink);
+  font-size: 13px;
+}
+
+.print-queue.failed {
+  color: var(--a-danger);
+}
+
+.print-warning {
+  padding: 12px clamp(20px, 4vw, 48px);
+  border-bottom: 1px solid var(--a-danger-line);
+  background: var(--a-danger-wash-soft);
+  color: var(--a-danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.print-warning p + p {
+  margin-top: 4px;
+}
+
+.printer-station + .printer-station {
+  margin-top: 18px;
+}
+
+.printer-station h3 {
+  padding: 0 10px 6px;
+  color: var(--a-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .04em;
+}
+
+.printer-entry.selected {
+  background: var(--a-rail);
+}
+
+.printer-entry .printer-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
+.printer-entry .printer-status {
+  justify-self: end;
+  text-align: right;
+}
+
+.printer-more {
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--a-line);
+}
+
+.printer-more summary {
+  cursor: pointer;
+  color: var(--a-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.printer-more[open] summary {
+  margin-bottom: 12px;
+}
+
+.printer-more > * + * {
+  margin-top: 10px;
+}
+
+@media (max-width: 520px) {
+  .printer-entry .printer-row {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .printer-entry .printer-status {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
+}

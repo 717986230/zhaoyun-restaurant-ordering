@@ -35,7 +35,7 @@ const initialState: AdminState = {
   tab: "catalog", role: null, account: null,
   gate: { checking: true, registered: false, busy: false, error: null, reachable: true },
   auditEntries: [],
-  connected: false, connectionError: null, products: [], printers: [], printBridges: [], printQueue: null,
+  connected: false, connectionError: null, products: [], printers: [], printBridges: [], printQueue: null, printFound: [],
   orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], staffActivity: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", settings: null, toast: null
 };
@@ -114,6 +114,7 @@ export function App() {
           printers: printerList.printers,
           printBridges: "bridges" in printerList ? printerList.bridges ?? [] : [],
           printQueue: "queue" in printerList ? printerList.queue ?? null : null,
+          printFound: "discovered" in printerList ? printerList.discovered ?? [] : [],
           settings: settings ?? current.settings,
           tab: tabs.includes(current.tab) ? current.tab : tabs[0] ?? "board"
         };
@@ -359,8 +360,8 @@ export function App() {
   /** The printers again, with what the print bridge last found at each. */
   const loadPrinters = useCallback(async () => {
     try {
-      const { printers, bridges = [], queue = null } = await adminApi.printers();
-      setState((current) => ({ ...current, printers, printBridges: bridges, printQueue: queue }));
+      const { printers, bridges = [], queue = null, discovered = [] } = await adminApi.printers();
+      setState((current) => ({ ...current, printers, printBridges: bridges, printQueue: queue, printFound: discovered }));
     } catch { /* The next round tries again. */ }
   }, []);
 
@@ -371,6 +372,22 @@ export function App() {
     const timer = window.setInterval(() => void loadPrinters(), 30_000);
     return () => window.clearInterval(timer);
   }, [state.tab, state.role, loadPrinters]);
+
+  async function deletePrinter(profile: PrinterProfile) {
+    try {
+      await adminApi.deletePrinter(profile.id);
+      setState((current) => ({ ...current, editingPrinter: null }));
+      await loadPrinters();
+      notify(t("printerDeleted"));
+    } catch (error) { failed(error, "deleteFailed"); }
+  }
+
+  /** Published dishes per station: a station with dishes and no printer is worth a warning. */
+  const dishesPerStation = useMemo(() => {
+    const counts: Partial<Record<PrinterProfile["role"], number>> = {};
+    for (const product of state.products) if (product.published) counts[product.printStation] = (counts[product.printStation] ?? 0) + 1;
+    return counts;
+  }, [state.products]);
 
   async function testPrinterRemote(profile: PrinterProfile) {
     try {
@@ -571,7 +588,7 @@ export function App() {
         onPrintBill={printBill}
         onOrdering={(table: string, open: boolean) => runBoardAction(() => adminApi.setTableOrdering(table, open), t(open ? "openForOrdering" : "closeForOrdering"))}
       />}
-      {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} apiBase={adminApi.storage.baseUrl} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
+      {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} found={state.printFound} dishesPerStation={dishesPerStation} apiBase={adminApi.storage.baseUrl} onDelete={deletePrinter} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel
         api={adminApi}

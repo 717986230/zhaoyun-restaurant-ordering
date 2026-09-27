@@ -22,7 +22,7 @@
 - **每台打印机单独设置**（管理台 → 打印）：
   - 打印语言，外加可选的第二语言，印在菜名下面，方便帮忙的同事看懂。
   - 纸宽：58 mm 每行 32 个字符，80 mm 每行 48 个字符。中文一个字按两个字符宽算，金额列不会错位。
-  - 字符编码：中文打印机选 GB18030。只能打西文的老打印机选 CP437，这时中文菜名会自动改印英文名，不会出现问号。
+  - 字符编码：默认「自动」，见下面「怎样保证单子打出来」。手动选 CP437 时，中文菜名会自动改印英文名，不会出现问号；
     GB18030 打印机上的德文变音字母会写成 ae、oe、ue、ss。
   - 制作单份数（1–3）：只对制作单生效，小票不会重复打印。
   - 菜名大字、出单蜂鸣（部分机型支持）、一菜一单（每道菜单独一张，标「第 1/3 张」）。
@@ -44,41 +44,60 @@
 
 ## 装打印桥
 
-店里要有一台常开、和打印机接在同一个网络里的设备，Windows 电脑、Mac 或树莓派都可以。
+店里要有一台常开、和打印机接在同一个路由器上的电脑，Windows、Mac 或树莓派都可以。
+整个过程在管理台 → 打印页面上有四步引导：
 
-1. 装 [Node.js 22](https://nodejs.org/)，把本项目下载到这台设备上，在项目文件夹里运行 `npm ci --omit=dev`。
-2. 管理台 → 打印 → **连接打印桥**。页面会显示一行命令，里面带着这台设备专用的令牌，令牌只显示这一次：
-
-   ```bash
-   npm run print-bridge -- --url=https://你的网址 --token=令牌
-   ```
-
-   在项目文件夹里运行一次。网址和令牌会记在 `print-bridge.config.json` 里，以后只要运行 `npm run print-bridge`。
-3. 管理台上打印桥显示「在线」，各台打印机显示「在线」后，点一次「测试打印」确认。
+1. 在那台电脑上装 [Node.js](https://nodejs.org/)，选 LTS 版，一路点下一步。
+2. 管理台点「下载打印桥」，得到一个文件 `print-bridge.mjs`，放进任意文件夹。
+   不需要下载整个项目，也不需要 npm install。
+3. 管理台点「生成连接命令」，得到这台电脑专用的令牌。令牌只显示这一次，连接方式二选一：
+   - **Windows**：点「Windows 启动文件」，把下载的 `zhaoyun-print-bridge.cmd` 和 `print-bridge.mjs` 放在同一个文件夹里，双击运行。
+     想开机自动运行，就把这个 `.cmd` 文件的快捷方式放进启动文件夹（按 Win+R，输入 `shell:startup`）。
+   - **Mac / 树莓派**：在那个文件夹里打开终端，运行页面给出的命令
+     `node print-bridge.mjs --url=… --token=…`。
+   打印桥会把网址和令牌记在 `print-bridge.config.json` 里，之后直接运行 `node print-bridge.mjs` 就行。
+4. 管理台显示打印桥「在线」后，它会自动找出店里网络上的打印机，列在「打印桥在店里网络上找到的打印机」下面：
+   - 小票打印机和办公打印机会分开标出。
+   - 点「添加」，选好档口和语言，保存后点「测试打印」。
 
 有新单子时，打印桥通过实时通道立刻收到，不用等下一次轮询；实时通道断开时，它每 5 秒查一次。
 没联网时单子会在云端排队，网络恢复后自动补打，失败的会按间隔重试，5 次后标记为失败。
 
-**开机自动运行：**
+在项目文件夹里运行 `npm run print-bridge` 效果一样，适合店里本来就跑着 Node 服务器的情况。
 
-- Windows：任务计划程序新建任务，触发器选「登录时」，操作为 `cmd /c cd /d C:\zhaoyun && npm run print-bridge`。
-- Linux / 树莓派（systemd），新建 `/etc/systemd/system/zhaoyun-print-bridge.service`：
+**树莓派 / Linux 开机自动运行（systemd）：** 新建 `/etc/systemd/system/zhaoyun-print-bridge.service`：
 
-  ```ini
-  [Unit]
-  Description=Zhaoyun print bridge
-  After=network-online.target
+```ini
+[Unit]
+Description=Zhaoyun print bridge
+After=network-online.target
 
-  [Service]
-  WorkingDirectory=/opt/zhaoyun
-  ExecStart=/usr/bin/npm run print-bridge
-  Restart=always
+[Service]
+WorkingDirectory=/opt/zhaoyun
+ExecStart=/usr/bin/node print-bridge.mjs
+Restart=always
 
-  [Install]
-  WantedBy=multi-user.target
-  ```
+[Install]
+WantedBy=multi-user.target
+```
 
-  然后运行 `sudo systemctl enable --now zhaoyun-print-bridge`。
+然后运行 `sudo systemctl enable --now zhaoyun-print-bridge`。
+
+## 怎样保证单子打出来
+
+- **发送前先问打印机**：打印桥每次发送前，先用 ESC/POS 实时状态指令（DLE EOT）询问打印机。
+  缺纸、纸仓盖开着或者打印机报错时，不把单子发给它，直接改用下一台打印机或备用打印机。
+  纸快用完时照常打印，但管理台会提示「纸快用完了」。不回答这个询问的打印机照常打印。
+- **字符编码默认「自动」**：
+  - 印中文的打印机，切到中文模式（FS &），按 GB18030 发送。
+  - 只印德文或英文的打印机，关掉中文模式（FS .），选 CP437 代码页（ESC t 0），这样 ä ö ü ß 能正确打出来。
+  - 大多数热敏打印机出厂就是这两种设置之一；每张单子开头都会重新设一次，不受打印机上一次状态的影响。
+- **不重复打印**：打印成功后回报服务器时，如果网络断了会自动重试，避免同一张单因为租约到期被再打一次。
+- **看得见的失败**：
+  - 管理台列出每台打印机在线或离线，并写出原因：缺纸、开盖、连不上等。
+  - 某个档口有菜但没有能用的打印机时，页面会直接提醒。
+  - 5 次都没打出来的单子，会显示在**每台 POS 的桌台页顶部**，写明是哪个档口、哪一桌、为什么没打出来；
+    处理好（比如换了纸）后点「重打」即可。管理台的「订单」页也能重打。
 
 **其他设置（环境变量，都不是必填）：**
 
@@ -87,7 +106,7 @@
 | `PRINTER_ROLE=kitchen,bar` | 这台打印桥只管这些档口，适合两个打印桥分管不同档口 |
 | `PRINT_AGENT_ID`、`PRINT_BRIDGE_NAME` | 打印桥的编号和在管理台上显示的名字，默认用电脑名 |
 | `PRINT_POLL_MS` | 实时通道断开时的轮询间隔，默认 5000 毫秒 |
-| `DATABASE_PATH` | 不填网址时，直接读这台电脑上 Node 服务器的数据库（本地模式） |
+| `DATABASE_PATH` | 不填网址时，直接读这台电脑上 Node 服务器的数据库（本地模式，只在项目文件夹里可用） |
 
 在管理台 → 设置 → 设备里取消打印桥的配对，它的令牌就立即失效。
 

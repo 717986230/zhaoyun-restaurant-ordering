@@ -291,3 +291,26 @@ test("a sent dish is voided with a reason, a dish sold out and back, and a recei
   await expect(page.locator(".pos-toast")).toContainText("已补打");
   await expect(page.locator(".pos-voids")).toContainText("退菜 1 份");
 });
+
+test("a ticket that did not print is on the floor for every waiter, with why, and is sent again from there", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  let failed = [{
+    id: "job-9", orderId: "o-9", printerRole: "kitchen", status: "failed", attempts: 5, error: "Küche: paper-out", nextAttemptAt: null,
+    payload: { orderNo: "A-9", table: "7", items: [] }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  }];
+  let retried = null;
+  await page.route("**/api/admin/print-jobs?status=failed*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jobs: failed }) }));
+  await page.route("**/api/admin/print-jobs/*/retry", (route) => {
+    retried = route.request().url();
+    failed = [];
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "job-9" }) });
+  });
+  await pairAndSignIn(page, "Tablet print", "Li", "1234");
+  const banner = page.locator(".pos-print-failed");
+  await expect(banner).toContainText("1 张单没打出来");
+  await expect(banner).toContainText("厨房 · 7");
+  await expect(banner).toContainText("缺纸");
+  await banner.getByRole("button", { name: "重打" }).click();
+  await expect.poll(() => retried).toMatch(/\/api\/admin\/print-jobs\/job-9\/retry$/);
+  await expect(banner).toHaveCount(0);
+});

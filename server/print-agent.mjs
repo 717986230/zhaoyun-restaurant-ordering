@@ -21,16 +21,23 @@
  * its station that answers, then to the backup that printer names, in that
  * printer's own language, paper and encoding (server/tickets.mjs). It checks
  * each printer once a minute and tells the console which ones answer.
+ *
+ * Before it sends a ticket it asks the printer how it is (paper, cover), so
+ * a printer out of paper is passed over for its backup instead of taking a
+ * ticket it cannot print; and every ten minutes it looks for printers on the
+ * shop's network, so the console can offer them without anyone typing an
+ * address.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { printerOptions } from "../shared/printing.mjs";
 import { renderTickets } from "./tickets.mjs";
 
 export { renderTickets, renderTickets as renderReceipt };
 
-export const BRIDGE_VERSION = "2";
+export const BRIDGE_VERSION = "3";
 const log = (event) => console.log(JSON.stringify({ at: new Date().toISOString(), ...event }));
 
 // ——— Where the tickets come from.
@@ -75,31 +82,126 @@ export function localSource(database, { leaseMs = 30_000, maxAttempts = 5 } = {}
 
 // ——— How the bytes reach a printer.
 
-export function createLanTransport({ connectTimeoutMs = 3500 } = {}) {
+/**
+ * What a printer says about itself (ESC/POS real-time status, DLE EOT 1, 2
+ * and 4): out of paper, cover open, offline, or paper running low. Each
+ * answer is one byte whose bits 1 and 4 are always set and 0 and 7 never;
+ * anything else is a printer that does not answer this way, and is not
+ * held against it.
+ */
+export const STATUS_QUERY = Buffer.from([0x10, 0x04, 0x01, 0x10, 0x04, 0x02, 0x10, 0x04, 0x04]);
+const isStatusByte = (byte) => (byte & 0x93) === 0x12;
+
+export function readPrinterStatus(bytes) {
+  if (!bytes || bytes.length < 3 || ![...bytes.subarray(0, 3)].every(isStatusByte)) return { known: false, problem: null, paperLow: false };
+  const [printer, cause, paper] = bytes;
+  const problem = paper & 0x60 ? "paper-out"
+    : cause & 0x04 ? "cover-open"
+    : cause & 0x40 ? "error"
+    : printer & 0x08 ? "offline"
+    : null;
+  return { known: true, problem, paperLow: !problem && Boolean(paper & 0x0c) };
+}
+
+export class PrinterProblem extends Error {
+  constructor(code) {
+    super(code);
+    this.code = code;
+  }
+}
+
+export function createLanTransport({ connectTimeoutMs = 3500, statusTimeoutMs = 700 } = {}) {
+  /**
+   * One connection: ask the printer how it is, give up before sending if it
+   * cannot print, otherwise send. A printer that does not answer the question
+   * is printed to all the same.
+   */
   async function open(printer, payload) {
     const net = await import("node:net");
-    await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const socket = new net.Socket();
-      const fail = (error) => { socket.destroy(); reject(error); };
-      socket.setTimeout(connectTimeoutMs, () => fail(new Error("Printer connection timed out")));
-      socket.once("error", fail);
-      socket.connect(printer.port || 9100, printer.address, () => {
-        if (!payload) {
-          socket.end(resolve);
-          return;
+      const answer = [];
+      let settled = false;
+      const done = (error, value) => {
+        if (settled) return;
+        settled = true;
+        if (error) {
+          socket.destroy();
+          reject(error);
+        } else {
+          socket.end(() => resolve(value));
         }
-        socket.write(payload, (error) => {
-          if (error) { fail(error); return; }
-          socket.end(resolve);
-        });
+      };
+      socket.setTimeout(connectTimeoutMs, () => done(new Error("Printer connection timed out")));
+      socket.once("error", (error) => done(error));
+      socket.on("data", (chunk) => answer.push(chunk));
+      socket.connect(printer.port || 9100, printer.address, () => {
+        socket.write(STATUS_QUERY);
+        setTimeout(() => {
+          const status = readPrinterStatus(Buffer.concat(answer));
+          if (status.problem) return done(new PrinterProblem(status.problem));
+          if (!payload) return done(null, status);
+          socket.write(payload, (error) => (error ? done(error) : done(null, status)));
+        }, statusTimeoutMs);
       });
     });
   }
   return {
+    /** Prints, unless the printer says it cannot; what it said. */
     send: (printer, payload) => open(printer, payload),
-    /** Whether the printer answers at all: a connection opened and closed, nothing printed. */
+    /** Whether the printer answers and can print; nothing is printed. */
     probe: (printer) => open(printer, null)
   };
+}
+
+/**
+ * The network printers in the shop: every address on this computer's own
+ * networks (at most a /24 each) that takes a connection on the raw printing
+ * port, and whether it answers like a receipt printer. An office printer
+ * listens on 9100 too; that is what `escpos` tells apart.
+ */
+export async function discoverPrinters({ port = 9100, timeoutMs = 400, concurrency = 64, interfaces = null } = {}) {
+  const [net, os] = await Promise.all([import("node:net"), import("node:os")]);
+  const hosts = new Set();
+  for (const entries of Object.values(interfaces ?? os.networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (entry.family !== "IPv4" || entry.internal) continue;
+      const [a, b, c] = entry.address.split(".");
+      for (let d = 1; d < 255; d += 1) {
+        const host = `${a}.${b}.${c}.${d}`;
+        if (host !== entry.address) hosts.add(host);
+      }
+    }
+  }
+  const probe = (address) => new Promise((resolve) => {
+    const socket = new net.Socket();
+    const answer = [];
+    let finished = false;
+    const finish = (value) => {
+      if (finished) return;
+      finished = true;
+      socket.destroy();
+      resolve(value);
+    };
+    socket.setTimeout(timeoutMs, () => finish(null));
+    socket.once("error", () => finish(null));
+    socket.on("data", (chunk) => answer.push(chunk));
+    socket.connect(port, address, () => {
+      // Connected is found; the wait from here is only for its answer.
+      socket.setTimeout(0);
+      socket.write(STATUS_QUERY);
+      setTimeout(() => finish({ address, port, escpos: readPrinterStatus(Buffer.concat(answer)).known }), timeoutMs);
+    });
+  });
+  const queue = [...hosts];
+  const found = [];
+  await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    while (queue.length) {
+      const result = await probe(queue.shift());
+      if (result) found.push(result);
+    }
+  }));
+  return found.sort((left, right) => left.address.localeCompare(right.address, "en", { numeric: true }));
 }
 
 // ——— The bridge.
@@ -119,15 +221,33 @@ export function printersFor(job, printers) {
   return backup && isNetworkPrinter(backup) && !own.includes(backup) ? [...own, backup] : own;
 }
 
-export function createBridge({ source, transport = createLanTransport(), bridgeId, name = bridgeId, stations = null, batch = 5 }) {
+export function createBridge({ source, transport = createLanTransport(), bridgeId, name = bridgeId, stations = null, batch = 5, retryDelayMs = 1_000, discover = discoverPrinters }) {
   const found = new Map();
   let changed = false;
+  let discovered = null;
 
-  function mark(printer, error = null) {
+  /** What a printer did, and a note (paper running low) when it printed all the same. */
+  function mark(printer, error = null, note = null) {
     const before = found.get(printer.id);
     const ok = !error;
-    if (!before || before.ok !== ok) changed = true;
-    found.set(printer.id, { ok, error: error ? String(error.message ?? error).slice(0, 300) : undefined });
+    const detail = error ? String(error.code ?? error.message ?? error).slice(0, 300) : note ?? undefined;
+    if (!before || before.ok !== ok || before.error !== detail) changed = true;
+    found.set(printer.id, { ok, error: detail });
+  }
+
+  /** A call to the server tried again a few times before it is given up on. */
+  async function settle(call, attempts = 3) {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await call();
+      } catch (error) {
+        if (attempt >= attempts) {
+          log({ event: "bridge_error", error: error instanceof Error ? error.message : String(error) });
+          return null;
+        }
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * attempt));
+      }
+    }
   }
 
   /** One job to the first of its printers that takes it. */
@@ -140,16 +260,20 @@ export function createBridge({ source, transport = createLanTransport(), bridgeI
     }
     const errors = [];
     for (const [index, printer] of candidates.entries()) {
+      let status;
       try {
         const bytes = renderTickets(job.payload, printer, { station: job.printerRole, standInFor: index ? candidates[0].name : null });
-        await transport.send(printer, bytes);
-        mark(printer);
-        await source.complete(job.id, bridgeId);
-        return { processed: true, status: "printed", jobId: job.id, printerId: printer.id, ...(index ? { standIn: true } : {}) };
+        status = await transport.send(printer, bytes);
       } catch (error) {
         mark(printer, error);
         errors.push(`${printer.name}: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
       }
+      mark(printer, null, status?.paperLow ? "paper-low" : null);
+      // Printed: saying so must not fail over a moment's network trouble, or
+      // the lease runs out and the kitchen gets the ticket twice.
+      await settle(() => source.complete(job.id, bridgeId));
+      return { processed: true, status: "printed", jobId: job.id, printerId: printer.id, ...(index ? { standIn: true } : {}) };
     }
     const error = errors.join("; ");
     await source.fail(job.id, bridgeId, error);
@@ -188,8 +312,8 @@ export function createBridge({ source, transport = createLanTransport(), bridgeI
     const served = stations ? printers.filter((printer) => stations.includes(printer.role)) : printers;
     for (const printer of served) {
       try {
-        await transport.probe(printer);
-        mark(printer);
+        const status = await transport.probe(printer);
+        mark(printer, null, status?.paperLow ? "paper-low" : null);
       } catch (error) {
         mark(printer, error);
       }
@@ -197,15 +321,22 @@ export function createBridge({ source, transport = createLanTransport(), bridgeI
     await report(served);
   }
 
+  /** The shop's network searched for printers; the console offers them to add. */
+  async function scan() {
+    discovered = (await discover()).slice(0, 50);
+    changed = true;
+    return discovered;
+  }
+
   async function report(printers = null) {
     const ids = printers ? new Set(printers.map((printer) => printer.id)) : null;
     const entries = [...found].filter(([id]) => !ids || ids.has(id)).map(([id, status]) => ({ id, ok: status.ok, ...(status.error ? { error: status.error } : {}) }));
     changed = false;
-    return source.report({ bridgeId, name, version: BRIDGE_VERSION, printers: entries });
+    return source.report({ bridgeId, name, version: BRIDGE_VERSION, printers: entries, ...(discovered ? { discovered } : {}) });
   }
 
   return {
-    deliver, processBatch, drain, check, report,
+    deliver, processBatch, drain, check, report, scan,
     get statusChanged() { return changed; },
     status: () => Object.fromEntries(found)
   };
@@ -225,8 +356,9 @@ export async function processPrintJob({ database, role, workerId, transport = cr
  * polling in any case (faster while the channel is down), checking the
  * printers every minute and whenever one stops or starts answering.
  */
-export function run(bridge, { live = null, pollMs = 5_000, livePollMs = 20_000, checkMs = 60_000, WebSocketImpl = globalThis.WebSocket } = {}) {
+export function run(bridge, { live = null, pollMs = 5_000, livePollMs = 20_000, checkMs = 60_000, scanMs = 10 * 60_000, WebSocketImpl = globalThis.WebSocket } = {}) {
   let stopped = false;
+  let scannedAt = 0;
   let busy = false;
   let again = false;
   let socketOpen = false;
@@ -264,6 +396,12 @@ export function run(bridge, { live = null, pollMs = 5_000, livePollMs = 20_000, 
 
   async function checkNow() {
     try {
+      // The shop's network searched now and then, so a printer plugged in shows up on the console.
+      if (scanMs && Date.now() - scannedAt >= scanMs) {
+        scannedAt = Date.now();
+        const printers = await bridge.scan();
+        log({ event: "printers_found", count: printers.length });
+      }
       await bridge.check();
     } catch (error) {
       log({ event: "check_error", error: error instanceof Error ? error.message : String(error) });
@@ -308,6 +446,9 @@ export function run(bridge, { live = null, pollMs = 5_000, livePollMs = 20_000, 
 }
 
 const CONFIG_FILE = path.join(process.cwd(), "print-bridge.config.json");
+// Named, not written in the import, so the single-file build leaves the server's database out.
+const LOCAL_DATABASE = "./database.mjs";
+const LOCAL_CONFIG = "./config.mjs";
 
 /** `--url=… --token=…` over the environment over what the last run kept; given ones are kept. */
 export function bridgeSettings(argv = process.argv.slice(2), env = process.env, file = CONFIG_FILE) {
@@ -335,7 +476,8 @@ async function main() {
     if (!settings.token && !settings.staffToken) throw new Error("A token is required: pair the bridge on the console (Printers → Connect a print bridge)");
     source = apiSource({ baseUrl: settings.url, token: settings.token, staffToken: settings.staffToken });
   } else {
-    const [{ createDatabase }, { config }] = await Promise.all([import("./database.mjs"), import("./config.mjs")]);
+    // Only in the repository: the single-file bridge (print-bridge.mjs) is always online.
+    const [{ createDatabase }, { config }] = await Promise.all([import(LOCAL_DATABASE), import(LOCAL_CONFIG)]);
     const database = createDatabase(config.databasePath);
     source = localSource(database);
     close = () => database.close();
@@ -362,6 +504,6 @@ async function main() {
   process.on("SIGTERM", stop);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => { console.error(error); process.exitCode = 1; });
 }

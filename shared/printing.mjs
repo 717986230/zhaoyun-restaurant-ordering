@@ -22,13 +22,21 @@ export const PRINTER_TRANSPORTS = new Set(["lan", "bluetooth", "usb"]);
  * and another printer to use when this one does not answer.
  */
 export const PRINT_LANGUAGES = ["zh", "de", "en"];
-export const PRINT_ENCODINGS = ["utf8", "gb18030", "shift_jis", "cp437"];
+/** `auto` is what a thermal printer is set to out of the box: GB18030 in Chinese
+ *  mode where Chinese is printed, code page 437 (umlauts, no Chinese) where not. */
+export const PRINT_ENCODINGS = ["auto", "gb18030", "cp437", "utf8", "shift_jis"];
 export const PAPER_WIDTHS = [58, 80];
 export const PRINTER_OPTION_DEFAULTS = Object.freeze({
-  printLanguage: "zh", secondLanguage: null, encoding: "utf8", paperWidth: 58,
+  printLanguage: "zh", secondLanguage: null, encoding: "auto", paperWidth: 58,
   copies: 1, largeText: false, beep: false, splitItems: false, backupPrinterId: null
 });
 const MAX_COPIES = 3;
+
+/** The encoding bytes are written in: `auto` settled by the languages printed. */
+export function resolvedEncoding(options) {
+  if (options.encoding !== "auto") return options.encoding;
+  return options.printLanguage === "zh" || options.secondLanguage === "zh" ? "gb18030" : "cp437";
+}
 
 /** What a printer's stored options mean, leniently: anything unreadable is its default. */
 export function printerOptions(capabilities = {}) {
@@ -154,9 +162,18 @@ export function normalizeBridgeReport(input = {}) {
     printers: (Array.isArray(input.printers) ? input.printers : []).slice(0, 50).map((printer) => ({
       id: String(printer?.id ?? ""),
       ok: printer?.ok === true,
-      error: printer?.ok === true ? null : String(printer?.error ?? "No answer").slice(0, 300)
-    })).filter((printer) => printer.id)
+      // An error when it cannot print; a note (paper running low) when it can.
+      error: printer?.error ? String(printer.error).slice(0, 300) : printer?.ok === true ? null : "No answer"
+    })).filter((printer) => printer.id),
+    // Only when the bridge searched: what it found on the shop's network.
+    discovered: Array.isArray(input.discovered)
+      ? input.discovered.slice(0, 50).map((entry) => ({ address: String(entry?.address ?? "").trim().slice(0, 64), port: Number(entry?.port) || 9100, escpos: entry?.escpos === true })).filter((entry) => entry.address)
+      : null
   };
+}
+
+export function discoveredPrinterView(row) {
+  return { address: row.address, port: row.port, escpos: Boolean(row.escpos), bridgeId: row.bridge_id, seenAt: row.seen_at };
 }
 
 export function printBridgeView(row) {

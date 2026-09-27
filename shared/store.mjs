@@ -29,7 +29,7 @@ import { normalizeCategoryName, normalizeMenuTheme, normalizeSettingsInput, rena
 import {
   assertOrderTransition, assertRequestTransition, billView, normalizeTableNo, OPEN_TABLE_ORDERS_SQL, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL, orderProductIds, orderView, planOrder, RECENT_ORDERS_SQL, serviceRequestView, tablesOverviewView, tableView
 } from "./orders.mjs";
-import { normalizeBridgeReport, normalizePrinter, PRINT_STATIONS, planPrintFailure, planTestPrint, printBridgeView, printerView, printJobView } from "./printing.mjs";
+import { discoveredPrinterView, normalizeBridgeReport, normalizePrinter, PRINT_STATIONS, planPrintFailure, planTestPrint, printBridgeView, printerView, printJobView } from "./printing.mjs";
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
@@ -1102,10 +1102,25 @@ export function createStore(driver) {
           `INSERT INTO printer_status (printer_id, bridge_id, ok, error, checked_at) VALUES (?, ?, ?, ?, ?)
            ON CONFLICT(printer_id) DO UPDATE SET bridge_id = excluded.bridge_id, ok = excluded.ok, error = excluded.error, checked_at = excluded.checked_at`,
           printer.id, report.id, printer.ok ? 1 : 0, printer.error, at
-        ))
+        )),
+        // What this bridge found replaces what it found before.
+        ...(report.discovered ? [
+          sql("DELETE FROM discovered_printers WHERE bridge_id = ?", report.id),
+          ...report.discovered.map((entry) => sql(
+            `INSERT INTO discovered_printers (address, port, escpos, bridge_id, seen_at) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(address, port) DO UPDATE SET escpos = excluded.escpos, bridge_id = excluded.bridge_id, seen_at = excluded.seen_at`,
+            entry.address, entry.port, entry.escpos ? 1 : 0, report.id, at
+          ))
+        ] : [])
       ]);
       return { ok: true, at };
     },
+    /** What the bridges found on the shop's network that is not a printer here yet. */
+    listDiscoveredPrinters: async () => (await all(
+      `SELECT * FROM discovered_printers WHERE NOT EXISTS (
+         SELECT 1 FROM printer_profiles WHERE printer_profiles.address = discovered_printers.address AND COALESCE(printer_profiles.port, 9100) = discovered_printers.port)
+       ORDER BY escpos DESC, address`
+    )).map(discoveredPrinterView),
     listPrintBridges: async () => (await all("SELECT * FROM print_bridges ORDER BY last_seen_at DESC LIMIT 20")).map(printBridgeView),
     printQueue: async () => {
       const rows = await all("SELECT status, COUNT(*) AS count FROM print_jobs WHERE status IN ('queued', 'claimed', 'retry-wait', 'failed') GROUP BY status");

@@ -446,6 +446,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       checked_at TEXT NOT NULL
     );
 
+    -- The printers a bridge found on the shop's network, for the console to
+    -- offer. See migrations/0059_discovered_printers.sql.
+    CREATE TABLE IF NOT EXISTS discovered_printers (
+      address TEXT NOT NULL,
+      port INTEGER NOT NULL,
+      escpos INTEGER NOT NULL DEFAULT 0,
+      bridge_id TEXT NOT NULL,
+      seen_at TEXT NOT NULL,
+      PRIMARY KEY (address, port)
+    );
+
     INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at)
     SELECT 'owner', 'admin', 'Admin', password_hash, password_salt, password_iterations, updated_at, updated_at
     FROM admin_gate WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM accounts);

@@ -94,7 +94,8 @@ export interface ServiceRequest {
 
 export type PrinterTransport = "lan" | "bluetooth" | "usb";
 export type PrinterLanguage = "zh" | "de" | "en";
-export type PrinterEncoding = "utf8" | "gb18030" | "shift_jis" | "cp437";
+/** `auto`: GB18030 where Chinese is printed, code page 437 where not. */
+export type PrinterEncoding = "auto" | "utf8" | "gb18030" | "shift_jis" | "cp437";
 
 /** How a printer prints (shared/printing.mjs, printerOptions). */
 export interface PrinterOptions {
