@@ -48,6 +48,8 @@ interface Props {
   onSaveConnection: (storage: AdminStorage) => Promise<void>;
   onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<boolean>;
   onDeleteTable: (table: string) => Promise<void>;
+  /** Tables 1 to count set up for their cards; the ones set up, or null when it failed. */
+  onRegisterNumberedTables: (count: number) => Promise<RestaurantTable[] | null>;
   /** The account signed in; null on a device opened with a configured token. */
   account: ApiAccount | null;
   onUpdateAccount: (command: AccountUpdateCommand) => Promise<boolean>;
@@ -319,6 +321,17 @@ function FeaturedList({ ids, products, onChange }: { ids: string[]; products: Pr
 export function SettingsPanel(props: Props) {
   const { t, language } = useI18n();
   const [showCards, setShowCards] = useState(false);
+  // The cards on screen: every table, or just the ones set up in one go.
+  const [cardTables, setCardTables] = useState<RestaurantTable[] | null>(null);
+  const floorCount = props.settings?.floorTables || 20;
+
+  async function registerNumbered() {
+    if (!window.confirm(t("numberedTablesConfirm", { count: floorCount }))) return;
+    const made = await props.onRegisterNumberedTables(floorCount);
+    if (!made) return;
+    setCardTables(made);
+    setShowCards(true);
+  }
   const [passwordNote, setPasswordNote] = useState("");
   const settings = props.settings;
 
@@ -550,14 +563,15 @@ export function SettingsPanel(props: Props) {
         {/* The menu's own code, with no table in it: for the door, a flyer, social media. */}
         <div className="qr-actions">
           <button className="primary-action" type="button" onClick={() => void downloadQrCard({ url: menuUrl(props.storage.baseUrl), restaurantName: settings?.restaurantName ?? "", menuLanguages: offered })}>⬇ {t("downloadMenuQr")}</button>
-          {props.tables.length > 0 && <button className="ghost-action settings-cards-button" onClick={() => setShowCards(true)}>{t("printCards")}</button>}
+          <button className="primary-action" type="button" onClick={() => void registerNumbered()}>{t("numberedTables", { count: floorCount })}</button>
+          {props.tables.length > 0 && <button className="ghost-action settings-cards-button" onClick={() => { setCardTables(null); setShowCards(true); }}>{t("printCards")}</button>}
         </div>
         {showCards && <TableCards
-          tables={props.tables}
+          tables={cardTables ?? props.tables}
           restaurantName={settings?.restaurantName ?? ""}
           menuLanguages={offered}
           entryUrl={(table) => entryUrl(props.storage.baseUrl, table)}
-          onClose={() => setShowCards(false)}
+          onClose={() => { setShowCards(false); setCardTables(null); }}
         />}
         <div className="table-list">{props.tables.length ? props.tables.map((table) => <div className="table-row" key={table.table}>
           <div><b>{t("table", { table: table.table })}</b>{table.label && <small> · {table.label}</small>}<code>{entryUrl(props.storage.baseUrl, table)}</code></div>

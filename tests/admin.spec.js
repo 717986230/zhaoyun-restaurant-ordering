@@ -999,3 +999,30 @@ test("a station with dishes and no printer is called out, and the setup steps sh
   await expect(page.locator(".print-bridge")).toContainText("还没有连接打印桥");
   await expect(page.locator(".bridge-steps > li")).toHaveCount(4);
 });
+
+test("tables 1–20 get their QR cards in one go, each with its own code, ready to print", async ({ page }) => {
+  await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
+  let tables = [];
+  let asked = null;
+  await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables }) }));
+  await page.route("**/api/admin/tables/numbered", (route) => {
+    asked = route.request().postDataJSON();
+    tables = Array.from({ length: asked.count }, (_, index) => ({ table: String(index + 1), label: "", token: `tok-${index + 1}-secret`, enabled: true }));
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ tables, created: asked.count }) });
+  });
+  await page.goto("/admin.html");
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  page.once("dialog", (dialog) => {
+    expect(dialog.message()).toContain("顾客扫码点餐必须用桌上的二维码");
+    void dialog.accept();
+  });
+  await page.getByRole("button", { name: "一键生成 1–20 号桌的二维码" }).click();
+  await expect.poll(() => asked).toEqual({ count: 20 });
+
+  const cards = page.locator(".table-card");
+  await expect(cards).toHaveCount(20);
+  await expect(cards.first().locator(".table-card-qr svg")).toBeVisible();
+  await expect(page.locator(".table-row")).toHaveCount(20);
+  await expect(page.locator(".table-row code").nth(6)).toContainText("table=7");
+  await expect(page.locator(".table-row code").nth(6)).toContainText("tok-7-secret");
+});

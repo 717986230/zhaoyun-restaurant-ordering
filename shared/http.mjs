@@ -18,7 +18,7 @@ import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
-  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody
+  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
@@ -813,6 +813,11 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       // /api/admin/tables[/:table]
       if (path[2] === "tables") {
         if (path.length === 3 && method === "GET") return json({ tables: await store.listTables() });
+        if (path.length === 4 && path[3] === "numbered" && method === "POST") {
+          const { value, invalid } = await body(request, NumberedTablesBody);
+          if (invalid) return invalid;
+          return json(await store.registerNumberedTables(value.count), 201);
+        }
         if (path.length === 3 && method === "POST") {
           try {
             const { value, invalid } = await body(request, TableBody);
