@@ -16,6 +16,18 @@ test("a successful write is an event; a read, a refusal or a sign-in is not", ()
   assert.deepEqual(liveEvent("POST", "/api/admin/print-jobs/j1/fail", 200), { type: "floor.changed" }, "a failed print shows on the board");
 });
 
+test("the print bridge's routine is nobody's news; a ticket queued without a floor change wakes it", () => {
+  for (const path of ["/api/print-bridge/claim", "/api/print-bridge/status", "/api/print-bridge/jobs/j1/complete"]) {
+    assert.equal(liveEvent("POST", path, 200), null, path);
+  }
+  assert.deepEqual(liveEvent("POST", "/api/print-bridge/jobs/j1/fail", 200), { type: "floor.changed" }, "a failed print shows on the board");
+  assert.deepEqual(liveEvent("POST", "/api/admin/receipts/r1/print", 201), { type: "print.queued" });
+  assert.deepEqual(liveEvent("POST", "/api/admin/printers/p1/test", 201), { type: "print.queued" });
+  assert.equal(liveEvent("PUT", "/api/admin/printers/p1", 200), null, "saving a printer is not a ticket");
+  assert.equal(reaches({ type: "print.queued" }, "staff"), true);
+  assert.equal(reaches({ type: "print.queued" }, "guest"), false);
+});
+
 test("the floor is for the staff; the dishes are for everyone", () => {
   assert.equal(reaches({ type: "floor.changed" }, "staff"), true);
   assert.equal(reaches({ type: "floor.changed" }, "guest"), false);

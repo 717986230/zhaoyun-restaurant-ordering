@@ -101,18 +101,13 @@ Android App 内进入管理台：在首页顶部“赵云”区域 4 秒内连�
 
 局域网热敏打印机通常使用 IP 和 9100 端口。USB 目前完成设备发现与选择，实际打印需要针对具体型号补充驱动。
 
-服务端 LAN 打印代理按档口单独启动：
+厨房、吧台、寿司台和前台的打印机，由店里一台常开电脑上的**打印桥**统一打印。它从云端或本地服务器取单，按档口把单子发给对应的打印机，每台打印机用自己的语言、纸宽和编码。在管理台 → 打印 → 「连接打印桥」，页面会给出一行命令，在那台电脑上运行一次：
 
 ```bash
-DATABASE_PATH=/var/lib/zhaoyun/restaurant.sqlite \
-PRINTER_ROLE=kitchen \
-PRINT_AGENT_ID=kitchen-01 \
-npm run print-agent
+npm run print-bridge -- --url=https://你的网址 --token=令牌
 ```
 
-每个档口运行一个代理。代理会认领任务、持有租约、失败退避重试，超过 5 次后标记 `failed`；修复打印机后可通过管理 API 的 `/api/admin/print-jobs/:id/retry` 手动重试。
-
-每台打印机的语言和编码在管理台配置：中文打印机通常选择 `中文 + GB18030`，德文或英文打印机通常选择 `Deutsch/English + UTF-8`。订单会按厨房、吧台、寿司台、前台拆成独立任务并发送给对应设备。这里打印的是订单制作单，不会自动打印整本菜单；真实设备必须验收中文字符、纸宽、换行、走纸和裁切。
+之后开机只要运行 `npm run print-bridge`。打印机设置、开机自启和打印机选购见 [`docs/PRINTING.md`](docs/PRINTING.md)。
 
 ## Android 构建
 

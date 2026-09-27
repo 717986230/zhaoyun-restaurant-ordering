@@ -15,6 +15,7 @@
     "start": "vite --host 127.0.0.1",
     "server": "node server/index.mjs",
     "backup": "node server/backup.mjs",
+    "print-bridge": "node server/print-agent.mjs",
     "print-agent": "node server/print-agent.mjs",
     "print-agent:once": "node server/print-agent.mjs --once",
     "server:test": "node --test server/tests/*.test.mjs",

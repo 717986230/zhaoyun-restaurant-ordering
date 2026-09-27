@@ -323,6 +323,19 @@ CREATE TABLE table_sessions (
       expires_at TEXT NOT NULL,
       staff_name TEXT
     );
+CREATE TABLE print_bridges (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      version TEXT NOT NULL DEFAULT '',
+      last_seen_at TEXT NOT NULL
+    );
+CREATE TABLE printer_status (
+      printer_id TEXT PRIMARY KEY REFERENCES printer_profiles(id) ON DELETE CASCADE,
+      bridge_id TEXT NOT NULL,
+      ok INTEGER NOT NULL,
+      error TEXT,
+      checked_at TEXT NOT NULL
+    );
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);

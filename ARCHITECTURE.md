@@ -211,7 +211,7 @@ Admin web
 4. [x] 用 React 迁移顾客端：shell -> catalog -> detail/flip -> cart -> checkout -> orders/service。
 5. [x] 迁移管理台：catalog/media -> printers/settings -> 后端订单与服务呼叫看板。
 6. [x] 两个后端共用一套路由（`shared/http.mjs`）和数据层（`shared/store.mjs`）；下一步是 TypeScript 化。
-7. 增加 transactional outbox 与 print-agent，完成打印回执和重试。
+7. [x] 打印队列与打印桥（`server/print-agent.mjs`、`server/tickets.mjs`）：租约、退避重试、备用打印机、打印机状态回报。
 8. 完成 Android 回归、响应式矩阵、APK 构建和旧 JS 删除。
 
 详细决策见 `docs/adr/0001-modular-monolith-typescript.md`。

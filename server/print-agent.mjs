@@ -1,272 +1,365 @@
-import { createDatabase } from "./database.mjs";
-import { config } from "./config.mjs";
-import iconv from "iconv-lite";
-
-const ESC = 0x1b;
-const GS = 0x1d;
-
-function line(value = "") {
-  return `${String(value).replace(/[\u0000-\u001f]/g, "")}\n`;
-}
-
-const labels = {
-  zh: {
-    title: "赵云餐厅", order: "订单", table: "桌号", note: "备注",
-    bill: "账单", total: "合计", net: "净额", vat: "增值税", rate: "税率",
-    disclaimer: "内部账单，不是税务收据",
-    kitchen: "后厨单 · 不是收据",
-    unsigned: "测试小票 · 未签名（RKSV）", receipt: "小票", register: "收银机", storno: "冲销", stornoOf: "冲销小票 {no}",
-    sum: "合计", cash: "现金", card: "银行卡", voucher: "代金券", tendered: "收", change: "找零", gross: "含税",
-    voucherCode: "代金券码", closing: "日结", sales: "销售", stornos: "冲销", receipts: "小票", vouchersSold: "售出代金券", uid: "UID",
-    waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣",
-    voidTicket: "*** 退菜 · 停止制作 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***",
-    guestDineIn: "*** 顾客扫码点餐 ***", guestPickup: "*** 线上自取 ***"
-  },
-  de: {
-    title: "ZHAO YUN RESTAURANT", order: "Bestellung", table: "Tisch", note: "Notiz",
-    bill: "Rechnung", total: "Gesamt", net: "Netto", vat: "MwSt", rate: "Satz",
-    disclaimer: "Interne Rechnung, kein Kassenbeleg",
-    kitchen: "KÜCHENBON – KEIN BELEG",
-    unsigned: "TESTBELEG – NICHT SIGNIERT", receipt: "Beleg", register: "Kasse", storno: "STORNO", stornoOf: "Storno zu Beleg {no}",
-    sum: "SUMME", cash: "Bar", card: "Karte", voucher: "Gutschein", tendered: "gegeben", change: "Rückgeld", gross: "Brutto",
-    voucherCode: "Gutschein-Code", closing: "TAGESABSCHLUSS", sales: "Verkäufe", stornos: "Stornos", receipts: "Belege", vouchersSold: "Gutscheine verkauft", uid: "UID",
-    waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt",
-    voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***",
-    guestDineIn: "*** GAST-BESTELLUNG (QR) ***", guestPickup: "*** ONLINE – ABHOLUNG ***"
-  },
-  en: {
-    title: "ZHAO YUN RESTAURANT", order: "Order", table: "Table", note: "Note",
-    bill: "Bill", total: "Total", net: "Net", vat: "VAT", rate: "Rate",
-    disclaimer: "Internal bill, not a fiscal receipt",
-    kitchen: "Kitchen ticket – not a receipt",
-    unsigned: "TEST RECEIPT – NOT SIGNED", receipt: "Receipt", register: "Register", storno: "CANCELLATION", stornoOf: "Cancels receipt {no}",
-    sum: "TOTAL", cash: "Cash", card: "Card", voucher: "Voucher", tendered: "given", change: "change", gross: "Gross",
-    voucherCode: "Voucher code", closing: "DAY CLOSING", sales: "sales", stornos: "cancellations", receipts: "Receipts", vouchersSold: "Vouchers sold", uid: "UID",
-    waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount",
-    voidTicket: "*** VOID – STOP COOKING ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***",
-    guestDineIn: "*** GUEST ORDER (QR) ***", guestPickup: "*** ONLINE PICKUP ***"
-  }
-};
-
-const RULE = "--------------------------------";
-
-function money(value) {
-  return Number(value || 0).toFixed(2);
-}
-
-/** A kitchen ticket: what to cook, for which table. No price and no tax —
- *  it is not a receipt, and says so on its first line. */
-function orderLines(payload, copy, language) {
-  // A void: the same ticket, marked, the quantities taken back, and why.
-  const voiding = payload.kind === "void";
-  const lines = [
-    ...(voiding ? [copy.voidTicket] : []),
-    // A guest ordered it from their phone: nobody at the pass took it down.
-    ...(payload.guest ? [payload.guest.channel === "pickup" ? copy.guestPickup : copy.guestDineIn] : []),
-    copy.kitchen,
-    copy.title,
-    // A takeaway's pickup number is what the kitchen calls out; big on the ticket.
-    ...(payload.pickupNo ? [`${copy.pickup} ${payload.pickupNo}`] : []),
-    `${copy.order} ${payload.orderNo || ""}  ${copy.table} ${payload.table || ""}`,
-    ...(payload.staffName ? [`${copy.waiter}: ${payload.staffName}`] : []),
-    ...(payload.guest?.name ? [payload.guest.name] : []),
-    RULE
-  ];
-  for (const item of payload.items || []) {
-    lines.push(`${voiding ? "-" : ""}${item.quantity} x ${item.names?.[language] || item.name || item.sku || "Item"}`);
-    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}`);
-  }
-  if (payload.note) lines.push(`${copy.note}: ${payload.note}`);
-  if (voiding && payload.reason) lines.push(`${copy.reason}: ${payload.reason}`);
-  lines.push(RULE, "\n");
-  return lines;
-}
-
-function billLines(payload, copy, language) {
-  const lines = [
-    copy.title,
-    `${copy.bill}  ${copy.table} ${payload.table || ""}`,
-    payload.issuedAt ? new Date(payload.issuedAt).toLocaleString("de-AT") : "",
-    RULE
-  ];
-  for (const item of payload.items || []) {
-    lines.push(`${item.qty} x ${item.names?.[language] || item.name || "Item"}`);
-    for (const modifier of item.modifiers || []) lines.push(`  - ${modifier.names?.[language] || modifier.name}`);
-    // A set menu over two rates shows both.
-    const rates = item.vatSplit ? item.vatSplit.map((part) => `${part.percent}%`).join("/") : `${item.vatPercent}%`;
-    lines.push(`      ${money(item.lineTotal)}  ${rates}`);
-  }
-  lines.push(RULE, `${copy.total}: EUR ${money(payload.total)}`);
-  for (const group of payload.vatBreakdown || []) {
-    lines.push(`${copy.rate} ${group.percent}%  ${copy.net} ${money(group.net)}  ${copy.vat} ${money(group.vat)}`);
-  }
-  lines.push(RULE, copy.disclaimer, "\n");
-  return lines;
-}
-
-const WIDTH = RULE.length;
-const euros = (cents) => (Number(cents || 0) / 100).toFixed(2);
-/** Text on the left, an amount on the right, on one 32-column line. */
-function row(left, right) {
-  const text = String(left);
-  const room = WIDTH - String(right).length - 1;
-  return `${text.length > room ? text.slice(0, room) : text.padEnd(room)} ${right}`;
-}
-const at = (iso) => (iso ? new Date(iso).toLocaleString("de-AT", { timeZone: "Europe/Vienna" }) : "");
-
-function companyLines(company = {}, copy) {
-  return [company.name, company.address, company.uid ? `${copy.uid}: ${company.uid}` : ""].filter(Boolean);
-}
-
 /**
- * A register receipt (shared/register.mjs): who issued it, its number, the
- * register and the time, each line, the amount per VAT rate, and how it was
- * paid. Until the receipt is signed (fiskaly) it says, at its head and its
- * foot, that it is a test receipt.
+ * The print bridge: the one program that runs in the restaurant, on any
+ * computer in the same network as the printers (the till PC, a Raspberry Pi),
+ * and turns the queue of tickets into paper.
+ *
+ * It is how the mature systems do it (Odoo's IoT box, Lightspeed's printer
+ * bridge, the 打印助手 of the Chinese POS vendors): the orders live in the
+ * cloud, the printers in the shop's own network, and one small program in
+ * between reaches out to the first and talks to the second. So nothing in the
+ * restaurant has to be reachable from the internet.
+ *
+ *  - Online: `--url` (the Cloudflare deployment, or a Node server elsewhere)
+ *    and `--token`, the token the console shows when it pairs the bridge, or
+ *    PRINT_BRIDGE_URL and PRINT_BRIDGE_TOKEN. The first run keeps them in
+ *    print-bridge.config.json, so the next start needs neither. It is woken by
+ *    the live channel the moment a ticket is queued and polls as a safety net.
+ *  - Local: `DATABASE_PATH`, the Node server's own database on this computer.
+ *
+ * One bridge serves every enabled network printer (or the stations named in
+ * `PRINTER_ROLE`, comma-separated). Each ticket goes to the first printer of
+ * its station that answers, then to the backup that printer names, in that
+ * printer's own language, paper and encoding (server/tickets.mjs). It checks
+ * each printer once a minute and tells the console which ones answer.
  */
-function receiptLines(payload, copy, language) {
-  const receipt = payload.receipt;
-  const unsigned = receipt.fiscalStatus !== "signed";
-  const lines = [
-    ...(payload.copy ? [copy.receiptCopy] : []),
-    ...(unsigned ? [copy.unsigned] : []),
-    ...companyLines(payload.company, copy),
-    RULE,
-    `${copy.receipt} ${receipt.receiptNo}  ${copy.register} ${receipt.cashRegisterId}`,
-    `${at(receipt.createdAt)}${receipt.table ? `  ${copy.table} ${receipt.table}` : ""}`,
-    ...(receipt.staffName ? [`${copy.waiter}: ${receipt.staffName}`] : [])
-  ];
-  if (receipt.type === "storno") lines.push(copy.storno, copy.stornoOf.replace("{no}", String(receipt.refersToNo ?? "")), receipt.reason || "");
-  lines.push(RULE);
-  for (const line of receipt.lines) {
-    // The dish in the front printer's language: German on the guest's receipt.
-    const name = line.names?.[language] || line.name;
-    lines.push(line.kind === "discount" ? row(name, euros(line.totalCents)) : row(`${line.quantity} x ${name}`, euros(line.totalCents)));
-    for (const modifier of line.modifiers || []) lines.push(`  - ${modifier}`);
-    lines.push(`    ${line.vatSplit.map((part) => `${part.percent}%`).join("/")}${line.quantity !== 1 && line.quantity !== -1 ? `  à ${euros(line.unitPriceCents)}` : ""}`);
+import { readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { printerOptions } from "../shared/printing.mjs";
+import { renderTickets } from "./tickets.mjs";
+
+export { renderTickets, renderTickets as renderReceipt };
+
+export const BRIDGE_VERSION = "2";
+const log = (event) => console.log(JSON.stringify({ at: new Date().toISOString(), ...event }));
+
+// ——— Where the tickets come from.
+
+/** The API, over HTTPS: the Cloudflare deployment or a Node server. */
+export function apiSource({ baseUrl, token, staffToken = "", fetch = globalThis.fetch, timeoutMs = 15_000 }) {
+  const base = String(baseUrl).replace(/\/+$/, "");
+  const headers = {
+    "content-type": "application/json",
+    ...(token ? { "x-device-token": token } : {}),
+    ...(staffToken ? { "x-admin-token": staffToken } : {})
+  };
+  async function call(method, path, body) {
+    const response = await fetch(`${base}${path}`, {
+      method, headers, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(timeoutMs)
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${json.error ?? ""}`.trim());
+    return json;
   }
-  lines.push(RULE, row(`${copy.sum} EUR`, euros(receipt.totalCents)));
-  // Per rate on one line: rate, net and tax on the left, the gross amount
-  // (what § 11 RKSV asks per rate) in the amount column.
-  for (const group of receipt.vat) lines.push(row(`${group.percent}% ${copy.net} ${euros(group.netCents)} ${copy.vat} ${euros(group.vatCents)}`, euros(group.grossCents)));
-  lines.push(RULE);
-  for (const payment of receipt.payments) {
-    lines.push(row(`${copy[payment.type] ?? payment.type}${payment.voucherCode ? ` ${payment.voucherCode}` : ""}`, euros(payment.amountCents)));
-    if (payment.tenderedCents) lines.push(`  ${copy.tendered} ${euros(payment.tenderedCents)}  ${copy.change} ${euros(payment.changeCents)}`);
-  }
-  for (const line of receipt.lines) if (line.kind === "voucher" && receipt.type === "sale") lines.push(RULE, `${copy.voucherCode}: ${line.code}`, row(copy.voucher, euros(line.totalCents)));
-  lines.push(RULE, ...(unsigned ? [copy.unsigned] : []), "\n");
-  return lines;
+  return {
+    live: `${base.replace(/^http/, "ws")}/ws?role=staff`,
+    printers: async () => (await call("GET", "/api/print-bridge/printers")).printers,
+    claim: async (roles, workerId, max) => (await call("POST", "/api/print-bridge/claim", { workerId, roles, max })).jobs,
+    complete: async (id, workerId) => (await call("POST", `/api/print-bridge/jobs/${encodeURIComponent(id)}/complete`, { workerId })).ok,
+    fail: async (id, workerId, error) => (await call("POST", `/api/print-bridge/jobs/${encodeURIComponent(id)}/fail`, { workerId, error: String(error).slice(0, 1000) })).ok,
+    report: async (report) => call("POST", "/api/print-bridge/status", report)
+  };
 }
 
-/** The day's closing (Z report): the run of receipts and what they add up to. */
-function closingLines(payload, copy) {
-  const { closing } = payload;
-  const totals = closing.totals;
-  const lines = [
-    `${copy.closing} ${closing.closingNo}`,
-    ...companyLines(payload.company, copy),
-    `${copy.register} ${payload.cashRegisterId}  ${at(closing.createdAt)}`,
-    RULE,
-    `${copy.receipts} ${totals.firstReceiptNo}–${totals.lastReceiptNo}: ${totals.sales} ${copy.sales}, ${totals.stornos} ${copy.stornos}`,
-    row(`${copy.sum} EUR`, euros(totals.grossCents))
-  ];
-  for (const group of totals.vat) lines.push(row(`${group.percent}% ${copy.net} ${euros(group.netCents)} ${copy.vat} ${euros(group.vatCents)}`, euros(group.grossCents)));
-  lines.push(RULE);
-  for (const [type, amount] of Object.entries(totals.payments)) lines.push(row(copy[type] ?? type, euros(amount)));
-  if (totals.vouchersSoldCents) lines.push(row(copy.vouchersSold, euros(totals.vouchersSoldCents)));
-  lines.push(RULE, "\n");
-  return lines;
+/** The Node server's database on this computer. */
+export function localSource(database, { leaseMs = 30_000, maxAttempts = 5 } = {}) {
+  return {
+    live: null,
+    printers: async () => (await database.listPrinters()).filter((printer) => printer.enabled),
+    claim: (roles, workerId, max) => database.claimPrintJobs(roles, workerId, leaseMs, max),
+    complete: (id, workerId) => database.completePrintJob(id, workerId),
+    fail: (id, workerId, error) => database.failPrintJob(id, workerId, error, maxAttempts),
+    report: (report) => database.recordBridgeReport(report)
+  };
 }
 
-/** A waiter's settlement: the receipts they took and the cash they hand in. */
-function settlementLines(payload, copy) {
-  const { settlement } = payload;
-  const totals = settlement.totals;
-  return [
-    copy.settlement,
-    ...companyLines(payload.company, copy),
-    `${copy.waiter}: ${settlement.staffName}  ${at(settlement.createdAt)}`,
-    RULE,
-    `${copy.receipts} ${totals.firstReceiptNo}–${totals.lastReceiptNo}: ${totals.sales} ${copy.sales}, ${totals.stornos} ${copy.stornos}`,
-    row(`${copy.sum} EUR`, euros(totals.grossCents)),
-    RULE,
-    ...Object.entries(totals.payments).map(([type, amount]) => row(copy[type] ?? type, euros(amount))),
-    ...(totals.voids?.count ? [row(`${copy.voids} ${totals.voids.count}x`, euros(-totals.voids.cents))] : []),
-    RULE,
-    "\n"
-  ];
-}
-
-export function renderReceipt(payload, printer = {}) {
-  const capabilities = printer.capabilities || {};
-  const language = ["zh", "de", "en"].includes(capabilities.printLanguage) ? capabilities.printLanguage : "zh";
-  const encoding = ["utf8", "gb18030", "shift_jis", "cp437"].includes(capabilities.encoding) ? capabilities.encoding : "utf8";
-  const copy = labels[language];
-  const lines = payload.kind === "bill" ? billLines(payload, copy, language)
-    : payload.kind === "receipt" ? receiptLines(payload, copy, language)
-    : payload.kind === "closing" ? closingLines(payload, copy)
-    : payload.kind === "settlement" ? settlementLines(payload, copy)
-    : orderLines(payload, copy, language);
-  return Buffer.concat([
-    Buffer.from([ESC, 0x40]),
-    iconv.encode(lines.filter((value) => value !== "").map(line).join(""), encoding),
-    Buffer.from([GS, 0x56, 0x00])
-  ]);
-}
+// ——— How the bytes reach a printer.
 
 export function createLanTransport({ connectTimeoutMs = 3500 } = {}) {
-  return {
-    async send(printer, payload) {
-      const net = await import("node:net");
-      await new Promise((resolve, reject) => {
-        const socket = new net.Socket();
-        const fail = (error) => { socket.destroy(); reject(error); };
-        socket.setTimeout(connectTimeoutMs, () => fail(new Error("Printer connection timed out")));
-        socket.once("error", fail);
-        socket.connect(printer.port || 9100, printer.address, () => {
-          socket.write(payload, (error) => {
-            if (error) { fail(error); return; }
-            socket.end(resolve);
-          });
+  async function open(printer, payload) {
+    const net = await import("node:net");
+    await new Promise((resolve, reject) => {
+      const socket = new net.Socket();
+      const fail = (error) => { socket.destroy(); reject(error); };
+      socket.setTimeout(connectTimeoutMs, () => fail(new Error("Printer connection timed out")));
+      socket.once("error", fail);
+      socket.connect(printer.port || 9100, printer.address, () => {
+        if (!payload) {
+          socket.end(resolve);
+          return;
+        }
+        socket.write(payload, (error) => {
+          if (error) { fail(error); return; }
+          socket.end(resolve);
         });
       });
+    });
+  }
+  return {
+    send: (printer, payload) => open(printer, payload),
+    /** Whether the printer answers at all: a connection opened and closed, nothing printed. */
+    probe: (printer) => open(printer, null)
+  };
+}
+
+// ——— The bridge.
+
+const isNetworkPrinter = (printer) => printer.enabled && printer.transport === "lan";
+
+/**
+ * The printers a job may go to, in order: a test page to its own printer
+ * only; a ticket to its station's printers, then the backup the first of
+ * them names.
+ */
+export function printersFor(job, printers) {
+  const byId = new Map(printers.map((printer) => [printer.id, printer]));
+  if (job.payload?.kind === "test") return [byId.get(job.payload.printerId)].filter((printer) => printer && isNetworkPrinter(printer));
+  const own = printers.filter((printer) => printer.role === job.printerRole && isNetworkPrinter(printer));
+  const backup = own.length ? byId.get(printerOptions(own[0].capabilities).backupPrinterId) : null;
+  return backup && isNetworkPrinter(backup) && !own.includes(backup) ? [...own, backup] : own;
+}
+
+export function createBridge({ source, transport = createLanTransport(), bridgeId, name = bridgeId, stations = null, batch = 5 }) {
+  const found = new Map();
+  let changed = false;
+
+  function mark(printer, error = null) {
+    const before = found.get(printer.id);
+    const ok = !error;
+    if (!before || before.ok !== ok) changed = true;
+    found.set(printer.id, { ok, error: error ? String(error.message ?? error).slice(0, 300) : undefined });
+  }
+
+  /** One job to the first of its printers that takes it. */
+  async function deliver(job, printers) {
+    const candidates = printersFor(job, printers);
+    if (!candidates.length) {
+      const error = job.payload?.kind === "test" ? "The printer is not an enabled network printer" : `No enabled network printer for the ${job.printerRole} station`;
+      await source.fail(job.id, bridgeId, error);
+      return { processed: true, status: "not-printed", jobId: job.id, error };
+    }
+    const errors = [];
+    for (const [index, printer] of candidates.entries()) {
+      try {
+        const bytes = renderTickets(job.payload, printer, { station: job.printerRole, standInFor: index ? candidates[0].name : null });
+        await transport.send(printer, bytes);
+        mark(printer);
+        await source.complete(job.id, bridgeId);
+        return { processed: true, status: "printed", jobId: job.id, printerId: printer.id, ...(index ? { standIn: true } : {}) };
+      } catch (error) {
+        mark(printer, error);
+        errors.push(`${printer.name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    const error = errors.join("; ");
+    await source.fail(job.id, bridgeId, error);
+    return { processed: true, status: "not-printed", jobId: job.id, error };
+  }
+
+  async function servedStations(printers) {
+    const own = [...new Set(printers.filter(isNetworkPrinter).map((printer) => printer.role))];
+    return stations ? own.filter((role) => stations.includes(role)) : own;
+  }
+
+  /** At most `max` jobs, taken and printed; what happened to each. */
+  async function processBatch(max = batch) {
+    const printers = await source.printers();
+    const roles = await servedStations(printers);
+    if (!roles.length) return [];
+    const jobs = await source.claim(roles, bridgeId, max);
+    const results = [];
+    for (const job of jobs) results.push(await deliver(job, printers));
+    return results;
+  }
+
+  /** Everything waiting, until the queue is empty. */
+  async function drain() {
+    const results = [];
+    for (;;) {
+      const done = await processBatch();
+      results.push(...done);
+      if (done.length < batch) return results;
+    }
+  }
+
+  /** Each printer asked whether it answers; the console told what was found. */
+  async function check() {
+    const printers = (await source.printers()).filter(isNetworkPrinter);
+    const served = stations ? printers.filter((printer) => stations.includes(printer.role)) : printers;
+    for (const printer of served) {
+      try {
+        await transport.probe(printer);
+        mark(printer);
+      } catch (error) {
+        mark(printer, error);
+      }
+    }
+    await report(served);
+  }
+
+  async function report(printers = null) {
+    const ids = printers ? new Set(printers.map((printer) => printer.id)) : null;
+    const entries = [...found].filter(([id]) => !ids || ids.has(id)).map(([id, status]) => ({ id, ok: status.ok, ...(status.error ? { error: status.error } : {}) }));
+    changed = false;
+    return source.report({ bridgeId, name, version: BRIDGE_VERSION, printers: entries });
+  }
+
+  return {
+    deliver, processBatch, drain, check, report,
+    get statusChanged() { return changed; },
+    status: () => Object.fromEntries(found)
+  };
+}
+
+/** The old one-station, one-job entry point, kept for scripts that call it. */
+export async function processPrintJob({ database, role, workerId, transport = createLanTransport(), leaseMs = 30_000, maxAttempts = 5 }) {
+  const bridge = createBridge({ source: localSource(database, { leaseMs, maxAttempts }), transport, bridgeId: workerId, stations: [role], batch: 1 });
+  const [result] = await bridge.processBatch(1);
+  return result ?? { processed: false, reason: "No queued job" };
+}
+
+// ——— Running it.
+
+/**
+ * Keeps the bridge going: woken by the live channel when there is one,
+ * polling in any case (faster while the channel is down), checking the
+ * printers every minute and whenever one stops or starts answering.
+ */
+export function run(bridge, { live = null, pollMs = 5_000, livePollMs = 20_000, checkMs = 60_000, WebSocketImpl = globalThis.WebSocket } = {}) {
+  let stopped = false;
+  let busy = false;
+  let again = false;
+  let socketOpen = false;
+  let socket = null;
+  let pollTimer;
+  let checkTimer;
+
+  async function work() {
+    if (busy) {
+      again = true;
+      return;
+    }
+    busy = true;
+    try {
+      do {
+        again = false;
+        for (const result of await bridge.drain()) log({ event: "print_job", ...result });
+        if (bridge.statusChanged) await bridge.report();
+      } while (again && !stopped);
+    } catch (error) {
+      log({ event: "bridge_error", error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      busy = false;
+    }
+  }
+
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    if (stopped) return;
+    pollTimer = setTimeout(async () => {
+      await work();
+      schedulePoll();
+    }, socketOpen ? livePollMs : pollMs);
+  }
+
+  async function checkNow() {
+    try {
+      await bridge.check();
+    } catch (error) {
+      log({ event: "check_error", error: error instanceof Error ? error.message : String(error) });
+    }
+    if (!stopped) checkTimer = setTimeout(checkNow, checkMs);
+  }
+
+  function connect() {
+    if (!live || !WebSocketImpl || stopped) return;
+    socket = new WebSocketImpl(live);
+    socket.onopen = () => {
+      socketOpen = true;
+      log({ event: "live_connected" });
+      void work();
+    };
+    socket.onmessage = (message) => {
+      try {
+        const { type } = JSON.parse(String(message.data));
+        if (type === "floor.changed" || type === "print.queued") void work();
+      } catch { /* Not ours to read. */ }
+    };
+    socket.onclose = () => {
+      if (socketOpen) log({ event: "live_closed" });
+      socketOpen = false;
+      if (!stopped) setTimeout(connect, 5_000);
+    };
+    socket.onerror = () => { /* onclose follows. */ };
+  }
+
+  connect();
+  void work();
+  schedulePoll();
+  void checkNow();
+  return {
+    stop() {
+      stopped = true;
+      clearTimeout(pollTimer);
+      clearTimeout(checkTimer);
+      socket?.close();
     }
   };
 }
 
-export async function processPrintJob({ database, role, workerId, transport = createLanTransport(), leaseMs = 30_000, maxAttempts = 5 }) {
-  const printer = await database.printerForRole(role);
-  if (!printer || printer.transport !== "lan") return { processed: false, reason: "No enabled LAN printer configured for role" };
-  const job = await database.claimPrintJob(role, workerId, leaseMs);
-  if (!job) return { processed: false, reason: "No queued job" };
-  try {
-    await transport.send(printer, renderReceipt(job.payload, printer));
-    await database.completePrintJob(job.id, workerId);
-    return { processed: true, status: "printed", jobId: job.id };
-  } catch (error) {
-    await database.failPrintJob(job.id, workerId, error instanceof Error ? error.message : String(error), maxAttempts);
-    return { processed: true, status: "retry-wait", jobId: job.id, error: error instanceof Error ? error.message : String(error) };
-  }
+const CONFIG_FILE = path.join(process.cwd(), "print-bridge.config.json");
+
+/** `--url=… --token=…` over the environment over what the last run kept; given ones are kept. */
+export function bridgeSettings(argv = process.argv.slice(2), env = process.env, file = CONFIG_FILE) {
+  const args = Object.fromEntries(argv.filter((arg) => arg.startsWith("--") && arg.includes("=")).map((arg) => {
+    const [key, ...value] = arg.slice(2).split("=");
+    return [key, value.join("=")];
+  }));
+  let saved = {};
+  try { saved = JSON.parse(readFileSync(file, "utf8")); } catch { /* Nothing kept yet. */ }
+  const url = args.url || env.PRINT_BRIDGE_URL || saved.url || "";
+  const token = args.token || env.PRINT_BRIDGE_TOKEN || saved.token || "";
+  if (args.url || args.token) writeFileSync(file, `${JSON.stringify({ url, token }, null, 2)}\n`, { mode: 0o600 });
+  return { url, token, staffToken: env.PRINT_BRIDGE_STAFF_TOKEN || "" };
 }
 
 async function main() {
-  const role = process.env.PRINTER_ROLE;
-  if (!role) throw new Error("PRINTER_ROLE is required");
-  const database = createDatabase(config.databasePath);
-  const workerId = process.env.PRINT_AGENT_ID || `${role}-${process.pid}`;
-  const intervalMs = Math.max(500, Number(process.env.PRINT_POLL_MS || 1500));
+  const stations = process.env.PRINTER_ROLE ? process.env.PRINTER_ROLE.split(",").map((role) => role.trim()).filter(Boolean) : null;
+  const bridgeId = process.env.PRINT_AGENT_ID || `bridge-${os.hostname()}`;
+  const name = process.env.PRINT_BRIDGE_NAME || os.hostname();
   const once = process.argv.includes("--once");
-  const run = async () => processPrintJob({ database, role, workerId });
-  try {
-    do {
-      const result = await run();
-      if (result.processed) console.log(JSON.stringify({ event: "print_job", ...result, role, workerId }));
-      if (!once) await new Promise((resolve) => setTimeout(resolve, intervalMs));
-    } while (!once);
-  } finally {
-    database.close();
+  const settings = bridgeSettings();
+  let source;
+  let close = () => {};
+  if (settings.url) {
+    if (!settings.token && !settings.staffToken) throw new Error("A token is required: pair the bridge on the console (Printers → Connect a print bridge)");
+    source = apiSource({ baseUrl: settings.url, token: settings.token, staffToken: settings.staffToken });
+  } else {
+    const [{ createDatabase }, { config }] = await Promise.all([import("./database.mjs"), import("./config.mjs")]);
+    const database = createDatabase(config.databasePath);
+    source = localSource(database);
+    close = () => database.close();
   }
+  const bridge = createBridge({ source, bridgeId, name, stations });
+  log({ event: "bridge_started", bridgeId, mode: settings.url ? `online ${settings.url}` : "local", stations: stations ?? "all" });
+  if (once) {
+    try {
+      await bridge.check();
+      for (const result of await bridge.drain()) log({ event: "print_job", ...result });
+    } finally {
+      close();
+    }
+    return;
+  }
+  const pollMs = Math.max(500, Number(process.env.PRINT_POLL_MS || (source.live ? 5_000 : 1_500)));
+  const running = run(bridge, { live: source.live, pollMs });
+  const stop = () => {
+    running.stop();
+    close();
+    process.exit(0);
+  };
+  process.on("SIGINT", stop);
+  process.on("SIGTERM", stop);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

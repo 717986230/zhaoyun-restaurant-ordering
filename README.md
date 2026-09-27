@@ -63,7 +63,7 @@ npm run server:test   # Fastify/SQLite 集成测试
 npm test              # Playwright 手机/平板响应式测试
 npm run build         # Web 生产构建
 npm run backup        # 生成并校验 SQLite/媒体备份
-npm run print-agent   # 按 PRINTER_ROLE 启动 LAN 打印任务代理
+npm run print-bridge  # 店里的打印桥：取单、按档口发给各台网口打印机（见 docs/PRINTING.md）
 npm run cap:sync      # 同步 Capacitor Android 工程
 npm run android:debug # 构建 debug APK
 npm run android:release # 使用环境变量签名构建 Release APK

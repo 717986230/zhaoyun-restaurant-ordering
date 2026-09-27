@@ -1415,6 +1415,79 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.ok((await call("GET", "/api/orders?limit=500", { admin: true })).json.orders.some((entry) => entry.id === ramen.id));
     }],
 
+    ["the print bridge: paired like a POS, reads the printers, takes its stations' tickets, reports each printer", async () => {
+      assert.equal((await call("GET", "/api/print-bridge/printers")).status, 401, "the bridge signs in");
+      const token = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Print bridge" } })).json.token;
+
+      // A printer's options are checked: paper, copies, a backup that exists and is not itself.
+      const add = (body) => call("POST", "/api/admin/printers", { admin: true, body: { name: "Bar", transport: "lan", address: "192.168.1.61", port: 9100, role: "bar", enabled: true, ...body } });
+      assert.equal((await add({ capabilities: { paperWidth: 70 } })).status, 400, "paper is 58 or 80 mm");
+      assert.equal((await add({ capabilities: { copies: 5 } })).status, 400, "at most three copies");
+      assert.equal((await add({ capabilities: { printLanguage: "fr" } })).status, 400);
+      assert.equal((await add({ capabilities: { backupPrinterId: "no-such-printer" } })).status, 400, "the backup exists");
+      const spare = (await add({ name: "Kitchen spare", address: "192.168.1.62", role: "kitchen" })).json.printer;
+      const bar = await add({ capabilities: { printLanguage: "de", secondLanguage: "zh", paperWidth: 80, copies: 2, largeText: true, backupPrinterId: spare.id, model: "TM-T20" } });
+      assert.equal(bar.status, 201, JSON.stringify(bar.json));
+      assert.deepEqual(bar.json.printer.capabilities, {
+        model: "TM-T20", printLanguage: "de", secondLanguage: "zh", encoding: "utf8", paperWidth: 80,
+        copies: 2, largeText: true, beep: false, splitItems: false, backupPrinterId: spare.id
+      }, "the known options checked, a device's own kept");
+      const own = await call("PUT", `/api/admin/printers/${spare.id}`, { admin: true, body: { name: "Kitchen spare", transport: "lan", address: "192.168.1.62", port: 9100, role: "kitchen", enabled: true, capabilities: { backupPrinterId: spare.id } } });
+      assert.equal(own.status, 400, "a printer is not its own backup");
+
+      const seen = (await call("GET", "/api/print-bridge/printers", { deviceToken: token })).json.printers;
+      assert.ok(seen.some((printer) => printer.id === bar.json.printer.id && printer.capabilities.paperWidth === 80));
+
+      // A test page goes through the bridge like any ticket, to that printer.
+      assert.equal((await call("POST", `/api/admin/printers/${bar.json.printer.id}/test`, { role: "staff" })).status, 403);
+      assert.equal((await call("POST", "/api/admin/printers/no-such-printer/test", { admin: true })).status, 404);
+      const queued = await call("POST", `/api/admin/printers/${bar.json.printer.id}/test`, { admin: true });
+      assert.equal(queued.status, 201);
+      assert.equal((await call("POST", "/api/print-bridge/claim", { deviceToken: token, body: { workerId: "bridge-1", roles: ["sommelier"] } })).status, 400);
+      const claimUntil = async (jobId) => {
+        for (let round = 0; round < 20; round += 1) {
+          const jobs = (await call("POST", "/api/print-bridge/claim", { deviceToken: token, body: { workerId: "bridge-1", roles: ["bar"], max: 20 } })).json.jobs;
+          const found = jobs.find((job) => job.id === jobId);
+          if (found) return found;
+          if (!jobs.length) return null;
+        }
+        return null;
+      };
+      const test = await claimUntil(queued.json.jobId);
+      assert.ok(test, "the bridge gets the test page");
+      assert.deepEqual([test.printerRole, test.payload.kind, test.payload.printerId], ["bar", "test", bar.json.printer.id]);
+      assert.equal((await call("POST", `/api/print-bridge/jobs/${test.id}/complete`, { deviceToken: token, body: { workerId: "someone-else" } })).json.ok, false, "only its claimer finishes a job");
+      assert.equal((await call("POST", `/api/print-bridge/jobs/${test.id}/complete`, { deviceToken: token, body: { workerId: "bridge-1" } })).json.ok, true);
+
+      // A ticket that would not print waits and is tried again.
+      const again = (await call("POST", `/api/admin/printers/${bar.json.printer.id}/test`, { admin: true })).json.jobId;
+      const second = await claimUntil(again);
+      assert.equal((await call("POST", `/api/print-bridge/jobs/${second.id}/fail`, { deviceToken: token, body: { workerId: "bridge-1", error: "connect ETIMEDOUT" } })).json.ok, true);
+      const waiting = (await call("GET", "/api/admin/print-jobs?status=retry-wait&limit=200", { role: "staff" })).json.jobs.find((job) => job.id === second.id);
+      assert.equal(waiting.error, "connect ETIMEDOUT");
+
+      // What the bridge found at each printer, on the console; a printer it does not know is ignored.
+      assert.equal((await call("POST", "/api/print-bridge/status", { deviceToken: token, body: { printers: [] } })).status, 400, "a bridge names itself");
+      const report = await call("POST", "/api/print-bridge/status", {
+        deviceToken: token,
+        body: { bridgeId: "bridge-1", name: "Kasse PC", version: "2", printers: [{ id: bar.json.printer.id, ok: false, error: "connect ETIMEDOUT" }, { id: spare.id, ok: true }, { id: "gone", ok: true }] }
+      });
+      assert.equal(report.status, 200, JSON.stringify(report.json));
+      const console = (await call("GET", "/api/admin/printers", { admin: true })).json;
+      const statusOf = (id) => console.printers.find((printer) => printer.id === id).status;
+      assert.deepEqual([statusOf(bar.json.printer.id).online, statusOf(bar.json.printer.id).error, statusOf(bar.json.printer.id).bridgeId], [false, "connect ETIMEDOUT", "bridge-1"]);
+      assert.deepEqual([statusOf(spare.id).online, statusOf(spare.id).error], [true, null]);
+      assert.ok(console.bridges.some((bridge) => bridge.id === "bridge-1" && bridge.name === "Kasse PC" && bridge.version === "2" && bridge.lastSeenAt));
+      assert.ok(console.queue.waiting >= 1 && typeof console.queue.failed === "number");
+
+      // A staff token works too; the kitchen's does not.
+      assert.equal((await call("GET", "/api/print-bridge/printers", { role: "staff" })).status, 200);
+      assert.equal((await call("GET", "/api/print-bridge/printers", { role: "kitchen" })).status, 403);
+
+      for (const printer of [bar.json.printer, spare]) await call("DELETE", `/api/admin/printers/${printer.id}`, { admin: true });
+      for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true });
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

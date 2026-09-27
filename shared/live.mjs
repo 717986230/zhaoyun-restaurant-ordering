@@ -12,6 +12,9 @@
  *  - `floor.changed` reaches the staff sockets (admin console, POS): an order,
  *    a table, a bill, a claim, a service call. The console's board and the
  *    POS floor reload at once instead of on their next poll.
+ *  - `print.queued` reaches the staff sockets too: a ticket to print that
+ *    changed nothing on the floor (a receipt printed again, a test page). The
+ *    print bridge takes it at once; the screens have nothing to reload.
  *
  * Every successful write to the API is an event unless it is listed here as
  * not one, so a new route is live without anybody remembering to make it so.
@@ -30,9 +33,12 @@ const SILENT = [
   // A print agent asks for work every few seconds; what it takes is nobody's news.
   /^\/api\/admin\/print-jobs\/[^/]+\/(claim|complete)$/,
   /^\/api\/admin\/print-jobs\/claim$/,
-  // A receipt printed again changes nothing.
-  /^\/api\/admin\/receipts\/[^/]+\/print$/
+  // The print bridge's routine: asking for work, saying it printed, checking in.
+  /^\/api\/print-bridge\/(claim|status|jobs\/[^/]+\/complete)$/
 ];
+
+/** Writes that only queue something to print. */
+const PRINT_QUEUED = [/^\/api\/admin\/receipts\/[^/]+\/print$/, /^\/api\/admin\/printers\/[^/]+\/test$/];
 
 const CATALOG = /^\/api\/(admin\/(products|categories|settings)|pos\/products)(\/|$)/;
 const TABLE_IN_PATH = /\/tables\/([^/]+)(\/|$)/;
@@ -44,6 +50,7 @@ const TABLE_IN_PATH = /\/tables\/([^/]+)(\/|$)/;
 export function liveEvent(method, pathname, status, tableHint) {
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
   if (status < 200 || status >= 300 || !pathname.startsWith("/api/")) return null;
+  if (PRINT_QUEUED.some((pattern) => pattern.test(pathname))) return { type: "print.queued" };
   if (SILENT.some((pattern) => pattern.test(pathname))) return null;
   if (CATALOG.test(pathname)) return { type: "catalog.changed" };
   const inPath = TABLE_IN_PATH.exec(pathname)?.[1];

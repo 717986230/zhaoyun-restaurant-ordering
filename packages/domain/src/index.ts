@@ -96,6 +96,32 @@ export type PrinterTransport = "lan" | "bluetooth" | "usb";
 export type PrinterLanguage = "zh" | "de" | "en";
 export type PrinterEncoding = "utf8" | "gb18030" | "shift_jis" | "cp437";
 
+/** How a printer prints (shared/printing.mjs, printerOptions). */
+export interface PrinterOptions {
+  printLanguage?: PrinterLanguage;
+  /** Under each dish, for whoever helps out at the station. */
+  secondLanguage?: PrinterLanguage | null;
+  encoding?: PrinterEncoding;
+  /** 58 mm is 32 characters a line, 80 mm is 48. */
+  paperWidth?: 58 | 80;
+  /** Copies of each kitchen ticket, 1 to 3. */
+  copies?: number;
+  largeText?: boolean;
+  beep?: boolean;
+  /** One ticket per dish (一菜一单). */
+  splitItems?: boolean;
+  /** The printer that prints for this one when it does not answer. */
+  backupPrinterId?: string | null;
+}
+
+/** What the print bridge last found at a printer. */
+export interface PrinterStatus {
+  online: boolean;
+  error: string | null;
+  checkedAt: string;
+  bridgeId: string;
+}
+
 export interface PrinterProfile {
   id: string;
   name: string;
@@ -104,7 +130,8 @@ export interface PrinterProfile {
   port: number | null;
   role: PrintStation;
   enabled: boolean;
-  capabilities?: Record<string, unknown> & { printLanguage?: PrinterLanguage; encoding?: PrinterEncoding };
+  capabilities?: Record<string, unknown> & PrinterOptions;
+  status?: PrinterStatus;
 }
 
 export interface DiscoveredPrinter {
