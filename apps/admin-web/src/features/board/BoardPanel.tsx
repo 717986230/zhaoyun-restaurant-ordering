@@ -25,6 +25,7 @@ export const STATION_KEYS: Record<ApiPrintJob["printerRole"], CopyKey> = {
 };
 
 const SERVICE_KEYS: Record<string, CopyKey> = {
+  waiter: "serviceWaiter",
   water: "serviceWater",
   utensils: "serviceUtensils",
   napkin: "serviceNapkin",

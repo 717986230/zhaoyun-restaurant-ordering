@@ -516,6 +516,9 @@ export function createStore(driver) {
   async function createServiceRequest(input) {
     const table = String(input.table || "").trim();
     if (!table) throw new Error("Service request requires a table number");
+    // Asked again before anyone came: the same call, not a second one on the waiter's screen.
+    const waiting = await first("SELECT * FROM service_requests WHERE table_no = ? AND type = ? AND status IN ('open', 'acknowledged') ORDER BY created_at LIMIT 1", table, String(input.type || "").trim());
+    if (waiting) return { ...serviceRequestView(waiting), repeated: true };
     const id = uuid();
     const timestamp = now();
     await run(
@@ -523,6 +526,11 @@ export function createStore(driver) {
       id, table, String(input.type || "").trim(), timestamp, timestamp
     );
     return serviceRequestView(await first("SELECT * FROM service_requests WHERE id = ?", id));
+  }
+
+  /** The calls nobody has dealt with yet, oldest first: what the POS floor shows. */
+  async function openServiceRequests() {
+    return (await all("SELECT * FROM service_requests WHERE status IN ('open', 'acknowledged') ORDER BY created_at LIMIT 100")).map(serviceRequestView);
   }
 
   async function updateServiceRequest(id, status) {
@@ -875,6 +883,7 @@ export function createStore(driver) {
     listServiceRequests: async (limit = 100) =>
       (await all("SELECT * FROM service_requests ORDER BY created_at DESC LIMIT ?", boundedLimit(limit))).map(serviceRequestView),
     createServiceRequest,
+    openServiceRequests,
     updateServiceRequest,
     listPrinters: async () => (await all(PRINTERS_WITH_STATUS_SQL)).map(printerView),
     savePrinter,

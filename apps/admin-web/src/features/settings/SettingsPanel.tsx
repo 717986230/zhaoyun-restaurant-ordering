@@ -318,6 +318,9 @@ function FeaturedList({ ids, products, onChange }: { ids: string[]; products: Pr
   })}</ol>;
 }
 
+/** The settings page's groups, for the chips at its top. */
+const SETTINGS_GROUPS: Array<["menu" | "business" | "account", CopyKey]> = [["menu", "groupMenu"], ["business", "groupBusiness"], ["account", "groupAccount"]];
+
 export function SettingsPanel(props: Props) {
   const { t, language } = useI18n();
   const [showCards, setShowCards] = useState(false);
@@ -414,6 +417,11 @@ export function SettingsPanel(props: Props) {
   return <section id="systemPanel" className="admin-panel active"><div className="settings-page">
     <h1 className="settings-title">{t("settingsTitle")}</h1>
 
+    {/* Three groups, in the order a restaurant sets itself up: what the guests
+        see, how it runs, and the account behind it. The chips jump to each. */}
+    <nav className="settings-jump" aria-label={t("settingsGroups")}>{SETTINGS_GROUPS.map(([id, label]) => <button key={id} type="button" className="ghost-action" onClick={() => document.getElementById(`group-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>{t(label)}</button>)}</nav>
+
+    <h2 className="settings-group" id="group-menu">{t("groupMenu")}</h2>
     {settings && <div className="settings-grid">
       <Section id="restaurant" title={t("sectionRestaurant")} summary={`${settings.restaurantName} · ${settings.menuTitle}`}>
         {/* Keyed on the saved values so the fields show what the server kept
@@ -425,33 +433,6 @@ export function SettingsPanel(props: Props) {
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>
-
-      {/* Who the receipts say issued them. The console's own fields; the
-          server checks the UID's form and the register id's. */}
-      <Section id="company" title={t("sectionCompany")} hint={t("companyHint")} summary={[settings.companyName || settings.restaurantName, settings.companyUid, settings.cashRegisterId].filter(Boolean).join(" · ")}>
-        <form key={`${settings.companyName}|${settings.companyAddress}|${settings.companyUid}|${settings.cashRegisterId}|${settings.takeawayDiscountPercent}|${settings.floorTables}`} className="editor-form" onSubmit={(event) => {
-          event.preventDefault();
-          const data = new FormData(event.currentTarget);
-          const text = (name: string) => String(data.get(name) || "").trim();
-          void props.onSaveSettings({ companyName: text("companyName"), companyAddress: text("companyAddress"), companyUid: text("companyUid").toUpperCase(), cashRegisterId: text("cashRegisterId").toUpperCase(), takeawayDiscountPercent: Number(text("takeawayDiscountPercent")) || 0, ...(data.has("floorTables") ? { floorTables: Math.max(0, Math.min(200, Math.round(Number(text("floorTables")) || 0))) } : {}) }, "companySaved");
-        }}>
-          <label><span>{t("companyName")}</span><input name="companyName" maxLength={80} defaultValue={settings.companyName} placeholder={settings.restaurantName} /><small>{t("companyNameHint")}</small></label>
-          <label><span>{t("companyAddress")}</span><input name="companyAddress" maxLength={160} defaultValue={settings.companyAddress} autoComplete="street-address" /></label>
-          <div className="field-grid">
-            <label><span>{t("companyUid")}</span><input name="companyUid" maxLength={16} defaultValue={settings.companyUid} placeholder="ATU12345678" pattern="(ATU|atu)[0-9]{8}" /><small>{t("companyUidHint")}</small></label>
-            <label><span>{t("cashRegisterId")}</span><input name="cashRegisterId" required maxLength={32} defaultValue={settings.cashRegisterId} /></label>
-          </div>
-          {/* Only while no table is set up: from then on the room is edited under Tables. */}
-          {props.tables.length === 0 && <label><span>{t("floorTables")}</span><input name="floorTables" type="number" min={0} max={200} step={1} inputMode="numeric" defaultValue={settings.floorTables} /><small>{t("floorTablesHint")}</small></label>}
-          <label><span>{t("takeawayDiscount")}</span><input name="takeawayDiscountPercent" type="number" min={0} max={50} step={1} inputMode="numeric" defaultValue={settings.takeawayDiscountPercent} /><small>{t("takeawayDiscountHint")}</small></label>
-          <button className="primary-action" type="submit">{t("save")}</button>
-        </form>
-      </Section>
-
-      <Section id="staff" title={t("sectionStaff")} hint={t("staffHint")}>
-        <StaffCard api={props.api} notify={props.notify} failed={props.failed} />
-      </Section>
-
       <Section id="appearance" title={t("sectionAppearance")} summary={`${themeName(MENU_THEMES[settings.menuTheme] ?? MENU_THEMES.jade)} · ${t(settings.menuDefaultScheme === "dark" ? "schemeDark" : "schemeLight")}`}>
         <p className="settings-label">{t("menuStyle")}</p>
         <div className="theme-picker">{Object.values(MENU_THEMES).filter((theme) => !theme.festive).map(themeButton)}</div>
@@ -471,7 +452,6 @@ export function SettingsPanel(props: Props) {
         <small className="settings-hint">{t("defaultSchemeHint")}</small>
         <Toggle checked={settings.showTableNumber} label={t("showTableNumber")} onChange={(showTableNumber) => void props.onSaveSettings({ showTableNumber }, "appearanceSaved")} />
       </Section>
-
       <Section id="languages" title={t("sectionLanguages")} hint={t("languagesHint")} summary={offered.map((option) => LANGUAGE_INFO[option].name).join(" · ")}>
         <div className="language-picker" role="group" aria-label={t("sectionLanguages")}>{MENU_LANGUAGES.map((option) => {
           const on = offered.includes(option);
@@ -489,19 +469,12 @@ export function SettingsPanel(props: Props) {
           ><img src={LANGUAGE_INFO[option].flag} alt="" /><span>{LANGUAGE_INFO[option].name}</span></button>;
         })}</div>
       </Section>
-
       <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t, language)).join(" · ") : t("navDefault")}>
         <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
       </Section>
-
-      <Section id="vat" title={t("sectionVat")} hint={t("vatHint")} wide summary={VAT_RATES.map((rate) => `${rate}% × ${props.products.filter((product) => !product.bundleItems?.length && product.vatPercent === rate).length}`).join(" · ")}>
-        <VatRates products={props.products} onSet={props.onSetCategoryVat} />
-      </Section>
-
       <Section id="tabNames" title={t("sectionTabNames")} hint={t("tabNamesHint")} summary={t("categoryCount", { count: new Set(props.products.map((product) => product.category)).size })}>
         <TabNames settings={settings} products={props.products} onSave={(navLabels) => void props.onSaveSettings({ navLabels }, "tabNamesSaved")} onRename={props.onRenameCategory} />
       </Section>
-
       {/* The biggest card: across the page, what the page is on the left and
           how it looks and what is on it on the right. */}
       <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")} wide summary={settings.featuredEnabled
@@ -541,18 +514,46 @@ export function SettingsPanel(props: Props) {
           </div>
         </div>
       </Section>
-
       <Section id="sets" title={t("sectionSets")} hint={t("setsHint")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>
         <ScheduleEditor key={JSON.stringify(settings.setsSchedule)} value={settings.setsSchedule} timeZone={settings.timeZone} onSave={(setsSchedule) => props.onSaveSettings({ setsSchedule }, "setsSaved")} />
       </Section>
-
-      <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
-        <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
+      <Section id="vat" title={t("sectionVat")} hint={t("vatHint")} wide summary={VAT_RATES.map((rate) => `${rate}% × ${props.products.filter((product) => !product.bundleItems?.length && product.vatPercent === rate).length}`).join(" · ")}>
+        <VatRates products={props.products} onSet={props.onSetCategoryVat} />
       </Section>
     </div>}
 
+    <h2 className="settings-group" id="group-business">{t("groupBusiness")}</h2>
     <div className="settings-grid">
+      {settings && <>
+      {/* Who the receipts say issued them. The console's own fields; the
+          server checks the UID's form and the register id's. */}
+      <Section id="company" title={t("sectionCompany")} hint={t("companyHint")} summary={[settings.companyName || settings.restaurantName, settings.companyUid, settings.cashRegisterId].filter(Boolean).join(" · ")}>
+        <form key={`${settings.companyName}|${settings.companyAddress}|${settings.companyUid}|${settings.cashRegisterId}|${settings.takeawayDiscountPercent}|${settings.floorTables}`} className="editor-form" onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const text = (name: string) => String(data.get(name) || "").trim();
+          void props.onSaveSettings({ companyName: text("companyName"), companyAddress: text("companyAddress"), companyUid: text("companyUid").toUpperCase(), cashRegisterId: text("cashRegisterId").toUpperCase(), takeawayDiscountPercent: Number(text("takeawayDiscountPercent")) || 0, ...(data.has("floorTables") ? { floorTables: Math.max(0, Math.min(200, Math.round(Number(text("floorTables")) || 0))) } : {}) }, "companySaved");
+        }}>
+          <label><span>{t("companyName")}</span><input name="companyName" maxLength={80} defaultValue={settings.companyName} placeholder={settings.restaurantName} /><small>{t("companyNameHint")}</small></label>
+          <label><span>{t("companyAddress")}</span><input name="companyAddress" maxLength={160} defaultValue={settings.companyAddress} autoComplete="street-address" /></label>
+          <div className="field-grid">
+            <label><span>{t("companyUid")}</span><input name="companyUid" maxLength={16} defaultValue={settings.companyUid} placeholder="ATU12345678" pattern="(ATU|atu)[0-9]{8}" /><small>{t("companyUidHint")}</small></label>
+            <label><span>{t("cashRegisterId")}</span><input name="cashRegisterId" required maxLength={32} defaultValue={settings.cashRegisterId} /></label>
+          </div>
+          {/* Only while no table is set up: from then on the room is edited under Tables. */}
+          {props.tables.length === 0 && <label><span>{t("floorTables")}</span><input name="floorTables" type="number" min={0} max={200} step={1} inputMode="numeric" defaultValue={settings.floorTables} /><small>{t("floorTablesHint")}</small></label>}
+          <label><span>{t("takeawayDiscount")}</span><input name="takeawayDiscountPercent" type="number" min={0} max={50} step={1} inputMode="numeric" defaultValue={settings.takeawayDiscountPercent} /><small>{t("takeawayDiscountHint")}</small></label>
+          <button className="primary-action" type="submit">{t("save")}</button>
+        </form>
+      </Section>
+      <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
+        <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
+      </Section>
+      <Section id="staff" title={t("sectionStaff")} hint={t("staffHint")}>
+        <StaffCard api={props.api} notify={props.notify} failed={props.failed} />
+      </Section>
+      </>}
       <Section id="tables" title={t("sectionTables")} hint={t("tablesHint")} summary={t("tableCount", { count: props.tables.length })}>
         <form className="editor-form" onSubmit={(event) => void addTable(event)}>
           <div className="field-grid">
@@ -583,7 +584,10 @@ export function SettingsPanel(props: Props) {
           </div>
         </div>) : <div className="admin-empty">{t("noTables")}</div>}</div>
       </Section>
+    </div>
 
+    <h2 className="settings-group" id="group-account">{t("groupAccount")}</h2>
+    <div className="settings-grid">
       <Section id="password" title={t("sectionPassword")} hint={t("passwordHint")}>
         {props.account ? <form className="editor-form account-form" key={props.account.id + props.account.login + props.account.name} onSubmit={(event) => void saveAccount(event)}>
           <label><span>{t("gateLogin")}</span><input name="login" required minLength={3} maxLength={64} pattern="[a-zA-Z0-9][a-zA-Z0-9._@\-]{2,63}" autoComplete="username" autoCapitalize="none" defaultValue={props.account.login} /></label>

@@ -459,8 +459,12 @@ export class PosApi {
   voidItem(table: string, orderItemId: string, quantity: number, reason: string): Promise<{ void: PosVoid }> {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/void`, { method: "POST", body: JSON.stringify({ orderItemId, quantity, reason }) });
   }
-  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
   /** The tickets the print bridge gave up on, for the waiter to see and send again. */
+  /** A guest's call dealt with: off every waiter's floor. */
+  finishServiceRequest(id: string): Promise<{ request: ApiServiceRequest }> {
+    return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status: "completed" }) });
+  }
   failedPrints(): Promise<{ jobs: ApiPrintJob[] }> { return this.#request("/api/admin/print-jobs?status=failed&limit=20"); }
   retryPrint(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }
   /** The POS's live channel: every change on the floor, whoever made it. */
@@ -550,7 +554,8 @@ export class RestaurantApi {
   /** Everything kept about this guest's account, to download. */
   exportCustomerData(): Promise<CustomerDataExport> { return this.#request("/api/customer/export"); }
 
-  createServiceRequest(command: CreateServiceRequestCommand): Promise<{ request: { id: string } }> {
+  /** `repeated` when the same call was already waiting: nothing new was sent. */
+  createServiceRequest(command: CreateServiceRequestCommand): Promise<{ request: { id: string }; repeated?: boolean }> {
     return this.#request("/api/service-requests", { method: "POST", body: JSON.stringify(command) });
   }
 

@@ -1587,6 +1587,35 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true });
     }],
 
+    ["a guest's call reaches every waiter's floor once, however often they press, until one of them deals with it", async () => {
+      const tablet = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Tablet C" } })).json.token;
+      const ma = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Ma", pin: "1357" } })).json.staff;
+      const asMa = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: tablet, body: { staffId: ma.id, pin: "1357" } })).json.token };
+      // Called from the menu of a table with its card, as a guest does.
+      const tableToken = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "18" } })).json.table.token;
+      const press = (type) => call("POST", "/api/service-requests", { tableToken, body: { table: "18", type } });
+
+      const bill = await press("pay");
+      assert.equal(bill.status, 201);
+      const again = await press("pay");
+      assert.deepEqual([again.status, again.json.repeated, again.json.request.id], [200, true, bill.json.request.id], "pressed twice, one call");
+      const water = await press("water");
+      assert.equal(water.status, 201);
+      assert.notEqual(water.json.request.id, bill.json.request.id, "another kind of call is another call");
+
+      const waiting = async () => (await call("GET", "/api/pos/floor", asMa)).json.requests.filter((request) => request.table === "18").map((request) => request.id).sort();
+      assert.deepEqual(await waiting(), [bill.json.request.id, water.json.request.id].sort(), "on the waiter's floor");
+      assert.equal((await call("PATCH", `/api/service-requests/${bill.json.request.id}/status`, { ...asMa, body: { status: "completed" } })).status, 200, "dealt with from the POS");
+      assert.deepEqual(await waiting(), [water.json.request.id]);
+      const later = await press("pay");
+      assert.equal(later.status, 201, "asked again once dealt with: a new call");
+
+      for (const id of [water.json.request.id, later.json.request.id]) await call("PATCH", `/api/service-requests/${id}/status`, { ...asMa, body: { status: "completed" } });
+      await call("DELETE", "/api/admin/tables/18", { admin: true });
+      await call("PUT", `/api/admin/staff/${ma.id}`, { admin: true, body: { active: false } });
+      for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true });
+    }],
+
     ["tables 1 to N set up in one go for their cards, each with its own code, and a table already there keeps its code", async () => {
       const kept = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "2", label: "Fenster" } })).json.table;
       assert.equal((await call("POST", "/api/admin/tables/numbered", { role: "staff", body: { count: 3 } })).status, 403, "the manager's");

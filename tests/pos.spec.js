@@ -176,6 +176,21 @@ test("the same waiter on a second device sees the table locked there, with whose
   await phone.close();
 });
 
+test("a guest's call is on the waiter's floor at once, and gone once they deal with it", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  await pairAndSignIn(page, "Tablet call", "Li", "1234");
+  const call = await request.post(`${API}/api/service-requests`, { data: { table: "6", type: "water" } });
+  expect(call.status()).toBe(201);
+
+  const calls = page.locator(".pos-calls");
+  await expect(calls).toContainText("桌 6");
+  await expect(calls).toContainText("加水");
+  await expect(page.locator(".pos-table[data-table='6'] .pos-call-badge")).toBeVisible();
+  await calls.getByRole("button", { name: "已处理" }).click();
+  await expect(calls).toHaveCount(0);
+  await expect(page.locator(".pos-table[data-table='6'] .pos-call-badge")).toHaveCount(0);
+});
+
 test("an order sent on one tablet shows at once on the other and on the admin board", async ({ browser, request }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
   const [dish] = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
