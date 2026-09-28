@@ -19,6 +19,7 @@ import { useCustomer } from "../features/account/useCustomer";
 import { AccountSheet } from "../features/account/AccountSheet";
 import { CartSheet } from "../features/cart/CartSheet";
 import { OrdersSheet } from "../features/orders/OrdersSheet";
+import { ServiceSheet } from "../features/service/ServiceSheet";
 
 /**
  * The guest app is the menu. Everything else opens over it as a sheet, and
@@ -74,6 +75,8 @@ export function App() {
 
   // Ordering from the menu and guests' accounts, as the owner switched them on.
   const ordering = orderingState(catalog.menu, assignedTableNo(), new Date(minute * 60_000), timeZone);
+  // A waiter can be called only to a table the phone was given (its card scanned).
+  const serviceTable = assignedTableNo();
   const accountsOn = Boolean(catalog.menu?.accounts);
   const account = useCustomer(accountsOn);
   const loyalty = catalog.menu?.loyalty ?? null;
@@ -115,6 +118,7 @@ export function App() {
     <AnimatePresence>
       {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} />}
       {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} />}
+      {sheet === "service" && serviceTable && <ServiceSheet key="service" state={{ ...state, language }} dispatch={dispatch} table={serviceTable} />}
       {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}
     </AnimatePresence>
     <div className={`toast ${state.toast ? "show" : ""}`} role="status" aria-live="polite">{state.toast}</div>

@@ -405,7 +405,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const value = refusedBody.value;
           const refused = await refuseUnknownTable(request, value);
           if (refused) return refused;
-          return json({ request: await store.createServiceRequest(value) }, 201);
+          const created = await store.createServiceRequest(value);
+          // The same call again, before anyone came: the one already waiting, not a second.
+          if (created.repeated) {
+            const { repeated, ...waiting } = created;
+            return json({ request: waiting, repeated }, 200);
+          }
+          return json({ request: created }, 201);
         } catch (error) {
           return fail(error.message);
         }
@@ -501,7 +507,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
-          return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), deviceId: pos.deviceId, takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
+          return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), deviceId: pos.deviceId, requests: await store.openServiceRequests(), takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
         }
         if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
           if (method === "POST") {

@@ -97,6 +97,24 @@ test("a guest orders at the table a waiter opened, and it goes straight to the k
   expect(orders[0].items.reduce((sum, item) => sum + item.qty, 0)).toBe(3);
   const jobs = (await (await admin(request, "get", "/api/admin/print-jobs?status=queued")).json()).jobs;
   expect(jobs.some((job) => job.orderId === orders[0].id && job.payload.guest?.channel === "dine-in")).toBe(true);
+
+  // The bill, called for from the table: once, however often it is asked for.
+  await page.locator("#ordersSheet .sheet-close").click();
+  await page.locator("#callBtn").click();
+  await expect(page.locator("#serviceSheet")).toContainText("G5");
+  await page.locator("#serviceSheet [data-call=pay]").click();
+  await expect(page.locator(".toast")).toContainText("已通知服务员");
+  await page.locator("#callBtn").click();
+  await page.locator("#serviceSheet [data-call=pay]").click();
+  await expect(page.locator(".toast")).toContainText("马上就来");
+  const calls = (await (await admin(request, "get", "/api/service-requests")).json()).requests.filter((call) => call.table === "G5");
+  expect(calls.map((call) => [call.type, call.status])).toEqual([["pay", "open"]]);
+});
+
+test("a phone that scanned no table card has no one to call", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  await expect(page.locator("#callBtn")).toHaveCount(0);
 });
 
 test("a guest registers, keeps a favourite, orders for pickup, earns points and spends them on a reward", async ({ page, request }) => {

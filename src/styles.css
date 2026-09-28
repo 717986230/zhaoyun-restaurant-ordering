@@ -3543,6 +3543,75 @@ button:focus-visible,
   bottom: calc(90px + env(safe-area-inset-bottom));
 }
 
+/* Calling a waiter: the round glass button in the bottom-left corner, only
+   on a phone that scanned a table's card. */
+.call-waiter {
+  position: fixed;
+  z-index: 45;
+  left: calc(16px + env(safe-area-inset-left));
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--panel-glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+}
+
+.call-waiter.above-cart {
+  bottom: calc(90px + env(safe-area-inset-bottom));
+}
+
+.call-waiter:active {
+  transform: scale(0.94);
+}
+
+.call-waiter .scheme-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.service-calls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.service-call {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  padding: 10px 14px;
+  font-size: 15px;
+  text-align: left;
+}
+
+.service-call span {
+  font-size: 20px;
+}
+
+.service-call.primary {
+  grid-column: 1 / -1;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.service-call:disabled {
+  opacity: 0.55;
+}
+
 /* The sheets: from the bottom, over a dimmed menu, as wide as the menu's column. */
 .sheet-scrim {
   position: fixed;

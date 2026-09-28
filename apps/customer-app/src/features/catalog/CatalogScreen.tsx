@@ -214,6 +214,10 @@ function ReceiptIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z" /><path d="M9 8.5h6M9 12h6M9 15.5h3.5" /></svg>;
 }
 
+function BellIcon() {
+  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></svg>;
+}
+
 function MoonIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2z" /></svg>;
 }
@@ -704,6 +708,11 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     {ordering.open && cart.count > 0 && !activeProduct && <button type="button" id="cartBar" className="cartbar" onClick={() => dispatch({ type: "sheet", sheet: "cart" })}>
       <span>{g(state.language, "cart")}</span><b>{cart.count}</b><em>{formatPrice(cart.totalCents, state.language)}</em>
     </button>}
+    {/* Calling a waiter to the table this phone scanned: in the other bottom
+        corner from "back to top", above the cart when there is one. */}
+    {table && !activeProduct && <button type="button" id="callBtn" className={`call-waiter ${ordering.open && cart.count > 0 ? "above-cart" : ""}`}
+      aria-label={g(state.language, "callButton")} title={g(state.language, "callButton")}
+      onClick={() => dispatch({ type: "sheet", sheet: "service" })}><BellIcon /></button>}
     <button
       type="button"
       className={`to-top ${farDown && !activeProduct ? "on" : ""} ${ordering.open && cart.count > 0 ? "above-cart" : ""}`}

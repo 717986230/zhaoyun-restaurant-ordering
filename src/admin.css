@@ -1747,6 +1747,25 @@ em.voided {
   margin: 0;
 }
 
+/* The page's three groups: buttons at the top to jump to each, and a
+   heading over each group's cards. */
+.settings-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.settings-group {
+  margin: 18px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--a-line);
+  color: var(--a-ink-2);
+  font-size: 17px;
+  /* Clear of the header and tabs pinned above the page. */
+  scroll-margin-top: 190px;
+}
+
 /* Cards of very different heights in two columns: as a grid, the short one
    beside the promotions card left a screen of empty page under it. As
    columns they pack down each side with no hole, and a wide card runs

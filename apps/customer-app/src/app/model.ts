@@ -5,8 +5,8 @@ import { cartKey } from "./cart";
 import type { Cart } from "./cart";
 import { tableNo } from "./table";
 
-/** The sheets that open over the menu: the cart, the guest's account, their orders. */
-export type Sheet = "cart" | "account" | "orders" | null;
+/** The sheets that open over the menu: the cart, the guest's account, their orders, calling a waiter. */
+export type Sheet = "cart" | "account" | "orders" | "service" | null;
 
 /** An order this phone placed: enough to follow it, with or without an account. */
 export interface PlacedOrder {
