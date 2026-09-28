@@ -18,7 +18,7 @@ import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
-  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody
+  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
@@ -65,6 +65,12 @@ function fail(message, status = 400) {
 function coded(error) {
   const status = error.status ?? (error.code === "TABLE_LOCKED" ? 409 : 400);
   return json({ error: error.message || "Request failed", ...(error.code ? { code: error.code } : {}) }, status, error.retryAfter ? { "retry-after": String(error.retryAfter) } : {});
+}
+
+/** A table someone is at, or a number already taken: a 409 that says which (`code`). */
+const TABLE_CONFLICTS = new Set(["TABLE_CLAIMED", "TABLE_IN_USE", "TABLE_EXISTS"]);
+function tableRefusal(error) {
+  return TABLE_CONFLICTS.has(error.code) ? coded({ message: error.message, code: error.code, status: 409 }) : fail(error.message);
 }
 
 /**
@@ -473,7 +479,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       const claimed = (error) => fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400);
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
-          return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
+          // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
+          return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), deviceId: pos.deviceId, takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
         }
         if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
           if (method === "POST") {
@@ -625,23 +632,26 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         const { value, invalid } = await body(request, TableOrderingBody);
         if (invalid) return invalid;
         try {
+          // A table open on a POS is that device's to open or close.
+          await store.assertTableFree(path[3], pos?.deviceId ?? null);
           if (value.open) return json({ session: await store.openTable(path[3], pos) });
           await store.closeTable(path[3]);
           return json({ session: null });
         } catch (error) {
-          return fail(error.message);
+          return tableRefusal(error);
         }
       }
       if (path.length === 5 && path[2] === "tables" && path[4] === "lock" && method === "POST") {
-        const { denied } = await gate("staff");
+        const { denied, pos } = await gate("staff");
         if (denied) return denied;
         try {
           const { value, invalid } = await body(request, TableLockBody);
           if (invalid) return invalid;
+          await store.assertTableFree(path[3], pos?.deviceId ?? null);
           const table = await store.setTableLock(path[3], value.locked);
           return table ? json({ table }) : fail("Table not found", 404);
         } catch (error) {
-          return fail(error.message);
+          return tableRefusal(error);
         }
       }
       // The bill is the floor's, not the manager's.
@@ -827,13 +837,24 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             return fail(error.message);
           }
         }
+        // Another number or label. The number waits until nobody is at the table.
+        if (path.length === 4 && method === "PATCH") {
+          try {
+            const { value, invalid } = await body(request, TableRenameBody);
+            if (invalid) return invalid;
+            const table = await store.renameTable(path[3], value);
+            return table ? json({ table }) : fail("Table not found", 404);
+          } catch (error) {
+            return tableRefusal(error);
+          }
+        }
         if (path.length === 4 && method === "DELETE") {
           try {
             return (await store.deleteTable(path[3]))
               ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
               : fail("Table not found", 404);
           } catch (error) {
-            return fail(error.message);
+            return tableRefusal(error);
           }
         }
       }

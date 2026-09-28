@@ -148,6 +148,34 @@ test("a table open on one device is locked to it; the manager may take it over",
   await phone.close();
 });
 
+test("the same waiter on a second device sees the table locked there, with whose it is", async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const tablet = await browser.newPage({ locale: "zh-CN" });
+  const phone = await browser.newPage({ locale: "zh-CN" });
+  await pairAndSignIn(tablet, "Tablet L", "Li", "1234");
+  await pairAndSignIn(phone, "Phone L", "Li", "1234");
+
+  await tablet.getByLabel("打开桌号").fill("5");
+  await tablet.getByRole("button", { name: "打开", exact: true }).click();
+  await expect(tablet.locator(".pos-ticket h1")).toHaveText("桌 5");
+
+  // Locked on the phone, even for the same waiter: the tablet has it open.
+  const five = phone.locator(".pos-table[data-table='5']");
+  await expect(five).toHaveClass(/claimed/);
+  await expect(five.locator(".pos-lock")).toHaveText("🔒");
+  await expect(five).toContainText("Li 正在操作");
+  await five.click();
+  await expect(phone.locator(".pos-toast")).toContainText("桌 5 正在 Li 的设备上操作");
+  await expect(phone.locator(".pos-floor")).toBeVisible();
+  // Li leaves the table on the tablet: free on the phone again.
+  await tablet.getByRole("button", { name: "← 返回" }).click();
+  await expect(tablet.locator(".pos-floor")).toBeVisible();
+  await phone.reload();
+  await expect(phone.locator(".pos-table[data-table='5']")).not.toHaveClass(/claimed/);
+  await tablet.close();
+  await phone.close();
+});
+
 test("an order sent on one tablet shows at once on the other and on the admin board", async ({ browser, request }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
   const [dish] = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
@@ -179,7 +207,7 @@ test("an order sent on one tablet shows at once on the other and on the admin bo
 
   // The room, as the manager sees it: who has table 9 open, and each waiter now.
   await office.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "桌位", exact: true }).click();
-  await expect(office.locator(".table-tile", { hasText: "桌 9" }).locator(".table-open-on")).toHaveText("Li 正在操作");
+  await expect(office.locator(".table-tile", { hasText: "桌 9" }).locator(".table-open-on")).toHaveText("🔒 Li 正在 POS 上操作");
   const li = office.locator('.staff-live-card[data-staff="Li"]');
   await expect(li).toHaveClass(/online/);
   await expect(li).toContainText("Tablet live A");
