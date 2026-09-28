@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-09-28（二）
+
+### Added
+
+- **运维手册** `docs/OPERATIONS.md`：写给负责系统运行的人，内容包括：
+  - 上线流程、需要设置的密钥和变量
+  - 监控、备份与恢复
+  - 回滚、换密钥和令牌
+  - 出事了怎么办、安全基线
+- **上线自检和自动回滚**：Worker 部署后，CI 会访问线上的 `/api/health`，逐项确认：
+  - 回答的是这次的 commit，并且连得上数据库。
+  - 管理台页面带着 CSP。
+  - 菜单能读出来。
+
+  任何一项不过，就自动 `wrangler rollback` 退回上一个版本。
+- **夜间加密备份**（`.github/workflows/backup.yml`）：
+  - 每天把 D1 整库导出，先装进空数据库检查一遍（`scripts/verify-d1-export.mjs`），再用 AES-256 加密，作为 GitHub 产物保存 90 天。
+  - 需要设置 `BACKUP_PASSPHRASE` 这个 Secret。
+- **健康检查**：`/api/health` 现在返回运行中的版本（`version`）和数据库状态；连不上数据库时返回 503。
+- **请求编号**：每个接口回答都带 `x-request-id`。服务器出错时，回答里有 `requestId`，日志里也有同一个编号的一行 JSON，方便对上。
+  Worker 的日志已开启（`[observability]`）。
+- **页面安全头**：所有页面都带上 CSP（只运行本站脚本、禁止被嵌入）、HSTS、`Permissions-Policy`、`Cross-Origin-Opener-Policy`。
+  - Worker、Node 服务器、浏览器测试用的是同一份设置（`shared/web-headers.mjs`）。
+  - 浏览器测试在生产构建上运行时，页面有任何东西被 CSP 挡住，测试就会失败。
+- **Dependabot**：每周一提交依赖更新的 PR，分组提交，每组一个 PR。
+- **顾客数据导出（GDPR 第 15、20 条）**：
+  - 顾客可以在「账户设置」下面点「下载我的数据」。
+  - 店长也可以在管理台 → 顾客里点「导出数据」，处理顾客通过邮件或到店提出的请求。
+  - 导出的是一个 JSON 文件：账户信息、收藏、全部积分记录、全部订单。不含密码。
+  - 接口：`GET /api/customer/export`、`GET /api/admin/customers/:id/export`。
+- **隐私说明（GDPR 第 13 条）**：注册时和「账户设置」里都能看到。内容包括：
+  - 保存哪些数据、用来做什么。
+  - 可以下载全部数据，或删除账户。
+  - 删除账户后，个人信息立即清除；订单按奥地利税法（BAO）保存 7 年，但不再和本人关联。
+
+### Changed
+
+- 接口回答的 `X-Frame-Options` 从 `SAMEORIGIN` 改为 `DENY`。
+
 ## 2026-09-28
 
 ### Added

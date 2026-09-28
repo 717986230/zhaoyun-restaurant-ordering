@@ -27,6 +27,9 @@ import {
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
 
+// More than any guest has: an export is all of it.
+const MAX_EXPORTED_ROWS = 100_000;
+
 // A salt for nobody: an unknown email costs the same PBKDF2 work as a wrong
 // password, so the time a sign-in takes does not say which it was.
 const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
@@ -170,6 +173,21 @@ export function createCustomerStore(driver, { ordersFor }) {
       if (!(await withPassword(customerId, password))) return null;
       await removeAccount(customerId);
       return true;
+    },
+    /**
+     * Everything kept about the account (GDPR Art. 15 and 20): the account
+     * itself, favourites, every points entry and every order placed with it.
+     * Never the password's hash, nor anyone else's data.
+     */
+    async exportData(customerId) {
+      const row = await byId(customerId);
+      if (!row) return null;
+      return {
+        account: { ...customerView(row), updatedAt: row.updated_at },
+        favorites: await favorites(row.id),
+        points: (await driver.all(POINTS_HISTORY_SQL, row.id, MAX_EXPORTED_ROWS)).map(pointsEntryView),
+        orders: await ordersFor(await driver.all(CUSTOMER_ORDERS_SQL, row.id, MAX_EXPORTED_ROWS))
+      };
     },
     async points(customerId, limit = 50) {
       return (await driver.all(POINTS_HISTORY_SQL, String(customerId), Math.min(Math.max(Number(limit) || 50, 1), 200))).map(pointsEntryView);

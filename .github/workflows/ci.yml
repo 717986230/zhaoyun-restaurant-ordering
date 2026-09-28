@@ -204,6 +204,50 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx wrangler d1 migrations apply zhaoyun-ordering --remote
 
+      # VERSION names the commit, so /api/health says which build is live.
       - name: Deploy the Worker
+        id: deploy
         if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npx wrangler deploy
+        run: npx wrangler deploy --var VERSION:${GITHUB_SHA} | tee deploy.log
+
+      # A deploy is done when the live Worker answers as the new build: its
+      # health check names this commit and reaches D1, and the web app is
+      # served with its security headers. Otherwise it is rolled back to the
+      # version before, and the run goes red.
+      - name: Smoke test the live Worker
+        id: smoke
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          base="${API_BASE_URL:-$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -n1)}"
+          if [ -z "$base" ]; then
+            echo "::error::No address to test: set the API_BASE_URL repository variable to the Worker's address."
+            exit 1
+          fi
+          echo "Testing $base"
+          for attempt in $(seq 1 12); do
+            health=$(curl -fsS "$base/api/health" || true)
+            if echo "$health" | grep -q "\"version\":\"${GITHUB_SHA}\"" && echo "$health" | grep -q '"database":"ok"'; then
+              echo "Health: $health"
+              break
+            fi
+            if [ "$attempt" = 12 ]; then
+              echo "::error::The live Worker did not answer as this build: $health"
+              exit 1
+            fi
+            sleep 5
+          done
+          headers=$(curl -fsSIL "$base/admin.html")
+          echo "$headers" | grep -qi "^content-security-policy: .*script-src 'self'" || { echo "::error::The web app is served without its Content-Security-Policy"; exit 1; }
+          # Saved first: under pipefail, grep -q closing the pipe early would fail curl.
+          curl -fsS -o catalog.json "$base/api/catalog"
+          grep -q '"products"' catalog.json || { echo "::error::The catalogue does not load"; exit 1; }
+          echo "Smoke test passed."
+
+      - name: Roll back a deploy that failed its smoke test
+        # Only this deploy's own failure: a migration that failed never deployed anything to undo.
+        if: failure() && steps.deploy.outcome == 'success' && steps.smoke.outcome == 'failure'
+        run: |
+          npx wrangler rollback --message "Smoke test failed for ${GITHUB_SHA}" --yes
+          echo "::error::Rolled the Worker back to the version before ${GITHUB_SHA}. D1 migrations are additive and stay applied; see docs/OPERATIONS.md."

@@ -3845,6 +3845,31 @@ button:focus-visible,
   flex: 1 1 0;
 }
 
+/* What is kept about an account, and the guest's own copy of it (GDPR). */
+.guest-privacy {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.privacy-notice {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.privacy-notice summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  padding: 6px 0;
+}
+
+.privacy-notice p {
+  margin: 4px 0 8px;
+}
+
 .my-order {
   border: 1px solid var(--line);
   border-radius: 12px;

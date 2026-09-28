@@ -366,7 +366,10 @@ test("responses carry hardening headers", async (context) => {
   const response = await app.inject({ method: "GET", url: "/api/health" });
   assert.equal(response.headers["x-content-type-options"], "nosniff");
   assert.equal(response.headers["referrer-policy"], "no-referrer");
-  assert.equal(response.headers["x-frame-options"], "SAMEORIGIN");
+  assert.equal(response.headers["x-frame-options"], "DENY");
+  assert.match(response.headers["content-security-policy"], /script-src 'self'/);
+  assert.match(response.headers["strict-transport-security"], /max-age=31536000/);
+  assert.ok(response.headers["x-request-id"], "every answer says which request it was, to quote in a report");
 });
 
 test("table bill splits VAT by rate and prints once", async (context) => {

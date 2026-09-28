@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,7 +24,13 @@ function parseTrustProxy(value) {
   return normalized.split(",").map((entry) => entry.trim()).filter(Boolean);
 }
 
+const packageVersion = (() => {
+  try { return JSON.parse(readFileSync(path.join(projectDir, "package.json"), "utf8")).version; } catch { return null; }
+})();
+
 export const config = {
+  // Which build is running, for /api/health: APP_VERSION (a commit, say) when the deploy sets it.
+  version: process.env.APP_VERSION || packageVersion,
   host: process.env.HOST || "0.0.0.0",
   port: Number(process.env.PORT || 8787),
   isProduction: process.env.NODE_ENV === "production",

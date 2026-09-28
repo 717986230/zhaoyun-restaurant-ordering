@@ -3,7 +3,7 @@ import type {
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
-  ApiCustomer, ApiGuestOrdering, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand
+  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -366,6 +366,8 @@ export class AdminApi {
     return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/password`, { method: "POST", body: JSON.stringify({ password }) });
   }
   deleteCustomer(id: string): Promise<void> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  /** A guest's data, for a request that reached the restaurant by e-mail or at the counter. */
+  exportCustomer(id: string): Promise<CustomerDataExport> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/export`); }
 
   /** The console's live channel: every change on the floor and in the menu. */
   live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
@@ -541,6 +543,8 @@ export class RestaurantApi {
   }
   customerPoints(): Promise<{ entries: ApiPointsEntry[] }> { return this.#request("/api/customer/points"); }
   customerOrders(): Promise<{ orders: ApiOrder[] }> { return this.#request("/api/customer/orders"); }
+  /** Everything kept about this guest's account, to download. */
+  exportCustomerData(): Promise<CustomerDataExport> { return this.#request("/api/customer/export"); }
 
   createServiceRequest(command: CreateServiceRequestCommand): Promise<{ request: { id: string } }> {
     return this.#request("/api/service-requests", { method: "POST", body: JSON.stringify(command) });

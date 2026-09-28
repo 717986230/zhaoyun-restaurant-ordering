@@ -52,7 +52,8 @@ export function registerRoutes(app, { database, realtime, config }) {
     tokens: { manager: config.adminToken, staff: config.staffToken, kitchen: config.kitchenToken },
     uploads: saveUpload,
     publish: (event) => realtime.publish(event),
-    realtimeClients: () => realtime.size()
+    realtimeClients: () => realtime.size(),
+    version: config.version ?? null
   });
 
   /** A Fastify request as the web's Request, for shared/http.mjs. */
@@ -79,7 +80,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.addContentTypeParser("*", { parseAs: "buffer" }, (request, bodyBytes, done) => done(null, bodyBytes));
 
   async function forward(request, reply) {
-    const response = await api(toRequest(request), { ip: request.ip });
+    const response = await api(toRequest(request), { ip: request.ip, requestId: request.id });
     if (!response) return reply.code(404).send({ error: "API route not found" });
     return send(reply, response);
   }
@@ -95,7 +96,7 @@ export function registerRoutes(app, { database, realtime, config }) {
   // A picture kept in the database answers first; anything else is an upload
   // on disk. The id carries a hash of the bytes, so it can be cached for good.
   app.get("/media/:file", async (request, reply) => {
-    const response = await api(toRequest(request), { ip: request.ip });
+    const response = await api(toRequest(request), { ip: request.ip, requestId: request.id });
     if (response) return send(reply, response);
     return reply.sendFile(request.params.file);
   });

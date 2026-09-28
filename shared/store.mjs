@@ -993,6 +993,8 @@ export function createStore(driver) {
      * thing anyone wants. `crypto.getRandomValues` is what a Worker has in
      * place of `node:crypto`.
      */
+    /** The database answers: what /api/health asks. */
+    ping: async () => Boolean(await first("SELECT 1 AS ok")),
     hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables LIMIT 1")),
     // 2 before 10: numbers in the order a waiter counts them.
     listTables: async () => (await all("SELECT * FROM restaurant_tables ORDER BY length(table_no), table_no")).map(tableView),
