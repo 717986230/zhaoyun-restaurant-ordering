@@ -777,6 +777,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
 
       // Guests' accounts, the manager's side: look a guest up, change their
       // points with a reason, set a new password, remove the account.
+      // The sales report over the manager's days: GET /api/admin/reports/sales?from=YYYY-MM-DD&to=YYYY-MM-DD
+      if (path.length === 4 && path[2] === "reports" && path[3] === "sales" && method === "GET") {
+        try {
+          return json({ report: await store.salesReport(url.searchParams.get("from"), url.searchParams.get("to")) });
+        } catch (error) {
+          return coded(error);
+        }
+      }
       if (path[2] === "customers") {
         const customers = store.customers;
         try {

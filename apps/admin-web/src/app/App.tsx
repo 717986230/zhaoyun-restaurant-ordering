@@ -15,6 +15,7 @@ import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { GuestsPanel } from "../features/guests/GuestsPanel";
+import { ReportsPanel } from "../features/reports/ReportsPanel";
 import { BackToTop } from "./BackToTop";
 
 const adminApi = new AdminApi();
@@ -55,13 +56,14 @@ const LIVE_SETTLE_MS = 250;
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
   if (role === "staff") return ["board", "tables"];
-  return showOrdering ? ["catalog", "board", "tables", "printers", "guests", "system"] : ["catalog", "guests", "system"];
+  return showOrdering ? ["catalog", "board", "tables", "reports", "printers", "guests", "system"] : ["catalog", "guests", "system"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
   catalog: "tabCatalog",
   board: "tabBoard",
   tables: "tabTables",
+  reports: "tabReports",
   printers: "tabPrinters",
   guests: "tabGuests",
   system: "tabSettings"
@@ -245,6 +247,8 @@ export function App() {
     const timer = window.setInterval(() => void loadBoard(true), live ? BOARD_REFRESH_LIVE_MS : BOARD_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [floorTab, live, loadBoard]);
+
+  const reportFailed = useCallback((error: unknown) => failed(error, "genericFailed"), [failed]);
 
   /** A refusal about a table, in words: a number taken, someone at it, open on a POS. */
   function tableFailed(error: unknown, fallback: CopyKey) {
@@ -632,6 +636,7 @@ export function App() {
         onDeleteTable={async (table: string) => { await editRoom(() => adminApi.deleteTable(table), t("tableDeleted")); }}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} found={state.printFound} dishesPerStation={dishesPerStation} apiBase={adminApi.storage.baseUrl} onDelete={deletePrinter} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
+      {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel
         api={adminApi}

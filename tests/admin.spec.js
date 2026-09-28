@@ -397,7 +397,7 @@ test("the console says Admin, and switches its own language without touching the
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("菜品订单桌位打印顾客设置");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("菜品订单桌位报表打印顾客设置");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
@@ -437,7 +437,7 @@ test("orders, tables and printers stay out of the way until ordering is switched
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("菜品订单桌位打印顾客设置");
+  await expect(nav).toHaveText("菜品订单桌位报表打印顾客设置");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
@@ -1103,4 +1103,45 @@ test("the manager adds, renumbers and removes tables, and a table open on a POS 
   await expect(page.locator(".table-tile[data-table='4']")).toHaveCount(0);
   expect(calls).toEqual([["setUp", 3], ["add", "4"], ["rename", "1", { table: "A1" }], ["delete", "4"]]);
   expect(dialogs[1]).toContain("删除桌 4");
+});
+
+test("the manager reads the takings for a period: totals, hours, dishes and waiters, and downloads the dishes as CSV", async ({ page }) => {
+  const asked = [];
+  const empty = { cash: 0, card: 0, voucher: 0 };
+  await page.route("**/api/admin/reports/sales?*", (route) => {
+    const url = new URL(route.request().url());
+    asked.push([url.searchParams.get("from"), url.searchParams.get("to")]);
+    const days = url.searchParams.get("from") === url.searchParams.get("to") ? [url.searchParams.get("from")] : ["2026-09-01", "2026-09-02"];
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ report: {
+      from: url.searchParams.get("from"), to: url.searchParams.get("to"), timeZone: "Europe/Vienna",
+      totals: { sales: 3, stornos: 1, receipts: 2, averageCents: 2450, firstReceiptNo: 1, lastReceiptNo: 4, grossCents: 4900, vat: [{ percent: 10, grossCents: 4900, netCents: 4455, vatCents: 445 }], payments: { ...empty, cash: 1500, card: 3400 }, vouchersSoldCents: 0, discountCents: 0, cashCents: 1500 },
+      days: days.map((date, index) => ({ date, receipts: 1 + index, grossCents: 2000 + index * 900 })),
+      hours: Array.from({ length: 24 }, (_, hour) => ({ hour, receipts: hour === 12 ? 2 : 0, grossCents: hour === 12 ? 4900 : 0 })),
+      items: [
+        { name: "黑椒牛柳", names: { zh: "黑椒牛柳", de: "Rinderfilet", en: "Beef Fillet" }, quantity: 1, grossCents: 3450 },
+        { name: "Ramen, \"scharf\"", names: null, quantity: 2, grossCents: 1450 }
+      ],
+      staff: [{ name: "Li", receipts: 2, grossCents: 4900 }]
+    } }) });
+  });
+  await page.goto("/admin.html");
+  await page.getByRole("button", { name: "报表", exact: true }).click();
+
+  await expect(page.locator("[data-report=gross]")).toHaveText("€49.00");
+  await expect(page.locator("[data-report=receipts]")).toHaveText("2");
+  expect(asked[0][0]).toBe(asked[0][1]);
+  await expect(page.locator(".report-bar-slot")).toHaveCount(24);
+  await expect(page.locator(".report-items tbody tr").first()).toContainText("黑椒牛柳");
+  await expect(page.locator(".report-card", { hasText: "跑堂" })).toContainText("Li");
+
+  await page.getByRole("button", { name: "本月" }).click();
+  await expect.poll(() => asked.at(-1)?.[0]).toMatch(/^\d{4}-\d{2}-01$/);
+  await expect(page.locator(".report-card", { hasText: "每日营业额" }).locator(".report-bar-slot")).toHaveCount(2);
+
+  const [download] = await Promise.all([page.waitForEvent("download"), page.locator("[data-action=items-csv]").click()]);
+  expect(download.suggestedFilename()).toMatch(/^sales-dishes_.*\.csv$/);
+  const text = Buffer.concat(await (await download.createReadStream()).toArray()).toString("utf8");
+  expect(text.startsWith("﻿"), "Excel reads it as UTF-8").toBe(true);
+  expect(text).toContain('"黑椒牛柳","1","34.50"');
+  expect(text).toContain('"Ramen, ""scharf""","2","14.50"');
 });

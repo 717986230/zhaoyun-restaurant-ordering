@@ -253,6 +253,18 @@ export interface ApiClosingTotals {
 
 export interface ApiClosing { id: string; closingNo: number; totals: ApiClosingTotals; createdAt: string }
 
+/** Sales over the manager's days (shared/reports.mjs): from the receipts, in the restaurant's time zone. */
+export interface ApiSalesReport {
+  from: string;
+  to: string;
+  timeZone: string;
+  totals: ApiClosingTotals & { receipts: number; averageCents: number };
+  days: Array<{ date: string; receipts: number; grossCents: number }>;
+  hours: Array<{ hour: number; receipts: number; grossCents: number }>;
+  items: Array<{ name: string; names: { zh: string; de: string; en: string } | null; quantity: number; grossCents: number }>;
+  staff: Array<{ name: string; receipts: number; grossCents: number }>;
+}
+
 /** One entry of the journal (DEP 131), chained to the one before by its hash. */
 export interface ApiJournalEntry { seq: number; at: string; kind: string; ref: string | null; payload: unknown; prevHash: string; hash: string }
 export interface ApiJournalExport { entries: ApiJournalEntry[]; verification: { ok: boolean; brokenAt: number | null; reason: "chain" | "content" | null } }

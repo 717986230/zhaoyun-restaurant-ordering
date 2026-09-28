@@ -473,6 +473,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_order_item_voids_item ON order_item_voids(order_item_id);
     CREATE INDEX IF NOT EXISTS idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts(created_at);
     CREATE INDEX IF NOT EXISTS idx_customer_sessions_expiry ON customer_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_points_ledger_customer ON points_ledger(customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_points_ledger_ref ON points_ledger(ref, reason);

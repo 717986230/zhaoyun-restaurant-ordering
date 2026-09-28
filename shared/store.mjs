@@ -47,6 +47,7 @@ import {
 } from "./account.mjs";
 import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
+import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
 import {
   CLOSE_TABLE_SESSION_SQL, closePaidTableStatements, guestOrderError, LAST_CUSTOMER_PICKUP_SQL, LAST_TABLE_GUEST_ORDER_SQL, LIVE_TABLE_SESSIONS_SQL,
   moveTableSessionStatements, NEXT_GUEST_PICKUP_SQL, OPEN_PICKUPS_SQL, openTableStatements, pickupDayStart, planGuestOrder, TABLE_SESSION_SQL, tableSessionView
@@ -993,6 +994,12 @@ export function createStore(driver) {
      * thing anyone wants. `crypto.getRandomValues` is what a Worker has in
      * place of `node:crypto`.
      */
+    /** Sales over the manager's days, from the receipts (shared/reports.mjs). */
+    salesReport: async (from, to) => {
+      const range = reportRange(from, to);
+      const rows = await all(REPORT_RECEIPTS_SQL, range.readFrom, range.readTo);
+      return salesReport(rows, range, (await getSettings()).timeZone);
+    },
     /** The database answers: what /api/health asks. */
     ping: async () => Boolean(await first("SELECT 1 AS ok")),
     hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables LIMIT 1")),

@@ -1,7 +1,7 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand
 } from "@zhaoyun/contracts";
@@ -366,6 +366,10 @@ export class AdminApi {
     return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/password`, { method: "POST", body: JSON.stringify({ password }) });
   }
   deleteCustomer(id: string): Promise<void> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  /** Sales from `from` to `to` (YYYY-MM-DD, both included, the restaurant's days). */
+  salesReport(from: string, to: string): Promise<{ report: ApiSalesReport }> {
+    return this.#request(`/api/admin/reports/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  }
   /** A guest's data, for a request that reached the restaurant by e-mail or at the counter. */
   exportCustomer(id: string): Promise<CustomerDataExport> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/export`); }
 

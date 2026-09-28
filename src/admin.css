@@ -3538,3 +3538,182 @@ em.voided {
     text-align: left;
   }
 }
+
+/* ——— Reports: the period, the headline numbers, then the breakdowns. */
+.report-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.report-presets,
+.report-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.report-dates label {
+  display: grid;
+  gap: 4px;
+  color: var(--a-muted);
+  font-size: 12px;
+}
+
+.report-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.report-tile {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 12px 14px;
+}
+
+.report-tile small {
+  color: var(--a-muted);
+  font-size: 12px;
+}
+
+.report-tile b {
+  color: var(--a-ink);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 12px;
+}
+
+.report-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  padding: 14px;
+}
+
+.report-card-wide {
+  grid-column: 1 / -1;
+}
+
+.report-card h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.report-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* One series: thin bars on a baseline, a 2px gap between, rounded at the data end. */
+.report-bars {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.report-bars-plot {
+  display: grid;
+  align-items: end;
+  gap: 2px;
+  height: 140px;
+  border-bottom: 1px solid var(--a-line-2);
+}
+
+.report-bar-slot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+  outline: none;
+}
+
+.report-bar {
+  display: block;
+  width: 100%;
+  max-width: 36px;
+  min-height: 0;
+  border-radius: 4px 4px 0 0;
+  background: var(--a-accent);
+}
+
+.report-bar-slot:hover .report-bar,
+.report-bar-slot:focus-visible .report-bar {
+  background: var(--a-accent-2);
+}
+
+.report-bar-slot:hover::after,
+.report-bar-slot:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: var(--a-head);
+  color: var(--a-head-ink);
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.report-bars-axis {
+  display: grid;
+  gap: 2px;
+  color: var(--a-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-bars-axis span {
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-table th,
+.report-table td {
+  border-bottom: 1px solid var(--a-line-soft);
+  padding: 6px 4px;
+  text-align: right;
+}
+
+.report-table th:first-child,
+.report-table td:first-child,
+.report-items td:nth-child(2),
+.report-items th:nth-child(2) {
+  text-align: left;
+}
+
+.report-table th {
+  color: var(--a-muted);
+  font-weight: 600;
+}
