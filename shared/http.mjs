@@ -18,7 +18,7 @@ import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
-  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody
+  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
@@ -38,6 +38,11 @@ export const SECURITY_HEADERS = {
 const AUTH_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_MAX_FAILURES = 5;
 const AUTH_MAX_TRACKED_SOURCES = 10_000;
+// The count every isolate and process shares (store.authThrottle): wrong
+// passwords and PINs from one address, and against one account from anywhere.
+const GUESS_WINDOW_MS = 15 * 60 * 1000;
+const GUESS_MAX_PER_SOURCE = 10;
+const GUESS_MAX_PER_IDENTITY = 20;
 
 // Business fields worth keeping in the audit log; a request body is never stored whole.
 const AUDIT_FIELDS = ["status", "table", "sku", "price", "vatPercent", "published", "available", "name", "role", "enabled", "rotateToken"];
@@ -109,7 +114,9 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     // their password must not lock the POS out.
     customerFailures: new Map(),
     orderLimiter: createRateLimiter({ windowMs: publicWindowMs, max: orderMax }),
-    serviceLimiter: createRateLimiter({ windowMs: publicWindowMs, max: serviceMax })
+    serviceLimiter: createRateLimiter({ windowMs: publicWindowMs, max: serviceMax }),
+    // Error reports from the apps: enough for a bad page load, not a flood.
+    errorLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 20 })
   };
 }
 
@@ -152,6 +159,28 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       pass() {
         failuresBySource.delete(key);
       }
+    };
+  }
+
+  /**
+   * Guessing a password or a PIN, counted in the database: Cloudflare runs
+   * many isolates of the Worker, each with its own memory, so the count in
+   * `authThrottle` alone could be multiplied by however many there are. By
+   * address, and by the account being guessed (`identity`) from any address.
+   * `{ denied }` once either is spent; `fail()` and `pass()` otherwise.
+   */
+  async function guessBudget(ctx, scope, identity = "") {
+    const keys = [`${scope}:ip:${ctx.ip || "unknown"}`];
+    const entries = [[keys[0], GUESS_MAX_PER_SOURCE]];
+    if (identity) {
+      keys.push(`${scope}:id:${String(identity).trim().toLowerCase().slice(0, 128)}`);
+      entries.push([keys[1], GUESS_MAX_PER_IDENTITY]);
+    }
+    const retryAfter = await store.authThrottle.retryAfter(entries);
+    if (retryAfter > 0) return { denied: json({ error: "Too many authentication attempts", retryAfter }, 429, { "retry-after": String(retryAfter) }) };
+    return {
+      fail: () => store.authThrottle.fail(keys, GUESS_WINDOW_MS),
+      pass: () => store.authThrottle.clear(keys)
     };
   }
 
@@ -350,12 +379,16 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         }
         const { value, invalid } = await body(request, CustomerSignInBody);
         if (invalid) return invalid;
+        const budget = await guessBudget(ctx, "customer", value.email);
+        if (budget.denied) return budget.denied;
         const session = await customers.signIn(value.email, value.password);
         if (!session) {
           throttle.fail();
+          await budget.fail();
           return fail("Wrong email or password", 401);
         }
         throttle.pass();
+        await budget.pass();
         return json(session);
       }
       if (method === "POST" && rest === "sign-out") {
@@ -387,6 +420,27 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         return coded(error);
       }
       return fail("Not found", 404);
+    }
+
+    // An error in one of the apps, for the log (packages/api-client, reportClientErrors).
+    // Written as one JSON line beside the server's own; nothing is stored.
+    if (path.length === 2 && path[0] === "api" && path[1] === "client-errors" && method === "POST") {
+      const limited = throttlePublic(state.errorLimiter, ctx, "Too many error reports from this device");
+      if (limited) return limited;
+      const { value, invalid } = await body(request, ClientErrorBody);
+      if (invalid) return invalid;
+      console.error(JSON.stringify({
+        level: "error",
+        msg: "client error",
+        requestId: ctx.requestId,
+        app: value.app,
+        error: value.message,
+        stack: value.stack ?? "",
+        // The path only: a table card's code travels in the query.
+        path: String(value.path ?? "").split("?")[0],
+        userAgent: String(request.headers.get("user-agent") ?? "").slice(0, 200)
+      }));
+      return new Response(null, { status: 204, headers: SECURITY_HEADERS });
     }
 
     // /api/service-requests and /api/service-requests/:id/status
@@ -482,12 +536,17 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (!device) return fail("This device is not paired with the POS", 401);
         const { value, invalid } = await body(request, PosSignInBody);
         if (invalid) return invalid;
+        // A PIN is four to six digits: the waiter's, from any of the paired devices, counts too.
+        const budget = await guessBudget(ctx, "pin", value.staffId);
+        if (budget.denied) return budget.denied;
         const session = await store.posSignIn(device, value.staffId, value.pin);
         if (!session) {
           throttle.fail();
+          await budget.fail();
           return fail("Wrong PIN", 401);
         }
         throttle.pass();
+        await budget.pass();
         return json(session);
       }
       if (path.length === 3 && path[2] === "sign-out" && method === "POST") {
@@ -601,12 +660,16 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (path[2] === "sign-in") {
           const { value, invalid } = await body(request, AccountSignInBody);
           if (invalid) return invalid;
+          const budget = await guessBudget(ctx, "account", value.login);
+          if (budget.denied) return budget.denied;
           const session = await store.signInAccount(value.login, value.password);
           if (!session) {
             throttle.fail();
+            await budget.fail();
             return fail("Wrong account name or password", 401);
           }
           throttle.pass();
+          await budget.pass();
           return json(session);
         }
         if (path[2] === "recover") {

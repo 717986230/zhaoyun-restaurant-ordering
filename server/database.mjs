@@ -446,6 +446,14 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       checked_at TEXT NOT NULL
     );
 
+    -- Wrong passwords and PINs, counted where every process sees the same
+    -- count. See migrations/0061_auth_throttle.sql.
+    CREATE TABLE IF NOT EXISTS auth_throttle (
+      key TEXT PRIMARY KEY,
+      failures INTEGER NOT NULL,
+      reset_at TEXT NOT NULL
+    );
+
     -- The printers a bridge found on the shop's network, for the console to
     -- offer. See migrations/0059_discovered_printers.sql.
     CREATE TABLE IF NOT EXISTS discovered_printers (

@@ -2,7 +2,7 @@ import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { initialAdminLanguage, translate } from "../app/i18n";
 
-interface Props { children: ReactNode }
+interface Props { children: ReactNode; onError?: (error: Error) => void }
 interface State { error: Error | null }
 
 /** Keeps a crash in one admin panel from blanking the whole console. */
@@ -15,6 +15,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("Admin console crashed", error, info.componentStack);
+    this.props.onError?.(error);
   }
 
   override render(): ReactNode {

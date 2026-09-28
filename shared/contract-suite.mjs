@@ -1688,6 +1688,16 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(Object.values(day.totals.payments).reduce((total, cents) => total + cents, 0), gross, "paid as much as sold");
     }],
 
+    ["an app's error reaches the server's log, within limits, and is nobody's live news", async () => {
+      const report = (body) => call("POST", "/api/client-errors", { body });
+      assert.equal((await report({ app: "menu", message: "TypeError: x is undefined", stack: "at render (app.js:1:2)", path: "/" })).status, 204);
+      assert.equal((await report({ app: "admin", message: "boom" })).status, 204, "stack and path are optional");
+      assert.equal((await report({ app: "kiosk", message: "boom" })).status, 400, "only the three apps");
+      assert.equal((await report({ app: "pos", message: "" })).status, 400);
+      assert.equal((await report({ app: "pos", message: "x".repeat(501) })).status, 400, "a message is kept short");
+      assert.equal((await report({ app: "pos", message: "boom", password: "hunter2" })).status, 400, "nothing but the error");
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

@@ -336,6 +336,11 @@ CREATE TABLE printer_status (
       error TEXT,
       checked_at TEXT NOT NULL
     );
+CREATE TABLE auth_throttle (
+      key TEXT PRIMARY KEY,
+      failures INTEGER NOT NULL,
+      reset_at TEXT NOT NULL
+    );
 CREATE TABLE discovered_printers (
       address TEXT NOT NULL,
       port INTEGER NOT NULL,

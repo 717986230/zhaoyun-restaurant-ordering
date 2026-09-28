@@ -42,6 +42,8 @@ Worker 自己的密钥用 `npx wrangler secret put ADMIN_TOKEN` 设置，至少 
 - **日志**：
   - Cloudflare 控制台 → Workers → ck → Logs（`wrangler.toml` 里已经打开 `observability`）。
   - 用请求编号一搜就能找到那次出错。服务器出错会写一行 JSON，包含 `level`、`requestId`、`method`、`path`、`error`。
+- **前端错误**：顾客手机、平板、管理台上的页面出错时，也会写进 Workers Logs，搜 `"client error"` 就能找到。
+  每条记录包括哪个应用（menu、pos、admin）、错误信息、出错位置和页面路径。
 - **打印**：管理台 → 打印，会显示每台打印机和打印桥是否在线；没打出来的单子也会显示在每台 POS 的桌台页顶部（见 `docs/PRINTING.md`）。
 
 ## 3. 备份
@@ -131,7 +133,12 @@ npx wrangler d1 time-travel restore zhaoyun-ordering --timestamp=2026-09-28T09:0
   - 三处用的是同一份：`shared/web-headers.mjs` 生成的 Worker 静态资源头、Node 服务器、浏览器测试用的预览服务器。
   - 页面有东西被 CSP 挡住时，浏览器测试就会失败。
 - **接口回答**：接口返回的是数据，不是页面，禁止执行和嵌入。上传的图片放在沙盒里。
-- **密码和 PIN**：用 PBKDF2 保存。登录错误次数超限会暂时锁定：每个地址 5 分钟内最多错 5 次。
+- **密码和 PIN**：用 PBKDF2 保存。账户登录、顾客登录、POS 的 PIN 都有错误次数限制：
+  - 同一个地址 15 分钟内最多错 10 次。
+  - 同一个账户、邮箱或跑堂，不管从哪里登录，15 分钟内最多错 20 次。
+  - 这两个计数都存在数据库里，Cloudflare 上所有实例共用，不会因为请求落到不同实例而被绕过。
+  - 每台服务器自己在内存里另有一道：同一地址 5 分钟内最多错 5 次。
+  - 被锁住时稍等即可，回答里的 `retry-after` 会说明要等几秒；登录成功后计数清零。
 - **顾客下单和呼叫**：按 IP 限流。
 - **审计日志**：管理操作都有记录，只记业务字段，不保存请求原文。
 - **依赖更新**：Dependabot 每周一提交依赖更新的 PR，每个 PR 都要过完整的 CI；CI 里 `npm audit` 也会拦下生产依赖里的已知漏洞。
