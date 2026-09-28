@@ -1621,6 +1621,44 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.match(health.headers["content-security-policy"] ?? "", /(frame-ancestors 'none'|default-src 'none')/);
     }],
 
+    ["the sales report adds up to the receipts: per day, per hour, per dish and per waiter, in the restaurant's own days", async () => {
+      const { timeZone } = (await call("GET", "/api/admin/settings", { admin: true })).json;
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const weekAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 6 * 86_400_000).toISOString().slice(0, 10);
+      const report = async (from, to, auth = { admin: true }) => call("GET", `/api/admin/reports/sales?from=${from}&to=${to}`, auth);
+
+      assert.equal((await report(today, today, { role: "staff" })).status, 403, "the manager's");
+      for (const [from, to] of [["yesterday", today], [today, weekAgo], ["2025-01-01", "2026-12-31"]]) {
+        const refused = await report(from, to);
+        assert.deepEqual([refused.status, refused.json.code], [400, "BAD_RANGE"], `${from}..${to}`);
+      }
+
+      const week = (await report(weekAgo, today)).json.report;
+      assert.equal(week.timeZone, timeZone);
+      assert.equal(week.days.length, 7, "every day, sales or not");
+      assert.equal(week.hours.length, 24);
+      // Everything the suite rang up today, straight from the receipts.
+      const receipts = (await call("GET", "/api/admin/receipts?limit=500", { role: "staff" })).json.receipts;
+      const localDay = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+      const todays = receipts.filter((receipt) => localDay(receipt.createdAt) === today);
+      assert.ok(todays.length > 0, "the suite has rung up sales by now");
+      const gross = todays.reduce((sum, receipt) => sum + receipt.totalCents, 0);
+      const day = (await report(today, today)).json.report;
+      assert.equal(day.totals.grossCents, gross, "to the cent");
+      assert.equal(day.totals.sales, todays.filter((receipt) => receipt.type === "sale").length);
+      assert.equal(day.totals.stornos, todays.filter((receipt) => receipt.type === "storno").length);
+      assert.equal(day.totals.receipts, day.totals.sales - day.totals.stornos);
+      assert.equal(week.days.at(-1).grossCents, gross);
+      const sum = (list) => list.reduce((total, entry) => total + entry.grossCents, 0);
+      assert.equal(sum(day.days), gross);
+      assert.equal(sum(day.hours), gross);
+      assert.equal(sum(day.staff), gross);
+      const itemGross = todays.flatMap((receipt) => receipt.lines).filter((line) => line.kind === "item").reduce((total, line) => total + line.totalCents, 0);
+      assert.equal(sum(day.items), itemGross, "the dishes add up to what they were sold for");
+      assert.ok(day.items.every((item, index) => index === 0 || day.items[index - 1].grossCents >= item.grossCents), "best-selling first");
+      assert.equal(Object.values(day.totals.payments).reduce((total, cents) => total + cents, 0), gross, "paid as much as sold");
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

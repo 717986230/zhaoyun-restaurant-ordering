@@ -352,6 +352,7 @@ CREATE INDEX idx_account_sessions_expiry ON account_sessions(expires_at);
 CREATE INDEX idx_order_item_voids_item ON order_item_voids(order_item_id);
 CREATE INDEX idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
+CREATE INDEX idx_receipts_created ON receipts(created_at);
 CREATE INDEX idx_customer_sessions_expiry ON customer_sessions(expires_at);
 CREATE INDEX idx_points_ledger_customer ON points_ledger(customer_id, created_at);
 CREATE INDEX idx_points_ledger_ref ON points_ledger(ref, reason);
