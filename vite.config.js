@@ -26,7 +26,9 @@ export default defineConfig({
       input: {
         app: resolve(import.meta.dirname, "index.html"),
         admin: resolve(import.meta.dirname, "admin.html"),
-        pos: resolve(import.meta.dirname, "pos.html")
+        pos: resolve(import.meta.dirname, "pos.html"),
+        // The guests' table booking page, linked from the menu, a website or Google Maps.
+        book: resolve(import.meta.dirname, "book.html")
       }
     }
   },

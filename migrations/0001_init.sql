@@ -341,6 +341,25 @@ CREATE TABLE auth_throttle (
       failures INTEGER NOT NULL,
       reset_at TEXT NOT NULL
     );
+CREATE TABLE reservations (
+      id TEXT PRIMARY KEY,
+      reference TEXT NOT NULL UNIQUE,
+      token_hash TEXT,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      party INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      language TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL,
+      table_no TEXT,
+      source TEXT NOT NULL,
+      customer_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 CREATE TABLE discovered_printers (
       address TEXT NOT NULL,
       port INTEGER NOT NULL,
@@ -365,3 +384,5 @@ CREATE INDEX idx_guest_orders_table ON guest_orders(table_no, created_at);
 CREATE INDEX idx_guest_orders_customer ON guest_orders(customer_id, created_at);
 CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);
 CREATE INDEX idx_audit_at ON audit_log(at DESC);
+CREATE INDEX idx_reservations_date ON reservations(date, time);
+CREATE INDEX idx_reservations_customer ON reservations(customer_id, date);

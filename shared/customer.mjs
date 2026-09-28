@@ -121,6 +121,9 @@ export const UPDATE_CUSTOMER_SQL = "UPDATE customers SET name = ?, password_hash
 /** A guest's account removed on request (GDPR): their orders stay the restaurant's, without them. */
 export const DELETE_CUSTOMER_STATEMENTS = [
   "UPDATE guest_orders SET customer_id = NULL WHERE customer_id = ?",
+  // Their bookings: the ones still to come cancelled, all of them without their name or number.
+  `UPDATE reservations SET customer_id = NULL, name = '', phone = '', email = '', notes = '', token_hash = NULL,
+     status = CASE WHEN status IN ('pending', 'confirmed') THEN 'cancelled' ELSE status END WHERE customer_id = ?`,
   "DELETE FROM points_ledger WHERE customer_id = ?",
   "DELETE FROM customer_favorites WHERE customer_id = ?",
   "DELETE FROM customer_sessions WHERE customer_id = ?",

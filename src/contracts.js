@@ -191,6 +191,24 @@ export const SettingsBody = Type.Object({
     maxRewardsPerOrder: Type.Optional(Type.Number()),
     rewards: Type.Optional(Type.Array(Type.Object({ productId: ProductId, points: Type.Number() }), { maxItems: 30 }))
   }, { maxProperties: 8 })),
+  // Online table bookings; the rules are shared/reservations.mjs's to check.
+  reservations: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    hours: Type.Optional(Type.Array(Schedule, { maxItems: 14 })),
+    intervalMinutes: Type.Optional(Type.Number()),
+    durationMinutes: Type.Optional(Type.Number()),
+    capacity: Type.Optional(Type.Number()),
+    maxParty: Type.Optional(Type.Number()),
+    leadMinutes: Type.Optional(Type.Number()),
+    daysAhead: Type.Optional(Type.Number()),
+    autoConfirm: Type.Optional(Type.Boolean()),
+    closedDates: Type.Optional(Type.Array(Type.String({ maxLength: 10 }), { maxItems: 200 })),
+    note: Type.Optional(Type.String({ maxLength: 300 })),
+    tables: Type.Optional(Type.Array(Type.Object({ table: Type.String({ minLength: 1, maxLength: 8 }), seats: Type.Number() }), { maxItems: 200 })),
+    maxActivePerGuest: Type.Optional(Type.Number()),
+    maxPerDayPerGuest: Type.Optional(Type.Number()),
+    noShowLimit: Type.Optional(Type.Number())
+  }, { maxProperties: 20 })),
   // The guest menu's first three tabs, in order; the rest keep their usual order.
   navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 3 })),
   // What the tabs are called, per language: "ALLE", "__sets__" or a category.
@@ -339,6 +357,44 @@ export const ClientErrorBody = Type.Object({
   stack: Type.Optional(Type.String({ maxLength: 4000 })),
   path: Type.Optional(Type.String({ maxLength: 200 }))
 }, { additionalProperties: false });
+
+// A table booking (shared/reservations.mjs checks the rest: the form of the
+// phone and email, the time against the owner's hours).
+const ReservationFields = {
+  date: Type.String({ minLength: 10, maxLength: 10 }),
+  time: Type.String({ minLength: 5, maxLength: 5 }),
+  party: Type.Integer({ minimum: 1, maximum: 500 }),
+  name: Type.String({ minLength: 1, maxLength: 80 }),
+  phone: Type.Optional(Type.String({ maxLength: 30 })),
+  email: Type.Optional(Type.String({ maxLength: 254 })),
+  notes: Type.Optional(Type.String({ maxLength: 500 }))
+};
+/** From the booking page. */
+export const ReservationBody = Type.Object({
+  ...ReservationFields,
+  phone: Type.String({ minLength: 1, maxLength: 30 }),
+  language: Type.Optional(Type.Union([Type.Literal("zh"), Type.Literal("en"), Type.Literal("de")])),
+  // The guest's own table, where the restaurant lets guests pick one.
+  table: Type.Optional(Type.String({ maxLength: 8 }))
+}, { additionalProperties: false });
+/** Taken by the staff, over the phone or at the door. */
+export const StaffReservationBody = Type.Object({
+  ...ReservationFields,
+  table: Type.Optional(Type.String({ maxLength: 8 }))
+}, { additionalProperties: false });
+export const RESERVATION_STATUSES = ["pending", "confirmed", "seated", "completed", "cancelled", "declined", "no_show"];
+/** A booking changed by the staff: only what is sent changes. */
+export const ReservationUpdateBody = Type.Object({
+  date: Type.Optional(ReservationFields.date),
+  time: Type.Optional(ReservationFields.time),
+  party: Type.Optional(ReservationFields.party),
+  name: Type.Optional(ReservationFields.name),
+  phone: Type.Optional(Type.String({ maxLength: 30 })),
+  email: Type.Optional(Type.String({ maxLength: 254 })),
+  notes: Type.Optional(Type.String({ maxLength: 500 })),
+  status: Type.Optional(literals(RESERVATION_STATUSES)),
+  table: Type.Optional(Type.String({ maxLength: 8 }))
+}, { additionalProperties: false, minProperties: 1 });
 
 /** A table given another number or label; its card keeps the same code. */
 export const TableRenameBody = Type.Object({

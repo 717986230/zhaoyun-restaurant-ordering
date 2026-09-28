@@ -48,6 +48,8 @@ interface Props {
   account: CustomerAccount | null;
   /** The cart as it stands, for the bar at the bottom. */
   cart: CartSummary;
+  /** Guests can book a table online (/book). */
+  reservations?: boolean;
 }
 
 /** The promotions page's place among the categories; no real category is called this. */
@@ -212,6 +214,10 @@ function PersonIcon() {
 
 function ReceiptIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z" /><path d="M9 8.5h6M9 12h6M9 15.5h3.5" /></svg>;
+}
+
+function CalendarIcon() {
+  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></svg>;
 }
 
 function BellIcon() {
@@ -470,7 +476,7 @@ function FeaturedPage({ title, eyebrow, template, products, byId, language, onOp
   </div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {}, ordering, account, cart }: Props) {
+export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {}, ordering, account, cart, reservations = false }: Props) {
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
@@ -643,6 +649,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           aria-label={t(state.language, scheme === "dark" ? "lightMode" : "darkMode")}
           onClick={onToggleScheme}
         >{scheme === "dark" ? <SunIcon /> : <MoonIcon />}</button>
+        {/* Booking a table, for a guest reading the menu away from one. */}
+        {reservations && !table && <a id="bookBtn" className="icon-btn guest-toggle" href={`book.html?lang=${state.language}`} aria-label={g(state.language, "bookTable")} title={g(state.language, "bookTable")}><CalendarIcon /></a>}
         {/* The guest's account; without accounts, the orders this phone placed. */}
         {account
           ? <button id="accountBtn" className={`icon-btn guest-toggle ${account.signedIn ? "on" : ""}`} aria-label={g(state.language, "account")} onClick={() => dispatch({ type: "sheet", sheet: "account" })}><PersonIcon /></button>

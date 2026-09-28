@@ -401,6 +401,83 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   font-weight: 650;
 }
 
+/* Today's bookings: under the calls, folded away when the waiter wants the room. */
+.pos-bookings {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  background: var(--p-card);
+  color: var(--p-ink);
+}
+
+.pos-bookings summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.pos-bookings summary::-webkit-details-marker {
+  display: none;
+}
+
+.pos-floor .pos-bookings h2 {
+  display: inline;
+  margin: 0;
+  font-size: 16px;
+}
+
+.pos-bookings ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pos-bookings li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pos-bookings li span {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.pos-bookings li[data-status="seated"] {
+  color: var(--p-muted);
+}
+
+.pos-bookings em {
+  color: var(--p-warn);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.pos-bookings small {
+  color: var(--p-muted);
+}
+
+.pos-bookings button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--p-accent);
+  color: var(--p-accent-ink);
+  font-weight: 650;
+}
+
+.pos-bookings button.pos-quiet {
+  border: 1px solid var(--p-line);
+  background: var(--p-card);
+  color: var(--p-ink);
+}
+
 .pos-call-badge {
   display: inline-block;
   margin-top: 4px;

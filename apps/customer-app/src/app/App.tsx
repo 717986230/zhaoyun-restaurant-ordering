@@ -114,6 +114,7 @@ export function App() {
       ordering={ordering}
       account={accountsOn ? account : null}
       cart={cart}
+      reservations={catalog.menu?.reservations ?? false}
     />
     <AnimatePresence>
       {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} />}

@@ -30,7 +30,8 @@ test("Worker on D1 satisfies the API contract", { skip: baseUrl ? false : "set W
         ...(options.admin || options.role ? { "x-admin-token": tokens[options.role || "manager"] } : {}),
         ...(options.tableToken ? { "x-table-token": options.tableToken } : {}),
         ...(options.deviceToken ? { "x-device-token": options.deviceToken } : {}),
-        ...(options.customerToken ? { "x-customer-token": options.customerToken } : {})
+        ...(options.customerToken ? { "x-customer-token": options.customerToken } : {}),
+        ...(options.headers ?? {})
       },
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
       ...(options.raw ? { body: options.raw.body } : {})

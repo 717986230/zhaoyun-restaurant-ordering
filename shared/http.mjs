@@ -18,7 +18,8 @@ import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
-  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody
+  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
+  ReservationBody, StaffReservationBody, ReservationUpdateBody
 } from "../src/contracts.js";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
@@ -46,6 +47,8 @@ const GUESS_MAX_PER_IDENTITY = 20;
 
 // Business fields worth keeping in the audit log; a request body is never stored whole.
 const AUDIT_FIELDS = ["status", "table", "sku", "price", "vatPercent", "published", "available", "name", "role", "enabled", "rotateToken"];
+// A booking's: never the guest's name or number, which the audit log would keep past the booking's own retention.
+const RESERVATION_AUDIT_FIELDS = ["status", "table", "date", "time", "party"];
 
 /** Constant-time compare, so a wrong token leaks nothing through timing. */
 function tokenMatches(provided, expected) {
@@ -76,6 +79,18 @@ function coded(error) {
 const TABLE_CONFLICTS = new Set(["TABLE_CLAIMED", "TABLE_IN_USE", "TABLE_EXISTS"]);
 function tableRefusal(error) {
   return TABLE_CONFLICTS.has(error.code) ? coded({ message: error.message, code: error.code, status: 409 }) : fail(error.message);
+}
+
+/** A booking refused by its rules: the code says why (full, too soon, too large); anything else is a bug. */
+function reservationRefusal(error) {
+  if (!error.code) throw error;
+  return json({
+    error: error.message,
+    code: error.code,
+    ...(error.reason ? { reason: error.reason } : {}),
+    ...(error.maxParty ? { maxParty: error.maxParty } : {}),
+    ...(error.limit ? { limit: error.limit } : {})
+  }, error.status ?? 400);
 }
 
 /**
@@ -116,7 +131,11 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     orderLimiter: createRateLimiter({ windowMs: publicWindowMs, max: orderMax }),
     serviceLimiter: createRateLimiter({ windowMs: publicWindowMs, max: serviceMax }),
     // Error reports from the apps: enough for a bad page load, not a flood.
-    errorLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 20 })
+    errorLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 20 }),
+    // Table bookings from one address (a restaurant's or a hotel's Wi-Fi is many
+    // guests): a burst, not a script filling the evening. The guest's account
+    // and its limits (shared/reservations.mjs, guestLimit) do the rest.
+    reservationLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 60 })
   };
 }
 
@@ -416,6 +435,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
+        if (rest === "reservations" && method === "GET") return json({ reservations: await store.reservations.forCustomer(customer.id) }, 200, { "cache-control": "no-store" });
       } catch (error) {
         return coded(error);
       }
@@ -441,6 +461,44 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         userAgent: String(request.headers.get("user-agent") ?? "").slice(0, 200)
       }));
       return new Response(null, { status: 204, headers: SECURITY_HEADERS });
+    }
+
+    /**
+     * Booking a table (shared/reservations.mjs). Open to anyone while the
+     * owner has it switched on; a guest's own booking is theirs through the
+     * link they were given: its id, and the token in `x-reservation-token`.
+     */
+    if (path[0] === "api" && path[1] === "reservations") {
+      const reservations = store.reservations;
+      try {
+        if (path.length === 3 && path[2] === "availability" && method === "GET") {
+          const date = url.searchParams.get("date");
+          if (!date) return json({ booking: await reservations.booking() });
+          return json(await reservations.availability(date, url.searchParams.get("party") ?? undefined, url.searchParams.get("time")));
+        }
+        if (path.length === 2 && method === "POST") {
+          const limited = throttlePublic(state.reservationLimiter, ctx, "Too many bookings from this device");
+          if (limited) return limited;
+          const { value, invalid } = await body(request, ReservationBody);
+          if (invalid) return invalid;
+          // From the guest's own account: signed in, or no booking.
+          const customer = await store.customers.session(request.headers.get("x-customer-token"));
+          return json(await reservations.create(value, { customer }), 201);
+        }
+        const token = request.headers.get("x-reservation-token");
+        if (path.length === 3 && method === "GET") {
+          const reservation = await reservations.forGuest(path[2], token);
+          return reservation ? json({ reservation }, 200, { "cache-control": "no-store" }) : fail("Booking not found", 404);
+        }
+        if (path.length === 4 && path[3] === "cancel" && method === "POST") {
+          const customer = await store.customers.session(request.headers.get("x-customer-token"));
+          const reservation = await reservations.cancelForGuest(path[2], token, customer?.id ?? null);
+          return reservation ? json({ reservation }) : fail("Booking not found", 404);
+        }
+      } catch (error) {
+        return reservationRefusal(error);
+      }
+      return fail("Not found", 404);
     }
 
     // /api/service-requests and /api/service-requests/:id/status
@@ -566,7 +624,15 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
-          return json({ tables: await store.tablesOverview(), claims: await store.liveClaims(), deviceId: pos.deviceId, requests: await store.openServiceRequests(), takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent });
+          return json({
+            tables: await store.tablesOverview(),
+            claims: await store.liveClaims(),
+            deviceId: pos.deviceId,
+            requests: await store.openServiceRequests(),
+            // Today's bookings still to come or at the table.
+            reservations: await store.reservations.today(),
+            takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent
+          });
         }
         if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
           if (method === "POST") {
@@ -813,6 +879,36 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const { value: payload } = await body(request);
           return json({ ok: await store.failPrintJob(path[3], payload.workerId, payload.error) });
         }
+      }
+
+      // Table bookings are the floor's: the waiters take them by phone, seat
+      // them and mark who never came. Erasing one for good is the manager's.
+      if (path[2] === "reservations" && path.length <= 4) {
+        const { denied } = await gate(method === "DELETE" ? "manager" : "staff");
+        if (denied) return denied;
+        const reservations = store.reservations;
+        try {
+          if (path.length === 3 && method === "GET") {
+            return json(await reservations.list(url.searchParams.get("from") ?? "", url.searchParams.get("to") ?? "", { q: url.searchParams.get("q") ?? "", status: url.searchParams.get("status") ?? "" }));
+          }
+          if (path.length === 3 && method === "POST") {
+            const { value, invalid } = await body(request, StaffReservationBody);
+            if (invalid) return invalid;
+            return json(await reservations.create(value, { staff: true }), 201);
+          }
+          if (path.length === 4 && method === "PATCH") {
+            const { value, invalid } = await body(request, ReservationUpdateBody);
+            if (invalid) return invalid;
+            const reservation = await reservations.update(path[3], value);
+            return reservation ? json({ reservation }) : fail("Booking not found", 404);
+          }
+          if (path.length === 4 && method === "DELETE") {
+            return (await reservations.remove(path[3])) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("Booking not found", 404);
+          }
+        } catch (error) {
+          return reservationRefusal(error);
+        }
+        return fail("Not found", 404);
       }
 
       const { denied, role, pos } = await gate("manager");
@@ -1140,7 +1236,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     }
     if (ctx.role && !ctx.audited) {
       const detail = {};
-      for (const field of AUDIT_FIELDS) if (sent && typeof sent === "object" && sent[field] !== undefined) detail[field] = sent[field];
+      const fields = url.pathname.startsWith("/api/admin/reservations") ? RESERVATION_AUDIT_FIELDS : AUDIT_FIELDS;
+      for (const field of fields) if (sent && typeof sent === "object" && sent[field] !== undefined) detail[field] = sent[field];
       try {
         await store.recordAudit({ role: ctx.role, ip, method: request.method, route: url.pathname, status: response.status, detail });
       } catch (error) {
