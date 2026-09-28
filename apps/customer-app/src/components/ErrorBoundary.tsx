@@ -2,7 +2,7 @@ import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { cachedMenuSettings } from "../app/useCatalog";
 
-interface Props { children: ReactNode }
+interface Props { children: ReactNode; onError?: (error: Error) => void }
 interface State { error: Error | null }
 
 const lastErrorKey = "zy_last_client_error";
@@ -22,6 +22,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("Customer app crashed", error, info.componentStack);
+    this.props.onError?.(error);
     try {
       localStorage.setItem(lastErrorKey, JSON.stringify({
         message: error.message,

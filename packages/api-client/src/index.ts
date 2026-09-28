@@ -574,3 +574,35 @@ export class RestaurantApi {
     return parseJsonResponse<T>(response);
   }
 }
+
+/**
+ * Errors on a guest's phone, a waiter's tablet or the console, sent to the
+ * server's log (POST /api/client-errors) so they are seen at all: a crash on
+ * a phone is otherwise known only to whoever was holding it. A handful per
+ * page load at most, the page's path without its query (a table card's code
+ * lives there), and never anything typed in.
+ */
+export function reportClientErrors(app: "menu" | "admin" | "pos", apiBase: () => string): (error: unknown) => void {
+  const MAX_REPORTS = 5;
+  let sent = 0;
+  const seen = new Set<string>();
+  const report = (error: unknown) => {
+    if (sent >= MAX_REPORTS) return;
+    const message = String((error as { message?: unknown })?.message ?? error ?? "").slice(0, 500);
+    if (!message || seen.has(message)) return;
+    seen.add(message);
+    sent += 1;
+    const body = JSON.stringify({
+      app,
+      message,
+      stack: String((error as { stack?: unknown })?.stack ?? "").slice(0, 4000),
+      path: location.pathname.slice(0, 200)
+    });
+    try {
+      void fetch(`${apiBase()}/api/client-errors`, { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => undefined);
+    } catch { /* The report is best effort; the page carries on. */ }
+  };
+  window.addEventListener("error", (event) => report(event.error ?? event.message));
+  window.addEventListener("unhandledrejection", (event) => report(event.reason));
+  return report;
+}

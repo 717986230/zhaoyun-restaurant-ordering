@@ -24,6 +24,8 @@ export const LIVE_ROLES = ["staff", "guest"];
 
 /** Writes that change nothing anyone else is looking at. */
 const SILENT = [
+  // An error report from an app: the log's news, not the floor's.
+  /^\/api\/client-errors$/,
   /^\/api\/account(\/|$)/,
   // A guest's account, favourites and points are theirs alone; the console's list of guests too.
   /^\/api\/customer(\/|$)/,

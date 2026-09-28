@@ -332,6 +332,14 @@ export const TableLockBody = Type.Object({
 export const TableOrderingBody = Type.Object({ open: Type.Boolean() }, { additionalProperties: false });
 
 // Tables 1 to count set up at once, each with a code of its own; those already there keep theirs.
+/** An error on a guest's phone, a tablet or the console, for the server's log. */
+export const ClientErrorBody = Type.Object({
+  app: Type.Union([Type.Literal("menu"), Type.Literal("admin"), Type.Literal("pos")]),
+  message: Type.String({ minLength: 1, maxLength: 500 }),
+  stack: Type.Optional(Type.String({ maxLength: 4000 })),
+  path: Type.Optional(Type.String({ maxLength: 200 }))
+}, { additionalProperties: false });
+
 /** A table given another number or label; its card keeps the same code. */
 export const TableRenameBody = Type.Object({
   table: Type.Optional(TableNo),

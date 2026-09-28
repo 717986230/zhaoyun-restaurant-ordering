@@ -1009,6 +1009,38 @@ export function createStore(driver) {
       const rows = await all(REPORT_RECEIPTS_SQL, range.readFrom, range.readTo);
       return salesReport(rows, range, (await getSettings()).timeZone);
     },
+    /**
+     * Wrong passwords and PINs, counted in the database so that every Worker
+     * isolate and every Node process adds to the same count (shared/http.mjs).
+     * `entries` are [key, limit]; `retryAfter` is the seconds until the most
+     * spent of them opens again, or 0.
+     */
+    authThrottle: {
+      async retryAfter(entries) {
+        const at = now();
+        let wait = 0;
+        for (const [key, limit] of entries) {
+          const row = await first("SELECT failures, reset_at FROM auth_throttle WHERE key = ? AND reset_at > ?", key, at);
+          if (row && row.failures >= limit) wait = Math.max(wait, Math.ceil((Date.parse(row.reset_at) - Date.now()) / 1000));
+        }
+        return wait;
+      },
+      async fail(keys, windowMs) {
+        const at = now();
+        const resetAt = new Date(Date.now() + windowMs).toISOString();
+        await batch([
+          sql("DELETE FROM auth_throttle WHERE reset_at <= ?", at),
+          ...keys.map((key) => sql(
+            `INSERT INTO auth_throttle (key, failures, reset_at) VALUES (?, 1, ?)
+             ON CONFLICT(key) DO UPDATE SET failures = auth_throttle.failures + 1`,
+            key, resetAt
+          ))
+        ]);
+      },
+      async clear(keys) {
+        await batch(keys.map((key) => sql("DELETE FROM auth_throttle WHERE key = ?", key)));
+      }
+    },
     /** The database answers: what /api/health asks. */
     ping: async () => Boolean(await first("SELECT 1 AS ok")),
     hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables LIMIT 1")),

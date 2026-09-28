@@ -26,6 +26,43 @@ async function buildServer(options) {
   return app;
 }
 
+/**
+ * Cloudflare runs many isolates of the Worker, each with its own memory: a
+ * count of wrong passwords kept in memory alone is one per isolate. Three
+ * servers over one database stand in for three isolates here — and together
+ * they are held to the one count kept in the database.
+ */
+test("wrong passwords are counted across every server, by address and by account", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-guess-"));
+  const options = { databasePath: path.join(directory, "restaurant.sqlite"), uploadDir: path.join(directory, "media"), adminToken: "guess-test-admin-token-guess-test-admin-token", logger: false };
+  const servers = [await build(options), await build(options), await build(options)];
+  context.after(async () => {
+    for (const server of servers) await server.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const signIn = (server, password, remoteAddress = "203.0.113.7", login = "owner") => server.inject({ method: "POST", url: "/api/account/sign-in", remoteAddress, payload: { login, password } });
+  const registered = await servers[0].inject({ method: "POST", url: "/api/account/register", payload: { login: "owner", name: "Owner", password: "the-right-one" } });
+  assert.equal(registered.statusCode, 201, registered.body);
+
+  // Five wrong on the first server, five on the second: each server's own
+  // memory has seen only five, but the third has never seen any.
+  for (const server of servers.slice(0, 2)) {
+    for (let attempt = 0; attempt < 5; attempt += 1) assert.equal((await signIn(server, "wrong")).statusCode, 401);
+  }
+  const held = await signIn(servers[2], "the-right-one");
+  assert.equal(held.statusCode, 429, "ten from one address, on whichever server");
+  assert.ok(Number(held.headers["retry-after"]) > 0);
+  // Another address may still try, and the right password clears its count.
+  assert.equal((await signIn(servers[2], "the-right-one", "198.51.100.1")).statusCode, 200);
+
+  // One account guessed at from many addresses: twenty, then it waits too.
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    assert.equal((await signIn(servers[attempt % 3], "wrong", `192.0.2.${attempt + 1}`, "manager")).statusCode, 401);
+  }
+  assert.equal((await signIn(servers[0], "wrong", "192.0.2.200", "manager")).statusCode, 429, "the account, from a fresh address");
+  assert.equal((await signIn(servers[0], "the-right-one", "192.0.2.201")).statusCode, 200, "another account is not held");
+});
+
 test("catalog, orders, service requests and print routing work together", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-api-"));
   const app = await buildServer({
