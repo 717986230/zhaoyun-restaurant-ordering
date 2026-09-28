@@ -145,6 +145,13 @@ export const COLOR_SCHEMES = ["dark", "light"];
 // Any subset may be saved; an empty body is a mistake, not a save. The text
 // limits are the ones shared/settings.mjs enforces after trimming, stated here too
 // so an oversized value is a 400 at the edge.
+const DeliveryPlatformSettings = Type.Object({
+  enabled: Type.Optional(Type.Boolean()),
+  autoAccept: Type.Optional(Type.Boolean()),
+  prepMinutes: Type.Optional(Type.Number()),
+  storeId: Type.Optional(Type.String({ maxLength: 64 }))
+}, { additionalProperties: false });
+
 export const SettingsBody = Type.Object({
   menuTheme: Type.Optional(literals(MENU_THEMES)),
   menuLanguages: Type.Optional(Type.Array(literals(MENU_LANGUAGES), { minItems: 1, maxItems: MENU_LANGUAGES.length, uniqueItems: true })),
@@ -209,6 +216,11 @@ export const SettingsBody = Type.Object({
     maxPerDayPerGuest: Type.Optional(Type.Number()),
     noShowLimit: Type.Optional(Type.Number())
   }, { maxProperties: 20 })),
+  // The delivery platforms, one switch board each (shared/delivery.mjs checks the rest).
+  delivery: Type.Optional(Type.Object({
+    lieferando: Type.Optional(DeliveryPlatformSettings),
+    foodora: Type.Optional(DeliveryPlatformSettings)
+  }, { additionalProperties: false })),
   // The guest menu's first three tabs, in order; the rest keep their usual order.
   navPinned: Type.Optional(Type.Array(Type.String({ maxLength: 64 }), { maxItems: 3 })),
   // What the tabs are called, per language: "ALLE", "__sets__" or a category.
@@ -395,6 +407,12 @@ export const ReservationUpdateBody = Type.Object({
   status: Type.Optional(literals(RESERVATION_STATUSES)),
   table: Type.Optional(Type.String({ maxLength: 8 }))
 }, { additionalProperties: false, minProperties: 1 });
+
+/** The floor's answer to a delivery platform's order (shared/delivery.mjs). */
+export const DeliveryActionBody = Type.Object({
+  prepMinutes: Type.Optional(Type.Integer({ minimum: 5, maximum: 180 })),
+  reason: Type.Optional(Type.Union(["TOO_BUSY", "CLOSED", "ITEM_UNAVAILABLE", "OUTSIDE_DELIVERY_AREA", "OTHER"].map((reason) => Type.Literal(reason))))
+}, { additionalProperties: false });
 
 /** A table given another number or label; its card keeps the same code. */
 export const TableRenameBody = Type.Object({

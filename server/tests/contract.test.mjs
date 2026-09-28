@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { buildServer } from "../index.mjs";
-import { contractChecks } from "../../shared/contract-suite.mjs";
+import { contractChecks, DELIVERY_TEST_SECRETS } from "../../shared/contract-suite.mjs";
 
 const TOKENS = {
   manager: "contract-admin-token-contract-admin-token",
@@ -27,6 +27,7 @@ test("Node server satisfies the API contract", async (context) => {
     adminToken: TOKENS.manager,
     staffToken: TOKENS.staff,
     kitchenToken: TOKENS.kitchen,
+    delivery: { lieferando: { webhookSecret: DELIVERY_TEST_SECRETS.lieferando }, foodora: { webhookSecret: DELIVERY_TEST_SECRETS.foodora } },
     logger: false
   });
   context.after(async () => {

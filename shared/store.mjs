@@ -47,6 +47,7 @@ import {
 } from "./account.mjs";
 import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
+import { createDeliveryStore } from "./delivery-store.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
 import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
 import {
@@ -856,6 +857,8 @@ export function createStore(driver) {
     return getSettings();
   }
 
+  const deliveryStore = createDeliveryStore(driver, { settings: getSettings });
+
   return {
     listProducts,
     getProduct,
@@ -880,6 +883,8 @@ export function createStore(driver) {
     customers: createCustomerStore(driver, { ordersFor: (rows) => Promise.all(rows.map(viewOrder)) }),
     // Table reservations (shared/reservation-store.mjs), both backends alike.
     reservations: createReservationStore(driver, { settings: getSettings }),
+    // Orders from the delivery platforms (shared/delivery-store.mjs), both backends alike.
+    delivery: deliveryStore,
     /** For what the backends add of their own (seeding, the Node print agent). */
     driver,
     updateOrder,
@@ -1010,7 +1015,10 @@ export function createStore(driver) {
     salesReport: async (from, to) => {
       const range = reportRange(from, to);
       const rows = await all(REPORT_RECEIPTS_SQL, range.readFrom, range.readTo);
-      return salesReport(rows, range, (await getSettings()).timeZone);
+      const report = salesReport(rows, range, (await getSettings()).timeZone);
+      // The delivery platforms' orders beside the register's: their money is the platform's to collect, not in the receipts.
+      report.delivery = await deliveryStore.totalsFor(range.readFrom, range.readTo, range.from, range.to);
+      return report;
     },
     /**
      * Wrong passwords and PINs, counted in the database so that every Worker

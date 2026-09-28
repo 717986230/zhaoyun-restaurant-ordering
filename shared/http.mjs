@@ -19,8 +19,9 @@ import {
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
-  ReservationBody, StaffReservationBody, ReservationUpdateBody
+  ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody
 } from "../src/contracts.js";
+import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
 import { liveEvent } from "./live.mjs";
@@ -93,6 +94,26 @@ function reservationRefusal(error) {
   }, error.status ?? 400);
 }
 
+/** A delivery order refused by its rules (not switched on, not an order, a step out of turn); anything else is a bug. */
+function deliveryRefusal(error) {
+  if (!error.code) throw error;
+  return json({ error: error.message, code: error.code }, error.status ?? 400);
+}
+
+/**
+ * What a platform's "something happened to an order" call is about: the
+ * order's id and whether it was cancelled. The platforms name these
+ * differently, and send more than cancellations; the rest is not ours.
+ */
+function platformEvent(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const order = payload.order ?? payload.Order ?? payload;
+  const id = order.OrderId ?? order.orderId ?? order.Id ?? order.id ?? order.token ?? order.orderToken ?? payload.orderToken ?? payload.OrderId ?? payload.orderId;
+  const what = [payload.status, payload.Status, payload.event, payload.Event, payload.type, payload.Type, order.status, order.Status].filter((value) => typeof value === "string").join(" ");
+  if (!id) return null;
+  return { externalId: String(id), cancelled: /cancel/i.test(what), reason: String(payload.reason ?? payload.Reason ?? payload.message ?? payload.Message ?? "").slice(0, 120) };
+}
+
 /**
  * A body checked against its schema. An invalid one is a 400 that says which
  * field and why, and starts "Invalid request" whichever backend answers.
@@ -153,8 +174,53 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
  * `handle(request, { ip })` answers with a Response, or null for anything that
  * is not the API's — the web app, a picture the database does not have.
  */
-export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients, version = null }) {
+export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients, version = null, delivery = {}, fetch: send = (...args) => fetch(...args) }) {
   const options = { realtimeClients, version };
+  // foodora's bearer token, kept between calls until it runs out (per isolate on a Worker).
+  const platformTokens = new Map();
+
+  /**
+   * Tells the platform what the floor did with its order (shared/delivery.mjs,
+   * outboundRequest), and keeps what came of it on the order, where the POS
+   * shows it and can send it again. A test order, or a platform whose API
+   * access is not configured, has nothing to tell: `sync.status` "none".
+   */
+  async function tellPlatform(order, action, extra = {}) {
+    const credentials = { ...(delivery[order.provider] ?? {}) };
+    if (order.test) return store.delivery.recordSync(order.id, { ok: null });
+    try {
+      if (order.provider === "foodora") {
+        const cached = platformTokens.get("foodora");
+        if (cached && cached.expires > Date.now()) credentials.accessToken = cached.token;
+        else {
+          const login = foodoraLoginRequest(credentials);
+          if (login) {
+            const response = await send(login.url, { method: login.method, headers: login.headers, body: login.body, signal: AbortSignal.timeout(8000) });
+            if (!response.ok) return store.delivery.recordSync(order.id, { ok: false, error: `Sign-in HTTP ${response.status}` });
+            const signedIn = await response.json().catch(() => ({}));
+            const token = signedIn.access_token ?? signedIn.accessToken;
+            if (!token) return store.delivery.recordSync(order.id, { ok: false, error: "Sign-in gave no token" });
+            platformTokens.set("foodora", { token, expires: Date.now() + Math.max(60, Number(signedIn.expires_in) || 1800) * 1000 - 60_000 });
+            credentials.accessToken = token;
+          }
+        }
+      }
+      const call = outboundRequest(order, action, credentials, extra);
+      if (!call) return store.delivery.recordSync(order.id, { ok: null });
+      const response = await send(call.url, { method: call.method, headers: call.headers, body: JSON.stringify(call.body), signal: AbortSignal.timeout(8000) });
+      if (response.status === 401) platformTokens.delete(order.provider);
+      if (!response.ok) {
+        const detail = (await response.text().catch(() => "")).slice(0, 200);
+        return store.delivery.recordSync(order.id, { ok: false, error: `HTTP ${response.status}${detail ? `: ${detail}` : ""}` });
+      }
+      return store.delivery.recordSync(order.id, { ok: true });
+    } catch (error) {
+      return store.delivery.recordSync(order.id, { ok: false, error: String(error?.message ?? error) });
+    }
+  }
+
+  /** The step the platform was last told about, to tell it again. */
+  const LAST_TOLD = { accepted: "accept", rejected: "reject", ready: "ready" };
 
   /** The budget for guessing, per client address: `{ denied }` once it is spent. */
   function authThrottle(ctx, failuresBySource = state.authFailures) {
@@ -464,6 +530,38 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     }
 
     /**
+     * The delivery platforms' webhooks (shared/delivery.mjs): a new order at
+     * /api/delivery/<platform>/orders, what became of one on their side at
+     * /api/delivery/<platform>/events. Each platform proves itself with the
+     * secret this deployment was given for it (LIEFERANDO_WEBHOOK_SECRET,
+     * FOODORA_WEBHOOK_SECRET); one without is not here at all.
+     */
+    if (path[0] === "api" && path[1] === "delivery" && path.length === 4 && method === "POST" && (path[3] === "orders" || path[3] === "events")) {
+      const provider = path[2];
+      const secret = DELIVERY_PROVIDERS[provider] ? delivery[provider]?.webhookSecret : null;
+      if (!secret) return fail("Not found", 404);
+      const throttle = authThrottle(ctx);
+      if (throttle.denied) return throttle.denied;
+      if (!(await webhookAuthentic(request.headers, secret))) {
+        throttle.fail();
+        return fail("Unauthorized", 401);
+      }
+      const { value } = await body(request);
+      try {
+        if (path[3] === "orders") {
+          const received = await store.delivery.receive(provider, value);
+          const order = received.autoAccepted ? await tellPlatform(received.order, "accept", { prepMinutes: received.order.prepMinutes }) : received.order;
+          return json({ id: order.id, status: order.status, duplicate: !received.created }, received.created ? 201 : 200);
+        }
+        const event = platformEvent(value);
+        const order = event?.cancelled ? await store.delivery.platformCancelled(provider, event.externalId, event.reason) : null;
+        return json({ ok: true, ...(order ? { id: order.id, status: order.status } : { ignored: true }) });
+      } catch (error) {
+        return deliveryRefusal(error);
+      }
+    }
+
+    /**
      * Booking a table (shared/reservations.mjs). Open to anyone while the
      * owner has it switched on; a guest's own booking is theirs through the
      * link they were given: its id, and the token in `x-reservation-token`.
@@ -631,6 +729,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             requests: await store.openServiceRequests(),
             // Today's bookings still to come or at the table.
             reservations: await store.reservations.today(),
+            // Delivery platforms' orders not yet handed over.
+            delivery: await store.delivery.open(),
             takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent
           });
         }
@@ -907,6 +1007,65 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           }
         } catch (error) {
           return reservationRefusal(error);
+        }
+        return fail("Not found", 404);
+      }
+
+      /**
+       * The delivery platforms' orders are the floor's: accept (the kitchen
+       * gets its tickets), reject, ready, handed over; and the platform told
+       * each time. Which platforms are connected, and a made-up order to try
+       * the whole path with, are the manager's.
+       */
+      if (path[2] === "delivery") {
+        const manager = path[3] === "status" || path[3] === "test";
+        const { denied } = await gate(manager ? "manager" : "staff");
+        if (denied) return denied;
+        try {
+          if (path.length === 4 && path[3] === "orders" && method === "GET") {
+            return json(await store.delivery.list(url.searchParams.get("from") ?? "", url.searchParams.get("to") ?? "", { provider: url.searchParams.get("provider") ?? "", status: url.searchParams.get("status") ?? "" }));
+          }
+          if (path.length === 6 && path[3] === "orders" && method === "POST") {
+            const action = path[5];
+            const { value, invalid } = await body(request, DeliveryActionBody);
+            if (invalid) return invalid;
+            if (action === "resend") {
+              const order = await store.delivery.get(path[4]);
+              if (!order) return fail("Order not found", 404);
+              const step = LAST_TOLD[order.status];
+              if (!step) return fail("Nothing to tell the platform", 409);
+              return json({ order: await tellPlatform(order, step, { prepMinutes: order.prepMinutes ?? 20, reason: order.rejectReason ?? "OTHER" }) });
+            }
+            if (!["accept", "reject", "ready", "complete"].includes(action)) return fail("Not found", 404);
+            const done = await store.delivery.act(path[4], action, value);
+            if (!done) return fail("Order not found", 404);
+            if (action === "complete") return json({ order: done.order });
+            return json({ order: await tellPlatform(done.order, action, { prepMinutes: done.order.prepMinutes ?? 20, reason: done.order.rejectReason ?? "OTHER" }) });
+          }
+          if (path.length === 4 && path[3] === "status" && method === "GET") {
+            const settings = (await store.getSettings()).delivery;
+            return json({
+              providers: DELIVERY_PROVIDER_IDS.map((id) => ({
+                id,
+                name: DELIVERY_PROVIDERS[id].name,
+                ...settings[id],
+                // Whether this deployment holds the platform's secrets; never the secrets.
+                webhook: Boolean(delivery[id]?.webhookSecret),
+                api: id === "foodora" ? Boolean(delivery[id]?.username && delivery[id]?.password) : Boolean(delivery[id]?.apiKey),
+                ordersPath: `/api/delivery/${id}/orders`,
+                eventsPath: `/api/delivery/${id}/events`
+              }))
+            });
+          }
+          if (path.length === 5 && path[3] === "test" && method === "POST") {
+            if (!DELIVERY_PROVIDERS[path[4]]) return fail("Not found", 404);
+            const dishes = (await store.listProducts(true)).slice(0, 2);
+            // The platform's own shape, through the same path: the owner sees the ticket, the POS and the report before going live.
+            const received = await store.delivery.receive(path[4], sampleOrder(path[4], dishes.map((dish) => ({ sku: dish.sku, name_de: dish.names.de, price_cents: Math.round(dish.price * 100) }))), { simulate: true });
+            return json({ order: received.order }, 201);
+          }
+        } catch (error) {
+          return deliveryRefusal(error);
         }
         return fail("Not found", 404);
       }

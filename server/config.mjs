@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { deliveryConfig } from "../shared/delivery.mjs";
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(serverDir, "..");
@@ -49,7 +50,11 @@ export const config = {
   // otherwise every guest shares one bucket.
   publicRateLimitWindowMs: Number(process.env.PUBLIC_RATE_LIMIT_WINDOW_MS || 60_000),
   orderRateLimitMax: Number(process.env.ORDER_RATE_LIMIT_MAX || 60),
-  serviceRateLimitMax: Number(process.env.SERVICE_RATE_LIMIT_MAX || 20)
+  serviceRateLimitMax: Number(process.env.SERVICE_RATE_LIMIT_MAX || 20),
+  // The delivery platforms' secrets (docs/DELIVERY.md): what each proves itself
+  // with on our webhook, and what we sign in to theirs with. Unset, a platform is
+  // simply not connected.
+  delivery: deliveryConfig(process.env)
 };
 
 if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) {

@@ -33,6 +33,7 @@ export const labels = {
     waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣",
     voidTicket: "*** 退菜 · 停止制作 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***",
     guestDineIn: "*** 顾客扫码点餐 ***", guestPickup: "*** 线上自取 ***",
+    deliveryDelivery: "外送", deliveryPickup: "到店自取", due: "取餐时间",
     stations: { kitchen: "厨房", bar: "吧台", sushi: "寿司台", front: "前台" },
     standIn: "*** 代打：{name} ***", part: "第 {n}/{total} 张",
     test: "打印测试", testPrinter: "打印机", testStation: "档口", testLanguage: "语言", testEncoding: "编码", testPaper: "纸宽", testOk: "能看清下面三种文字、这一行没有被截断，就设置好了。"
@@ -48,6 +49,7 @@ export const labels = {
     waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt",
     voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***",
     guestDineIn: "*** GAST-BESTELLUNG (QR) ***", guestPickup: "*** ONLINE – ABHOLUNG ***",
+    deliveryDelivery: "LIEFERUNG", deliveryPickup: "ABHOLUNG", due: "Fertig um",
     stations: { kitchen: "KÜCHE", bar: "BAR", sushi: "SUSHI", front: "KASSE" },
     standIn: "*** ERSATZ FÜR {name} ***", part: "Bon {n}/{total}",
     test: "TESTDRUCK", testPrinter: "Drucker", testStation: "Station", testLanguage: "Sprache", testEncoding: "Kodierung", testPaper: "Papier", testOk: "Sind alle drei Schriften lesbar und diese Zeile nicht abgeschnitten, passt alles."
@@ -63,6 +65,7 @@ export const labels = {
     waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount",
     voidTicket: "*** VOID – STOP COOKING ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***",
     guestDineIn: "*** GUEST ORDER (QR) ***", guestPickup: "*** ONLINE PICKUP ***",
+    deliveryDelivery: "DELIVERY", deliveryPickup: "COLLECTION", due: "Ready by",
     stations: { kitchen: "KITCHEN", bar: "BAR", sushi: "SUSHI", front: "FRONT" },
     standIn: "*** STANDING IN FOR {name} ***", part: "Ticket {n}/{total}",
     test: "TEST PRINT", testPrinter: "Printer", testStation: "Station", testLanguage: "Language", testEncoding: "Encoding", testPaper: "Paper", testOk: "If all three scripts are readable and this line is not cut off, it is set up."
@@ -217,8 +220,15 @@ function orderLines(payload, context, part = null) {
     ...(context.station ? [{ text: copy.stations[context.station] ?? context.station, bold: true, center: true }] : []),
     // A takeaway's pickup number is what the kitchen calls out; the table where
     // it is served otherwise. Either is the largest thing on the ticket.
-    payload.pickupNo ? { text: `${copy.pickup} ${payload.pickupNo}`, size: "big", bold: true } : { text: `${copy.table} ${payload.table || ""}`, size: "big", bold: true },
-    `${copy.order} ${payload.orderNo || ""}${payload.pickupNo ? `  ${copy.table} ${payload.table || ""}` : ""}  ${clock(payload.at)}`,
+    // A delivery platform's order: the platform and its number, the way the rider or the guest will say it.
+    ...(payload.delivery ? [
+      { text: `*** ${payload.delivery.name} · ${payload.delivery.type === "pickup" ? copy.deliveryPickup : copy.deliveryDelivery} ***`, bold: true, center: true },
+      // Big print is half as many characters to a line: the number alone, as the rider will say it.
+      { text: `#${payload.delivery.reference}`, size: "big", bold: true },
+      ...(payload.delivery.dueAt ? [{ text: `${copy.due} ${clock(payload.delivery.dueAt)}`, bold: true }] : []),
+      ...(payload.delivery.customerName ? [payload.delivery.customerName] : [])
+    ] : [payload.pickupNo ? { text: `${copy.pickup} ${payload.pickupNo}`, size: "big", bold: true } : { text: `${copy.table} ${payload.table || ""}`, size: "big", bold: true }]),
+    payload.delivery ? clock(payload.at) : `${copy.order} ${payload.orderNo || ""}${payload.pickupNo ? `  ${copy.table} ${payload.table || ""}` : ""}  ${clock(payload.at)}`,
     ...(payload.staffName ? [`${copy.waiter}: ${payload.staffName}`] : []),
     ...(payload.guest?.name ? [payload.guest.name] : []),
     ...(part ? [{ text: copy.part.replace("{n}", part.n).replace("{total}", part.total), bold: true }] : []),
