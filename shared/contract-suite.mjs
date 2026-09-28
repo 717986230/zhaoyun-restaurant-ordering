@@ -1423,6 +1423,20 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(overdrawn.status, 409);
       const detail = (await call("GET", `/api/admin/customers/${id}`, { admin: true })).json;
       assert.deepEqual([detail.customer.points, detail.points[0].reason, detail.points[0].note], [10, "adjust", "birthday"]);
+      // Everything kept about them, as they may ask for it (GDPR): from their own account, and by the manager for them.
+      assert.equal((await call("GET", "/api/customer/export")).status, 401);
+      const own = await call("GET", "/api/customer/export", { customerToken: guest.token });
+      assert.equal(own.status, 200);
+      assert.equal(own.headers["cache-control"], "no-store");
+      assert.equal(own.json.format, "zhaoyun-customer-export/1");
+      assert.equal(own.json.account.email, "points@example.com");
+      assert.equal(typeof own.json.restaurant.name, "string");
+      assert.ok([ramen.id, second.id].every((orderId) => own.json.orders.some((order) => order.id === orderId)), "every order placed with the account");
+      assert.deepEqual(own.json.points.map((entry) => entry.reason).sort(), ["adjust", "earn", "redeem", "redeem", "refund", "reverse"].sort());
+      assert.ok(!/password|salt|hash/i.test(JSON.stringify(own.json.account)), "never the password's hash");
+      assert.equal((await call("GET", `/api/admin/customers/${id}/export`, { role: "staff" })).status, 403);
+      assert.equal((await call("GET", "/api/admin/customers/nobody/export", { admin: true })).status, 404);
+      assert.deepEqual((await call("GET", `/api/admin/customers/${id}/export`, { admin: true })).json.account, own.json.account);
       // A forgotten password, set anew at the counter; then the account removed on request.
       assert.equal((await call("POST", `/api/admin/customers/${id}/password`, { admin: true, body: { password: "fresh-start-1" } })).status, 200);
       assert.equal((await call("GET", "/api/customer", { customerToken: guest.token })).status, 401, "the old sessions end");
@@ -1591,6 +1605,20 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(again.json.created, 0);
       assert.deepEqual(again.json.tables.map((table) => table.token), tokens, "asking twice changes no card");
       for (const table of ["1", "2", "3"]) await call("DELETE", `/api/admin/tables/${table}`, { admin: true });
+    }],
+
+    ["health says which build answers and that its database does; every answer carries a request id and no page may frame it", async () => {
+      const health = await call("GET", "/api/health");
+      assert.equal(health.status, 200);
+      assert.equal(health.json.ok, true);
+      assert.equal(health.json.database, "ok");
+      assert.ok("version" in health.json, "the build is named, or null when the deploy did not name it");
+      const first = health.headers["x-request-id"];
+      assert.ok(first, "an id to quote when something goes wrong");
+      assert.notEqual((await call("GET", "/api/health")).headers["x-request-id"], first, "one per request");
+      assert.equal(health.headers["x-content-type-options"], "nosniff");
+      assert.equal(health.headers["x-frame-options"], "DENY");
+      assert.match(health.headers["content-security-policy"] ?? "", /(frame-ancestors 'none'|default-src 'none')/);
     }],
 
     ["an unknown API route is a JSON 404, not the web app", async () => {

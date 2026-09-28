@@ -18,22 +18,52 @@ interface Props {
   account: CustomerAccount;
   loyalty: ApiMenuSettings["loyalty"];
   ordering: OrderingState;
+  /** Who keeps the data, for the privacy notice. */
+  restaurantName: string;
 }
 
 const PASSWORD_MIN = 6;
+
+type Language = CustomerState["language"];
+
+/** What the restaurant keeps about an account and what the guest may do about it (GDPR Art. 13). */
+function PrivacyNotice({ language, restaurantName, open = false }: { language: Language; restaurantName: string; open?: boolean }) {
+  return <details className="privacy-notice" open={open}>
+    <summary>{g(language, "privacy")}</summary>
+    <p>{g(language, "privacyBody", { restaurant: restaurantName || "—" })}</p>
+  </details>;
+}
+
+/** The guest's data as a file on their phone: everything the restaurant keeps about the account. */
+async function downloadMyData(language: Language, dispatch: CustomerDispatch) {
+  try {
+    const data = await restaurantApi.exportCustomerData();
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `my-data-${data.exportedAt.slice(0, 10)}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    dispatch({ type: "toast", message: g(language, "dataDownloaded") });
+  } catch (error) {
+    dispatch({ type: "toast", message: message(language, error) });
+  }
+}
 
 /**
  * The guest's account: signing in or registering (an email and a password),
  * and once in, their points and the rewards they buy with them, their
  * orders, and their settings — deleting the account included.
  */
-export function AccountSheet({ state, dispatch, products, account, loyalty, ordering }: Props) {
+export function AccountSheet({ state, dispatch, products, account, loyalty, ordering, restaurantName }: Props) {
   const language = state.language;
   const close = () => dispatch({ type: "sheet", sheet: null });
   return <Sheet id="accountSheet" title={g(language, "account")} closeLabel={t(language, "close")} onClose={close}>
     {account.signedIn && account.customer
-      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} ordering={ordering} />
-      : <SignInForm language={language} account={account} />}
+      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={restaurantName} />
+      : <SignInForm language={language} account={account} restaurantName={restaurantName} />}
   </Sheet>;
 }
 
@@ -45,7 +75,7 @@ function message(language: CustomerState["language"], error: unknown): string {
   return error.message;
 }
 
-function SignInForm({ language, account }: { language: CustomerState["language"]; account: CustomerAccount }) {
+function SignInForm({ language, account, restaurantName }: { language: Language; account: CustomerAccount; restaurantName: string }) {
   const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -88,10 +118,12 @@ function SignInForm({ language, account }: { language: CustomerState["language"]
     {error && <p className="cart-error" role="alert">{error}</p>}
     <button type="submit" className="primary" disabled={!ready || busy}>{busy ? "…" : g(language, registering ? "register" : "signIn")}</button>
     {!registering && <p className="cart-hint">{g(language, "forgot")}</p>}
+    {registering && <p className="cart-hint">{g(language, "registerConsent", { privacy: g(language, "privacy") })}</p>}
+    {registering && <PrivacyNotice language={language} restaurantName={restaurantName} />}
   </form>;
 }
 
-function SignedIn({ state, dispatch, products, account, loyalty, ordering }: Props) {
+function SignedIn({ state, dispatch, products, account, loyalty, ordering, restaurantName }: Props) {
   const language = state.language;
   const customer = account.customer!;
   const byId = new Map(products.map((product) => [product.id, product]));
@@ -142,6 +174,10 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering }: Pro
     </div>
 
     <ProfileForm language={language} account={account} dispatch={dispatch} />
+    <div className="guest-privacy">
+      <button type="button" className="link-button" onClick={() => void downloadMyData(language, dispatch)}>⬇ {g(language, "downloadData")}</button>
+      <PrivacyNotice language={language} restaurantName={restaurantName} />
+    </div>
   </div>;
 }
 

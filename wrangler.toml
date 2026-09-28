@@ -45,3 +45,9 @@ class_name = "LiveHub"
 [[migrations]]
 tag = "live-hub-v1"
 new_sqlite_classes = ["LiveHub"]
+
+# Workers Logs: every request and every console line (the API logs failures
+# as one JSON line with the request's id), searchable in the dashboard for a
+# few days. Included in the Free plan.
+[observability]
+enabled = true

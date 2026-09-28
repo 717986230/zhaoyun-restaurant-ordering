@@ -127,8 +127,8 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
  * `handle(request, { ip })` answers with a Response, or null for anything that
  * is not the API's — the web app, a picture the database does not have.
  */
-export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients }) {
-  const options = { realtimeClients };
+export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients, version = null }) {
+  const options = { realtimeClients, version };
 
   /** The budget for guessing, per client address: `{ denied }` once it is spent. */
   function authThrottle(ctx, failuresBySource = state.authFailures) {
@@ -233,7 +233,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
 
     // /api/health
     if (path.length === 2 && path[0] === "api" && path[1] === "health" && method === "GET") {
-      return json({ ok: true, realtimeClients: options.realtimeClients?.() ?? 0, timestamp: new Date().toISOString() });
+      // What a deploy's smoke test and an uptime monitor ask: which build, and can it reach its database.
+      const version = options.version ?? null;
+      try {
+        await store.ping();
+      } catch {
+        return json({ ok: false, database: "unreachable", version, timestamp: new Date().toISOString() }, 503);
+      }
+      return json({ ok: true, database: "ok", version, realtimeClients: options.realtimeClients?.() ?? 0, timestamp: new Date().toISOString() });
     }
 
     // /api/catalog
@@ -271,6 +278,19 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return fail(error.message);
         }
       }
+    }
+
+    /** One guest's data as one document (GDPR Art. 15 and 20), for them or for the manager answering them. */
+    async function customerExport(customerId) {
+      const data = await store.customers.exportData(customerId);
+      if (!data) return fail("Guest not found", 404);
+      const settings = await store.getSettings();
+      return json({
+        format: "zhaoyun-customer-export/1",
+        exportedAt: new Date().toISOString(),
+        restaurant: { name: settings.restaurantName ?? "", company: settings.companyName ?? "", address: settings.companyAddress ?? "" },
+        ...data
+      }, 200, { "cache-control": "no-store" });
     }
 
     /**
@@ -362,6 +382,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         }
         if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
+        if (rest === "export" && method === "GET") return customerExport(customer.id);
       } catch (error) {
         return coded(error);
       }
@@ -766,6 +787,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             return found ? json(found) : fail("Guest not found", 404);
           }
           if (path.length === 4 && method === "DELETE") return (await customers.remove(id)) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("Guest not found", 404);
+          if (path.length === 5 && path[4] === "export" && method === "GET") return customerExport(id);
           if (path.length === 5 && path[4] === "points" && method === "POST") {
             const { value, invalid } = await body(request, PointsAdjustBody);
             if (invalid) return invalid;
@@ -1017,8 +1039,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
    * (shared/live.mjs) and a staff write recorded in the audit log. An error
    * nobody planned for is a 500 that says nothing about the inside.
    */
-  return async function serve(request, { ip = "" } = {}) {
-    const ctx = { ip, role: null, audited: false };
+  return async function serve(request, { ip = "", requestId = "" } = {}) {
+    const ctx = { ip, requestId, role: null, audited: false };
     const url = new URL(request.url);
     const writing = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     // The body a write names its table and business fields in, read once.
@@ -1030,8 +1052,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     try {
       response = await handle(request, ctx);
     } catch (error) {
-      console.error(error);
-      response = fail("Internal server error", 500);
+      // One line a log search can find by the id the caller was given.
+      console.error(JSON.stringify({ level: "error", msg: "request failed", requestId, method: request.method, path: url.pathname, error: String(error?.message ?? error), stack: error?.stack }));
+      response = json({ error: "Internal server error", ...(requestId ? { requestId } : {}) }, 500);
     }
     if (!response || !writing || QUIET.has(response)) return response;
     const event = liveEvent(request.method, url.pathname, response.status, sent?.table);

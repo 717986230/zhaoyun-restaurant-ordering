@@ -173,6 +173,21 @@ function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message
     const password = window.prompt(t("resetCustomerPrompt", { email: customer.email }));
     if (password && password.length >= 6) void act(customer, () => api.resetCustomerPassword(customer.id, password), "customerPasswordReset");
   }
+  /** A guest's request for their data (GDPR Art. 15), answered with one file. */
+  async function exportData(customer: ApiCustomer) {
+    try {
+      const data = await api.exportCustomer(customer.id);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `guest-${customer.email.replace(/[^a-z0-9._-]+/gi, "_")}-${data.exportedAt.slice(0, 10)}.json`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      notify(t("customerExported"));
+    } catch (error) { failed(error); }
+  }
   function remove(customer: ApiCustomer) {
     if (window.confirm(t("deleteCustomerConfirm", { email: customer.email }))) void act(customer, () => api.deleteCustomer(customer.id), "customerDeleted");
   }
@@ -185,6 +200,7 @@ function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message
       <span className="staff-actions">
         <button type="button" className="ghost-action" onClick={() => adjust(customer)}>{t("adjustPoints")}</button>
         <button type="button" className="ghost-action" onClick={() => reset(customer)}>{t("resetCustomerPassword")}</button>
+        <button type="button" className="ghost-action" onClick={() => void exportData(customer)}>{t("exportCustomer")}</button>
         <button type="button" className="ghost-action danger" onClick={() => remove(customer)}>{t("deleteCustomer")}</button>
       </span>
       {open?.customer.id === customer.id && <div className="customer-history">

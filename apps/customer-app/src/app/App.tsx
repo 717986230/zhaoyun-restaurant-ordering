@@ -114,7 +114,7 @@ export function App() {
     />
     <AnimatePresence>
       {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} />}
-      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} />}
+      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} />}
       {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}
     </AnimatePresence>
     <div className={`toast ${state.toast ? "show" : ""}`} role="status" aria-live="polite">{state.toast}</div>

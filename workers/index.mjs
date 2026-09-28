@@ -67,10 +67,14 @@ export default {
         if (file.size > MAX_STORED_IMAGE_BYTES) return { error: "Picture exceeds 1.5 MB — make it smaller first", status: 413 };
         return { product: await store.storeMedia(productId, { contentType: file.type, extension, bytes: new Uint8Array(await file.arrayBuffer()) }) };
       },
-      publish: (event) => ctx?.waitUntil(publishLive(env, event))
+      publish: (event) => ctx?.waitUntil(publishLive(env, event)),
+      // VERSION is the commit, set by the deploy (wrangler deploy --var VERSION:<sha>).
+      version: env.VERSION || null
     });
 
-    let response = await api(request, { ip: request.headers.get("cf-connecting-ip") || "unknown" });
+    // Cloudflare's own id for the request (cf-ray) where there is one: the same id its logs show.
+    const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
+    let response = await api(request, { ip: request.headers.get("cf-connecting-ip") || "unknown", requestId });
     if (!response) {
       if (url.pathname.startsWith("/media/")) response = json({ error: "Media not found" }, 404);
       // Anything else is the web app. ASSETS is bound when the built site is
@@ -78,9 +82,12 @@ export default {
       else if (env.ASSETS) return env.ASSETS.fetch(request);
       else response = json({ error: "This deployment serves the API only" }, 404);
     }
-    if (!Object.keys(cors).length) return response;
     const headers = new Headers(response.headers);
     for (const [name, value] of Object.entries(cors)) headers.set(name, value);
+    headers.set("x-request-id", requestId);
+    // An API answer is data, never a page: nothing in it may run or be framed.
+    if (!headers.has("content-security-policy")) headers.set("content-security-policy", "default-src 'none'; frame-ancestors 'none'");
+    headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
     return new Response(response.body, { status: response.status, headers });
   }
 };

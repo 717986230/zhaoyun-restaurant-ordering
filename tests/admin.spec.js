@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test.js";
 import { isolateLive } from "./support/live.js";
 
 const require = createRequire(import.meta.url);
@@ -606,7 +606,9 @@ test("the menu's QR code downloads as a PNG that a phone can scan", async ({ pag
     }, bytes.toString("base64"));
     return { name: download.suggestedFilename(), text };
   };
-  await page.addScriptTag({ path: require.resolve("jsqr/dist/jsQR.js") });
+  // The decoder is the test's, not the page's: evaluated from outside, where the
+  // page's Content-Security-Policy (no inline scripts) does not apply.
+  await page.evaluate(readFileSync(require.resolve("jsqr/dist/jsQR.js"), "utf8"));
 
   // The code has to carry exactly the link the console shows for that table.
   const row = page.locator(".table-row", { hasText: "桌 12" });

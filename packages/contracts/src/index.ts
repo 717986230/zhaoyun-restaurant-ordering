@@ -53,6 +53,19 @@ export interface CustomerRegisterCommand { email: string; name?: string; passwor
 export interface CustomerUpdateCommand { currentPassword: string; name?: string; password?: string }
 export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
 export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string }
+/**
+ * Everything the restaurant keeps about one guest's account, as they may ask
+ * for it (GDPR Art. 15 and 20): machine-readable, in one file.
+ */
+export interface CustomerDataExport {
+  format: "zhaoyun-customer-export/1";
+  exportedAt: string;
+  restaurant: { name: string; company: string; address: string };
+  account: ApiCustomer & { updatedAt: string };
+  favorites: string[];
+  points: ApiPointsEntry[];
+  orders: ApiOrder[];
+}
 
 /** Ordering from the menu and its limits, as the owner sets them. */
 export interface ApiGuestOrdering {

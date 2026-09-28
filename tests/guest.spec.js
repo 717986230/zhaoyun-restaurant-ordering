@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test.js";
 
 /**
  * A guest's own side of the menu against the real Node server: ordering at a
@@ -110,6 +110,10 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   await sheet.locator("input[name=name]").fill("Mei");
   await sheet.locator("input[name=password]").fill("noodles-4-life");
   await sheet.locator("input[name=password-repeat]").fill("noodles-4-life");
+  // What is kept and what they may do about it, before they sign up (GDPR Art. 13).
+  await expect(sheet).toContainText("注册即表示你已阅读隐私说明");
+  await sheet.locator(".privacy-notice summary").click();
+  await expect(sheet.locator(".privacy-notice p")).toContainText("下载全部数据");
   await sheet.locator("button[type=submit]").click();
   await expect(sheet.locator(".guest-card")).toContainText("你好，Mei");
   await expect(sheet.locator(".points-balance b")).toHaveText("0");
@@ -146,4 +150,14 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   await page.locator("#ordersSheet .sheet-close").click();
   await page.locator("#accountBtn").click();
   await expect(sheet.locator(".points-balance b")).toHaveText("7");
+
+  // Their own copy of everything kept about them, as one file.
+  const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "⬇ 下载我的数据" }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^my-data-\d{4}-\d{2}-\d{2}\.json$/);
+  const data = JSON.parse(await (await download.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString("utf8")));
+  expect(data.format).toBe("zhaoyun-customer-export/1");
+  expect(data.account.email).toBe("mei@example.com");
+  expect(data.orders).toHaveLength(2);
+  expect(data.favorites).toHaveLength(1);
+  expect(data.points.map((entry) => entry.reason).sort()).toEqual(["earn", "redeem"]);
 });
