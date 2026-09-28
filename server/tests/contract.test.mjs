@@ -46,7 +46,8 @@ test("Node server satisfies the API contract", async (context) => {
         ...(options.tableToken ? { "x-table-token": options.tableToken } : {}),
         ...(options.deviceToken ? { "x-device-token": options.deviceToken } : {}),
         ...(options.customerToken ? { "x-customer-token": options.customerToken } : {}),
-        ...(options.raw ? { "content-type": options.raw.contentType } : {})
+        ...(options.raw ? { "content-type": options.raw.contentType } : {}),
+        ...(options.headers ?? {})
       },
       ...(options.body ? { payload: options.body } : {}),
       ...(options.raw ? { payload: options.raw.body } : {})

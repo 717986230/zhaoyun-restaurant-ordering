@@ -47,6 +47,7 @@ import {
 } from "./account.mjs";
 import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
+import { createReservationStore } from "./reservation-store.mjs";
 import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
 import {
   CLOSE_TABLE_SESSION_SQL, closePaidTableStatements, guestOrderError, LAST_CUSTOMER_PICKUP_SQL, LAST_TABLE_GUEST_ORDER_SQL, LIVE_TABLE_SESSIONS_SQL,
@@ -877,6 +878,8 @@ export function createStore(driver) {
     closeTable: async (table) => (await run(CLOSE_TABLE_SESSION_SQL, normalizeTableNo(table))) > 0,
     // Guests' accounts, favourites and points: the one implementation both backends share.
     customers: createCustomerStore(driver, { ordersFor: (rows) => Promise.all(rows.map(viewOrder)) }),
+    // Table reservations (shared/reservation-store.mjs), both backends alike.
+    reservations: createReservationStore(driver, { settings: getSettings }),
     /** For what the backends add of their own (seeding, the Node print agent). */
     driver,
     updateOrder,

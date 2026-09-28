@@ -9,6 +9,7 @@
 import { DEFAULT_TIME_ZONE, normalizeSchedule, normalizeTimeZone } from "../src/schedule.js";
 import { GUEST_ORDERING_DEFAULTS, normalizeGuestOrdering, orderingMenuView } from "./ordering.mjs";
 import { LOYALTY_DEFAULTS, normalizeLoyalty } from "./customer.mjs";
+import { normalizeReservationSettings } from "./reservations.mjs";
 
 // The colour hexes themselves live in packages/domain/src/themes.ts, next to
 // the guest app that renders them; the backend only ever needs to know which
@@ -279,6 +280,8 @@ export const APP_SETTINGS = {
   guestOrdering: { key: "guest_ordering", fallback: () => ({ ...GUEST_ORDERING_DEFAULTS, hours: [] }), normalize: (value) => normalizeGuestOrdering(value) },
   // Points for what guests pay, and the rewards they buy with them (shared/customer.mjs).
   loyalty: { key: "loyalty", fallback: () => ({ ...LOYALTY_DEFAULTS, rewards: [] }), normalize: (value) => normalizeLoyalty(value) },
+  // Guests booking a table online, and the rules they book under (shared/reservations.mjs).
+  reservations: { key: "reservations", fallback: () => normalizeReservationSettings({}), normalize: normalizeReservationSettings },
   featuredTemplate: {
     key: "featured_template",
     fallback: () => DEFAULT_FEATURED_TEMPLATE,
@@ -322,10 +325,10 @@ export function settingsView(row, appValues = {}) {
   return view;
 }
 
-/** Whether guests can have accounts: switched on, or needed by pickup or points. */
+/** Whether guests can have accounts: switched on, or needed by pickup, points or booking a table. */
 export function customerAccountsOn(settings) {
   const ordering = settings.guestOrdering;
-  return Boolean(settings.customerAccounts || settings.loyalty?.enabled || (ordering?.enabled && ordering.pickup));
+  return Boolean(settings.customerAccounts || settings.loyalty?.enabled || (ordering?.enabled && ordering.pickup) || settings.reservations?.enabled);
 }
 
 /** The part of the settings the guest menu reads; served with the catalogue. */
@@ -342,6 +345,8 @@ export function menuSettingsView(settings) {
     // Guests' accounts, ordering and points: each only when switched on.
     accounts: customerAccountsOn(settings),
     ordering: orderingMenuView(settings.guestOrdering),
+    // Whether the menu links to the booking page.
+    reservations: Boolean(settings.reservations?.enabled),
     loyalty: settings.loyalty?.enabled
       ? { pointsPerEuro: settings.loyalty.pointsPerEuro, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }
       : null,

@@ -3,7 +3,8 @@ import type {
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
-  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand
+  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
+  ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -70,6 +71,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     customerAccounts: false,
     guestOrdering: { ...GUEST_ORDERING_DEFAULTS, hours: [] },
     loyalty: { ...LOYALTY_DEFAULTS, rewards: [] },
+    reservations: { ...RESERVATION_DEFAULTS, hours: RESERVATION_DEFAULTS.hours.map((range) => ({ ...range, days: [...range.days] })), closedDates: [], tables: [] },
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
   } as ApiSettings;
 }
@@ -80,6 +82,16 @@ export const GUEST_ORDERING_DEFAULTS: ApiGuestOrdering = {
   maxItems: 30, maxOrderCents: 30_000, minIntervalSeconds: 60, maxOpenPickups: 2
 };
 export const LOYALTY_DEFAULTS: ApiLoyalty = { enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 };
+/** shared/reservations.mjs, RESERVATION_DEFAULTS. */
+export const RESERVATION_DEFAULTS: ApiReservationSettings = {
+  enabled: false,
+  hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "11:30", to: "14:00" }, { days: [1, 2, 3, 4, 5, 6, 7], from: "17:30", to: "21:00" }],
+  intervalMinutes: 30, durationMinutes: 120, capacity: 40, maxParty: 8, leadMinutes: 60, daysAhead: 60, autoConfirm: true, closedDates: [], note: "", tables: [],
+  maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2
+};
+
+/** The floor's list of bookings over some days. */
+export interface ReservationList { reservations: ApiReservation[]; today: string; from: string; to: string; capacity: number; durationMinutes: number }
 
 /** A guest in the console's list, and their points' history. */
 export interface CustomerDetail { customer: ApiCustomer; points: ApiPointsEntry[] }
@@ -372,6 +384,18 @@ export class AdminApi {
   }
   /** A guest's data, for a request that reached the restaurant by e-mail or at the counter. */
   exportCustomer(id: string): Promise<CustomerDataExport> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/export`); }
+  // Table bookings: the floor's list, one taken by phone, a change, an erasure.
+  /** Bookings from `from` to `to`; `q` finds one by number, name, phone or email; `status` one status or "active". */
+  reservations(from = "", to = "", filter: { q?: string; status?: string } = {}): Promise<ReservationList> {
+    return this.#request(`/api/admin/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&q=${encodeURIComponent(filter.q ?? "")}&status=${encodeURIComponent(filter.status ?? "")}`);
+  }
+  createReservation(command: StaffReservationCommand): Promise<{ reservation: ApiReservation }> {
+    return this.#request("/api/admin/reservations", { method: "POST", body: JSON.stringify(command) });
+  }
+  updateReservation(id: string, command: ReservationUpdateCommand): Promise<{ reservation: ApiReservation }> {
+    return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
+  }
+  deleteReservation(id: string): Promise<void> { return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "DELETE" }); }
 
   /** The console's live channel: every change on the floor and in the menu. */
   live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
@@ -459,7 +483,11 @@ export class PosApi {
   voidItem(table: string, orderItemId: string, quantity: number, reason: string): Promise<{ void: PosVoid }> {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/void`, { method: "POST", body: JSON.stringify({ orderItemId, quantity, reason }) });
   }
-  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  /** A booking seated, finished or marked as never come, or given its table. */
+  updateReservation(id: string, command: ReservationUpdateCommand): Promise<{ reservation: ApiReservation }> {
+    return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
+  }
   /** The tickets the print bridge gave up on, for the waiter to see and send again. */
   /** A guest's call dealt with: off every waiter's floor. */
   finishServiceRequest(id: string): Promise<{ request: ApiServiceRequest }> {
@@ -557,6 +585,24 @@ export class RestaurantApi {
   /** `repeated` when the same call was already waiting: nothing new was sent. */
   createServiceRequest(command: CreateServiceRequestCommand): Promise<{ request: { id: string }; repeated?: boolean }> {
     return this.#request("/api/service-requests", { method: "POST", body: JSON.stringify(command) });
+  }
+
+  // Booking a table. A guest's own booking opens with its id and the token their phone was given.
+  bookingInfo(): Promise<{ booking: ApiBookingInfo }> { return this.#request("/api/reservations/availability"); }
+  /** The day's times; with `time`, where the guest picks a table, the tables then too. */
+  availability(date: string, party: number, time = ""): Promise<{ booking: ApiBookingInfo; date: string; party: number | null; slots: ApiReservationSlot[]; time?: string; tables?: ApiTableChoice[] }> {
+    return this.#request(`/api/reservations/availability?date=${encodeURIComponent(date)}&party=${party}${time ? `&time=${encodeURIComponent(time)}` : ""}`);
+  }
+  book(command: ReservationCommand): Promise<{ reservation: ApiGuestReservation; token: string }> {
+    return this.#request("/api/reservations", { method: "POST", body: JSON.stringify(command) });
+  }
+  reservation(id: string, token: string): Promise<{ reservation: ApiGuestReservation }> {
+    return this.#request(`/api/reservations/${encodeURIComponent(id)}`, { headers: { "x-reservation-token": token } });
+  }
+  /** The signed-in guest's own bookings. */
+  myReservations(): Promise<{ reservations: ApiGuestReservation[] }> { return this.#request("/api/customer/reservations"); }
+  cancelReservation(id: string, token: string): Promise<{ reservation: ApiGuestReservation }> {
+    return this.#request(`/api/reservations/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: { "x-reservation-token": token } });
   }
 
   connect(onMessage: (message: RealtimeEnvelope) => void): () => void {

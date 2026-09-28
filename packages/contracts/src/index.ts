@@ -363,7 +363,119 @@ export interface ApiSettings {
   customerAccounts: boolean;
   guestOrdering: ApiGuestOrdering;
   loyalty: ApiLoyalty;
+  /** Online table bookings and their rules (shared/reservations.mjs). */
+  reservations: ApiReservationSettings;
 }
+
+/** The owner's rules for online bookings. */
+export interface ApiReservationSettings {
+  enabled: boolean;
+  /** When bookings are taken: per period, the first and the last time a table is booked for. */
+  hours: ApiSchedule[];
+  /** Times offered every 15, 30 or 60 minutes. */
+  intervalMinutes: 15 | 30 | 60;
+  /** How long a booking holds its seats. */
+  durationMinutes: number;
+  /** Guests seated at once from bookings, at most. */
+  capacity: number;
+  /** The largest party booked online; a larger one calls. */
+  maxParty: number;
+  /** How long before the time a booking must be made online, minutes. */
+  leadMinutes: number;
+  /** How many days ahead bookings open. */
+  daysAhead: number;
+  /** Confirmed at once; off: pending until the floor confirms. */
+  autoConfirm: boolean;
+  /** Days the restaurant takes no bookings (YYYY-MM-DD). */
+  closedDates: string[];
+  /** Shown to guests on the booking page. */
+  note: string;
+  /** The tables guests pick from online, with their seats; empty: the floor seats them. */
+  tables: ApiBookableTable[];
+  /** Per guest (account or phone number): bookings still to come at once, and on one day. */
+  maxActivePerGuest: number;
+  maxPerDayPerGuest: number;
+  /** No-shows in 180 days before a guest must call instead; 0: never. */
+  noShowLimit: number;
+}
+
+export interface ApiBookableTable { table: string; seats: number }
+
+export type ReservationStatus = "pending" | "confirmed" | "seated" | "completed" | "cancelled" | "declined" | "no_show";
+
+/** A booking as the floor sees it. The day and time are the restaurant's. */
+export interface ApiReservation {
+  id: string;
+  /** Six letters and digits, for the phone. */
+  reference: string;
+  date: string;
+  time: string;
+  party: number;
+  name: string;
+  phone: string;
+  email: string;
+  notes: string;
+  status: ReservationStatus;
+  table: string | null;
+  source: "online" | "staff";
+  language: MenuLanguage | null;
+  /** The guest account it was made from, its email, and that guest's no-shows in 180 days. */
+  customerId: string | null;
+  accountEmail?: string | null;
+  guestNoShows?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A booking as the guest holding its link sees it. */
+export type ApiGuestReservation = Omit<ApiReservation, "source" | "customerId" | "accountEmail" | "guestNoShows"> & { cancellable?: boolean };
+
+/** What the booking page reads before a guest picks anything. */
+export interface ApiBookingInfo {
+  enabled: boolean;
+  restaurantName: string;
+  timeZone: string;
+  maxParty: number;
+  /** The restaurant's today, and the last day that can be booked. */
+  today: string;
+  lastDate: string;
+  /** Weekdays with any hours, 1 = Monday. */
+  days: number[];
+  closedDates: string[];
+  durationMinutes: number;
+  note: string;
+  /** The guest picks their table (absent from an older server: they do not). */
+  seatSelection?: boolean;
+  tables?: ApiBookableTable[];
+  /** Booking needs a guest account; the limits per guest. */
+  signInRequired?: boolean;
+  maxActivePerGuest?: number;
+  maxPerDayPerGuest?: number;
+}
+
+export interface ApiReservationSlot { time: string; available: boolean }
+/** A bookable table at one time: free and big enough for the party, or not. */
+export interface ApiTableChoice { table: string; seats: number; available: boolean }
+
+export interface ReservationCommand {
+  date: string;
+  time: string;
+  party: number;
+  name: string;
+  phone: string;
+  email?: string;
+  notes?: string;
+  language?: MenuLanguage;
+  /** The table the guest picked, where the restaurant lets them. */
+  table?: string;
+}
+
+export interface StaffReservationCommand extends Omit<ReservationCommand, "phone" | "language"> {
+  phone?: string;
+  table?: string;
+}
+
+export type ReservationUpdateCommand = Partial<Omit<StaffReservationCommand, "table">> & { status?: ReservationStatus; table?: string };
 
 /** Tab → language → the name the guest sees. */
 export type NavLabels = Record<string, Partial<Record<MenuLanguage, string>>>;
@@ -391,6 +503,8 @@ export interface ApiMenuSettings {
   ordering?: Pick<ApiGuestOrdering, "dineIn" | "pickup" | "hours" | "maxItems" | "maxOrderCents" | "requireOpenTable"> | null;
   /** The points programme, when it is on. */
   loyalty?: Omit<ApiLoyalty, "enabled"> | null;
+  /** Guests can book a table online; absent from an older server. */
+  reservations?: boolean;
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

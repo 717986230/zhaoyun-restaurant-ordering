@@ -108,7 +108,8 @@ export function registerRoutes(app, { database, realtime, config }) {
     if (request.url.startsWith("/assets/") || request.url.startsWith("/media/")) {
       return reply.code(404).send({ error: "Asset not found" });
     }
-    const fallback = path.join(config.webDir, request.url === "/admin" ? "admin.html" : "index.html");
+    const pages = { "/admin": "admin.html", "/pos": "pos.html", "/book": "book.html" };
+    const fallback = path.join(config.webDir, pages[request.url.split("?")[0]] ?? "index.html");
     if (existsSync(fallback)) return reply.type("text/html").sendFile(path.basename(fallback), config.webDir);
     return reply.code(404).send({ error: "Run npm run build before using the production web server" });
   });

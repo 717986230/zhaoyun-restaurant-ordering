@@ -16,6 +16,7 @@ import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { GuestsPanel } from "../features/guests/GuestsPanel";
 import { ReportsPanel } from "../features/reports/ReportsPanel";
+import { ReservationsPanel } from "../features/reservations/ReservationsPanel";
 import { BackToTop } from "./BackToTop";
 
 const adminApi = new AdminApi();
@@ -55,14 +56,15 @@ const LIVE_SETTLE_MS = 250;
  */
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
-  if (role === "staff") return ["board", "tables"];
-  return showOrdering ? ["catalog", "board", "tables", "reports", "printers", "guests", "system"] : ["catalog", "guests", "system"];
+  if (role === "staff") return ["board", "tables", "reservations"];
+  return showOrdering ? ["catalog", "board", "tables", "reservations", "reports", "printers", "guests", "system"] : ["catalog", "reservations", "guests", "system"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
   catalog: "tabCatalog",
   board: "tabBoard",
   tables: "tabTables",
+  reservations: "tabReservations",
   reports: "tabReports",
   printers: "tabPrinters",
   guests: "tabGuests",
@@ -240,6 +242,19 @@ export function App() {
     }, setLive);
     return () => { window.clearTimeout(pending); stop(); setLive(false); };
   }, [state.role, floorTab, loadBoard]);
+
+  // The bookings follow the floor live too: a guest's booking online shows at once.
+  const [reservationTick, setReservationTick] = useState(0);
+  useEffect(() => {
+    if (!state.role || state.tab !== "reservations") return undefined;
+    let pending: number | undefined;
+    const stop = adminApi.live((event) => {
+      if (event.type !== "floor.changed") return;
+      window.clearTimeout(pending);
+      pending = window.setTimeout(() => setReservationTick((tick) => tick + 1), LIVE_SETTLE_MS);
+    }, setLive);
+    return () => { window.clearTimeout(pending); stop(); setLive(false); };
+  }, [state.role, state.tab]);
 
   useEffect(() => {
     if (!floorTab) return undefined;
@@ -636,6 +651,7 @@ export function App() {
         onDeleteTable={async (table: string) => { await editRoom(() => adminApi.deleteTable(table), t("tableDeleted")); }}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} found={state.printFound} dishesPerStation={dishesPerStation} apiBase={adminApi.storage.baseUrl} onDelete={deletePrinter} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
+      {state.tab === "reservations" && <ReservationsPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
       {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel

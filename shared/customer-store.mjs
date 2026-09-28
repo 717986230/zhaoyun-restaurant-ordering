@@ -26,6 +26,7 @@ import {
   REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
+import { guestReservationView } from "./reservations.mjs";
 
 // More than any guest has: an export is all of it.
 const MAX_EXPORTED_ROWS = 100_000;
@@ -186,7 +187,8 @@ export function createCustomerStore(driver, { ordersFor }) {
         account: { ...customerView(row), updatedAt: row.updated_at },
         favorites: await favorites(row.id),
         points: (await driver.all(POINTS_HISTORY_SQL, row.id, MAX_EXPORTED_ROWS)).map(pointsEntryView),
-        orders: await ordersFor(await driver.all(CUSTOMER_ORDERS_SQL, row.id, MAX_EXPORTED_ROWS))
+        orders: await ordersFor(await driver.all(CUSTOMER_ORDERS_SQL, row.id, MAX_EXPORTED_ROWS)),
+        reservations: (await driver.all("SELECT * FROM reservations WHERE customer_id = ? ORDER BY date DESC, time DESC LIMIT ?", row.id, MAX_EXPORTED_ROWS)).map(guestReservationView)
       };
     },
     async points(customerId, limit = 50) {

@@ -13,6 +13,7 @@
 import { wallClock } from "../src/schedule.js";
 
 const EVERY_DAY = [1, 2, 3, 4, 5, 6, 7];
+const addDaysTo = (date, days) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 const clockTime = (minute) => {
   const wrapped = ((minute % 1440) + 1440) % 1440;
   return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
@@ -379,7 +380,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const before = await call("GET", "/api/catalog");
       // Ordering is on here only because the checks above switched it on (OPEN_ORDERING).
       const { ordering: _ordering, ...fresh } = before.json.menu;
-      assert.deepEqual(fresh, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null },
+      assert.deepEqual(fresh, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null, reservations: false },
         "a fresh restaurant ships with these");
 
       assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
@@ -396,7 +397,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
       const { ordering: _orderingNow, ...menu } = (await call("GET", "/api/catalog")).json.menu;
       assert.deepEqual(menu,
-        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null });
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null, reservations: false });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
       // A save of one setting leaves the rest where they were.
       assert.equal(saved.json.menuTheme, "jade");
@@ -1696,6 +1697,246 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await report({ app: "pos", message: "" })).status, 400);
       assert.equal((await report({ app: "pos", message: "x".repeat(501) })).status, 400, "a message is kept short");
       assert.equal((await report({ app: "pos", message: "boom", password: "hunter2" })).status, 400, "nothing but the error");
+    }],
+
+    ["a guest books a table online within the owner's hours and seats, sees and cancels it through their link; the floor manages it", async () => {
+      // Every guest here books from one account, with the per-guest limits out of the way (they have a check of their own).
+      let guestToken = "";
+      const book = (body) => call("POST", "/api/reservations", { body, customerToken: guestToken });
+      const guest = { name: "Anna Gast", phone: "+43 660 1234567", email: "anna@example.com" };
+
+      // Off until the owner switches it on.
+      assert.equal((await call("GET", "/api/reservations/availability")).json.booking.enabled, false);
+      const off = await book({ date: "2030-01-01", time: "18:00", party: 2, ...guest });
+      assert.equal(off.status, 403);
+      assert.equal(off.json.code, "RESERVATIONS_OFF");
+
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 10, maxParty: 6, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0 };
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, hours: [{ days: EVERY_DAY, from: "20:00", to: "12:00" }] } } })).status, 400, "a period ends after it starts");
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, intervalMinutes: 7 } } })).status, 400);
+      assert.equal((await call("PUT", "/api/admin/settings", { role: "staff", body: { reservations: rules } })).status, 403, "the owner's rules");
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } });
+      assert.equal(saved.status, 200);
+      assert.equal(saved.json.reservations.capacity, 10);
+      assert.equal((await call("GET", "/api/catalog")).json.menu.reservations, true, "the menu links to the booking page");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.accounts, true, "booking needs an account, so guests can have one");
+
+      const { booking } = (await call("GET", "/api/reservations/availability")).json;
+      assert.equal(booking.enabled, true);
+      assert.equal(booking.signInRequired, true);
+      assert.equal(booking.maxParty, 6);
+      const signedOut = await book({ date: addDaysTo(booking.today, 7), time: "18:00", party: 2, ...guest });
+      assert.equal(signedOut.status, 401, "no account, no booking");
+      assert.equal(signedOut.json.code, "SIGN_IN_REQUIRED");
+      guestToken = (await call("POST", "/api/customer/register", { body: { email: `anna-${Date.now().toString(36)}@example.com`, password: "secret123", name: "Anna" } })).json.token;
+      assert.ok(guestToken, "a guest signs up to book");
+      assert.equal(booking.capacity, undefined, "how many seats there are is the restaurant's business");
+      const addDays = (date, days) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+      const day = addDays(booking.today, 7);
+      assert.equal(booking.lastDate, addDays(booking.today, 30));
+
+      const slots = async (party) => (await call("GET", `/api/reservations/availability?date=${day}&party=${party}`)).json.slots;
+      const open = await slots(4);
+      assert.equal(open.length, 17, "every half hour from 12:00 to 20:00, both included");
+      assert.ok(open.every((slot) => slot.available));
+
+      const first = await book({ date: day, time: "18:00", party: 6, ...guest, notes: "Kinderstuhl", language: "de" });
+      assert.equal(first.status, 201);
+      assert.equal(first.json.reservation.status, "confirmed", "confirmed at once while the owner lets it be");
+      assert.match(first.json.reservation.reference, /^[A-Z2-9]{6}$/);
+      assert.ok(first.json.token, "the guest's link to their booking");
+      assert.equal(first.json.reservation.table, null, "no table until the floor gives one");
+      assert.equal(first.json.reservation.source, undefined, "no staff fields for the guest");
+      const second = await book({ date: day, time: "19:00", party: 4, name: "Ben", phone: "0660 7654321" });
+      assert.equal(second.status, 201, "six and four make ten: exactly full at 19:00");
+
+      const full = await book({ date: day, time: "19:30", party: 2, name: "Cara", phone: "0660 1111111" });
+      assert.equal(full.status, 409);
+      assert.equal(full.json.code, "SLOT_FULL");
+      const forOne = Object.fromEntries((await slots(1)).map((slot) => [slot.time, slot.available]));
+      assert.equal(forOne["16:00"], true, "gone before the first booking sits down");
+      assert.equal(forOne["17:00"], true, "seven at the busiest moment");
+      assert.equal(forOne["18:00"], false);
+      assert.equal(forOne["19:30"], false);
+      assert.equal(forOne["20:00"], true, "the six have left by eight");
+
+      const refused = async (body, status, code) => {
+        const response = await book({ date: day, time: "13:00", party: 2, name: "X", phone: "0660 2222222", ...body });
+        assert.equal(response.status, status, JSON.stringify(body));
+        if (code) assert.equal(response.json.code, code, JSON.stringify(body));
+        return response.json;
+      };
+      assert.equal((await refused({ party: 7 }, 400, "PARTY_TOO_LARGE")).maxParty, 6, "a larger party calls");
+      await refused({ time: "12:15" }, 409, "SLOT_UNAVAILABLE");
+      await refused({ time: "21:00" }, 409, "SLOT_UNAVAILABLE");
+      assert.equal((await refused({ date: addDays(booking.today, -1) }, 409, "SLOT_UNAVAILABLE")).reason, "PAST");
+      assert.equal((await refused({ date: addDays(booking.today, 31) }, 409, "SLOT_UNAVAILABLE")).reason, "TOO_FAR");
+      await refused({ phone: "call me" }, 400);
+      await refused({ email: "not-an-email" }, 400);
+      await refused({ date: "2030-02-30" }, 400);
+      assert.equal((await book({ date: day, time: "13:00", party: 2, name: "X" })).status, 400, "a guest leaves a number to call");
+      assert.equal((await call("GET", `/api/reservations/availability?date=${day}&party=9`)).json.code, "PARTY_TOO_LARGE");
+
+      // The guest's own link.
+      const mine = (id, token, method = "GET", suffix = "") => call(method, `/api/reservations/${id}${suffix}`, { headers: token ? { "x-reservation-token": token } : {} });
+      const seen = await mine(first.json.reservation.id, first.json.token);
+      assert.equal(seen.status, 200);
+      assert.equal(seen.json.reservation.notes, "Kinderstuhl");
+      assert.equal(seen.json.reservation.cancellable, true);
+      assert.equal((await mine(first.json.reservation.id)).status, 404, "no token, no booking");
+      assert.equal((await mine(first.json.reservation.id, second.json.token)).status, 404, "another guest's token opens nothing");
+      assert.equal((await mine(second.json.reservation.id, "x".repeat(43), "POST", "/cancel")).status, 404);
+
+      // The floor's list: today by default, any run of days by asking.
+      assert.equal((await call("GET", `/api/admin/reservations?from=${day}&to=${day}`)).status, 401);
+      const listed = (await call("GET", `/api/admin/reservations?from=${day}&to=${day}`, { role: "staff" })).json;
+      assert.deepEqual(listed.reservations.map((entry) => entry.time), ["18:00", "19:00"]);
+      assert.equal(listed.reservations[0].phone, "+43 660 1234567", "the floor calls back");
+      assert.equal(listed.reservations[0].source, "online");
+      assert.equal(listed.capacity, 10);
+      assert.equal((await call("GET", `/api/admin/reservations?from=${day}&to=${addDays(day, 400)}`, { role: "staff" })).status, 400, "a year at most");
+
+      const seated = await call("PATCH", `/api/admin/reservations/${first.json.reservation.id}`, { role: "staff", body: { table: "5", status: "seated" } });
+      assert.equal(seated.status, 200);
+      assert.equal(seated.json.reservation.table, "5");
+      assert.equal(seated.json.reservation.status, "seated");
+      assert.equal((await call("PATCH", `/api/admin/reservations/${first.json.reservation.id}`, { role: "staff", body: { status: "gone" } })).status, 400);
+      assert.equal((await call("PATCH", "/api/admin/reservations/nope", { role: "staff", body: { status: "seated" } })).status, 404);
+      assert.equal((await mine(first.json.reservation.id, first.json.token)).json.reservation.cancellable, false, "at the table: not the guest's to cancel");
+      assert.equal((await mine(first.json.reservation.id, first.json.token, "POST", "/cancel")).json.code, "TOO_LATE");
+
+      // The guest cancels; the seats are free again.
+      const cancelled = await mine(second.json.reservation.id, second.json.token, "POST", "/cancel");
+      assert.equal(cancelled.status, 200);
+      assert.equal(cancelled.json.reservation.status, "cancelled");
+      assert.equal((await book({ date: day, time: "19:30", party: 2, name: "Cara", phone: "0660 1111111" })).status, 201);
+
+      // Taken by phone: any time and size, confirmed, and the floor decides where they sit.
+      const phoned = await call("POST", "/api/admin/reservations", { role: "staff", body: { date: day, time: "18:15", party: 20, name: "Firma Huber", table: "12" } });
+      assert.equal(phoned.status, 201);
+      assert.equal(phoned.json.reservation.status, "confirmed");
+      assert.equal(phoned.json.reservation.source, "staff");
+      assert.equal(phoned.json.reservation.table, "12");
+      assert.equal(phoned.json.token, undefined);
+
+      // A month after the day, the guest's details are gone; the count stays.
+      const old = addDays(booking.today, -40);
+      await call("POST", "/api/admin/reservations", { role: "staff", body: { date: old, time: "19:00", party: 3, name: "Alt", phone: "0660 3333333", email: "alt@example.com" } });
+      const forgotten = (await call("GET", `/api/admin/reservations?from=${old}&to=${old}`, { role: "staff" })).json.reservations[0];
+      assert.equal(forgotten.party, 3);
+      assert.deepEqual([forgotten.name, forgotten.phone, forgotten.email], ["", "", ""]);
+
+      // Erased for good on request: the manager's.
+      assert.equal((await call("DELETE", `/api/admin/reservations/${phoned.json.reservation.id}`, { role: "staff" })).status, 403);
+      assert.equal((await call("DELETE", `/api/admin/reservations/${phoned.json.reservation.id}`, { admin: true })).status, 204);
+      assert.equal((await call("DELETE", `/api/admin/reservations/${phoned.json.reservation.id}`, { admin: true })).status, 404);
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
+      assert.equal((await call("GET", "/api/catalog")).json.menu.reservations, false);
+    }],
+
+    ["a guest picks their own table online: only a free one big enough, never one already booked for that stay", async () => {
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [{ table: "s1", seats: 2 }, { table: "S2", seats: 4 }], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0 };
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, tables: [{ table: "S1", seats: 2 }, { table: "s1", seats: 4 }] } } })).status, 400, "a table listed twice");
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, tables: [{ table: "S1", seats: 0 }] } } })).status, 400);
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } });
+      assert.deepEqual(saved.json.reservations.tables, [{ table: "S1", seats: 2 }, { table: "S2", seats: 4 }], "numbers as the floor writes them");
+
+      const { booking } = (await call("GET", "/api/reservations/availability")).json;
+      assert.equal(booking.seatSelection, true);
+      assert.deepEqual(booking.tables, [{ table: "S1", seats: 2 }, { table: "S2", seats: 4 }]);
+      const day = new Date(Date.parse(`${booking.today}T00:00:00Z`) + 8 * 86_400_000).toISOString().slice(0, 10);
+      const at = async (time, party) => (await call("GET", `/api/reservations/availability?date=${day}&party=${party}&time=${time}`)).json;
+      const tables = (answer) => Object.fromEntries(answer.tables.map((table) => [table.table, table.available]));
+      assert.deepEqual(tables(await at("19:00", 2)), { S1: true, S2: true });
+      assert.deepEqual(tables(await at("19:00", 3)), { S1: false, S2: true }, "two seats are not enough for three");
+      assert.equal((await call("GET", `/api/reservations/availability?date=${day}&party=2`)).json.tables, undefined, "tables only for a time");
+
+      const customerToken = (await call("POST", "/api/customer/register", { body: { email: `dora-${Date.now().toString(36)}@example.com`, password: "secret123" } })).json.token;
+      const book = (body) => call("POST", "/api/reservations", { customerToken, body: { date: day, time: "19:00", party: 3, name: "Dora", phone: "0660 4444444", ...body } });
+      assert.equal((await book({})).json.code, "TABLE_REQUIRED", "the guest picks one");
+      assert.equal((await book({ table: "S1" })).json.code, "TABLE_TOO_SMALL");
+      assert.equal((await book({ table: "S9" })).json.code, "TABLE_REQUIRED", "only a bookable table");
+      const taken = await book({ table: "s2" });
+      assert.equal(taken.status, 201);
+      assert.equal(taken.json.reservation.table, "S2", "the guest sees the table they picked");
+      assert.equal((await book({ table: "S2", time: "20:00", party: 2 })).json.code, "TABLE_TAKEN", "held for the whole stay");
+      assert.deepEqual(tables(await at("20:00", 2)), { S1: true, S2: false });
+      assert.deepEqual(tables(await at("17:00", 2)), { S1: true, S2: true }, "gone before they sit down");
+      const forThree = Object.fromEntries((await call("GET", `/api/reservations/availability?date=${day}&party=3`)).json.slots.map((slot) => [slot.time, slot.available]));
+      assert.equal(forThree["19:30"], false, "no table for three left then");
+      assert.equal(forThree["17:00"], true);
+      assert.equal((await book({ table: "S2", time: "17:00", party: 2 })).status, 201, "a stay that ends as the next begins");
+
+      const cancelled = await call("POST", `/api/reservations/${taken.json.reservation.id}/cancel`, { headers: { "x-reservation-token": taken.json.token } });
+      assert.equal(cancelled.json.reservation.status, "cancelled");
+      assert.equal(tables(await at("19:00", 3)).S2, true, "a cancelled booking frees its table");
+      await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
+    }],
+
+    ["online bookings are held to limits per guest and per phone, no-shows stop them, and the floor finds every booking in its records", async () => {
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 1 };
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, maxActivePerGuest: 0 } } })).status, 400);
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } })).status, 200);
+      const { booking } = (await call("GET", "/api/reservations/availability")).json;
+      assert.deepEqual([booking.maxActivePerGuest, booking.maxPerDayPerGuest], [2, 1]);
+      const stamp = Date.now().toString(36);
+      const signUp = async (name) => (await call("POST", "/api/customer/register", { body: { email: `${name}-${stamp}@example.com`, password: "secret123", name } })).json.token;
+      const eva = await signUp("eva");
+      const day = (offset) => addDaysTo(booking.today, offset);
+      const book = (customerToken, date, body = {}) => call("POST", "/api/reservations", { customerToken, body: { date, time: "18:00", party: 2, name: "Eva", ...body } });
+      const phone = "+43 699 7777777";
+
+      const first = await book(eva, day(10), { phone });
+      assert.equal(first.status, 201);
+      assert.equal(first.json.reservation.name, "Eva");
+      const sameDay = await book(eva, day(10), { phone, time: "13:00" });
+      assert.equal(sameDay.status, 409);
+      assert.deepEqual([sameDay.json.code, sameDay.json.limit], ["DAY_LIMIT", 1], "one booking a day");
+      assert.equal((await book(eva, day(11), { phone })).status, 201);
+      const third = await book(eva, day(12), { phone });
+      assert.deepEqual([third.status, third.json.code, third.json.limit], [409, "TOO_MANY_BOOKINGS", 2], "two to come at once");
+
+      // A second account with the same number is the same guest.
+      const twin = await signUp("twin");
+      assert.equal((await book(twin, day(12), { phone: "0043 699 777 7777" })).json.code, "TOO_MANY_BOOKINGS", "the phone number counts, however written");
+      assert.equal((await book(twin, day(12), { phone: "0699 1231231" })).status, 201, "another number is another guest");
+
+      // The guest's own list, and a cancel from the account frees a place.
+      const mine = (await call("GET", "/api/customer/reservations", { customerToken: eva })).json.reservations;
+      assert.equal(mine.length, 2);
+      assert.ok(mine.every((entry) => entry.cancellable && entry.customerId === undefined));
+      assert.equal((await call("GET", "/api/customer/reservations")).status, 401);
+      assert.equal((await call("POST", `/api/reservations/${first.json.reservation.id}/cancel`, { customerToken: twin })).status, 404, "not another guest's to cancel");
+      assert.equal((await call("POST", `/api/reservations/${first.json.reservation.id}/cancel`, { customerToken: eva })).json.reservation.status, "cancelled");
+      assert.equal((await book(eva, day(12), { phone })).status, 201);
+
+      // A no-show, and the guest calls from then on.
+      const records = async (query) => (await call("GET", `/api/admin/reservations?from=${day(0)}&to=${day(30)}&${query}`, { role: "staff" })).json.reservations;
+      const evas = await records(`q=${encodeURIComponent("7777777")}`);
+      assert.ok(evas.length >= 3, "found by phone");
+      assert.ok(evas.every((entry) => entry.accountEmail === `eva-${stamp}@example.com` || entry.accountEmail === `twin-${stamp}@example.com`));
+      assert.equal((await records(`q=${first.json.reservation.reference}`)).length, 1, "found by its number");
+      assert.ok((await records("status=cancelled")).some((entry) => entry.id === first.json.reservation.id));
+      assert.ok((await records("status=active")).every((entry) => ["pending", "confirmed", "seated"].includes(entry.status)));
+      assert.equal((await call("GET", `/api/admin/reservations?from=${day(0)}&to=${day(30)}&status=lost`, { role: "staff" })).status, 400);
+      const upcoming = (await records(`q=eva-${stamp}`)).find((entry) => entry.status === "confirmed");
+      await call("PATCH", `/api/admin/reservations/${upcoming.id}`, { role: "staff", body: { status: "no_show" } });
+      assert.equal((await records(`q=eva-${stamp}`)).find((entry) => entry.id === upcoming.id).guestNoShows, 1, "the floor sees who did not come");
+      const blocked = await book(eva, day(20), { phone: "0699 5550000" });
+      assert.deepEqual([blocked.status, blocked.json.code], [403, "NO_SHOW_BLOCKED"]);
+      // Set right by the floor, and they may book again.
+      await call("PATCH", `/api/admin/reservations/${upcoming.id}`, { role: "staff", body: { status: "completed" } });
+      assert.equal((await book(eva, day(20), { phone: "0699 5550000" })).status, 201);
+
+      // An account removed on request takes its bookings' details with it; those still to come are cancelled.
+      const gone = await signUp("gone");
+      const kept = await book(gone, day(15), { phone: "0699 8889999" });
+      assert.equal((await call("POST", "/api/customer/delete", { customerToken: gone, body: { password: "secret123" } })).status, 204);
+      const after = (await records(`q=${kept.json.reservation.reference}`))[0];
+      assert.deepEqual([after.status, after.name, after.phone, after.customerId], ["cancelled", "", "", null]);
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
     }],
 
     ["an unknown API route is a JSON 404, not the web app", async () => {

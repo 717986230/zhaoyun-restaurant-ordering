@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { TableOverview } from "@zhaoyun/api-client";
-import type { ApiPrintJob, ApiServiceRequest, PosClaim } from "@zhaoyun/contracts";
+import type { ApiPrintJob, ApiReservation, ApiServiceRequest, PosClaim, ReservationUpdateCommand } from "@zhaoyun/contracts";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 import type { PosKey } from "./i18n";
@@ -117,12 +117,50 @@ function ServiceCalls({ pos, requests, onDone }: { pos: Pos; requests: ApiServic
   </section>;
 }
 
+/**
+ * Today's bookings still to come or at the table: who, how many, when, and
+ * where they sit. Seating one asks for the table; the console has the rest.
+ */
+function TodayBookings({ pos, bookings, onDone }: { pos: Pos; bookings: ApiReservation[]; onDone: () => void }) {
+  const { t } = pos;
+  if (!bookings.length) return null;
+  async function change(booking: ApiReservation, command: ReservationUpdateCommand) {
+    try {
+      await api.updateReservation(booking.id, command);
+      onDone();
+    } catch (error) { pos.failed(error); }
+  }
+  function seat(booking: ApiReservation) {
+    const table = window.prompt(t("bookingTablePrompt", { name: booking.name, party: booking.party }), booking.table ?? "");
+    if (table === null) return;
+    void change(booking, { status: "seated", table: table.trim().toUpperCase() });
+  }
+  const guests = bookings.reduce((total, booking) => total + booking.party, 0);
+  return <details className="pos-bookings" open>
+    <summary><h2>📅 {t("bookings", { count: bookings.length, guests })}</h2></summary>
+    <ul>{bookings.map((booking) => <li key={booking.id} data-booking={booking.reference} data-status={booking.status}>
+      <span>
+        <b>{booking.time}</b> · {booking.name} · {booking.party} 👤{booking.table ? ` · ${t("table", { table: booking.table })}` : ""}
+        {booking.status !== "confirmed" && <em>{t(booking.status === "seated" ? "bookingSeated" : "bookingPending")}</em>}
+        {booking.notes && <small>{booking.notes}</small>}
+      </span>
+      {booking.status === "seated"
+        ? <button type="button" onClick={() => void change(booking, { status: "completed" })}>{t("bookingFinish")}</button>
+        : <>
+          <button type="button" onClick={() => seat(booking)}>{t("bookingSeat")}</button>
+          <button type="button" className="pos-quiet" onClick={() => void change(booking, { status: "no_show" })}>{t("bookingNoShow")}</button>
+        </>}
+    </li>)}</ul>
+  </details>;
+}
+
 /** The room: every table and what is open on it, and the takeaways waiting. */
 export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const { t, money } = pos;
   const [tables, setTables] = useState<TableOverview[]>([]);
   const [claims, setClaims] = useState<PosClaim[]>([]);
   const [requests, setRequests] = useState<ApiServiceRequest[]>([]);
+  const [bookings, setBookings] = useState<ApiReservation[]>([]);
   // This device: the tables it has open are its own, every other device's are locked to it.
   const [deviceId, setDeviceId] = useState("");
 
@@ -133,6 +171,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       setClaims(floor.claims);
       setDeviceId(floor.deviceId ?? "");
       setRequests(floor.requests ?? []);
+      setBookings(floor.reservations ?? []);
     } catch (error) { pos.failed(error); }
   }, [pos.failed]);
 
@@ -145,6 +184,11 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
 
   const claimOf = (table: string) => claims.find((claim) => claim.table === table.toUpperCase());
   const calling = new Set(requests.map((request) => request.table.toUpperCase()));
+  // A table booked for later today, not yet sat at: the first such booking's time on its tile.
+  const bookedAt = new Map<string, string>();
+  for (const booking of bookings) {
+    if (booking.table && booking.status !== "seated" && !bookedAt.has(booking.table.toUpperCase())) bookedAt.set(booking.table.toUpperCase(), booking.time);
+  }
   const room = tables.filter((table) => !TAKEAWAY.test(table.table));
   const takeaways = tables.filter((table) => TAKEAWAY.test(table.table) && table.state !== "free");
 
@@ -174,6 +218,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       {busy && <small>{t("openOn", { name: claim.staffName ?? "?" })}</small>}
       {calling.has(table.table.toUpperCase()) && <em className="pos-call-badge">🔔 {t("calling")}</em>}
       {table.orderingUntil && <em className="pos-qr-badge">{t("qrBadge")}</em>}
+      {bookedAt.has(table.table.toUpperCase()) && <em className="pos-qr-badge pos-booked-badge">{t("bookingBadge", { time: bookedAt.get(table.table.toUpperCase())! })}</em>}
       {table.orders.some((order) => order.channel === "pickup") && <em className="pos-qr-badge">{t("pickupBadge")}</em>}
     </button>;
   };
@@ -181,6 +226,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   return <section className="pos-floor">
     <FailedPrints pos={pos} />
     <ServiceCalls pos={pos} requests={requests} onDone={() => void load()} />
+    <TodayBookings pos={pos} bookings={bookings} onDone={() => void load()} />
     <div className="pos-floor-bar">
       <form onSubmit={openTyped} className="pos-open-table">
         <input name="table" placeholder={t("openTable")} aria-label={t("openTable")} maxLength={8} autoCapitalize="characters" />

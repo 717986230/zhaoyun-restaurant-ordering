@@ -454,6 +454,28 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       reset_at TEXT NOT NULL
     );
 
+    -- Guests' table bookings (shared/reservations.mjs). The day and time are
+    -- the restaurant's own wall clock. See migrations/0062_reservations.sql.
+    CREATE TABLE IF NOT EXISTS reservations (
+      id TEXT PRIMARY KEY,
+      reference TEXT NOT NULL UNIQUE,
+      token_hash TEXT,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      party INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      language TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL,
+      table_no TEXT,
+      source TEXT NOT NULL,
+      customer_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     -- The printers a bridge found on the shop's network, for the console to
     -- offer. See migrations/0059_discovered_printers.sql.
     CREATE TABLE IF NOT EXISTS discovered_printers (
@@ -489,6 +511,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_guest_orders_customer ON guest_orders(customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
+    CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(date, time);
+    CREATE INDEX IF NOT EXISTS idx_reservations_customer ON reservations(customer_id, date);
   `);
   for (const statement of [
     "ALTER TABLE products ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",

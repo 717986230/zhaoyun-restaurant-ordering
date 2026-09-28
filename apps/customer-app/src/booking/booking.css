@@ -1,0 +1,413 @@
+/* The booking page (/book). It borrows the menu's colours and type from
+   styles.css and scrolls like an ordinary page. */
+html.bk-root,
+html.bk-root body {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+.bk-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  color: var(--ink);
+  display: grid;
+  gap: 14px;
+}
+
+.bk-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0 4px;
+}
+.bk-head h1 {
+  margin: 0;
+  font-size: clamp(26px, 7vw, 34px);
+  letter-spacing: -0.01em;
+}
+.bk-eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bk-languages {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.bk-languages button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.bk-languages button.active {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.bk-form {
+  display: grid;
+  gap: 14px;
+}
+.bk-card {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.bk-card h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.bk-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.bk-message p {
+  margin: 0;
+}
+
+.bk-party,
+.bk-times {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 8px;
+}
+.bk-times {
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+}
+.bk-party button,
+.bk-times button,
+.bk-days button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.bk-party button.active,
+.bk-times button.active,
+.bk-days button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.bk-times button:disabled,
+.bk-days button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.bk-days button:disabled {
+  text-decoration: none;
+}
+
+/* Signed in or not: the account line, the sign-in card, the guest's bookings. */
+.bk-account {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.bk-link-button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.bk-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  width: fit-content;
+}
+.bk-tabs button {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.bk-tabs button.active {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+.bk-signin {
+  display: grid;
+  gap: 12px;
+}
+.bk-mine {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bk-mine li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bk-mine li span {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.bk-mine small {
+  color: var(--muted);
+}
+.bk-mine li[data-status="cancelled"],
+.bk-mine li[data-status="no_show"] {
+  opacity: 0.6;
+}
+
+/* Picking a table: a tile per table, its seats as dots. */
+.bk-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.bk-table {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-height: 84px;
+  padding: 10px 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.bk-table strong {
+  font-size: 15px;
+}
+.bk-seats {
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+.bk-table small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.bk-table.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.bk-table.active .bk-seats,
+.bk-table.active small {
+  color: var(--accent-ink);
+}
+.bk-table:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bk-days {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+}
+.bk-days button {
+  flex: 0 0 64px;
+  display: grid;
+  gap: 2px;
+  padding: 8px 4px;
+  scroll-snap-align: start;
+}
+.bk-days span,
+.bk-days small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.bk-days strong {
+  font-size: 20px;
+}
+
+.bk-field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.bk-field span {
+  color: var(--ink-2);
+}
+.bk-field small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.bk-field input,
+.bk-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.bk-field input:focus,
+.bk-field textarea:focus {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+.bk-other-date {
+  max-width: 260px;
+}
+
+.bk-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-wash);
+  font-size: 14px;
+}
+.bk-privacy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bk-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--danger);
+  color: var(--danger-ink);
+  font-size: 14px;
+}
+
+.bk-primary,
+.bk-secondary,
+.bk-danger {
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bk-primary {
+  position: sticky;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-1);
+}
+.bk-primary:disabled {
+  opacity: 0.6;
+}
+.bk-secondary {
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: var(--ink);
+}
+.bk-danger {
+  border: 1px solid var(--danger);
+  background: none;
+  color: var(--danger-ink);
+}
+
+.bk-status {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.bk-status-confirmed,
+.bk-status-seated {
+  color: var(--accent-strong);
+}
+.bk-status-cancelled,
+.bk-status-declined,
+.bk-status-no_show {
+  color: var(--danger-ink);
+}
+.bk-summary {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.bk-summary div {
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) 1fr;
+  gap: 8px;
+}
+.bk-summary dt {
+  color: var(--muted);
+}
+.bk-summary dd {
+  margin: 0;
+}
+#bookingReference {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+}
+.bk-link {
+  display: grid;
+  gap: 8px;
+}
+.bk-link p {
+  margin: 0;
+  font-size: 14px;
+}
+.bk-link input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+}
+.bk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
