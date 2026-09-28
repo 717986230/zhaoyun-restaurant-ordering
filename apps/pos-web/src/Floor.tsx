@@ -21,8 +21,15 @@ export async function openTable(pos: Pos, table: string, go: (screen: Screen) =>
     await api.claim(table);
     go({ name: "order", table: table.toUpperCase() });
   } catch (error) {
-    const holder = claims.find((claim) => claim.table === table.toUpperCase())?.staffName ?? "?";
-    if (pos.staff.role !== "manager" || !window.confirm(pos.t("forceConfirm", { name: holder }))) return pos.failed(error);
+    const held = (error as { status?: number })?.status === 409;
+    // Locked to the device that has it open: a waiter is told whose it is; the manager may take it over.
+    if (!held) return pos.failed(error);
+    const holderOf = (list: PosClaim[]) => list.find((claim) => claim.table === table.toUpperCase())?.staffName;
+    // A number typed in may be one the floor on screen did not know was taken yet.
+    const holder = holderOf(claims) ?? holderOf(await api.floor().then((floor) => floor.claims, () => [])) ?? "?";
+    if (pos.staff.role !== "manager" || !window.confirm(pos.t("forceConfirm", { name: holder }))) {
+      return pos.notify(pos.t("claimedBy", { table: table.toUpperCase(), name: holder }), "error");
+    }
     try {
       await api.release(table, true);
       await api.claim(table);
@@ -90,12 +97,15 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const { t, money } = pos;
   const [tables, setTables] = useState<TableOverview[]>([]);
   const [claims, setClaims] = useState<PosClaim[]>([]);
+  // This device: the tables it has open are its own, every other device's are locked to it.
+  const [deviceId, setDeviceId] = useState("");
 
   const load = useCallback(async () => {
     try {
       const floor = await api.floor();
       setTables(floor.tables);
       setClaims(floor.claims);
+      setDeviceId(floor.deviceId ?? "");
     } catch (error) { pos.failed(error); }
   }, [pos.failed]);
 
@@ -125,12 +135,13 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
 
   const tile = (table: TableOverview) => {
     const claim = claimOf(table.table);
-    const mine = claim && claim.staffId === pos.staff.id;
+    const mine = claim && (deviceId ? claim.deviceId === deviceId : claim.staffId === pos.staff.id);
     const busy = claim && !mine;
     return <button key={table.table} type="button" data-table={table.table}
       className={`pos-table ${table.state} ${busy ? "claimed" : ""}`}
+      title={busy ? t("claimedBy", { table: table.table, name: claim.staffName ?? "?" }) : undefined}
       onClick={() => void openTable(pos, table.table, go, claims)}>
-      <b>{table.table}</b>
+      <b>{busy && <i className="pos-lock" aria-label={t("lockedHere")}>🔒</i>}{table.table}</b>
       <span>{table.total > 0 ? money(Math.round(table.total * 100)) : t(table.state === "locked" ? "lockedByGuest" : "free")}</span>
       {busy && <small>{t("openOn", { name: claim.staffName ?? "?" })}</small>}
       {table.orderingUntil && <em className="pos-qr-badge">{t("qrBadge")}</em>}

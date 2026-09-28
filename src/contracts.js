@@ -332,6 +332,11 @@ export const TableLockBody = Type.Object({
 export const TableOrderingBody = Type.Object({ open: Type.Boolean() }, { additionalProperties: false });
 
 // Tables 1 to count set up at once, each with a code of its own; those already there keep theirs.
+/** A table given another number or label; its card keeps the same code. */
+export const TableRenameBody = Type.Object({
+  table: Type.Optional(TableNo),
+  label: Type.Optional(Type.String({ maxLength: 64 }))
+}, { additionalProperties: false });
 export const NumberedTablesBody = Type.Object({ count: Type.Integer({ minimum: 1, maximum: 200 }) }, { additionalProperties: false });
 
 export const TableBody = Type.Object({

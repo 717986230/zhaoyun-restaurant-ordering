@@ -952,6 +952,77 @@ em.voided {
   background: var(--a-sunken);
 }
 
+/* Open on a POS: that device's table, locked everywhere else. Dashed and
+   hatched so it reads as "hands off" across the room. */
+.table-tile.claimed {
+  border-style: dashed;
+  border-left-style: solid;
+  border-left-color: var(--a-warn-solid);
+  background: repeating-linear-gradient(135deg, var(--a-card) 0 12px, var(--a-sunken) 12px 24px);
+}
+
+.table-tile.claimed .table-open-on {
+  background: var(--a-warn-solid);
+  color: var(--a-on-accent);
+}
+
+.list-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-editor {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--a-line-2);
+  border-radius: 6px;
+  background: var(--a-sunken);
+  padding: 12px 14px;
+}
+
+.table-editor p {
+  margin: 0;
+  color: var(--a-muted);
+  font-size: 13px;
+}
+
+.table-editor-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.table-editor-add label,
+.table-rename label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--a-muted);
+}
+
+.table-editor-add input {
+  width: 9em;
+}
+
+.table-rename {
+  display: grid;
+  gap: 8px;
+}
+
+.table-rename input {
+  width: 100%;
+  min-width: 0;
+}
+
+.table-in-use {
+  flex-basis: 100%;
+  color: var(--a-muted);
+  font-size: 12px;
+}
+
 .table-tile-head {
   display: flex;
   align-items: baseline;

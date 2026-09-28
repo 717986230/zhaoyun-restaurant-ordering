@@ -420,7 +420,8 @@ export function createStore(driver) {
       const voucherRows = codes.length ? await selectByIds("SELECT * FROM vouchers WHERE code IN (?)", codes) : [];
       // Another device's open table is theirs to pay, before anything else is looked at.
       const openTable = input.table || itemRows[0]?.table_no;
-      if (pos && openTable) assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(openTable).toUpperCase()), pos.deviceId);
+      // The console has no table of its own: one open on a POS is that POS's.
+      if (openTable) assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(openTable).toUpperCase()), pos?.deviceId ?? null);
       const settings = await getSettings();
       const plan = planCheckout({ ...input, clientRequestId: requestId }, {
         itemRows, voucherRows, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1, settings, role, staff: pos?.staff ?? null
@@ -697,6 +698,26 @@ export function createStore(driver) {
     const row = await first("SELECT * FROM table_claims WHERE table_no = ?", table);
     assertClaim(row, pos.deviceId, at);
     return claimView(row, at);
+  }
+
+  function tableConflict(message, code) {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+  }
+
+  /**
+   * Throws unless nobody is at the table: no bill left open, no waiter with it
+   * open on a POS, no guests ordering from their phones. What renumbering or
+   * removing a table waits for.
+   */
+  async function assertTableIdle(tableNo) {
+    const at = now();
+    const claim = claimView(await first("SELECT * FROM table_claims WHERE table_no = ?", tableNo), at);
+    if (claim) throw tableConflict(`Table ${tableNo} is open on a POS (${claim.staffName ?? "?"})`, "TABLE_IN_USE");
+    const open = (await first("SELECT COUNT(*) AS n FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", tableNo))?.n ?? 0;
+    if (open) throw tableConflict(`Table ${tableNo} still has a bill open`, "TABLE_IN_USE");
+    if (await first("SELECT table_no FROM table_sessions WHERE table_no = ? AND expires_at > ?", tableNo, at)) throw tableConflict(`Table ${tableNo} is open for guests to order`, "TABLE_IN_USE");
   }
 
   async function holdsTable(tableInput, deviceId) {
@@ -1015,7 +1036,39 @@ export function createStore(driver) {
       const tables = (await all("SELECT * FROM restaurant_tables ORDER BY length(table_no), table_no")).filter((row) => wanted.has(row.table_no)).map(tableView);
       return { tables, created: missing.length };
     },
-    deleteTable: async (table) => (await run("DELETE FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))) > 0,
+    /**
+     * A table given another number, a label, or both. The number changes only
+     * while nobody is at the table: an open bill, a waiter on a POS or guests
+     * ordering from their phones all hang on the number. The card on the table
+     * keeps its code, so it only needs the new number written on it.
+     */
+    renameTable: async (fromInput, input) => {
+      const from = normalizeTableNo(fromInput);
+      const to = input.table === undefined ? from : normalizeTableNo(input.table);
+      const current = await first("SELECT * FROM restaurant_tables WHERE table_no = ?", from);
+      if (!current) return null;
+      if (to !== from) {
+        if (await first("SELECT table_no FROM restaurant_tables WHERE table_no = ?", to)) throw tableConflict(`Table ${to} already exists`, "TABLE_EXISTS");
+        await assertTableIdle(from);
+        await assertTableIdle(to);
+      }
+      const timestamp = now();
+      await batch([
+        sql("UPDATE restaurant_tables SET table_no = ?, label = ?, updated_at = ? WHERE table_no = ?", to, String(input.label ?? current.label ?? "").trim(), timestamp, from),
+        ...(to !== from ? [sql(CLOSE_TABLE_SESSION_SQL, from)] : [])
+      ]);
+      return tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", to));
+    },
+    /** A table taken out of the room, once nobody is at it. */
+    deleteTable: async (table) => {
+      const tableNo = normalizeTableNo(table);
+      if (!await first("SELECT table_no FROM restaurant_tables WHERE table_no = ?", tableNo)) return false;
+      await assertTableIdle(tableNo);
+      return (await run("DELETE FROM restaurant_tables WHERE table_no = ?", tableNo)) > 0;
+    },
+    /** Throws when another device has the table open: what the console and other POS may not touch. */
+    assertTableFree: async (table, deviceId = null) =>
+      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(table).trim().toUpperCase()), deviceId),
     setTableLock: async (table, locked) => {
       const tableNo = normalizeTableNo(table);
       if (!await first("SELECT table_no FROM restaurant_tables WHERE table_no = ?", tableNo)) return null;
@@ -1036,7 +1089,10 @@ export function createStore(driver) {
       for (const row of await all(OPEN_TABLE_ORDERS_SQL)) orders.push(await viewOrder(row));
       const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
       const { floorTables } = await getSettings();
-      return tablesOverviewView(await all("SELECT * FROM restaurant_tables ORDER BY table_no"), orders, claims, await all(LIVE_TABLE_SESSIONS_SQL, now()), floorTables);
+      // Tables 1 to floorTables stand in until the manager sets the room up;
+      // from then on the room is the tables they set up, added and taken away.
+      const tableRows = await all("SELECT * FROM restaurant_tables ORDER BY table_no");
+      return tablesOverviewView(tableRows, orders, claims, await all(LIVE_TABLE_SESSIONS_SQL, now()), tableRows.length ? 0 : floorTables);
     },
     staffActivity: async () => {
       const staffRows = await all("SELECT * FROM staff ORDER BY active DESC, name");

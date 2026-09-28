@@ -1026,3 +1026,79 @@ test("tables 1–20 get their QR cards in one go, each with its own code, ready 
   await expect(page.locator(".table-row code").nth(6)).toContainText("table=7");
   await expect(page.locator(".table-row code").nth(6)).toContainText("tok-7-secret");
 });
+
+test("the manager adds, renumbers and removes tables, and a table open on a POS is locked here", async ({ page }) => {
+  const tile = (table, extra = {}) => ({ table, label: "", enabled: true, locked: false, lockedAt: null, registered: false, state: "free", total: 0, since: null, orders: [], openOn: null, orderingUntil: null, ...extra });
+  // Tables 1–3 as the floor shows them before anyone set them up; table 2 is open on Sun's tablet.
+  let room = [tile("1"), tile("2", { openOn: { staffId: "s1", staffName: "小孙" } }), tile("3")];
+  const calls = [];
+  const reply = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  await page.route("**/api/admin/audit*", (route) => reply(route, { entries: [] }));
+  await page.route("**/api/admin/tables", (route) => {
+    if (route.request().method() === "POST") {
+      const { table } = route.request().postDataJSON();
+      calls.push(["add", table]);
+      room = [...room, tile(table, { registered: true })];
+      return reply(route, { table: { table, label: "", token: "t", enabled: true } }, 201);
+    }
+    return reply(route, { tables: room.filter((table) => table.registered).map(({ table, label }) => ({ table, label, token: "t", enabled: true })) });
+  });
+  await page.route("**/api/admin/tables/*", (route) => {
+    const table = decodeURIComponent(route.request().url().split("/").pop());
+    if (route.request().method() === "PATCH") {
+      const change = route.request().postDataJSON();
+      calls.push(["rename", table, change]);
+      room = room.map((known) => known.table === table ? { ...known, ...change } : known);
+      return reply(route, { table: { table: change.table ?? table, label: "", token: "t", enabled: true } });
+    }
+    if (route.request().method() === "DELETE") {
+      calls.push(["delete", table]);
+      room = room.filter((known) => known.table !== table);
+      return route.fulfill({ status: 204 });
+    }
+    return route.fallback();
+  });
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => reply(route, { tables: room }));
+  await page.route("**/api/admin/tables/numbered", (route) => {
+    const { count } = route.request().postDataJSON();
+    calls.push(["setUp", count]);
+    room = room.map((table) => ({ ...table, registered: true }));
+    return reply(route, { tables: [], created: count }, 201);
+  });
+  const dialogs = [];
+  page.on("dialog", (dialog) => { dialogs.push(dialog.message()); void dialog.accept(); });
+
+  await page.goto("/admin.html");
+  await page.getByRole("button", { name: "桌位" }).click();
+
+  // Open on a POS: locked, whose it is, and nothing here to press.
+  const two = page.locator(".table-tile[data-table='2']");
+  await expect(two).toHaveClass(/claimed/);
+  await expect(two.locator(".table-open-on")).toHaveText("🔒 小孙 正在 POS 上操作");
+  await expect(two.getByRole("button", { name: "开台（允许扫码点餐）" })).toBeDisabled();
+
+  // The defaults are set up once, then edited.
+  await page.getByRole("button", { name: "编辑桌台" }).click();
+  await expect.poll(() => calls[0]).toEqual(["setUp", 3]);
+  expect(dialogs[0]).toContain("1–3");
+  const editor = page.locator(".table-editor");
+  await expect(editor.locator("input[name=table]")).toHaveValue("4");
+  await editor.getByRole("button", { name: "+ 加桌" }).click();
+  await expect(page.locator(".table-tile[data-table='4']")).toBeVisible();
+
+  await page.locator(".table-tile[data-table='1']").getByRole("button", { name: "改桌号" }).click();
+  await page.locator(".table-tile[data-table='1'] .table-rename input[name=table]").fill("a1");
+  await page.locator(".table-tile[data-table='1'] .table-rename").getByRole("button", { name: "保存" }).click();
+  await expect(page.locator(".table-tile[data-table='A1']")).toBeVisible();
+
+  // Someone is at table 2: its number waits.
+  await expect(two.getByRole("button", { name: "改桌号" })).toBeDisabled();
+  await expect(two.getByRole("button", { name: "删除" })).toBeDisabled();
+  await expect(two).toContainText("有人在用，空桌后才能改");
+
+  await page.locator(".table-tile[data-table='4']").getByRole("button", { name: "删除" }).click();
+  await expect(page.locator(".table-tile[data-table='4']")).toHaveCount(0);
+  expect(calls).toEqual([["setUp", 3], ["add", "4"], ["rename", "1", { table: "A1" }], ["delete", "4"]]);
+  expect(dialogs[1]).toContain("删除桌 4");
+});

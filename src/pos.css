@@ -136,8 +136,11 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-table.seated { border-color: var(--p-seated); background: #fff6e8; }
 .pos-table.seated span { color: var(--p-ink); font-weight: 700; }
 .pos-table.locked { border-color: var(--p-pay); background: #e8efff; }
-.pos-table.claimed { border-style: dashed; border-color: var(--p-warn); }
-.pos-table small { color: var(--p-warn); font-size: 12px; }
+/* Open on another device: locked here until that waiter is done. */
+.pos-table.claimed { border-style: dashed; border-color: var(--p-warn); background: repeating-linear-gradient(135deg, transparent 0 10px, rgb(0 0 0 / 4%) 10px 20px); }
+.pos-table.claimed b, .pos-table.claimed span { opacity: .6; }
+.pos-table .pos-lock { margin-right: 4px; font-size: 18px; font-style: normal; }
+.pos-table small { color: var(--p-warn); font-size: 12px; font-weight: 700; }
 
 .pos-order {
   display: grid;

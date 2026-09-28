@@ -52,6 +52,25 @@ const OPEN_ORDERING = { enabled: true, requireOpenTable: false, minIntervalSecon
 /** `liveBase` is the backend's address as ws://host:port. */
 export function contractChecks(call, assert, { liveBase } = {}) {
   return [
+    ["the floor shows tables 1 to 20 to tap before any is set up, and the manager changes how many", async () => {
+      const numbers = async () => (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.map((table) => table.table);
+      const floor = await numbers();
+      for (let n = 1; n <= 20; n += 1) assert.ok(floor.includes(String(n)), `table ${n} is on the floor`);
+      assert.equal((await call("GET", "/api/admin/settings", { admin: true })).json.floorTables, 20, "twenty by default");
+      const overview = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables;
+      const untouched = overview.filter((table) => /^\d+$/.test(table.table) && Number(table.table) <= 20 && !table.orders.length);
+      assert.ok(untouched.length > 0 && untouched.every((table) => !table.registered && table.state === "free" && table.total === 0), "there to tap, not set up one by one");
+      assert.ok(floor.indexOf("2") < floor.indexOf("10"), "counted as a waiter counts: 2 before 10");
+
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 500 } })).status, 400);
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 12 } })).json.floorTables, 12);
+      const fewer = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables;
+      assert.ok(fewer.some((table) => table.table === "12"), "twelve now");
+      assert.ok(fewer.filter((table) => /^\d+$/.test(table.table) && Number(table.table) > 12).every((table) => table.orders.length || table.registered), "past twelve, only a table someone ordered at or set up stays");
+      assert.ok((await call("GET", "/api/pos/floor", { role: "staff" })).status !== 404);
+      await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 20 } });
+    }],
+
     ["the catalogue is the seeded menu", async () => {
       const denied = await call("GET", "/api/admin/products");
       assert.equal(denied.status, 401, "admin products must require a token");
@@ -1497,23 +1516,61 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true });
     }],
 
-    ["the floor shows tables 1 to 20 to tap before any is set up, and the manager changes how many", async () => {
-      const numbers = async () => (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.map((table) => table.table);
-      const floor = await numbers();
-      for (let n = 1; n <= 20; n += 1) assert.ok(floor.includes(String(n)), `table ${n} is on the floor`);
-      assert.equal((await call("GET", "/api/admin/settings", { admin: true })).json.floorTables, 20, "twenty by default");
-      const overview = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables;
-      const untouched = overview.filter((table) => /^\d+$/.test(table.table) && Number(table.table) <= 20 && !table.orders.length);
-      assert.ok(untouched.length > 0 && untouched.every((table) => !table.registered && table.state === "free" && table.total === 0), "there to tap, not set up one by one");
-      assert.ok(floor.indexOf("2") < floor.indexOf("10"), "counted as a waiter counts: 2 before 10");
+    ["tables are added, renumbered and taken away, and one a waiter has open is locked to every other device", async () => {
+      const made = await call("POST", "/api/admin/tables", { admin: true, body: { table: "r1", label: "Terrasse" } });
+      assert.equal(made.status, 201);
+      const floor = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables;
+      assert.ok(floor.every((table) => table.registered || table.orders.length || table.orderingUntil), "once the room is set up, it is the tables set up");
 
-      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 500 } })).status, 400);
-      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 12 } })).json.floorTables, 12);
-      const fewer = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables;
-      assert.ok(fewer.some((table) => table.table === "12"), "twelve now");
-      assert.ok(fewer.filter((table) => /^\d+$/.test(table.table) && Number(table.table) > 12).every((table) => table.orders.length || table.registered), "past twelve, only a table someone ordered at or set up stays");
-      assert.ok((await call("GET", "/api/pos/floor", { role: "staff" })).status !== 404);
-      await call("PUT", "/api/admin/settings", { admin: true, body: { floorTables: 20 } });
+      // Another number: the card keeps its code, and the old number is gone.
+      assert.equal((await call("PATCH", "/api/admin/tables/R1", { role: "staff", body: { table: "R2" } })).status, 403, "the manager's");
+      const renamed = await call("PATCH", "/api/admin/tables/r1", { admin: true, body: { table: "r2" } });
+      assert.equal(renamed.status, 200, JSON.stringify(renamed.json));
+      assert.deepEqual([renamed.json.table.table, renamed.json.table.label, renamed.json.table.token], ["R2", "Terrasse", made.json.table.token]);
+      const listed = (await call("GET", "/api/admin/tables", { admin: true })).json.tables.map((table) => table.table);
+      assert.ok(listed.includes("R2") && !listed.includes("R1"));
+      assert.equal((await call("PATCH", "/api/admin/tables/R2", { admin: true, body: { label: "Garten" } })).json.table.label, "Garten", "a label alone");
+      assert.equal((await call("PATCH", "/api/admin/tables/R9", { admin: true, body: { table: "R8" } })).status, 404);
+      assert.equal((await call("PATCH", "/api/admin/tables/R2", { admin: true, body: { table: "no spaces" } })).status, 400);
+      await call("POST", "/api/admin/tables", { admin: true, body: { table: "R3" } });
+      const taken = await call("PATCH", "/api/admin/tables/R2", { admin: true, body: { table: "R3" } });
+      assert.deepEqual([taken.status, taken.json.code], [409, "TABLE_EXISTS"], "a number already taken");
+
+      // Guests ordering from their phones hang on the number: it waits.
+      assert.equal((await call("POST", "/api/admin/tables/R2/ordering", { role: "staff", body: { open: true } })).status, 200);
+      assert.equal((await call("PATCH", "/api/admin/tables/R2", { admin: true, body: { table: "R4" } })).status, 409);
+      const seated = await call("DELETE", "/api/admin/tables/R2", { admin: true });
+      assert.deepEqual([seated.status, seated.json.code], [409, "TABLE_IN_USE"]);
+      await call("POST", "/api/admin/tables/R2/ordering", { role: "staff", body: { open: false } });
+
+      // A waiter has R3 open on their tablet: locked to the console and every other device.
+      const tablet = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Tablet R" } })).json.token;
+      const phone = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Phone R" } })).json.token;
+      const sun = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Sun", pin: "2468" } })).json.staff;
+      const asSun = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: tablet, body: { staffId: sun.id, pin: "2468" } })).json.token };
+      const asSunElsewhere = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: phone, body: { staffId: sun.id, pin: "2468" } })).json.token };
+      assert.equal((await call("POST", "/api/pos/tables/R3/claim", asSun)).status, 200);
+      const tabletFloor = (await call("GET", "/api/pos/floor", asSun)).json;
+      const holder = tabletFloor.claims.find((claim) => claim.table === "R3");
+      assert.equal(holder.deviceId, tabletFloor.deviceId, "the floor says which tables are this device's own");
+      assert.notEqual((await call("GET", "/api/pos/floor", asSunElsewhere)).json.deviceId, holder.deviceId);
+      assert.equal((await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.find((table) => table.table === "R3").openOn.staffName, "Sun");
+      assert.equal((await call("POST", "/api/pos/tables/R3/claim", asSunElsewhere)).status, 409, "the same waiter on another device too");
+      const locked = await call("POST", "/api/admin/tables/R3/lock", { role: "staff", body: { locked: true } });
+      assert.deepEqual([locked.status, locked.json.code], [409, "TABLE_CLAIMED"], "the console may not touch it");
+      assert.equal((await call("POST", "/api/admin/tables/R3/ordering", { role: "staff", body: { open: true } })).status, 409);
+      assert.equal((await call("POST", "/api/admin/tables/R3/ordering", { ...asSunElsewhere, body: { open: true } })).status, 409);
+      assert.equal((await call("PATCH", "/api/admin/tables/R3", { admin: true, body: { table: "R5" } })).status, 409);
+      assert.equal((await call("DELETE", "/api/admin/tables/R3", { admin: true })).status, 409);
+      assert.equal((await call("POST", "/api/admin/tables/R3/ordering", { ...asSun, body: { open: true } })).status, 200, "the device that has it may");
+      await call("POST", "/api/admin/tables/R3/ordering", { ...asSun, body: { open: false } });
+      await call("DELETE", "/api/pos/tables/R3/claim", asSun);
+      assert.equal((await call("POST", "/api/admin/tables/R3/lock", { role: "staff", body: { locked: true } })).status, 200, "free again once the waiter is done");
+      await call("POST", "/api/admin/tables/R3/lock", { role: "staff", body: { locked: false } });
+
+      for (const table of ["R2", "R3"]) assert.equal((await call("DELETE", `/api/admin/tables/${table}`, { admin: true })).status, 204);
+      await call("PUT", `/api/admin/staff/${sun.id}`, { admin: true, body: { active: false } });
+      for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true });
     }],
 
     ["tables 1 to N set up in one go for their cards, each with its own code, and a table already there keeps its code", async () => {

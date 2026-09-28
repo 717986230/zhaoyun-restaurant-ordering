@@ -246,6 +246,14 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [floorTab, live, loadBoard]);
 
+  /** A refusal about a table, in words: a number taken, someone at it, open on a POS. */
+  function tableFailed(error: unknown, fallback: CopyKey) {
+    const code = (error as { code?: string } | null)?.code;
+    const key: CopyKey | null = code === "TABLE_EXISTS" ? "tableErrExists" : code === "TABLE_IN_USE" ? "tableErrInUse" : code === "TABLE_CLAIMED" ? "tableErrClaimed" : null;
+    if (key) notify(t(key), "error");
+    else failed(error, fallback);
+  }
+
   async function runBoardAction(action: () => Promise<unknown>, message: string) {
     setState((current) => ({ ...current, boardBusy: true }));
     try {
@@ -253,7 +261,24 @@ export function App() {
       await loadBoard(true);
       notify(message);
     } catch (error) {
-      failed(error, "genericFailed");
+      tableFailed(error, "genericFailed");
+    } finally {
+      setState((current) => ({ ...current, boardBusy: false }));
+    }
+  }
+
+  /** The room changed (a table added, renumbered, removed): the floor and the settings' list both follow. */
+  async function editRoom(action: () => Promise<unknown>, message: string): Promise<boolean> {
+    setState((current) => ({ ...current, boardBusy: true }));
+    try {
+      await action();
+      await Promise.all([loadBoard(true), loadTables()]);
+      notify(message);
+      return true;
+    } catch (error) {
+      tableFailed(error, "tableSaveFailed");
+      await loadBoard(true);
+      return false;
     } finally {
       setState((current) => ({ ...current, boardBusy: false }));
     }
@@ -517,7 +542,7 @@ export function App() {
       await adminApi.deleteTable(table);
       await loadTables();
       notify(t("tableDeleted"));
-    } catch (error) { failed(error, "deleteFailed"); }
+    } catch (error) { tableFailed(error, "deleteFailed"); }
   }
 
   async function openMenu() {
@@ -599,6 +624,12 @@ export function App() {
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
         onPrintBill={printBill}
         onOrdering={(table: string, open: boolean) => runBoardAction(() => adminApi.setTableOrdering(table, open), t(open ? "openForOrdering" : "closeForOrdering"))}
+        onSetUpTables={(count: number) => editRoom(() => adminApi.registerNumberedTables(count), t("tablesSetUpDone", { count }))}
+        onAddTable={(table: string) => state.tableOverview.some((known) => known.table === table && known.registered)
+          ? Promise.resolve((notify(t("tableErrExists"), "error"), false))
+          : editRoom(() => adminApi.saveTable({ table }), t("tableAdded", { table }))}
+        onRenameTable={(table: string, input: { table?: string; label?: string }) => editRoom(() => adminApi.renameTable(table, input), input.table ? t("tableRenamed", { table: input.table }) : t("tableSaved"))}
+        onDeleteTable={async (table: string) => { await editRoom(() => adminApi.deleteTable(table), t("tableDeleted")); }}
       />}
       {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} found={state.printFound} dishesPerStation={dishesPerStation} apiBase={adminApi.storage.baseUrl} onDelete={deletePrinter} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}

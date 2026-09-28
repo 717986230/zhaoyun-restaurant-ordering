@@ -332,6 +332,10 @@ export class AdminApi {
   /** Tables 1 to count set up at once, each with its own code; those already there keep theirs. */
   registerNumberedTables(count: number): Promise<{ tables: RestaurantTable[]; created: number }> { return this.#request("/api/admin/tables/numbered", { method: "POST", body: JSON.stringify({ count }) }); }
   saveTable(input: { table: string; label?: string; enabled?: boolean; rotateToken?: boolean }): Promise<{ table: RestaurantTable }> { return this.#request("/api/admin/tables", { method: "POST", body: JSON.stringify(input) }); }
+  /** Another number or label for a table; its card keeps the same code. */
+  renameTable(table: string, input: { table?: string; label?: string }): Promise<{ table: RestaurantTable }> {
+    return this.#request(`/api/admin/tables/${encodeURIComponent(table)}`, { method: "PATCH", body: JSON.stringify(input) });
+  }
   deleteTable(table: string): Promise<void> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}`, { method: "DELETE" }); }
   printers(): Promise<{ printers: PrinterProfile[]; bridges?: ApiPrintBridge[]; queue?: ApiPrintQueue; discovered?: ApiDiscoveredPrinter[] }> { return this.#request("/api/admin/printers"); }
   deletePrinter(id: string): Promise<void> { return this.#request(`/api/admin/printers/${encodeURIComponent(id)}`, { method: "DELETE" }); }
@@ -449,7 +453,7 @@ export class PosApi {
   voidItem(table: string, orderItemId: string, quantity: number, reason: string): Promise<{ void: PosVoid }> {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/void`, { method: "POST", body: JSON.stringify({ orderItemId, quantity, reason }) });
   }
-  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
   /** The tickets the print bridge gave up on, for the waiter to see and send again. */
   failedPrints(): Promise<{ jobs: ApiPrintJob[] }> { return this.#request("/api/admin/print-jobs?status=failed&limit=20"); }
   retryPrint(id: string): Promise<{ ok: boolean; id: string }> { return this.#request(`/api/admin/print-jobs/${encodeURIComponent(id)}/retry`, { method: "POST" }); }
