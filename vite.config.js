@@ -22,7 +22,7 @@ export default defineConfig({
   build: {
     outDir: "dist/web",
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         app: resolve(import.meta.dirname, "index.html"),
         admin: resolve(import.meta.dirname, "admin.html"),

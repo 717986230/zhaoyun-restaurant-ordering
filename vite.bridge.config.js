@@ -13,8 +13,8 @@ export default defineConfig({
     emptyOutDir: false,
     target: "node22",
     minify: false,
-    rollupOptions: {
-      output: { entryFileNames: "print-bridge.mjs", format: "es", inlineDynamicImports: true }
+    rolldownOptions: {
+      output: { entryFileNames: "print-bridge.mjs", format: "es", codeSplitting: false }
     }
   },
   ssr: { noExternal: true, target: "node" },

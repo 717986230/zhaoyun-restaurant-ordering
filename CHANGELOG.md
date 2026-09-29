@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-29（二）· 构建工具升级
+
+### Changed
+
+- **Vite 5 → 8、Vitest 3 → 5、React 插件 4 → 6**（取代 Dependabot #47；三者互相锁定大版本，只升一个装不上）。
+  - 构建改用 Rolldown，整站构建约 1 秒；打印桥单文件照常生成，实测可启动。
+  - 配置里 `rollupOptions` 改名 `rolldownOptions`，打印桥的 `inlineDynamicImports` 改为 `codeSplitting: false`。
+- **Dependabot**：Vite/Vitest/React 插件合成一组一起升；Capacitor 大版本不再自动提（大版本要同时改 Android 工程：Gradle、SDK 版本、Java，CI 不编 Android，需手动 `cap migrate` 后在 Android Studio 里验证）。
+
 ## 2026-09-29（二）· 顾客菜单界面
 
 ### Changed
