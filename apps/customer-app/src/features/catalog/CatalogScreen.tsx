@@ -599,6 +599,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   // they are back at the top. Watched on the list's own scroller — the
   // header and the category bar never scroll, so they need no help.
   const [farDown, setFarDown] = useState(false);
+  const firstPage = useRef(true);
+  useEffect(() => { firstPage.current = false; }, []);
   useEffect(() => {
     const stack = stackRef.current;
     if (!stack) return;
@@ -635,7 +637,9 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
 
   // The new page swings in like a leaf of a book hinged at its top edge,
   // from below for the next page and from above for the previous one.
-  const enter = reduceMotion || turn.current.direction === 0
+  // Not on the first page the menu opens on: fading in the list a guest came
+  // (or reloaded) to read left a ghost of every row over the next half second.
+  const enter = firstPage.current ? false : reduceMotion || turn.current.direction === 0
     ? { opacity: 0 }
     : { opacity: 0, y: 70 * turn.current.direction, rotateX: -24 * turn.current.direction, scale: 0.94 };
 

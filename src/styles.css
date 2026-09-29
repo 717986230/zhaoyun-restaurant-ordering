@@ -4235,3 +4235,39 @@ button:focus-visible,
     grid-column: 1 / -1;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   No ghosts (2026-09): what left trails behind a fling and a reload.
+   ------------------------------------------------------------------------ */
+
+/* The menu is simply there when it opens or reloads: the screen's own fade
+   and slide, on top of the page's, drew every row twice while it settled. */
+.screen.menu.active {
+  animation: none;
+}
+
+/* A thumbnail shows the moment it is decoded, at once. Faded in, the photos
+   arriving during a fling were half-drawn smears trailing behind the rows.
+   Still hidden until then, so a photo that fails never shows a broken icon. */
+.dish-media.dish-media-thumb {
+  transition: none;
+}
+
+/* A row is a flat tile: a gradient per card was one more thing to paint for
+   each row a fling brought on screen. */
+.dish-card {
+  background: var(--panel);
+}
+
+/* Nothing over the list blurs it: the buttons floating on it were frosted
+   glass, which redraws the rows under them on every frame of a scroll — the
+   smear around them in a fling. Their glass is nearly opaque, so it reads
+   the same without. */
+.cartbar,
+.to-top,
+.call-waiter,
+.install-offer {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
