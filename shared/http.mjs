@@ -19,7 +19,7 @@ import {
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
-  ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody
+  ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
@@ -73,7 +73,12 @@ function fail(message, status = 400) {
 /** A refusal that says what it is (`code`) and, for a pause, how long (retry-after). */
 function coded(error) {
   const status = error.status ?? (error.code === "TABLE_LOCKED" ? 409 : 400);
-  return json({ error: error.message || "Request failed", ...(error.code ? { code: error.code } : {}) }, status, error.retryAfter ? { "retry-after": String(error.retryAfter) } : {});
+  return json({
+    error: error.message || "Request failed",
+    ...(error.code ? { code: error.code } : {}),
+    // A dish sold out for today (shared/stock.mjs): which, and how many are left.
+    ...(error.code === "SOLD_OUT" ? { sku: error.sku, left: error.left } : {})
+  }, status, error.retryAfter ? { "retry-after": String(error.retryAfter) } : {});
 }
 
 /** A table someone is at, or a number already taken: a 409 that says which (`code`). */
@@ -718,7 +723,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       const { denied, role, pos } = await gate("staff");
       if (denied) return denied;
       if (!pos) return fail("Sign in on a POS device", 403);
-      const claimed = (error) => fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400);
+      const claimed = (error) => (error.code === "SOLD_OUT" || error.code === "BAD_STOCK" ? coded(error) : fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400));
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
@@ -771,6 +776,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         }
         if (path.length === 3 && path[2] === "catalog" && method === "GET") {
           return json({ products: (await store.listProducts(false)).filter((product) => product.published) });
+        }
+        // 每日限量: the floor says how many portions a dish has today, or each day.
+        if (path.length === 5 && path[2] === "products" && path[4] === "stock" && method === "PUT") {
+          const { value, invalid } = await body(request, StockBody);
+          if (invalid) return invalid;
+          const product = await store.setStock(path[3], value);
+          return product ? json({ product }) : fail("No such dish on the menu", 404);
         }
         if (path.length === 5 && path[2] === "products" && path[4] === "availability" && method === "PUT") {
           const { value, invalid } = await body(request, AvailabilityBody);
@@ -1019,9 +1031,12 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
        */
       if (path[2] === "delivery") {
         const manager = path[3] === "status" || path[3] === "test";
-        const { denied } = await gate(manager ? "manager" : "staff");
+        // The kitchen screen sees what it cooks and says when it is ready; nothing else.
+        const kitchen = (path.length === 4 && path[3] === "kitchen" && method === "GET") || (path.length === 6 && path[3] === "orders" && path[5] === "ready" && method === "POST");
+        const { denied } = await gate(manager ? "manager" : kitchen ? "kitchen" : "staff");
         if (denied) return denied;
         try {
+          if (path.length === 4 && path[3] === "kitchen" && method === "GET") return json({ orders: await store.delivery.kitchen() });
           if (path.length === 4 && path[3] === "orders" && method === "GET") {
             return json(await store.delivery.list(url.searchParams.get("from") ?? "", url.searchParams.get("to") ?? "", { provider: url.searchParams.get("provider") ?? "", status: url.searchParams.get("status") ?? "" }));
           }
@@ -1252,6 +1267,16 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (path.length === 4 && method === "GET") {
           const product = await store.getProduct(path[3]);
           return product ? json(product) : fail("Product not found", 404);
+        }
+        if (path.length === 5 && path[4] === "stock" && method === "PUT") {
+          try {
+            const { value, invalid } = await body(request, StockBody);
+            if (invalid) return invalid;
+            const product = await store.setStock(path[3], value);
+            return product ? json({ product }) : fail("Product not found", 404);
+          } catch (error) {
+            return coded(error);
+          }
         }
         if (path.length === 4 && method === "PUT") {
           try {

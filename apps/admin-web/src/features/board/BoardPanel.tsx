@@ -1,5 +1,5 @@
 import type { StaffRole } from "@zhaoyun/api-client";
-import type { ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
+import type { ApiDeliveryOrder, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 
@@ -38,6 +38,9 @@ interface Props {
   orders: ApiOrder[];
   requests: ApiServiceRequest[];
   failedJobs: ApiPrintJob[];
+  /** The platforms' orders being cooked, soonest due first. */
+  deliveryOrders: ApiDeliveryOrder[];
+  onDeliveryReady: (id: string) => Promise<void>;
   role: StaffRole | null;
   busy: boolean;
   onRefresh: () => Promise<void>;
@@ -75,6 +78,9 @@ export function BoardPanel(props: Props) {
         }) : <div className="admin-empty">{t("boardNoOrders")}</div>}</div>
       </section>
 
+      {/* The delivery platforms' orders: the kitchen's too, by when they are due. */}
+      {props.deliveryOrders.length > 0 && <DeliveryColumn orders={props.deliveryOrders} busy={props.busy} onReady={props.onDeliveryReady} />}
+
       {/* Billing lives on the Tables tab, where the table it belongs to is on
           screen with it. */}
       {floor && <section className="board-column">
@@ -94,5 +100,29 @@ export function BoardPanel(props: Props) {
         </article>) : <div className="admin-empty">{t("boardNoFailed")}</div>}</div>
       </section>}
     </div>
+  </section>;
+}
+
+/**
+ * What the platforms' riders and guests wait for: accepted orders by the time
+ * the floor promised (red once it has passed), then those ready for pickup.
+ * The kitchen says "ready" here; the platform is told.
+ */
+function DeliveryColumn({ orders, busy, onReady }: { orders: ApiDeliveryOrder[]; busy: boolean; onReady: (id: string) => Promise<void> }) {
+  const { t, language } = useI18n();
+  const cooking = orders.filter((order) => order.status === "accepted").length;
+  return <section className="board-column" id="boardDelivery">
+    <h2>{t("boardDelivery")} <em>{cooking}</em></h2>
+    <div className="board-list">{orders.map((order) => {
+      const due = order.readyBy ?? order.dueAt;
+      const late = order.status === "accepted" && due !== null && due !== undefined && Date.parse(due) < Date.now();
+      return <article className={`board-card ${late ? "late" : ""}`} key={order.id} data-delivery={order.reference} data-status={order.status}>
+        <div className="board-card-head"><b>{order.providerName} #{order.reference}</b><span className={`status ${order.status === "ready" ? "ready" : "preparing"}`}>{t(`dlStatus_${order.status}` as CopyKey)}</span></div>
+        <small>{t(order.type === "pickup" ? "dlTypePickup" : "dlTypeDelivery")}{due ? ` · ${t(late ? "boardLate" : "boardDue", { time: formatTime(due, language) })}` : ""}{order.customerName ? ` · ${order.customerName}` : ""}</small>
+        <ul>{order.items.map((item, index) => <li key={index}>{item.quantity} × {item.name}{item.options.length ? <em> ({item.options.map((option) => option.name).join(" · ")})</em> : null}</li>)}</ul>
+        {order.notes && <p className="board-note">{t("note", { note: order.notes })}</p>}
+        {order.status === "accepted" && <div className="board-actions"><button className="primary-action" disabled={busy} onClick={() => void onReady(order.id)}>{t("dlReady")}</button></div>}
+      </article>;
+    })}</div>
   </section>;
 }

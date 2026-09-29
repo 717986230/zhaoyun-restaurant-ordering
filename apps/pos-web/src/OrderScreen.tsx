@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { ApiBill } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
+import { ApiError } from "@zhaoyun/api-client";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 
@@ -29,6 +30,8 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // 退菜: the sent line being voided. 沽清: tapping a dish switches it off or on instead of adding it.
   const [voiding, setVoiding] = useState<ApiBill["items"][number] | null>(null);
   const [soldOutMode, setSoldOutMode] = useState(false);
+  // 限量: tapping a dish asks how many portions are left today instead of adding it.
+  const [stockMode, setStockMode] = useState(false);
   const [busy, setBusy] = useState(false);
   // One id per batch sent: a retried tap is the same order, not a second one.
   const requestId = useRef(crypto.randomUUID());
@@ -67,8 +70,26 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   }
   const pick = (product: Product) => {
     if (!product.available) return pos.notify(t("soldOutNote", { name: name(product) }), "error");
+    // 每日限量: no more on the order than there are portions left today.
+    const left = product.leftToday ?? null;
+    const inCart = cart.filter((line) => line.product.id === product.id).reduce((sum, line) => sum + line.quantity, 0);
+    if (left !== null && inCart >= left) return pos.notify(left ? t("stockShort", { name: name(product), left }) : t("stockOutNote", { name: name(product) }), "error");
     return product.modifiers?.length ? setChoosing(product) : add(product);
   };
+
+  /** "How many are left today?": a number, or nothing for no limit today. */
+  async function askStock(product: Product) {
+    const answer = window.prompt(t("stockPrompt", { name: name(product) }), product.leftToday === null || product.leftToday === undefined ? "" : String(product.leftToday));
+    if (answer === null) return;
+    const trimmed = answer.trim();
+    const leftToday = trimmed === "" ? null : Number(trimmed);
+    if (leftToday !== null && (!Number.isInteger(leftToday) || leftToday < 0 || leftToday > 9999)) return pos.notify(t("stockInvalid"), "error");
+    try {
+      await api.setStock(product.id, { leftToday });
+      pos.notify(leftToday === null ? t("stockCleared", { name: name(product) }) : t("stockSet", { name: name(product), n: leftToday }));
+      pos.refreshMenu();
+    } catch (error) { pos.failed(error); }
+  }
 
   async function toggleSoldOut(product: Product) {
     try {
@@ -118,8 +139,16 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       setCart([]);
       setNote("");
       await loadBill();
+      // The counts of limited dishes went down.
+      if (cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined)) pos.refreshMenu();
     } catch (error) {
-      pos.failed(error);
+      if (error instanceof ApiError && error.code === "SOLD_OUT") {
+        // Another table was quicker: say which dish and how many there still are, and show the new counts.
+        const dish = menu.find((product) => product.sku === error.details.sku);
+        const left = Number(error.details.left ?? 0);
+        pos.notify(left ? t("stockShort", { name: dish ? name(dish) : String(error.details.sku), left }) : t("stockOutNote", { name: dish ? name(dish) : String(error.details.sku) }), "error");
+        pos.refreshMenu();
+      } else pos.failed(error);
     } finally {
       setBusy(false);
     }
@@ -187,18 +216,26 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       <form className="pos-number" onSubmit={byNumber}>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("dishNumber")} aria-label={t("dishNumber")} autoFocus />
       </form>
-      <button type="button" className={`pos-soldout-mode ${soldOutMode ? "on" : ""}`} aria-pressed={soldOutMode} onClick={() => setSoldOutMode((on) => !on)}>{t(soldOutMode ? "soldOutModeOn" : "soldOutMode")}</button>
+      <div className="pos-dish-modes">
+        <button type="button" className={`pos-soldout-mode ${soldOutMode ? "on" : ""}`} aria-pressed={soldOutMode} onClick={() => { setSoldOutMode((on) => !on); setStockMode(false); }}>{t(soldOutMode ? "soldOutModeOn" : "soldOutMode")}</button>
+        <button type="button" className={`pos-soldout-mode pos-stock-mode ${stockMode ? "on" : ""}`} aria-pressed={stockMode} onClick={() => { setStockMode((on) => !on); setSoldOutMode(false); }}>{t(stockMode ? "stockModeOn" : "stockMode")}</button>
+      </div>
       <nav className="pos-categories">
         <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
         {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>{entry}</button>)}
       </nav>
-      <div className={`pos-dishes ${soldOutMode ? "choosing-soldout" : ""}`}>{shown.map((product) => <button key={product.id} type="button" data-sku={product.sku}
-        className={product.available ? "" : "soldout"} aria-disabled={!product.available && !soldOutMode}
-        onClick={() => void (soldOutMode ? toggleSoldOut(product) : pick(product))}>
-        <small>{product.sku}</small>
-        <b>{name(product)}</b>
-        <span>{product.available ? money(product.priceCents) : t("soldOut")}</span>
-      </button>)}</div>
+      <div className={`pos-dishes ${soldOutMode || stockMode ? "choosing-soldout" : ""}`}>{shown.map((product) => {
+        const left = product.leftToday ?? null;
+        const out = !product.available || left === 0;
+        return <button key={product.id} type="button" data-sku={product.sku}
+          className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
+          onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? askStock(product) : pick(product))}>
+          <small>{product.sku}</small>
+          <b>{name(product)}</b>
+          <span>{!product.available ? t("soldOut") : left === 0 ? t("stockOut") : money(product.priceCents)}</span>
+          {left !== null && left > 0 && <em className="pos-stock-left" data-left={left}>{t("stockLeft", { n: left })}</em>}
+        </button>;
+      })}</div>
     </div>
 
     {voiding && <VoidDialog pos={pos} item={voiding} onCancel={() => setVoiding(null)} onVoid={(quantity, reason) => void voidLine(voiding, quantity, reason)} />}

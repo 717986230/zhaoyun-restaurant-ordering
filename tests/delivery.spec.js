@@ -124,3 +124,56 @@ test("the console's delivery tab finds the order, shows the connection and sends
   await expect(page.locator("#dlOrders tbody tr")).toHaveCount(2);
   await expect(page.locator("#dlOrders tbody tr").first()).toContainText("测试单");
 });
+
+test("每日限量 on the POS: two left today, sold out at the count; the kitchen board shows a platform order and when it is due", async ({ page, request }) => {
+  const dish = (await (await request.get(`${API}/api/catalog`)).json()).products.find((product) => !product.bundleItems?.length && !product.modifiers?.length);
+
+  await page.goto("/pos.html");
+  await page.getByLabel(/设备名称/).fill("Counter 2");
+  await page.getByLabel("账户名").fill(LOGIN);
+  await page.getByLabel("账户密码").fill(PASSWORD);
+  await page.getByRole("button", { name: "配对" }).click();
+  await page.getByRole("button", { name: "Li", exact: true }).click();
+  for (const digit of "1234") await page.locator(".pos-keypad").getByRole("button", { name: digit, exact: true }).click();
+  await page.getByRole("button", { name: "OK" }).click();
+  await page.getByLabel("打开桌号").fill("7");
+  await page.getByRole("button", { name: "打开", exact: true }).click();
+
+  // "Two left today": the 限量 mode, a tap on the dish, the number.
+  const tile = page.locator(`.pos-dishes button[data-sku="${dish.sku}"]`);
+  await page.getByRole("button", { name: "限量", exact: true }).click();
+  page.once("dialog", (dialog) => dialog.accept("2"));
+  await tile.click();
+  await expect(tile.locator(".pos-stock-left")).toHaveText("剩 2");
+  await page.getByRole("button", { name: /^完成（点菜品设/ }).click();
+
+  // The guests see it too, while it lasts.
+  expect((await (await request.get(`${API}/api/catalog`)).json()).products.find((product) => product.id === dish.id).leftToday).toBe(2);
+
+  // Two on the order; a third is refused on the spot.
+  await tile.click();
+  await tile.click();
+  await tile.click();
+  await expect(page.locator(".pos-toast")).toContainText("今天只剩 2 份");
+  await expect(page.locator(".pos-lines.new li")).toContainText("2");
+  await page.getByRole("button", { name: "送厨" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已送厨：2 道菜");
+  await expect(tile).toHaveClass(/soldout/);
+  await expect(tile).toContainText("今日售完");
+  expect((await (await request.get(`${API}/api/catalog`)).json()).products.some((product) => product.id === dish.id)).toBe(false);
+
+  // A platform order accepted for 25 minutes is on the kitchen board, due by then.
+  const sent = await request.post(`${API}/api/delivery/lieferando/orders`, {
+    headers: { authorization: `Bearer ${SECRET}` },
+    data: { OrderId: "jet-e2e-2", FriendlyOrderReference: "E2E202", Items: [{ Name: "Gyoza", Quantity: 3, UnitPrice: 6 }] }
+  });
+  expect((await admin(request, "post", `/api/admin/delivery/orders/${(await sent.json()).id}/accept`, { prepMinutes: 25 })).ok()).toBe(true);
+  await page.addInitScript((token) => sessionStorage.setItem("zy_admin_token", token), ADMIN);
+  await page.goto("/admin.html");
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "订单" }).click();
+  const card = page.locator('#boardDelivery [data-delivery="E2E202"]');
+  await expect(card).toContainText("3 × Gyoza");
+  await expect(card).toContainText("前出餐");
+  await card.getByRole("button", { name: "出餐" }).click();
+  await expect(card).toHaveAttribute("data-status", "ready");
+});

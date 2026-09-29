@@ -506,6 +506,16 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       UNIQUE (provider, external_id)
     );
 
+    -- Portions a dish has left today (shared/stock.mjs): its daily limit and
+    -- today's count. See migrations/0064_product_stock.sql.
+    CREATE TABLE IF NOT EXISTS product_stock (
+      product_id TEXT PRIMARY KEY,
+      daily_limit INTEGER,
+      stock_day TEXT,
+      stock_left INTEGER,
+      updated_at TEXT NOT NULL
+    );
+
     -- The printers a bridge found on the shop's network, for the console to
     -- offer. See migrations/0059_discovered_printers.sql.
     CREATE TABLE IF NOT EXISTS discovered_printers (

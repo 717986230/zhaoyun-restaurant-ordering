@@ -1946,6 +1946,52 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
     }],
 
+    ["每日限量: a dish counts down with every order, leaves the guests' menu at zero, gets a void back, and takes more when the floor says so", async () => {
+      const catalog = (await call("GET", "/api/catalog")).json.products;
+      const dish = catalog.filter((product) => product.kind === "food" && !product.bundleItems?.length).at(-1);
+      assert.equal(dish.dailyLimit, undefined, "no limit, nothing said");
+      const stock = (body, auth = { admin: true }) => call("PUT", `/api/admin/products/${dish.id}/stock`, { ...auth, body });
+      assert.equal((await stock({ dailyLimit: 3 }, { role: "staff" })).status, 403, "the owner's, in the console");
+      assert.equal((await stock({})).status, 400);
+      assert.deepEqual([(await stock({ dailyLimit: 0 })).json.code], ["BAD_STOCK"], "zero a day is sold out, not a limit");
+      const set = await stock({ dailyLimit: 3 });
+      assert.deepEqual([set.status, set.json.product.dailyLimit, set.json.product.leftToday], [200, 3, 3]);
+
+      const stamp = Date.now().toString(36);
+      const device = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Tablet S" } })).json.token;
+      const mei = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Mei", pin: "2468" } })).json.staff;
+      const asMei = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: device, body: { staffId: mei.id, pin: "2468" } })).json.token };
+      assert.equal((await call("POST", "/api/pos/tables/S1/claim", asMei)).status, 200);
+      const order = (qty, n) => call("POST", "/api/pos/orders", { ...asMei, body: { clientRequestId: `contract-stock-${stamp}-${n}`, table: "S1", note: "", items: [{ id: dish.id, qty }] } });
+      assert.equal((await order(2, 1)).status, 201);
+      const left = async () => (await call("GET", "/api/catalog")).json.products.find((product) => product.id === dish.id)?.leftToday;
+      assert.equal(await left(), 1, "the guests see what is left");
+      const refused = await order(2, 2);
+      assert.deepEqual([refused.status, refused.json.code, refused.json.left, refused.json.sku], [409, "SOLD_OUT", 1, dish.sku], "said in words, with how many are left");
+      assert.equal((await order(1, 3)).status, 201);
+      assert.equal(await left(), undefined, "counted out: off the guests' menu");
+      const console = (await call("GET", "/api/admin/products", { admin: true })).json.products.find((product) => product.id === dish.id);
+      assert.deepEqual([console.leftToday, console.available], [0, true], "the staff see it counted out, not switched off by hand");
+      assert.equal((await order(1, 4)).json.code, "SOLD_OUT");
+
+      // The floor: "five more today", from the POS, and a dish voided comes back.
+      const more = await call("PUT", `/api/pos/products/${dish.id}/stock`, { ...asMei, body: { leftToday: 5 } });
+      assert.deepEqual([more.status, more.json.product.leftToday, more.json.product.dailyLimit], [200, 5, 3], "today's count, the daily limit as it was");
+      assert.equal((await call("PUT", `/api/pos/products/${dish.id}/stock`, { ...asMei, body: { leftToday: -1 } })).status, 400);
+      assert.equal((await order(2, 5)).status, 201);
+      assert.equal(await left(), 3);
+      const line = (await call("GET", "/api/admin/tables/S1/bill", asMei)).json.bill.items.at(-1);
+      assert.equal((await call("POST", "/api/pos/tables/S1/void", { ...asMei, body: { orderItemId: line.orderItemId, quantity: 1, reason: "Gast will nicht" } })).status, 201);
+      assert.equal(await left(), 4, "not cooked after all: back on the count");
+
+      // No limit again: as many as ordered, and nothing said.
+      const cleared = await stock({ dailyLimit: null, leftToday: null });
+      assert.equal(cleared.json.product.dailyLimit, undefined);
+      assert.equal(await left(), undefined);
+      assert.ok((await call("GET", "/api/catalog")).json.products.some((product) => product.id === dish.id), "back on the guests' menu");
+      await call("DELETE", `/api/pos/tables/S1/claim`, asMei);
+    }],
+
     ["delivery platforms: their orders come in by webhook once each, the floor accepts and the kitchen prints, a cancel voids, the report counts them", async () => {
       const stamp = Date.now().toString(36);
       const { timeZone } = (await call("GET", "/api/admin/settings", { admin: true })).json;
@@ -2010,7 +2056,12 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(tickets[0].payload.delivery.name, "Lieferando");
       const twice = await call("POST", `/api/admin/delivery/orders/${order.id}/accept`, { role: "staff", body: {} });
       assert.deepEqual([twice.status, twice.json.code], [409, "BAD_TRANSITION"]);
-      assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/ready`, { role: "staff", body: {} })).json.order.status, "ready");
+      // The kitchen screen sees it, due by the minutes the floor promised, and says when it is ready — and nothing more.
+      const cooking = (await call("GET", "/api/admin/delivery/kitchen", { role: "kitchen" })).json.orders.find((entry) => entry.id === order.id);
+      assert.ok(Math.abs(Date.parse(cooking.readyBy) - Date.now() - 30 * 60_000) < 5 * 60_000, "ready by: accepted + 30 minutes");
+      assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/reject`, { role: "kitchen", body: {} })).status, 403);
+      assert.equal((await call("GET", `/api/admin/delivery/orders?from=${today}&to=${today}`, { role: "kitchen" })).status, 403);
+      assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/ready`, { role: "kitchen", body: {} })).json.order.status, "ready");
       assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/complete`, { role: "staff", body: {} })).json.order.status, "completed");
       assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/fly`, { role: "staff", body: {} })).status, 404);
 

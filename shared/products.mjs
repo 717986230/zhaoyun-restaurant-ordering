@@ -38,7 +38,8 @@ export function normalizeBundleItems(value) {
     .map((item) => ({ productId: String(item.productId).trim(), quantity: Math.max(1, Math.min(99, Number(item.quantity) || 1)) }));
 }
 
-export function mapProduct(row, media = []) {
+/** A product for the API. `stock` is its daily limit and today's portions (shared/stock.mjs, stockView), when read. */
+export function mapProduct(row, media = [], stock = null) {
   return {
     id: row.id,
     sku: row.sku,
@@ -65,6 +66,8 @@ export function mapProduct(row, media = []) {
     published: Boolean(row.published),
     sortOrder: row.sort_order,
     printStation: row.print_station,
+    // Only for a dish that has a limit: the rest are as many as ordered, and say nothing.
+    ...(stock && (stock.dailyLimit !== null || stock.leftToday !== null) ? { dailyLimit: stock.dailyLimit, leftToday: stock.leftToday } : {}),
     media: media.map((item) => ({
       id: item.id,
       type: item.type,

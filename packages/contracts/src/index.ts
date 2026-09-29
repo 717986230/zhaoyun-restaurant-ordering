@@ -43,7 +43,7 @@ export interface GuestOrderCommand {
 /** Why a guest's order was refused, for the menu to say what to do. */
 export type GuestOrderRefusal =
   | "ORDERING_OFF" | "ORDERING_CLOSED" | "TABLE_NOT_OPEN" | "TABLE_LOCKED" | "TOO_SOON" | "ORDER_TOO_LARGE"
-  | "SIGN_IN_REQUIRED" | "TOO_MANY_PICKUPS" | "NOT_ENOUGH_POINTS" | "PAYMENT_UNAVAILABLE" | "BAD_CHANNEL";
+  | "SIGN_IN_REQUIRED" | "TOO_MANY_PICKUPS" | "NOT_ENOUGH_POINTS" | "PAYMENT_UNAVAILABLE" | "BAD_CHANNEL" | "SOLD_OUT";
 
 /** A guest's own account (shared/customer.mjs). */
 export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string }
@@ -132,6 +132,9 @@ export interface ApiCatalogProduct {
   available?: boolean;
   published?: boolean;
   printStation?: "kitchen" | "bar" | "sushi" | "front";
+  /** 每日限量 (shared/stock.mjs): the portions each day starts with, and what is left today; null for no limit. */
+  dailyLimit?: number | null;
+  leftToday?: number | null;
 }
 
 export interface ApiOrder {
@@ -425,6 +428,10 @@ export interface ApiDeliveryOrder {
   test: boolean;
   prepMinutes: number | null;
   rejectReason: string | null;
+  /** The kitchen's view only: when the floor told the platform it would be ready. */
+  readyBy?: string | null;
+  /** A new order's dishes the kitchen is out of, by hand or by today's count (POS floor only). */
+  shortages?: Array<{ sku: string; name: string; wanted: number; left: number }>;
   /** What the platform said to our answer: sent, failed, or nothing to send (not connected, a test order). */
   sync: { status: "none" | "sent" | "failed"; error: string | null; at: string | null };
   createdAt: string;

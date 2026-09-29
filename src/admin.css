@@ -808,6 +808,24 @@ h2 {
   border-color: var(--a-danger-line);
 }
 
+/* A delivery order past the time the platform was promised. */
+.board-card.late {
+  border: 2px solid var(--a-danger-line);
+  background: var(--a-danger-wash-soft);
+}
+
+.board-card.late small {
+  color: var(--a-danger);
+  font-weight: 650;
+}
+
+/* Three columns while the platforms have orders cooking, on a screen wide enough. */
+@media (min-width: 1100px) {
+  .board-layout:has(#boardDelivery) {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
 .board-card-head {
   display: flex;
   align-items: baseline;

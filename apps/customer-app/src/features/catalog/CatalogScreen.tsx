@@ -9,6 +9,7 @@ import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { assignedTableNo } from "../../app/table";
 import { formatPrice, productName, secondaryName, t } from "../../app/i18n";
+import type { Language } from "../../app/i18n";
 import type { ColorScheme } from "../../app/useColorScheme";
 import { usePageTurn } from "./usePageTurn";
 import type { TurnDirection } from "./usePageTurn";
@@ -60,6 +61,13 @@ export const SETS_PAGE = NAV_SETS;
 export const FAVORITES_PAGE = "__favorites__";
 
 /** A set menu is a dish made of other dishes; nothing else marks one. */
+/** 每日限量: a dish with few portions left today says so, before a guest sets their heart on it. */
+const FEW_LEFT = 10;
+function FewLeft({ product, language }: { product: Product; language: Language }) {
+  const left = product.leftToday ?? null;
+  return left !== null && left > 0 && left <= FEW_LEFT ? <span className="few-left" data-left={left}>{g(language, "fewLeft", { n: left })}</span> : null;
+}
+
 export function isSet(product: Product): boolean {
   return Boolean(product.bundleItems?.length);
 }
@@ -388,6 +396,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
             {facts(product).length > 0 && <div className="meta">{facts(product).map((fact) => <span key={fact}>{fact}</span>)}</div>}
           </div>
           <div className="detail-buy">
+            <FewLeft product={product} language={state.language} />
             <div className="buyline"><strong>{formatPrice(ordering.open ? product.priceCents + optionsCents : product.priceCents, state.language)}</strong>
               {ordering.open && <div className="qty" role="group" onClick={(event) => event.stopPropagation()}>
                 <button type="button" aria-label="−" onClick={() => dispatch({ type: "detail-quantity", quantity: state.detailQuantity - 1 })}>−</button>
@@ -682,6 +691,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
                 <span className="number">{product.sku}</span>
                 <h3>{productName(product, state.language)}</h3>
                 {secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}
+                <FewLeft product={product} language={state.language} />
               </div>
               {/* A menu without prices sends a guest into every dish to find one. */}
               <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>

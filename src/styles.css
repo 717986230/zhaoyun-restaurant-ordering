@@ -2213,6 +2213,19 @@ button:focus-visible,
 
 /* A row's text: the dish code, small, over the name and its second-language
    line. The code wraps inside this column rather than spilling out of it. */
+/* 每日限量: few portions left today, said on the dish and its card. */
+.few-left {
+  display: inline-block;
+  justify-self: start;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--danger);
+  border-radius: 999px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .row-text {
   min-width: 0;
 }

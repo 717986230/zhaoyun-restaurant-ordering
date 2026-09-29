@@ -58,6 +58,9 @@ export interface Product {
   available: boolean;
   published: boolean;
   printStation: PrintStation;
+  /** 每日限量: the portions each day starts with, and what is left today; null for no limit. */
+  dailyLimit?: number | null;
+  leftToday?: number | null;
 }
 
 export interface CartLine {
