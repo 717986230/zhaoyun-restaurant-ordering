@@ -8,7 +8,7 @@ const copy = {
   zh: {
     title: "预约餐桌", loading: "正在加载…", off: "目前不接受在线预约，请直接致电餐厅。", failedLoad: "连不上餐厅，请稍后再试。", retry: "重试",
     party: "人数", guests: "{n} 位", largeParty: "超过 {n} 位请直接致电餐厅。", date: "日期", otherDate: "其他日期", closed: "休息",
-    time: "时间", noTimes: "这一天没有可预约的时间。", fullDay: "这一天已经订满了，请换一天。", pickTime: "请选择时间", timesLoading: "正在查看空位…",
+    time: "时间", noTimes: "这一天没有可预约的时间。", fullDay: "这一天已经订满了，请换一天。", pickTime: "请选择时间", full: "已满", timesLoading: "正在查看空位…",
     signInTitle: "登录后预约", signInLead: "为防止恶意占位，预约需要用餐厅账户登录。没有账户？注册只要邮箱和密码。", signIn: "登录", register: "注册", loginEmail: "邮箱", password: "密码", passwordHint: "至少 6 位",
     accountName: "称呼（可不填）", signedInAs: "已登录：{email}", signOut: "退出", wrongLogin: "邮箱或密码不对", emailTaken: "这个邮箱已经注册过，请直接登录", forgot: "忘记密码？请联系餐厅重设。",
     myBookings: "我的预约", noBookings: "还没有预约", registerConsent: "注册即表示同意餐厅按下方说明使用你的邮箱和预约信息。",
@@ -29,7 +29,7 @@ const copy = {
   de: {
     title: "Tisch reservieren", loading: "Wird geladen …", off: "Online-Reservierungen sind derzeit nicht möglich – bitte rufen Sie uns an.", failedLoad: "Keine Verbindung zum Restaurant – bitte später noch einmal.", retry: "Erneut versuchen",
     party: "Personen", guests: "{n} Pers.", largeParty: "Ab {n} Personen bitte telefonisch reservieren.", date: "Datum", otherDate: "Anderes Datum", closed: "Ruhetag",
-    time: "Uhrzeit", noTimes: "An diesem Tag gibt es keine Reservierungszeiten.", fullDay: "Dieser Tag ist ausgebucht – bitte einen anderen wählen.", pickTime: "Bitte eine Uhrzeit wählen", timesLoading: "Freie Tische werden gesucht …",
+    time: "Uhrzeit", noTimes: "An diesem Tag gibt es keine Reservierungszeiten.", fullDay: "Dieser Tag ist ausgebucht – bitte einen anderen wählen.", pickTime: "Bitte eine Uhrzeit wählen", full: "ausgebucht", timesLoading: "Freie Tische werden gesucht …",
     signInTitle: "Zum Reservieren anmelden", signInLead: "Gegen Scheinreservierungen braucht eine Reservierung ein Gästekonto. Noch keines? Registrieren geht mit E-Mail und Passwort.", signIn: "Anmelden", register: "Registrieren", loginEmail: "E-Mail", password: "Passwort", passwordHint: "Mindestens 6 Zeichen",
     accountName: "Name (optional)", signedInAs: "Angemeldet: {email}", signOut: "Abmelden", wrongLogin: "E-Mail oder Passwort falsch", emailTaken: "Diese E-Mail ist schon registriert – bitte anmelden", forgot: "Passwort vergessen? Das Restaurant setzt es neu.",
     myBookings: "Meine Reservierungen", noBookings: "Noch keine Reservierungen", registerConsent: "Mit der Registrierung stimmst du zu, dass das Restaurant E-Mail und Reservierungen wie unten beschrieben verwendet.",
@@ -50,7 +50,7 @@ const copy = {
   en: {
     title: "Book a table", loading: "Loading…", off: "Online booking is not available right now – please call us.", failedLoad: "Cannot reach the restaurant – please try again later.", retry: "Try again",
     party: "Guests", guests: "{n}", largeParty: "For more than {n} guests, please call us.", date: "Date", otherDate: "Another date", closed: "Closed",
-    time: "Time", noTimes: "No booking times on this day.", fullDay: "This day is fully booked – please pick another.", pickTime: "Please pick a time", timesLoading: "Checking free tables…",
+    time: "Time", noTimes: "No booking times on this day.", fullDay: "This day is fully booked – please pick another.", pickTime: "Please pick a time", full: "full", timesLoading: "Checking free tables…",
     signInTitle: "Sign in to book", signInLead: "To stop fake bookings, booking needs a guest account. None yet? Registering takes an email and a password.", signIn: "Sign in", register: "Register", loginEmail: "Email", password: "Password", passwordHint: "At least 6 characters",
     accountName: "Name (optional)", signedInAs: "Signed in: {email}", signOut: "Sign out", wrongLogin: "Wrong email or password", emailTaken: "This email is registered already – please sign in", forgot: "Forgot your password? The restaurant can set a new one.",
     myBookings: "My bookings", noBookings: "No bookings yet", registerConsent: "By registering you agree to the restaurant using your email and bookings as described below.",

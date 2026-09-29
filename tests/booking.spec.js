@@ -72,10 +72,10 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator("#bookingName")).toHaveValue("Mia");
 
   // Three at the table: a date, a time, then a table big enough.
-  await page.locator('[data-party="3"]').click();
+  await page.locator("#bookingParty").selectOption("3");
   const day = page.locator(".bk-days button:not([disabled])").nth(2);
   await day.click();
-  await page.locator('.bk-times [data-time="19:00"]').click();
+  await page.locator("#bookingTime").selectOption("19:00");
   await expect(page.locator('[data-table="2"]')).toBeDisabled();
   await expect(page.locator('[data-table="2"]')).toContainText("座位不够");
   await page.locator('[data-table="4"]').click();
@@ -95,16 +95,16 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
 
   // The same day again: one a day, said in words.
   await page.locator("#bookingAnother").click();
-  await page.locator('[data-party="2"]').click();
+  await page.locator("#bookingParty").selectOption("2");
   await day.click();
-  await page.locator('.bk-times [data-time="13:00"]').click();
+  await page.locator("#bookingTime").selectOption("13:00");
   await page.locator('[data-table="2"]').click();
   await page.locator("#bookingPhone").fill("+43 660 1112233");
   await page.locator("#bookingSubmit").click();
   await expect(page.locator("#bookingError")).toHaveText("同一天最多预约 1 次。");
 
   // The table taken at 19:00 is taken for the whole stay.
-  await page.locator('.bk-times [data-time="20:00"]').click();
+  await page.locator("#bookingTime").selectOption("20:00");
   await expect(page.locator('[data-table="4"]')).toBeDisabled();
   await expect(page.locator('[data-table="4"]')).toContainText("已订");
 
