@@ -87,17 +87,6 @@ html.bk-root body {
   margin: 0;
 }
 
-.bk-party,
-.bk-times {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
-  gap: 8px;
-}
-.bk-times {
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-}
-.bk-party button,
-.bk-times button,
 .bk-days button {
   min-height: 44px;
   border: 1px solid var(--line);
@@ -109,15 +98,12 @@ html.bk-root body {
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-.bk-party button.active,
-.bk-times button.active,
 .bk-days button.active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
 }
-.bk-times button:disabled,
 .bk-days button:disabled {
   opacity: 0.38;
   cursor: not-allowed;
@@ -287,7 +273,21 @@ html.bk-root body {
   font: inherit;
   font-size: 16px;
 }
+.bk-field select {
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 40px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center / 18px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  appearance: none;
+}
 .bk-field input:focus,
+.bk-field select:focus,
 .bk-field textarea:focus {
   outline: 2px solid var(--accent-line);
   outline-offset: 1px;

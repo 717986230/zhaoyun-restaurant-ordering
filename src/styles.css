@@ -4044,15 +4044,14 @@ button:focus-visible,
 }
 
 /* ---------------------------------------------------------------------------
-   The list, refined (2026-09). Each dish its own card with air between —
-   the overlapping stack drew double edges at every seam — the whole menu
-   under category headings like the printed one, a clearer "+", a cart bar
-   that reads as the next step, and two columns where a tablet has the room.
+   The list, refined (2026-09): the whole menu under category headings like
+   the printed one, a clearer "+", a cart bar that reads as the next step,
+   and two columns where a tablet has the room. The rows stay the deck of
+   cards they were — each laid a little over the one before, its shadow on
+   it — which is what the page turn flips.
    ------------------------------------------------------------------------ */
 .dish-card {
-  margin: 0 0 8px;
-  border-radius: 12px;
-  box-shadow: none;
+  border-radius: 10px;
 }
 
 .dish-card .summary {
@@ -4233,6 +4232,11 @@ button:focus-visible,
 
   .menu:not(.on-featured) .stack-page > :not(.dish-card) {
     grid-column: 1 / -1;
+  }
+
+  /* Side by side, a row cannot lie over the one before it. */
+  .menu:not(.on-featured) .stack-page > .dish-card {
+    margin: 0 0 10px;
   }
 }
 

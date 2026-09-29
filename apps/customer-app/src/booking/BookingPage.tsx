@@ -358,9 +358,12 @@ function BookingForm({ language, info, customer, onSignedIn, onBooked }: {
   return <><form className="bk-form" id="bookingForm" onSubmit={(event) => void submit(event)}>
     <section className="bk-card">
       <h2>{b(language, "party")}</h2>
-      <div className="bk-party" role="radiogroup" aria-label={b(language, "party")}>
-        {Array.from({ length: info.maxParty }, (_, index) => index + 1).map((count) => <button key={count} type="button" role="radio" aria-checked={count === party} className={count === party ? "active" : ""} data-party={count} onClick={() => setParty(count)}>{count}</button>)}
-      </div>
+      {/* A list to pick from: twenty buttons were a screenful for one number. */}
+      <label className="bk-field bk-select">
+        <select id="bookingParty" aria-label={b(language, "party")} value={party} onChange={(event) => setParty(Number(event.target.value))}>
+          {Array.from({ length: info.maxParty }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{b(language, "guests", { n: count })}</option>)}
+        </select>
+      </label>
       <p className="bk-muted">{b(language, "largeParty", { n: info.maxParty })}</p>
     </section>
 
@@ -390,9 +393,12 @@ function BookingForm({ language, info, customer, onSignedIn, onBooked }: {
           ? <p className="bk-muted" id="bookingNoTimes">{b(language, "noTimes")}</p>
           : <>
             {!anyFree ? <p className="bk-muted" id="bookingFullDay">{b(language, "fullDay")}</p> : null}
-            <div className="bk-times" role="radiogroup" aria-label={b(language, "time")}>
-              {slots.map((slot) => <button key={slot.time} type="button" role="radio" aria-checked={slot.time === time} data-time={slot.time} disabled={!slot.available} className={slot.time === time ? "active" : ""} onClick={() => setTime(slot.time)}>{slot.time}</button>)}
-            </div>
+            <label className="bk-field bk-select">
+              <select id="bookingTime" aria-label={b(language, "time")} value={time} onChange={(event) => setTime(event.target.value)}>
+                <option value="" disabled>{b(language, "pickTime")}</option>
+                {slots.map((slot) => <option key={slot.time} value={slot.time} disabled={!slot.available}>{slot.available ? slot.time : `${slot.time} · ${b(language, "full")}`}</option>)}
+              </select>
+            </label>
           </>}
       <p className="bk-muted">{b(language, "staysFor", { minutes: info.durationMinutes })}</p>
     </section>

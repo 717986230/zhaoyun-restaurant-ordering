@@ -570,7 +570,10 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   // Headings only where more than one category is on the page: the whole menu, not a search or one category.
   const sectioned = !query && !onFavorites && state.category === "ALLE";
   const pageKey = `${state.category}|${query}`;
-  const [rows, setRows] = useState({ key: pageKey, limit: FIRST_ROWS });
+  // The page the menu opens on comes whole: nothing turns in, so there is no
+  // animation to keep light, and a fling straight away must never meet an
+  // empty end. Only a page turned to starts with a screenful.
+  const [rows, setRows] = useState({ key: pageKey, limit: Number.POSITIVE_INFINITY });
   const rowLimit = rows.key === pageKey ? rows.limit : FIRST_ROWS;
   // The promotions and set menus pages show cards, not these rows: nothing to build.
   const complete = rowLimit >= visible.length || onFeatured || onSets;
