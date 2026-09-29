@@ -4042,3 +4042,196 @@ button:focus-visible,
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The list, refined (2026-09). Each dish its own card with air between —
+   the overlapping stack drew double edges at every seam — the whole menu
+   under category headings like the printed one, a clearer "+", a cart bar
+   that reads as the next step, and two columns where a tablet has the room.
+   ------------------------------------------------------------------------ */
+.dish-card {
+  margin: 0 0 8px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.dish-card .summary {
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px;
+}
+
+.dish-card .summary:has(.quick-add) {
+  grid-template-columns: 60px minmax(0, 1fr) auto 40px;
+}
+
+.dish-card .summary .dish-media.dish-media-thumb,
+.dish-card .summary .art.art-thumb,
+.dish-card .summary .set-collage-thumb {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+}
+
+@media (max-width: 380px) {
+  .dish-card .summary {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .dish-card .summary:has(.quick-add) {
+    grid-template-columns: 52px minmax(0, 1fr) auto 40px;
+  }
+
+  .dish-card .summary .dish-media.dish-media-thumb,
+  .dish-card .summary .art.art-thumb,
+  .dish-card .summary .set-collage-thumb {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+.row-price {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The category a run of dishes belongs to, in the whole-menu view. */
+.list-section {
+  margin: 22px 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-2);
+  font: italic 400 19px/1.2 Georgia, "Noto Serif SC", serif;
+  letter-spacing: 0.02em;
+}
+
+.list-section::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.stack-page > .list-section:first-child {
+  margin-top: 6px;
+}
+
+/* "+": a button, not a ring. */
+.quick-add {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 24px;
+  font-weight: 300;
+  box-shadow: var(--shadow-1);
+}
+
+/* The chips: category names as words, not a banner; the row fades out at
+   its edge so a guest sees there is more to swipe to. */
+.chip {
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.chips {
+  -webkit-mask-image: linear-gradient(90deg, var(--ink) calc(100% - 36px), transparent);
+  mask-image: linear-gradient(90deg, var(--ink) calc(100% - 36px), transparent);
+  padding-right: 36px;
+}
+
+/* The cart bar: the next step, in the accent — count, "cart", total, arrow. */
+.cartbar {
+  grid-template-columns: 28px 1fr auto 18px;
+  border-color: var(--accent);
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.cartbar span {
+  font-weight: 600;
+}
+
+.cartbar b {
+  background: var(--accent-ink);
+  color: var(--accent);
+}
+
+.cartbar em {
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cartbar-arrow {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The detail's price with what is left today beside it, not wedged above. */
+.buy-price {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.buy-price .few-left {
+  margin-top: 0;
+}
+
+/* The cart speaks the list's language: the dish in the menu's serif, the
+   money in figures that line up. */
+.cart-line-text b {
+  font: 500 18px/1.25 Georgia, "Noto Serif SC", serif;
+  overflow-wrap: anywhere;
+}
+
+.cart-line-price,
+.total b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* One way to order (pickup only, say): a fact, not a button to press. */
+.cart-channel.single label {
+  flex: 0 1 auto;
+  border-color: transparent;
+  background: var(--accent-wash);
+  color: var(--ink);
+  text-align: left;
+  cursor: default;
+}
+
+.cart-channel.single label::before {
+  content: "✓ ";
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+/* A tablet held sideways: two columns of dishes, headings across both. */
+@media (min-width: 1100px) {
+  /* The header, the categories and the list share this width (see --page). */
+  :root {
+    --page: 1180px;
+  }
+
+  .menu:not(.on-featured) .stack-page {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12px;
+    align-items: start;
+  }
+
+  .menu:not(.on-featured) .stack-page > :not(.dish-card) {
+    grid-column: 1 / -1;
+  }
+}

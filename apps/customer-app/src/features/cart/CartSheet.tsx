@@ -94,6 +94,8 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
         <div className="cart-line-text">
           <b>{productName(product, language)}</b>
           {entry.modifiers.length > 0 && <small>{entry.modifiers.map((modifier) => modifier.name).join(" · ")}</small>}
+          {/* Two or more: what one costs, so the line's total explains itself. */}
+          {entry.quantity > 1 && !entry.reward && <small className="cart-unit">{entry.quantity} × {formatPrice(unitCents, language)}</small>}
           {entry.reward && <small className="cart-reward">★ {g(language, "reward")} · {g(language, "rewardCost", { points: (rewardPoints.get(product.id) ?? 0) * entry.quantity })}</small>}
         </div>
         <div className="qty" role="group">
@@ -104,7 +106,7 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
         <strong className="cart-line-price">{formatPrice(unitCents * entry.quantity, language)}</strong>
       </li>)}</ul>
 
-      {channels.length > 0 && <fieldset className="cart-channel">
+      {channels.length > 0 && <fieldset className={`cart-channel ${channels.length === 1 ? "single" : ""}`}>
         <legend>{g(language, "channel")}</legend>
         {channels.map((option) => <label key={option} className={channel === option ? "on" : ""}>
           <input type="radio" name="channel" value={option} checked={channel === option} onChange={() => setChosen(option)} />
