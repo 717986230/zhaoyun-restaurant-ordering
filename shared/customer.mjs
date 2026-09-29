@@ -51,7 +51,10 @@ export function normalizeCustomerRegistration(input) {
 
 /** A guest as they see themselves, and as the console lists them: never the hash. */
 export function customerView(row) {
-  return row ? { id: row.id, email: row.email, name: row.name, points: row.points, createdAt: row.created_at } : null;
+  return row ? {
+    id: row.id, email: row.email, name: row.name, points: row.points, createdAt: row.created_at,
+    ...(row.email_verified !== undefined ? { emailVerified: Boolean(row.email_verified) } : {})
+  } : null;
 }
 
 export function storedCustomerPassword(row) {
@@ -113,8 +116,11 @@ export function isOverdrawn(error) {
   return /CHECK constraint failed/i.test(String(error?.message ?? error));
 }
 
-export const CUSTOMER_BY_EMAIL_SQL = "SELECT * FROM customers WHERE email = ?";
-export const CUSTOMER_BY_ID_SQL = "SELECT * FROM customers WHERE id = ?";
+/** Whether the account's address, as it is now, was proved by a code (shared/email-verify.mjs). */
+const EMAIL_VERIFIED_COLUMN = `(SELECT 1 FROM customer_verified_emails AS verified
+    WHERE verified.customer_id = customers.id AND verified.email = customers.email) AS email_verified`;
+export const CUSTOMER_BY_EMAIL_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN} FROM customers WHERE email = ?`;
+export const CUSTOMER_BY_ID_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN} FROM customers WHERE id = ?`;
 export const INSERT_CUSTOMER_SQL = `INSERT INTO customers (id, email, name, password_hash, password_salt, password_iterations, points, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`;
 export const UPDATE_CUSTOMER_SQL = "UPDATE customers SET name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = ? WHERE id = ?";
@@ -127,6 +133,8 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   "DELETE FROM points_ledger WHERE customer_id = ?",
   "DELETE FROM customer_favorites WHERE customer_id = ?",
   "DELETE FROM customer_sessions WHERE customer_id = ?",
+  "DELETE FROM email_codes WHERE customer_id = ?",
+  "DELETE FROM customer_verified_emails WHERE customer_id = ?",
   "DELETE FROM customers WHERE id = ?"
 ];
 /** The console's list: newest first, or those whose email or name holds the search. */
@@ -135,7 +143,7 @@ export const SEARCH_CUSTOMERS_SQL = `SELECT * FROM customers
   ORDER BY created_at DESC LIMIT ?`;
 
 export const INSERT_CUSTOMER_SESSION_SQL = "INSERT INTO customer_sessions (token_hash, customer_id, expires_at, created_at) VALUES (?, ?, ?, ?)";
-export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*
+export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*, ${EMAIL_VERIFIED_COLUMN}
   FROM customer_sessions JOIN customers ON customers.id = customer_sessions.customer_id
   WHERE customer_sessions.token_hash = ?`;
 export const DELETE_CUSTOMER_SESSION_SQL = "DELETE FROM customer_sessions WHERE token_hash = ?";

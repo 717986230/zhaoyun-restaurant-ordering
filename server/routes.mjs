@@ -55,6 +55,7 @@ export function registerRoutes(app, { database, realtime, config }) {
     realtimeClients: () => realtime.size(),
     version: config.version ?? null,
     delivery: config.delivery ?? {},
+    mail: config.mail ?? null,
     ...(config.deliveryFetch ? { fetch: config.deliveryFetch } : {})
   });
 

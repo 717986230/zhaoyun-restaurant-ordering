@@ -16,6 +16,7 @@
  * Nothing here may import `node:` anything, so it runs unchanged on Workers.
  */
 import { normalizeSchedule } from "../src/schedule.js";
+import { checkMobile } from "./phone.mjs";
 
 export const RESERVATION_INTERVALS = [15, 30, 60];
 export const RESERVATION_STATUSES = ["pending", "confirmed", "seated", "completed", "cancelled", "declined", "no_show"];
@@ -308,8 +309,13 @@ export function normalizeReservationInput(input, rules, { staff = false } = {}) 
     throw reservationError(`Online bookings are for up to ${rules.maxParty} guests; please call us for a larger party`, "PARTY_TOO_LARGE", 400, { maxParty: rules.maxParty });
   }
   const name = text("The name", input.name, 80, { required: true });
-  const phone = text("The phone number", input.phone, 30, { required: !staff });
-  if (phone && !PHONE.test(phone)) throw reservationError("That is not a phone number", "INVALID");
+  let phone = text("The phone number", input.phone, 30, { required: !staff });
+  // A guest leaves a mobile number that could be real, written one way
+  // (shared/phone.mjs). The staff may write down a landline at the counter.
+  const mobile = phone ? checkMobile(phone) : null;
+  if (mobile?.ok) phone = mobile.display;
+  else if (!staff) throw reservationError(mobile?.reason === "NOT_MOBILE" ? "Please give a mobile number" : "That is not a mobile number", mobile?.reason === "NOT_MOBILE" ? "NOT_MOBILE" : "BAD_PHONE", 400);
+  else if (phone && !PHONE.test(phone)) throw reservationError("That is not a phone number", "INVALID");
   const email = text("The email", input.email, 254).toLowerCase();
   if (email && !EMAIL.test(email)) throw reservationError("That is not an email address", "INVALID");
   const notes = text("The note", input.notes, 500);

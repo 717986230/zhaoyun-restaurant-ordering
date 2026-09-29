@@ -516,6 +516,34 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    -- A guest's email proved by a code before they book (shared/email-verify.mjs):
+    -- the codes sent (hashed), the addresses proved, and — MAIL_OUTBOX only,
+    -- for the tests — the messages kept instead of sent. See
+    -- migrations/0066_email_verification.sql.
+    CREATE TABLE IF NOT EXISTS email_codes (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_codes_customer ON email_codes(customer_id, created_at);
+    CREATE TABLE IF NOT EXISTS customer_verified_emails (
+      customer_id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      verified_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS mail_outbox (
+      id TEXT PRIMARY KEY,
+      to_email TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     -- The cash drawer (shared/drawer.mjs): a shift's float, money in and
     -- out, and the count at the end. open_flag is 1 on the one open drawer
     -- and NULL once counted, so UNIQUE allows one open at a time. See

@@ -5,6 +5,7 @@ import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
 import { apiBaseUrl, customerToken, setCustomerToken } from "../app/api";
 import { b, bookingError, formatDay, initialLanguage, rememberLanguage } from "./booking-i18n";
 import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
+import { checkMobile } from "../../../../shared/phone.mjs";
 
 // The guest's session is the menu's own (the same account, the same phone).
 const api = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-customer-token": customerToken() }) });
@@ -47,10 +48,12 @@ function linkFor(held: Held): string {
 
 function refusal(language: BookingLanguage, error: unknown, info: ApiBookingInfo | null = null): string {
   if (error instanceof ApiError) {
-    if (error.status === 429 && error.code !== "NO_SHOW_BLOCKED") return bookingError(language, "RATE");
-    const known: BookingErrorKey[] = ["SLOT_FULL", "SLOT_UNAVAILABLE", "PARTY_TOO_LARGE", "RESERVATIONS_OFF", "INVALID", "TABLE_TAKEN", "TABLE_REQUIRED", "TABLE_TOO_SMALL", "SIGN_IN_REQUIRED", "NO_SHOW_BLOCKED", "DAY_LIMIT", "TOO_MANY_BOOKINGS"];
+    if (error.status === 429 && error.code !== "NO_SHOW_BLOCKED" && error.code !== "CODE_TOO_SOON" && error.code !== "TOO_MANY_CODES") return bookingError(language, "RATE");
+    const known: BookingErrorKey[] = ["SLOT_FULL", "SLOT_UNAVAILABLE", "PARTY_TOO_LARGE", "RESERVATIONS_OFF", "INVALID", "TABLE_TAKEN", "TABLE_REQUIRED", "TABLE_TOO_SMALL", "SIGN_IN_REQUIRED", "NO_SHOW_BLOCKED", "DAY_LIMIT", "TOO_MANY_BOOKINGS",
+      "EMAIL_UNVERIFIED", "BAD_PHONE", "NOT_MOBILE", "WRONG_CODE", "CODE_EXPIRED", "CODE_TOO_SOON", "TOO_MANY_CODES", "MAIL_FAILED"];
     const limit = error.code === "DAY_LIMIT" ? info?.maxPerDayPerGuest : info?.maxActivePerGuest;
-    if (error.code && (known as string[]).includes(error.code)) return bookingError(language, error.code as BookingErrorKey, { message: error.message, limit: limit ?? "" });
+    const details = (error.details ?? {}) as { attemptsLeft?: number; retryAfter?: number };
+    if (error.code && (known as string[]).includes(error.code)) return bookingError(language, error.code as BookingErrorKey, { message: error.message, limit: limit ?? "", left: details.attemptsLeft ?? "", s: details.retryAfter ?? "" });
     return bookingError(language, "INVALID", { message: error.message });
   }
   return bookingError(language, "OFFLINE");
@@ -183,7 +186,7 @@ export function BookingPage() {
           ? <p className="bk-muted">{b(language, "loading")}</p>
           : !info.enabled
             ? <section className="bk-card bk-message" id="bookingOff"><p>{b(language, "off")}</p></section>
-            : <BookingForm language={language} info={info} customer={customer} onSignedIn={signedIn} onBooked={booked} />}
+            : <BookingForm language={language} info={info} customer={customer} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />}
 
     {customer && mine.length ? <MyBookings language={language} bookings={mine} info={info} onChange={() => void loadMine()} /> : null}
   </main>;
@@ -212,6 +215,73 @@ function MyBookings({ language, bookings, info, onChange }: { language: BookingL
       </span>
       {booking.cancellable ? <button type="button" className="bk-danger" onClick={() => void cancel(booking)}>{b(language, "cancel")}</button> : null}
     </li>)}</ul>
+  </section>;
+}
+
+/**
+ * Proving the account's email before the first booking: a six-digit code
+ * sent to it, typed back. Once proved, it stays so for that address.
+ */
+function VerifyEmailCard({ language, customer, onVerified }: { language: BookingLanguage; customer: ApiCustomer; onVerified: (customer: ApiCustomer) => void }) {
+  const [sentTo, setSentTo] = useState("");
+  const [wait, setWait] = useState(0);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = window.setTimeout(() => setWait((left) => left - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [wait]);
+
+  async function send() {
+    setBusy(true);
+    setError("");
+    try {
+      const answer = await api.requestEmailCode(language);
+      setSentTo(answer.sentTo);
+      setWait(answer.retryAfter);
+      document.getElementById("bookingEmailCode")?.focus();
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.code === "ALREADY_VERIFIED") onVerified({ ...customer, emailVerified: true });
+      else {
+        setError(refusal(language, failure));
+        const after = failure instanceof ApiError ? Number((failure.details as { retryAfter?: number } | undefined)?.retryAfter) : 0;
+        if (after > 0 && after < 3600) setWait(after);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      onVerified((await api.verifyEmail(code.replace(/\s/g, ""))).customer);
+    } catch (failure) {
+      setError(refusal(language, failure));
+      if (failure instanceof ApiError && failure.code === "CODE_EXPIRED") setCode("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="bk-card" id="bookingVerify">
+    <h2>{b(language, "verifyTitle")}</h2>
+    <p className="bk-muted">{sentTo ? b(language, "codeSent", { email: sentTo }) : b(language, "verifyLead", { email: customer.email })}</p>
+    {sentTo ? <form className="bk-verify" onSubmit={(event) => void verify(event)}>
+      <label className="bk-field"><span>{b(language, "codeLabel")}</span>
+        <input id="bookingEmailCode" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} value={code} onChange={(event) => setCode(event.target.value.replace(/[^0-9 ]/g, ""))} />
+      </label>
+      <button type="submit" className="bk-primary" id="bookingVerifySubmit" disabled={busy || code.replace(/\s/g, "").length !== 6}>{b(language, "verify")}</button>
+    </form> : null}
+    {error ? <p className="bk-error" role="alert" id="bookingVerifyError">{error}</p> : null}
+    <button type="button" className="bk-secondary" id="bookingSendCode" disabled={busy || wait > 0} onClick={() => void send()}>
+      {wait > 0 ? b(language, "resendIn", { s: wait }) : sentTo ? b(language, "resend") : b(language, "sendCode")}
+    </button>
   </section>;
 }
 
@@ -260,9 +330,10 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
   </section>;
 }
 
-function BookingForm({ language, info, customer, onSignedIn, onBooked }: {
+function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooked }: {
   language: BookingLanguage; info: ApiBookingInfo; customer: ApiCustomer | null;
   onSignedIn: (session: { token: string; customer: ApiCustomer }) => void;
+  onVerified: (customer: ApiCustomer) => void;
   onBooked: (reservation: ApiGuestReservation, token: string) => void;
 }) {
   const [party, setParty] = useState(Math.min(2, info.maxParty));
@@ -282,6 +353,9 @@ function BookingForm({ language, info, customer, onSignedIn, onBooked }: {
   const [table, setTable] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  // Where mail goes out, a guest proves their email before booking (shared/email-verify.mjs).
+  const mustVerify = Boolean(info.emailVerification && customer && !customer.emailVerified);
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -336,6 +410,13 @@ function BookingForm({ language, info, customer, onSignedIn, onBooked }: {
     }
     if (seatSelection && !table) {
       setError(b(language, "pickTable"));
+      return;
+    }
+    // The same check the server makes (shared/phone.mjs), before the guest waits for it.
+    const mobile = checkMobile(phone);
+    if (!mobile.ok) {
+      setPhoneError(b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid"));
+      document.getElementById("bookingPhone")?.focus();
       return;
     }
     setBusy(true);
@@ -422,10 +503,15 @@ function BookingForm({ language, info, customer, onSignedIn, onBooked }: {
       </div> : null}
     </section> : null}
 
-    {customer ? <section className="bk-card">
+    {customer && !mustVerify ? <section className="bk-card">
       <h2>{b(language, "details")}</h2>
       <label className="bk-field"><span>{b(language, "name")}</span><input id="bookingName" required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label className="bk-field"><span>{b(language, "phone")}</span><input id="bookingPhone" required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" pattern="\+?[0-9][0-9 ()/.\-]{4,28}[0-9]" value={phone} onChange={(event) => setPhone(event.target.value)} /><small>{b(language, "phoneHint")}</small></label>
+      <label className="bk-field"><span>{b(language, "phone")}</span>
+        <input id="bookingPhone" required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" placeholder="0660 1234567" aria-invalid={phoneError ? true : undefined} value={phone}
+          onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }}
+          onBlur={() => { const mobile = checkMobile(phone); setPhoneError(!phone.trim() || mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid")); }} />
+        {phoneError ? <small className="bk-field-error" id="bookingPhoneError" role="alert">{phoneError}</small> : <small>{b(language, "phoneHint")}</small>}
+      </label>
       <label className="bk-field"><span>{b(language, "email")}</span><input id="bookingEmail" type="email" maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
       <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
       {info.note ? <p className="bk-note">{info.note}</p> : null}
@@ -433,12 +519,13 @@ function BookingForm({ language, info, customer, onSignedIn, onBooked }: {
     </section> : null}
 
     {error ? <p className="bk-error" role="alert" id="bookingError">{error}</p> : null}
-    {customer ? <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy}>
+    {customer && !mustVerify ? <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy}>
       {busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}` : b(language, "submit")}
     </button> : null}
   </form>
-  {/* Its own form, after the booking's: forms do not nest. */}
+  {/* Their own forms, after the booking's: forms do not nest. */}
   {!customer ? <SignInCard language={language} onSignedIn={onSignedIn} /> : null}
+  {customer && mustVerify ? <VerifyEmailCard language={language} customer={customer} onVerified={onVerified} /> : null}
   </>;
 }
 

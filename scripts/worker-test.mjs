@@ -65,7 +65,9 @@ try {
   writeFileSync(
     path.join(state, ".dev.vars"),
     `ADMIN_TOKEN = "${ADMIN_TOKEN}"\nSTAFF_TOKEN = "${STAFF_TOKEN}"\nKITCHEN_TOKEN = "${KITCHEN_TOKEN}"\n` +
-    `LIEFERANDO_WEBHOOK_SECRET = "${DELIVERY_TEST_SECRETS.lieferando}"\nFOODORA_WEBHOOK_SECRET = "${DELIVERY_TEST_SECRETS.foodora}"\n`
+    `LIEFERANDO_WEBHOOK_SECRET = "${DELIVERY_TEST_SECRETS.lieferando}"\nFOODORA_WEBHOOK_SECRET = "${DELIVERY_TEST_SECRETS.foodora}"\n` +
+    // The guests' email codes land in the outbox, where the contract reads them.
+    `MAIL_OUTBOX = "1"\n`
   );
 
   const wranglerArgs = ["wrangler", "d1", "migrations", "apply", "zhaoyun-ordering", "--local", `--persist-to=${state}`];
@@ -78,7 +80,8 @@ try {
     "--var", `STAFF_TOKEN:${STAFF_TOKEN}`,
     "--var", `KITCHEN_TOKEN:${KITCHEN_TOKEN}`,
     "--var", `LIEFERANDO_WEBHOOK_SECRET:${DELIVERY_TEST_SECRETS.lieferando}`,
-    "--var", `FOODORA_WEBHOOK_SECRET:${DELIVERY_TEST_SECRETS.foodora}`
+    "--var", `FOODORA_WEBHOOK_SECRET:${DELIVERY_TEST_SECRETS.foodora}`,
+    "--var", "MAIL_OUTBOX:1"
   ], { cwd: root, stdio: ["ignore", "pipe", "pipe"], detached: true });
   children.push(dev);
   dev.stdout.on("data", (chunk) => { devLog += chunk; });

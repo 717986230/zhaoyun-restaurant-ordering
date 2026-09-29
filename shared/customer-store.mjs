@@ -27,6 +27,11 @@ import {
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
 import { guestReservationView } from "./reservations.mjs";
+import {
+  COUNT_EMAIL_CODE_ATTEMPT_SQL, DELETE_OLD_EMAIL_CODES_SQL, EMAIL_CODE_ATTEMPTS, EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, EMAIL_CODES_PER_HOUR,
+  EMAIL_CODES_SINCE_SQL, emailCodeHash, INSERT_EMAIL_CODE_SQL, INSERT_OUTBOX_SQL, newEmailCode, OPEN_EMAIL_CODE_SQL, OUTBOX_SQL, USE_EMAIL_CODE_SQL,
+  VERIFY_EMAIL_SQL
+} from "./email-verify.mjs";
 
 // More than any guest has: an export is all of it.
 const MAX_EXPORTED_ROWS = 100_000;
@@ -35,10 +40,11 @@ const MAX_EXPORTED_ROWS = 100_000;
 // password, so the time a sign-in takes does not say which it was.
 const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
-function coded(message, code, status) {
+function coded(message, code, status, extra = {}) {
   const error = new Error(message);
   error.code = code;
   error.status = status;
+  Object.assign(error, extra);
   return error;
 }
 
@@ -161,9 +167,64 @@ export function createCustomerStore(driver, { ordersFor }) {
     return customerView(await byId(customerId));
   }
 
+  /**
+   * A new code for the account's address (shared/email-verify.mjs): once a
+   * minute, five times an hour. Returns the address and the code for the
+   * caller to send; only the code's hash is kept.
+   */
+  async function issueEmailCode(customerId) {
+    const row = await byId(customerId);
+    if (!row) throw coded("Please sign in", "SIGN_IN_REQUIRED", 401);
+    if (row.email_verified) throw coded("This email is verified already", "ALREADY_VERIFIED", 409);
+    const nowMs = Date.now();
+    await driver.run(DELETE_OLD_EMAIL_CODES_SQL, new Date(nowMs - 86_400_000).toISOString());
+    const recent = await driver.all(EMAIL_CODES_SINCE_SQL, row.id, new Date(nowMs - 3_600_000).toISOString());
+    if (recent.length) {
+      const wait = Math.ceil((Date.parse(recent[0].created_at) + EMAIL_CODE_RESEND_MS - nowMs) / 1000);
+      if (wait > 0) throw coded(`Please wait ${wait} seconds before asking for another code`, "CODE_TOO_SOON", 429, { retryAfter: wait });
+    }
+    if (recent.length >= EMAIL_CODES_PER_HOUR) throw coded("Too many codes this hour — please try again later", "TOO_MANY_CODES", 429, { retryAfter: 3600 });
+    const code = newEmailCode();
+    const at = new Date(nowMs).toISOString();
+    await driver.run(INSERT_EMAIL_CODE_SQL, uuid(), row.id, row.email, await emailCodeHash(row.id, code), new Date(nowMs + EMAIL_CODE_TTL_MS).toISOString(), at);
+    return { email: row.email, code };
+  }
+
+  /** The code the guest typed, against the newest one sent to their address as it is now. */
+  async function verifyEmailCode(customerId, input) {
+    const row = await byId(customerId);
+    if (!row) throw coded("Please sign in", "SIGN_IN_REQUIRED", 401);
+    if (row.email_verified) return customerView(row);
+    const code = String(input ?? "").replace(/\s/g, "");
+    const open = await driver.first(OPEN_EMAIL_CODE_SQL, row.id, row.email);
+    if (!open || Date.parse(open.expires_at) <= Date.now() || open.attempts >= EMAIL_CODE_ATTEMPTS) {
+      throw coded("This code has expired — please ask for a new one", "CODE_EXPIRED", 400);
+    }
+    if (!/^\d{6}$/.test(code) || (await emailCodeHash(row.id, code)) !== open.code_hash) {
+      await driver.run(COUNT_EMAIL_CODE_ATTEMPT_SQL, open.id);
+      const left = EMAIL_CODE_ATTEMPTS - open.attempts - 1;
+      throw coded(left > 0 ? "Wrong code" : "Wrong code — please ask for a new one", left > 0 ? "WRONG_CODE" : "CODE_EXPIRED", 400, { attemptsLeft: Math.max(left, 0) });
+    }
+    const at = now();
+    await driver.batch([[USE_EMAIL_CODE_SQL, [at, open.id]], [VERIFY_EMAIL_SQL, [row.id, row.email, at]]]);
+    return customerView(await byId(row.id));
+  }
+
   return {
     register,
     signIn,
+    issueEmailCode,
+    verifyEmailCode,
+    async emailVerified(customerId) {
+      return Boolean((await byId(customerId))?.email_verified);
+    },
+    /** MAIL_OUTBOX only (shared/mail.mjs): the messages the tests read instead of an inbox. */
+    async recordOutbox(message) {
+      await driver.run(INSERT_OUTBOX_SQL, uuid(), message.to, message.subject, message.text, now());
+    },
+    async outbox(limit = 20) {
+      return (await driver.all(OUTBOX_SQL, Math.min(Math.max(Number(limit) || 20, 1), 100))).map((row) => ({ to: row.to_email, subject: row.subject, text: row.text, createdAt: row.created_at }));
+    },
     session,
     signOut,
     profile,

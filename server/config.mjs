@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deliveryConfig } from "../shared/delivery.mjs";
+import { mailConfig } from "../shared/mail.mjs";
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(serverDir, "..");
@@ -54,7 +55,9 @@ export const config = {
   // The delivery platforms' secrets (docs/DELIVERY.md): what each proves itself
   // with on our webhook, and what we sign in to theirs with. Unset, a platform is
   // simply not connected.
-  delivery: deliveryConfig(process.env)
+  delivery: deliveryConfig(process.env),
+  // Email the guests' codes go out with (docs/MAIL.md): Brevo, or nothing.
+  mail: mailConfig(process.env)
 };
 
 if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) {

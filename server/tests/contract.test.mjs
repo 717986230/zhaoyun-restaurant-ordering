@@ -28,6 +28,7 @@ test("Node server satisfies the API contract", async (context) => {
     staffToken: TOKENS.staff,
     kitchenToken: TOKENS.kitchen,
     delivery: { lieferando: { webhookSecret: DELIVERY_TEST_SECRETS.lieferando }, foodora: { webhookSecret: DELIVERY_TEST_SECRETS.foodora } },
+    mail: { provider: "outbox" },
     logger: false
   });
   context.after(async () => {

@@ -26,7 +26,7 @@ test.beforeAll(async ({ request }, testInfo) => {
   if (testInfo.project.name !== PROJECT) return;
   directory = mkdtempSync(path.join(tmpdir(), "zy-booking-e2e-"));
   server = spawn(process.execPath, ["server/index.mjs"], {
-    env: { ...process.env, HOST: "127.0.0.1", PORT, ADMIN_TOKEN: ADMIN, DATABASE_PATH: path.join(directory, "db.sqlite"), UPLOAD_DIR: path.join(directory, "media"), NODE_ENV: "test" },
+    env: { ...process.env, HOST: "127.0.0.1", PORT, ADMIN_TOKEN: ADMIN, DATABASE_PATH: path.join(directory, "db.sqlite"), UPLOAD_DIR: path.join(directory, "media"), NODE_ENV: "test", MAIL_OUTBOX: "1" },
     stdio: "ignore"
   });
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -56,7 +56,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.addInitScript((base) => localStorage.setItem("zy_api_base", base), API);
 });
 
-test("a guest signs up, picks day, time and table, sees the booking and cancels it; the limits say no in words", async ({ page }) => {
+test("a guest signs up, picks day, time and table, sees the booking and cancels it; the limits say no in words", async ({ page, request }) => {
   await page.goto("/book.html?lang=zh");
   await expect(page.getByRole("heading", { name: "预约餐桌" })).toBeVisible();
 
@@ -69,6 +69,21 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingSignIn").getByLabel("称呼（可不填）").fill("Mia");
   await page.locator("#bookingSignInSubmit").click();
   await expect(page.locator("#bookingAccount")).toContainText("mia@example.com");
+
+  // The email proved first: a code to it, typed back (read here from the test server's outbox).
+  await expect(page.locator("#bookingVerify")).toContainText("mia@example.com");
+  await expect(page.locator("#bookingSubmit")).toHaveCount(0);
+  await page.locator("#bookingSendCode").click();
+  await expect(page.locator("#bookingVerify")).toContainText("验证码已发到 m••@example.com");
+  await expect(page.locator("#bookingSendCode")).toBeDisabled();
+  const outbox = await (await admin(request, "get", "/api/admin/mail/outbox")).json();
+  const code = outbox.messages[0].text.match(/\b(\d{6})\b/)[1];
+  await page.locator("#bookingEmailCode").fill(code === "000000" ? "000001" : "000000");
+  await page.locator("#bookingVerifySubmit").click();
+  await expect(page.locator("#bookingVerifyError")).toHaveText("验证码不对，还可以再试 4 次。");
+  await page.locator("#bookingEmailCode").fill(code);
+  await page.locator("#bookingVerifySubmit").click();
+  await expect(page.locator("#bookingVerify")).toHaveCount(0);
   await expect(page.locator("#bookingName")).toHaveValue("Mia");
 
   // Three at the table: a date, a time, then a table big enough.
@@ -79,7 +94,14 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator('[data-table="2"]')).toBeDisabled();
   await expect(page.locator('[data-table="2"]')).toContainText("座位不够");
   await page.locator('[data-table="4"]').click();
-  await page.locator("#bookingPhone").fill("+43 660 1112233");
+  // A number that could be no one's, then a landline: said at once, nothing sent.
+  await page.locator("#bookingPhone").fill("12345");
+  await page.locator("#bookingPhone").blur();
+  await expect(page.locator("#bookingPhoneError")).toHaveText("请填写有效的手机号，例如 0660 1234567 或 +43 660 1234567。");
+  await page.locator("#bookingPhone").fill("01 5877777");
+  await page.locator("#bookingSubmit").click();
+  await expect(page.locator("#bookingPhoneError")).toHaveText("请填写手机号，不是座机号码。");
+  await page.locator("#bookingPhone").fill("0660 111 22 33");
   await expect(page.locator(".bk-note")).toHaveText("8 人以上请致电");
   await page.locator("#bookingSubmit").click();
 

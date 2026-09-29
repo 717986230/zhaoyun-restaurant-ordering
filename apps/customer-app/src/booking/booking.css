@@ -153,6 +153,24 @@ html.bk-root body {
   display: grid;
   gap: 12px;
 }
+.bk-verify {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.bk-verify input {
+  font-size: 24px;
+  letter-spacing: 0.4em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.bk-field small.bk-field-error {
+  color: var(--danger-ink);
+  font-weight: 600;
+}
+.bk-field input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
 .bk-mine {
   display: grid;
   gap: 10px;
