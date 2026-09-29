@@ -1,7 +1,7 @@
 import type {
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
@@ -557,6 +557,11 @@ export class PosApi {
   voucher(code: string): Promise<{ voucher: ApiVoucher }> { return this.#request(`/api/admin/vouchers/${encodeURIComponent(code)}`); }
   settlement(staffId?: string): Promise<{ totals: PosSettlement["totals"] }> { return this.#request(`/api/pos/settlement${staffId ? `?staffId=${encodeURIComponent(staffId)}` : ""}`); }
   settle(staffId?: string): Promise<{ settlement: PosSettlement }> { return this.#request("/api/pos/settlement", { method: "POST", body: JSON.stringify(staffId ? { staffId } : {}) }); }
+  drawer(): Promise<{ drawer: PosDrawer | null }> { return this.#request("/api/pos/drawer"); }
+  openDrawer(float: number): Promise<{ drawer: PosDrawer }> { return this.#request("/api/pos/drawer/open", { method: "POST", body: JSON.stringify({ float }) }); }
+  moveCash(kind: "in" | "out", amount: number, reason: string): Promise<{ movement: PosDrawerMovement }> { return this.#request("/api/pos/drawer/movements", { method: "POST", body: JSON.stringify({ kind, amount, reason }) }); }
+  closeDrawer(command: DrawerCloseCommand): Promise<{ drawer: PosDrawer }> { return this.#request("/api/pos/drawer/close", { method: "POST", body: JSON.stringify(command) }); }
+  drawers(limit = 20): Promise<{ drawers: PosDrawer[] }> { return this.#request(`/api/pos/drawers?limit=${limit}`); }
   settlements(limit = 30): Promise<{ settlements: PosSettlement[] }> { return this.#request(`/api/pos/settlements?limit=${limit}`); }
   closingPreview(): Promise<{ totals: ApiClosingTotals }> { return this.#request("/api/admin/day-closings/preview"); }
   closeDay(): Promise<{ closing: ApiClosing }> { return this.#request("/api/admin/day-closings", { method: "POST" }); }

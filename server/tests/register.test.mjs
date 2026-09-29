@@ -6,6 +6,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
 import { vatSplit } from "../../shared/products.mjs";
+import { closingTotals, planCheckout, planStorno } from "../../shared/register.mjs";
 
 /**
  * The journal is only worth anything if a change to it shows. Each entry
@@ -62,4 +63,29 @@ test("a set menu's split adds up to its price to the cent, whatever the proporti
   // A plain dish is its own rate; a set whose dishes are gone keeps its own.
   assert.deepEqual(vatSplit({ vat_percent: 20 }, rows, 450), [{ percent: 20, cents: 450 }]);
   assert.deepEqual(vatSplit({ vat_percent: 10, bundle_items_json: '[{"productId":"gone","quantity":1}]' }, rows, 450), [{ percent: 10, cents: 450 }]);
+});
+
+/**
+ * A tip is the staff's: beside the payment, never in the receipt's total or
+ * its VAT; a storno gives it back; the closing counts it apart.
+ */
+test("a tip stays out of the takings, and a storno takes it back", () => {
+  const itemRows = [{ id: "i1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 1850, vat_percent: 10, product_name: "Ramen", modifiers_json: "[]" }];
+  const settings = { cashRegisterId: "K1" };
+  const { receipt } = planCheckout({ items: [{ orderItemId: "i1", quantity: 1 }], payments: [{ type: "cash", amount: 18.5, tendered: 50, tip: 1.5 }] }, { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" });
+  assert.equal(receipt.totalCents, 1850);
+  assert.deepEqual(receipt.vat, [{ percent: 10, grossCents: 1850, netCents: 1682, vatCents: 168 }]);
+  assert.deepEqual(receipt.payments, [{ type: "cash", amountCents: 1850, tipCents: 150, tenderedCents: 5000, changeCents: 3000 }]);
+  assert.throws(() => planCheckout({ items: [{ orderItemId: "i1", quantity: 1 }], payments: [{ type: "voucher", amount: 18.5, tip: 1, voucherCode: "X" }] }, { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" }), /cash or by card/);
+
+  const [sale] = [receipt].map((planned) => ({ receipt_no: 1, type: "sale", total_cents: planned.totalCents, vat_json: JSON.stringify(planned.vat), payments_json: JSON.stringify(planned.payments), lines_json: JSON.stringify(planned.lines), cash_register_id: "K1", table_no: "05", id: planned.id }));
+  const { receipt: storno } = planStorno(sale, { receiptNo: 2, reason: "wrong table", soldVoucherRows: [], role: "manager" });
+  assert.deepEqual(storno.payments, [{ type: "cash", amountCents: -1850, tipCents: -150 }]);
+
+  const closing = closingTotals([sale]);
+  assert.equal(closing.grossCents, 1850);
+  assert.equal(closing.cashCents, 1850);
+  assert.deepEqual(closing.tips, { cash: 150, card: 0 });
+  const both = closingTotals([sale, { receipt_no: 2, type: "storno", total_cents: storno.totalCents, vat_json: JSON.stringify(storno.vat), payments_json: JSON.stringify(storno.payments), lines_json: JSON.stringify(storno.lines) }]);
+  assert.equal(both.tipsCents, 0);
 });

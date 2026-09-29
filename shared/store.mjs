@@ -48,6 +48,10 @@ import {
 import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
 import { createDeliveryStore } from "./delivery-store.mjs";
+import {
+  CLOSE_DRAWER_SQL, countedOf, DRAWER_MOVEMENTS_SQL, DRAWER_RECEIPTS_SQL, drawerPrintPayload, drawerTotals, drawerView, floatOf, INSERT_DRAWER_SQL,
+  INSERT_MOVEMENT_SQL, movementView, OPEN_DRAWER_SQL, planMovement
+} from "./drawer.mjs";
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
 import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
@@ -856,6 +860,77 @@ export function createStore(driver) {
     });
   }
 
+  // ——— The cash drawer (shared/drawer.mjs): opened with a float, money in and out, counted at the end.
+
+  const drawerError = (message, code) => Object.assign(new Error(message), { code });
+
+  /** A drawer with its figures: so far while open, as counted once closed. */
+  async function drawerDetail(row) {
+    if (!row) return null;
+    const movements = await all(DRAWER_MOVEMENTS_SQL, row.id);
+    const totals = row.closed_at ? null : drawerTotals(row, await all(DRAWER_RECEIPTS_SQL, row.after_receipt_no), movements);
+    return drawerView(row, totals, movements);
+  }
+
+  async function openDrawer(input, staff = null) {
+    const floatCents = floatOf(input);
+    return retrying(async () => {
+      const last = await lastJournal();
+      const id = uuid();
+      const at = now();
+      try {
+        await batch([
+          sql(INSERT_DRAWER_SQL, id, floatCents, staff?.name ?? null, at),
+          await journalStatement(last, "drawer.opened", id, { floatCents, by: staff?.name ?? null }, at)
+        ]);
+      } catch (error) {
+        if (/UNIQUE constraint failed: drawer_sessions\.open_flag/.test(String(error?.message ?? error))) throw drawerError("The drawer is open already: count it before opening it again", "DRAWER_OPEN");
+        throw error;
+      }
+      return drawerDetail(await first("SELECT * FROM drawer_sessions WHERE id = ?", id));
+    });
+  }
+
+  async function moveCash(input, staff = null) {
+    return retrying(async () => {
+      const session = await first(OPEN_DRAWER_SQL);
+      if (!session) throw drawerError("Open the drawer first", "NO_DRAWER");
+      const last = await lastJournal();
+      const at = now();
+      const movement = planMovement(session, input, { staff, at });
+      await batch([
+        sql(INSERT_MOVEMENT_SQL, movement.id, movement.kind, movement.amountCents, movement.reason, movement.staffId, movement.staffName, at, session.id),
+        await journalStatement(last, movement.kind === "in" ? "drawer.in" : "drawer.out", session.id, { amountCents: movement.amountCents, reason: movement.reason, by: movement.staffName }, at)
+      ]);
+      const row = await first("SELECT * FROM drawer_movements WHERE id = ?", movement.id);
+      // Counted by someone else in between: the movement had no drawer to go into.
+      if (!row) throw drawerError("The drawer was counted meanwhile: open it again", "NO_DRAWER");
+      return movementView(row);
+    });
+  }
+
+  /** Counts the open drawer (Kassensturz) and closes it; the slip goes to the front printer. */
+  async function closeDrawer(input, staff = null) {
+    const counted = countedOf(input);
+    const note = String(input?.note ?? "").trim().slice(0, 200) || null;
+    return retrying(async () => {
+      const session = await first(OPEN_DRAWER_SQL);
+      if (!session) throw drawerError("No drawer is open", "NO_DRAWER");
+      const last = await lastJournal();
+      const at = now();
+      const movements = await all(DRAWER_MOVEMENTS_SQL, session.id);
+      const totals = drawerTotals(session, await all(DRAWER_RECEIPTS_SQL, session.after_receipt_no), movements, counted.cents);
+      const closed = { ...session, open_flag: null, closed_at: at, closed_by: staff?.name ?? null, counts_json: counted.counts ? JSON.stringify(counted.counts) : null, totals_json: JSON.stringify(totals), note };
+      const view = drawerView(closed, totals, movements);
+      await batch([
+        sql(CLOSE_DRAWER_SQL, at, closed.closed_by, totals.lastReceiptNo ?? session.after_receipt_no, counted.cents, closed.counts_json, closed.totals_json, note, session.id),
+        printStatement(drawerPrintPayload(view, companyOf(await getSettings())), at),
+        await journalStatement(last, "drawer.closed", session.id, { ...totals, counts: counted.counts, note, by: closed.closed_by }, at)
+      ]);
+      return drawerDetail(await first("SELECT * FROM drawer_sessions WHERE id = ?", session.id));
+    });
+  }
+
   async function signOut(token) {
     if (!token) return false;
     return (await run(DELETE_ACCOUNT_SESSION_SQL, await hashSessionToken(token))) > 0;
@@ -1233,6 +1308,13 @@ export function createStore(driver) {
     closeDay,
     exportJournal,
     closingPreview: async () => closingTotals(await all(OPEN_RECEIPTS_SQL)),
+    drawer: {
+      current: async () => drawerDetail(await first(OPEN_DRAWER_SQL)),
+      list: async (limit = 20) => Promise.all((await all("SELECT * FROM drawer_sessions WHERE closed_at IS NOT NULL ORDER BY closed_at DESC LIMIT ?", boundedLimit(limit, 20))).map(drawerDetail)),
+      open: openDrawer,
+      move: moveCash,
+      close: closeDrawer
+    },
     listClosings: async (limit = 30) => (await all("SELECT * FROM day_closings ORDER BY closing_no DESC LIMIT ?", Math.min(Number(limit) || 30, 366))).map(closingView),
     listReceipts: async (limit = 50) => Promise.all((await all("SELECT * FROM receipts ORDER BY receipt_no DESC LIMIT ?", boundedLimit(limit, 50))).map(receiptDetail)),
     getReceipt: async (id) => receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", String(id))),

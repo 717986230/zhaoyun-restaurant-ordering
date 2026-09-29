@@ -15,7 +15,7 @@
  */
 import { Value } from "@sinclair/typebox/value";
 import {
-  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
+  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
@@ -719,6 +719,11 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (denied) return denied;
         return json({ settlements: await store.listSettlements(limit) });
       }
+      if (path.length === 3 && path[2] === "drawers" && method === "GET") {
+        const { denied } = await gate("manager");
+        if (denied) return denied;
+        return json({ drawers: await store.drawer.list(limit) });
+      }
 
       const { denied, role, pos } = await gate("staff");
       if (denied) return denied;
@@ -789,6 +794,30 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           if (invalid) return invalid;
           const product = await store.setAvailable(path[3], value.available);
           return product ? json({ product }) : fail("No such dish on the menu", 404);
+        }
+        // The cash drawer: open with a float, money in and out, counted at the end (shared/drawer.mjs).
+        if (path[2] === "drawer") {
+          const drawerFailed = (error) => (error.code === "DRAWER_OPEN" || error.code === "NO_DRAWER" ? fail(error.message, 409) : fail(error.message, 400));
+          try {
+            if (path.length === 3 && method === "GET") return json({ drawer: await store.drawer.current() });
+            if (path.length === 4 && path[3] === "open" && method === "POST") {
+              const { value, invalid } = await body(request, DrawerOpenBody);
+              if (invalid) return invalid;
+              return json({ drawer: await store.drawer.open(value, pos.staff) }, 201);
+            }
+            if (path.length === 4 && path[3] === "movements" && method === "POST") {
+              const { value, invalid } = await body(request, DrawerMoveBody);
+              if (invalid) return invalid;
+              return json({ movement: await store.drawer.move(value, pos.staff) }, 201);
+            }
+            if (path.length === 4 && path[3] === "close" && method === "POST") {
+              const { value, invalid } = await body(request, DrawerCloseBody);
+              if (invalid) return invalid;
+              return json({ drawer: await store.drawer.close(value, pos.staff) }, 201);
+            }
+          } catch (error) {
+            return drawerFailed(error);
+          }
         }
         if (path.length === 3 && path[2] === "settlement") {
           const { value } = method === "POST" ? await body(request, SettlementBody) : { value: {} };

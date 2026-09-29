@@ -100,6 +100,7 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
   const pick = (next: Preset) => { setPreset(next); setRange(rangeOf(next, timeZone)); };
   const itemName = (item: ApiSalesReport["items"][number]) => item.names?.[language] || item.name;
   const totals = report?.totals;
+  const tipped = Boolean(report?.staff.some((person) => person.tipsCents));
   const suffix = report ? `${report.from}_${report.to}` : "";
 
   return <section id="reportsPanel" className="admin-panel active"><div className="settings-page">
@@ -134,6 +135,7 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
         <div className="report-tile"><small>{t("reportStornos")}</small><b>{totals.stornos}</b></div>
         {(totals.discountCents ?? 0) !== 0 && <div className="report-tile"><small>{t("reportDiscounts")}</small><b>{money(totals.discountCents ?? 0)}</b></div>}
         {totals.vouchersSoldCents !== 0 && <div className="report-tile"><small>{t("reportVouchers")}</small><b>{money(totals.vouchersSoldCents)}</b></div>}
+        {(totals.tipsCents ?? 0) !== 0 && <div className="report-tile"><small>{t("reportTips")}</small><b data-report="tips">{money(totals.tipsCents ?? 0)}</b></div>}
       </div>
 
       {totals.receipts === 0 && totals.stornos === 0 ? <div className="admin-empty">{t("reportEmpty")}</div> : <div className="report-grid">
@@ -165,8 +167,8 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
         <section className="report-card">
           <h2>{t("reportStaff")}</h2>
           <table className="report-table">
-            <thead><tr><th>{t("reportWaiter")}</th><th>{t("reportReceipts")}</th><th>{t("reportGross")}</th></tr></thead>
-            <tbody>{report.staff.map((person) => <tr key={person.name}><td>{person.name || t("reportConsole")}</td><td>{person.receipts}</td><td>{money(person.grossCents)}</td></tr>)}</tbody>
+            <thead><tr><th>{t("reportWaiter")}</th><th>{t("reportReceipts")}</th><th>{t("reportGross")}</th>{tipped && <th>{t("reportTips")}</th>}</tr></thead>
+            <tbody>{report.staff.map((person) => <tr key={person.name}><td>{person.name || t("reportConsole")}</td><td>{person.receipts}</td><td>{money(person.grossCents)}</td>{tipped && <td>{money(person.tipsCents ?? 0)}</td>}</tr>)}</tbody>
           </table>
         </section>
 

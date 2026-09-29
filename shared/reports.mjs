@@ -90,9 +90,11 @@ export function salesReport(rows, range, timeZone) {
     byHour[at.hour].grossCents += row.total_cents;
 
     const staffName = row.staff_name || "";
-    const staff = byStaff.get(staffName) ?? { name: staffName, receipts: 0, grossCents: 0 };
+    const staff = byStaff.get(staffName) ?? { name: staffName, receipts: 0, grossCents: 0, tipsCents: 0 };
     staff.receipts += count;
     staff.grossCents += row.total_cents;
+    // Each waiter's tips, for the owner who pays out the card tips.
+    for (const payment of parseJson(row.payments_json, [])) staff.tipsCents += payment.tipCents ?? 0;
     byStaff.set(staffName, staff);
 
     for (const line of parseJson(row.lines_json, [])) {

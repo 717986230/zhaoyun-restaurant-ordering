@@ -156,3 +156,38 @@ test("a receipt printed again says it is a copy; a settlement shows the voids", 
   const settlement = renderReceipt({ kind: "settlement", company: {}, settlement: { staffName: "Li", createdAt: "2026-09-26T22:00:00.000Z", totals } }, { capabilities: { printLanguage: "de" } }).toString("utf8");
   assert.match(settlement, /Stornos 1x\s+-9\.50/);
 });
+
+test("a tip prints under its payment, outside the sum; the settlement shows the tips and the cash to hand in", () => {
+  const receipt = renderReceipt({
+    kind: "receipt", company: {},
+    receipt: {
+      receiptNo: 8, cashRegisterId: "KASSE-1", type: "sale", fiscalStatus: "unsigned", createdAt: "2026-09-26T10:00:00.000Z",
+      lines: [{ kind: "item", name: "Ramen", quantity: 1, unitPriceCents: 1850, totalCents: 1850, vatSplit: [{ percent: 10, cents: 1850 }] }],
+      vat: [{ percent: 10, grossCents: 1850, netCents: 1682, vatCents: 168 }], totalCents: 1850,
+      payments: [{ type: "card", amountCents: 1850, tipCents: 150 }]
+    }
+  }, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(receipt, /SUMME EUR\s+18\.50/);
+  assert.match(receipt, /Karte\s+18\.50\n\s+\+ Trinkgeld\s+1\.50/);
+  const totals = { firstReceiptNo: 1, lastReceiptNo: 2, sales: 2, stornos: 0, grossCents: 4000, payments: { cash: 2500, card: 1500, voucher: 0 }, tips: { cash: 100, card: 300 }, tipsCents: 400, handInCents: 2200 };
+  const settlement = renderReceipt({ kind: "settlement", company: {}, settlement: { staffName: "Li", createdAt: "2026-09-26T22:00:00.000Z", totals } }, { capabilities: { printLanguage: "de" } }).toString("utf8");
+  assert.match(settlement, /Trinkgeld \(kein Umsatz\)\n\s+Bar\s+1\.00\n\s+Karte\s+3\.00/);
+  assert.match(settlement, /Abzugeben bar\s+22\.00/);
+});
+
+test("the drawer's count prints what should be there, what was, and every euro in or out with why", () => {
+  const drawer = {
+    openedAt: "2026-09-26T08:00:00.000Z", openedBy: "Li", closedAt: "2026-09-26T22:00:00.000Z", closedBy: "Wang", note: "Münzen nachgezählt",
+    counts: { 5000: 2, 200: 1 },
+    movements: [{ kind: "out", amountCents: 1240, reason: "Gemüse", staffName: "Li" }, { kind: "in", amountCents: 5000, reason: "Bank", staffName: "Wang" }],
+    totals: { floatCents: 15000, receipts: 3, firstReceiptNo: 4, lastReceiptNo: 6, cashSalesCents: 4000, cardTipsCents: 300, cashTipsCents: 100, inCents: 5000, outCents: 1240, expectedCents: 22460, countedCents: 10200, differenceCents: -12260 }
+  };
+  const text = renderReceipt({ kind: "drawer", company: {}, drawer }, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  assert.match(text, /KASSENSTURZ/);
+  assert.match(text, /Wechselgeld Anfang\s+150\.00/);
+  assert.match(text, /- Entnahme\s+-12\.40\n\s+Gemüse \(Li\)/);
+  assert.match(text, /- Kartentrinkgeld ausbezahlt\s+-3\.00/);
+  assert.match(text, /Soll\s+224\.60/);
+  assert.match(text, /Differenz -122\.60/);
+  assert.match(text, /2 x 50\.00\s+100\.00/);
+});

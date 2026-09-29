@@ -263,7 +263,9 @@ export const CheckoutBody = Type.Object({
     type: Type.String({ maxLength: 16 }),
     amount: Type.Number(),
     tendered: Type.Optional(Type.Number()),
-    voucherCode: Type.Optional(Type.String({ maxLength: 32 }))
+    voucherCode: Type.Optional(Type.String({ maxLength: 32 })),
+    // Trinkgeld, beside the amount: the staff's, not in the total (planCheckout).
+    tip: Type.Optional(Type.Number())
   // None only for a receipt of nothing to pay: a reward bought with points (planCheckout).
   }), { minItems: 0, maxItems: 10 })
 }, { additionalProperties: false });
@@ -280,6 +282,20 @@ export const DeviceBody = Type.Object({ name: Type.String({ maxLength: 64 }) }, 
 export const PosSignInBody = Type.Object({ staffId: Type.String({ minLength: 1, maxLength: 64 }), pin: Type.String({ maxLength: 12 }) }, { additionalProperties: false });
 export const MoveTableBody = Type.Object({ to: Type.String({ minLength: 1, maxLength: 8 }) }, { additionalProperties: false });
 export const SettlementBody = Type.Object({ staffId: Type.Optional(Type.String({ maxLength: 64 })) }, { additionalProperties: false });
+
+// The cash drawer (shared/drawer.mjs): opened with a float, money in and out with why, counted at the end.
+export const DrawerOpenBody = Type.Object({ float: Type.Number({ minimum: 0 }) }, { additionalProperties: false });
+export const DrawerMoveBody = Type.Object({
+  kind: Type.Union([Type.Literal("in"), Type.Literal("out")]),
+  amount: Type.Number(),
+  reason: Type.String({ minLength: 1, maxLength: 120 })
+}, { additionalProperties: false });
+// The count: note by note (cents of the denomination → how many), or the sum alone.
+export const DrawerCloseBody = Type.Object({
+  counts: Type.Optional(Type.Record(Type.String({ pattern: "^[0-9]{1,5}$" }), Type.Integer({ minimum: 0, maximum: 10000 }))),
+  amount: Type.Optional(Type.Number({ minimum: 0 })),
+  note: Type.Optional(Type.String({ maxLength: 200 }))
+}, { additionalProperties: false });
 
 // A dish taken off a bill after it went to the kitchen; a void always says why.
 export const VoidBody = Type.Object({

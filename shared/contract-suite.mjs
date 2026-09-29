@@ -868,6 +868,10 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.match(short.json.error, /13\.00.*14\.00/);
       assert.equal((await checkout({ items: all, payments: [{ type: "cheque", amount: 14 }] })).status, 400);
       assert.equal((await checkout({ items: all, payments: [{ type: "cash", amount: 14, tendered: 10 }] })).status, 400, "less handed over than it pays");
+      assert.equal((await checkout({ items: all, payments: [{ type: "cash", amount: 14, tendered: 14.5, tip: 1 }] })).status, 400, "the cash handed over pays the tip too");
+      assert.equal((await checkout({ items: all, payments: [{ type: "card", amount: 14, tip: -1 }] })).status, 400, "no negative tip");
+      assert.equal((await checkout({ items: all, payments: [{ type: "card", amount: 14, tip: 600 }] })).status, 400, "a tip of 600 is a slip of the finger");
+      assert.equal((await checkout({ items: all, payments: [{ type: "voucher", amount: 14, tip: 1, voucherCode: "NOSUCH" }] })).status, 400, "no tip on a voucher");
       assert.equal((await checkout({ items: all, payments: [{ type: "cash", amount: 14 }] }, { role: "kitchen" })).status, 403);
 
       // The rest in cash, with a 20 note: the change is worked out, the table is free.
@@ -1079,18 +1083,32 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const togoJob = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.find((job) => job.orderId === togo.json.order.id);
       assert.equal(togoJob.payload.pickupNo, takeaway.json.pickupNo);
       const togoBill = (await call("GET", `/api/admin/tables/${takeaway.json.table}/bill`, asLi)).json.bill;
+      // All but a euro in cash with 50 cents' tip out of a note five over, the euro by card with 2 euros' tip.
+      const togoCents = Math.round(togoBill.total * 100);
+      const cashCents = togoCents - 100;
       const liPaid = await call("POST", "/api/admin/checkout", {
-        ...asLi, body: { table: takeaway.json.table, items: togoBill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: togoBill.total, tendered: togoBill.total + 5 }] }
+        ...asLi, body: { table: takeaway.json.table, items: togoBill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [
+          { type: "cash", amount: cashCents / 100, tendered: (cashCents + 500) / 100, tip: 0.5 },
+          { type: "card", amount: 1, tip: 2 }
+        ] }
       });
       assert.equal(liPaid.status, 201, JSON.stringify(liPaid.json));
+      assert.equal(liPaid.json.receipt.totalCents, togoCents, "a tip is not in the receipt's total");
+      assert.deepEqual(liPaid.json.receipt.payments, [
+        { type: "cash", amountCents: cashCents, tipCents: 50, tenderedCents: cashCents + 500, changeCents: 450 },
+        { type: "card", amountCents: 100, tipCents: 200 }
+      ]);
       const liShift = (await call("GET", "/api/admin/staff/activity", { admin: true })).json.staff.find((entry) => entry.id === li.id).shift;
       assert.equal(liShift.receipts, 1);
-      assert.equal(liShift.payments.cash, Math.round(togoBill.total * 100), "the cash Li holds");
+      assert.equal(liShift.payments.cash, cashCents, "the cash Li holds");
+      assert.deepEqual(liShift.tips, { cash: 50, card: 200 });
 
-      // Settlement: Li hands in the cash Li took; Wang's is Wang's.
+      // Settlement: Li hands in the cash Li took, less the card tip Li keeps; Wang's is Wang's.
       const preview = (await call("GET", "/api/pos/settlement", asLi)).json.totals;
       assert.equal(preview.receipts, 1);
-      assert.equal(preview.payments.cash, Math.round(togoBill.total * 100));
+      assert.equal(preview.payments.cash, cashCents);
+      assert.equal(preview.tipsCents, 250);
+      assert.equal(preview.handInCents, cashCents - 200, "the card tip came in on the restaurant's terminal");
       assert.equal((await call("GET", `/api/pos/settlement?staffId=${wang.id}`, asLi)).status, 403, "only the manager looks at another waiter's");
       const settled = await call("POST", "/api/pos/settlement", { ...asLi, body: {} });
       assert.equal(settled.status, 201, JSON.stringify(settled.json));
@@ -1100,11 +1118,62 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("POST", "/api/pos/settlement", { ...asWang, body: {} })).status, 201);
       assert.ok((await call("GET", "/api/pos/settlements", asWang)).json.settlements.some((entry) => entry.staffName === "Li"));
 
+      // The cash drawer: opened with a float, money in and out with why, counted at the end.
+      assert.equal((await call("GET", "/api/pos/drawer", asLi)).json.drawer, null, "no drawer open yet");
+      assert.equal((await call("POST", "/api/pos/drawer/movements", { ...asLi, body: { kind: "out", amount: 5, reason: "Gemüse" } })).status, 409, "no drawer to take it from");
+      assert.equal((await call("POST", "/api/pos/drawer/close", { ...asLi, body: { amount: 0 } })).status, 409, "nothing to count");
+      const opened = await call("POST", "/api/pos/drawer/open", { ...asLi, body: { float: 150 } });
+      assert.equal(opened.status, 201, JSON.stringify(opened.json));
+      assert.equal(opened.json.drawer.totals.expectedCents, 15000);
+      assert.equal(opened.json.drawer.openedBy, "Li");
+      assert.equal((await call("POST", "/api/pos/drawer/open", { ...asWang, body: { float: 100 } })).status, 409, "one drawer open at a time");
+      assert.equal((await call("POST", "/api/pos/drawer/movements", { ...asLi, body: { kind: "out", amount: 12.4, reason: "Gemüse vom Markt" } })).status, 201);
+      assert.equal((await call("POST", "/api/pos/drawer/movements", { ...asWang, body: { kind: "in", amount: 50, reason: "Wechselgeld von der Bank" } })).status, 201);
+      assert.equal((await call("POST", "/api/pos/drawer/movements", { ...asLi, body: { kind: "out", amount: 5, reason: "   " } })).status, 400, "money out says why");
+      assert.equal((await call("POST", "/api/pos/drawer/movements", { ...asLi, body: { kind: "out", amount: 0, reason: "nichts" } })).status, 400);
+      // A sale in cash with a tip the waiter keeps, and a card tip paid out of the till.
+      const drawerTa = (await call("POST", "/api/pos/takeaway", asLi)).json;
+      assert.equal((await posOrder(asLi, drawerTa.table, "contract-pos-drawer", [{ id: food.id, qty: 2 }])).status, 201);
+      const drawerBill = (await call("GET", `/api/admin/tables/${drawerTa.table}/bill`, asLi)).json.bill;
+      const drawerCents = Math.round(drawerBill.total * 100);
+      assert.equal((await call("POST", "/api/admin/checkout", {
+        ...asLi, body: { table: drawerTa.table, items: drawerBill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [
+          { type: "cash", amount: (drawerCents - 100) / 100, tip: 1 },
+          { type: "card", amount: 1, tip: 3 }
+        ] }
+      })).status, 201);
+      const running = (await call("GET", "/api/pos/drawer", asWang)).json.drawer;
+      const expected = 15000 + (drawerCents - 100) + 5000 - 1240 - 300;
+      assert.deepEqual(
+        { cash: running.totals.cashSalesCents, cardTips: running.totals.cardTipsCents, cashTips: running.totals.cashTipsCents, in: running.totals.inCents, out: running.totals.outCents, expected: running.totals.expectedCents },
+        { cash: drawerCents - 100, cardTips: 300, cashTips: 100, in: 5000, out: 1240, expected }
+      );
+      assert.deepEqual(running.movements.map((movement) => [movement.kind, movement.amountCents, movement.staffName]), [["out", 1240, "Li"], ["in", 5000, "Wang"]]);
+      // Counted note by note, fifty cents short.
+      assert.equal((await call("POST", "/api/pos/drawer/close", { ...asLi, body: { counts: { 300: 1 } } })).status, 400, "there is no 3 euro note");
+      const counts = {};
+      let left = expected - 50;
+      for (const denomination of [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1]) {
+        if (left >= denomination) { counts[denomination] = Math.floor(left / denomination); left -= counts[denomination] * denomination; }
+      }
+      const counted = await call("POST", "/api/pos/drawer/close", { ...asLi, body: { counts, note: "Münzen nachgezählt" } });
+      assert.equal(counted.status, 201, JSON.stringify(counted.json));
+      assert.equal(counted.json.drawer.open, false);
+      assert.equal(counted.json.drawer.totals.countedCents, expected - 50);
+      assert.equal(counted.json.drawer.totals.differenceCents, -50, "fifty cents short");
+      assert.deepEqual(counted.json.drawer.counts, Object.fromEntries(Object.entries(counts).map(([key, value]) => [String(key), value])));
+      assert.equal((await call("GET", "/api/pos/drawer", asLi)).json.drawer, null, "counted is closed");
+      const drawerJob = (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.find((job) => job.payload?.kind === "drawer");
+      assert.equal(drawerJob?.payload.drawer.totals.differenceCents, -50, "the count goes to the front printer");
+      assert.equal((await call("GET", "/api/pos/drawers", asLi)).status, 403, "the history is the manager's");
+      assert.equal((await call("GET", "/api/pos/drawers", asWang)).json.drawers[0].totals.countedCents, expected - 50);
+      await call("DELETE", `/api/pos/tables/${drawerTa.table}/claim?force=1`, asWang);
+
       // In the journal: who moved what, who settled.
       const today = new Date().toISOString().slice(0, 10);
       const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
       const kinds = (await call("GET", `/api/admin/journal?from=${today}&to=${tomorrow}`, { admin: true })).json.entries.map((entry) => entry.kind);
-      for (const kind of ["table.moved", "staff.settled"]) assert.ok(kinds.includes(kind), kind);
+      for (const kind of ["table.moved", "staff.settled", "drawer.opened", "drawer.out", "drawer.in", "drawer.closed"]) assert.ok(kinds.includes(kind), kind);
 
       // A waiter switched off is signed out at once.
       assert.equal((await call("PUT", `/api/admin/staff/${li.id}`, { admin: true, body: { active: false } })).status, 200);
