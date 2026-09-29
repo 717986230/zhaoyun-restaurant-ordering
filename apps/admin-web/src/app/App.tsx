@@ -39,7 +39,7 @@ const initialState: AdminState = {
   gate: { checking: true, registered: false, busy: false, error: null, reachable: true },
   auditEntries: [],
   connected: false, connectionError: null, products: [], printers: [], printBridges: [], printQueue: null, printFound: [],
-  orders: [], requests: [], failedJobs: [], bill: null, tables: [], tableOverview: [], staffActivity: [], boardBusy: false,
+  orders: [], requests: [], failedJobs: [], deliveryOrders: [], bill: null, tables: [], tableOverview: [], staffActivity: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", settings: null, toast: null
 };
 
@@ -137,6 +137,8 @@ export function App() {
     if (!adminApi.storage.token) return;
     try {
       const { orders } = await adminApi.orders();
+      // The platforms' orders being cooked, for the kitchen as for the floor; the board works without them.
+      const deliveryOrders = await adminApi.deliveryKitchen().then(({ orders: cooking }) => cooking, () => []);
       // The kitchen screen may only read orders; asking for the rest would 403.
       const floor = roleRef.current === "kitchen"
         ? { requests: [], jobs: [], tables: [], staff: [] }
@@ -145,7 +147,7 @@ export function App() {
           // Who is on the floor and their shift: the manager's to see.
           roleRef.current === "manager" ? adminApi.staffActivity() : Promise.resolve({ staff: [] })
         ]).then(([a, b, c, d]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables, staff: d.staff }));
-      setState((current) => ({ ...current, orders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables, staffActivity: floor.staff }));
+      setState((current) => ({ ...current, orders, deliveryOrders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables, staffActivity: floor.staff }));
     } catch (error) {
       if (!silent) failed(error, "boardLoadFailed");
     }
@@ -325,10 +327,12 @@ export function App() {
   }
 
 
-  async function saveProduct(input: AdminProductInput, id: string | null, media: File | null): Promise<boolean> {
+  async function saveProduct(input: AdminProductInput, id: string | null, media: File | null, dailyLimit?: number | null): Promise<boolean> {
     try {
       const result = id ? await adminApi.updateProduct(id, input) : await adminApi.createProduct(input);
       if (media) await adminApi.uploadMedia(result.product.id, media);
+      // 每日限量, kept apart from the dish itself (shared/stock.mjs).
+      if (dailyLimit !== undefined) await adminApi.setProductStock(result.product.id, { dailyLimit });
       setState((current) => ({ ...current, editingProduct: null }));
       await connect();
       notify(t("productSaved"));
@@ -626,6 +630,8 @@ export function App() {
         orders={state.orders}
         requests={state.requests}
         failedJobs={state.failedJobs}
+        deliveryOrders={state.deliveryOrders}
+        onDeliveryReady={(id: string) => runBoardAction(() => adminApi.deliveryAction(id, "ready"), t("dlReadyDone"))}
         busy={state.boardBusy}
         onRefresh={() => loadBoard()}
         onOrderStatus={(id: string, status: ApiOrder["status"]) => runBoardAction(() => adminApi.updateOrderStatus(id, status), t("orderUpdated"))}

@@ -289,6 +289,9 @@ export const VoidBody = Type.Object({
 }, { additionalProperties: false });
 // Sold out (沽清), or back on.
 export const AvailabilityBody = Type.Object({ available: Type.Boolean() }, { additionalProperties: false });
+/** A dish's portions (每日限量; shared/stock.mjs): each day's, today's, or both; null for no limit. */
+const Portions = Type.Union([Type.Integer({ minimum: 0, maximum: 9999 }), Type.Null()]);
+export const StockBody = Type.Object({ dailyLimit: Type.Optional(Portions), leftToday: Type.Optional(Portions) }, { additionalProperties: false, minProperties: 1 });
 
 // A storno always says why.
 export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false });

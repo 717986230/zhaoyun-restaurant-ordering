@@ -119,6 +119,8 @@ export function planVoid(input, row, { table, staff = null, role, at = now() }) 
   const modifiers = parseJson(row.modifiers_json, []);
   return {
     void: { id: uuid(), orderItemId: row.id, orderId: row.order_id, table, quantity, amountCents, reason, staffId: staff?.id ?? null, staffName, at },
+    // The dish, for its portions to go back on today's count (shared/stock.mjs).
+    productId: row.product_id,
     printJob: {
       id: uuid(),
       orderId: row.order_id,

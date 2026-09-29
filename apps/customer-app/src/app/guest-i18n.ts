@@ -19,6 +19,7 @@ const copy = {
     privacy: "隐私说明", registerConsent: "注册即表示你已阅读{privacy}。",
     privacyBody: "{restaurant}只为你的账户保存这些：邮箱、称呼、密码（加密保存，任何人都看不到原文）、收藏的菜、积分记录、用账户下的订单。用途只有登录、外带取餐、积分和收藏，不发广告，不交给第三方。你可以随时在「账户设置」里下载全部数据，或删除账户。删除后，邮箱、称呼、密码、积分和收藏立即清除；订单和收据按奥地利税法保存 7 年，但不再和你关联。有其他问题请直接问店员。",
     forgot: "忘记密码？请到前台，工作人员可以帮你重设。",
+    fewLeft: "今天仅剩 {n} 份",
     cart: "购物车", addToCart: "加入购物车", added: "已加入：{name}", cartEmpty: "购物车是空的", total: "合计", note: "备注", notePlaceholder: "例如：少辣、不要香菜", placeOrder: "下单", placing: "正在下单…",
     dineIn: "堂食 · {table} 桌", pickup: "外带自取", channel: "用餐方式", noTable: "请扫描桌上的二维码再下单", pickupNeedsAccount: "外带自取需要先登录", payInStore: "到店 / 餐后付款",
     limits: "每单最多 {items} 份、{amount}", reward: "积分兑换", rewardCost: "{points} 积分", pointsNeeded: "需要 {points} 积分",
@@ -27,7 +28,8 @@ const copy = {
     refused: {
       ORDERING_OFF: "餐厅暂未开放线上点餐，请呼叫服务员", ORDERING_CLOSED: "现在不接受线上点餐", TABLE_NOT_OPEN: "这桌还没开台，请先请服务员开台",
       TABLE_LOCKED: "这桌正在结账，暂时不能下单", TOO_SOON: "刚刚下过单，请 {seconds} 秒后再试", ORDER_TOO_LARGE: "这单超过了线上点餐的上限，请分开下单或请服务员帮忙",
-      SIGN_IN_REQUIRED: "请先登录", TOO_MANY_PICKUPS: "你还有没取的外带订单，请先取餐", NOT_ENOUGH_POINTS: "积分不够兑换这道菜", PAYMENT_UNAVAILABLE: "暂不支持线上付款，请到店付款", BAD_CHANNEL: "请选择堂食或外带"
+      SIGN_IN_REQUIRED: "请先登录", TOO_MANY_PICKUPS: "你还有没取的外带订单，请先取餐", NOT_ENOUGH_POINTS: "积分不够兑换这道菜", PAYMENT_UNAVAILABLE: "暂不支持线上付款，请到店付款", BAD_CHANNEL: "请选择堂食或外带",
+      SOLD_OUT: "{dish}今天只剩 {left} 份了，请改一下数量或换一道菜"
     } as Record<GuestOrderRefusal, string>,
     failed: "没能下单：{message}", offline: "网络连不上，订单没有发出去，请稍后再试"
   },
@@ -43,6 +45,7 @@ const copy = {
     privacy: "Datenschutzhinweis", registerConsent: "Mit der Registrierung bestätigst du den {privacy}.",
     privacyBody: "{restaurant} speichert für dein Konto nur: E-Mail, Namen, Passwort (verschlüsselt, niemand sieht es im Klartext), Favoriten, Punktebuchungen und die Bestellungen mit deinem Konto. Nur für Anmeldung, Abholung, Punkte und Favoriten – keine Werbung, keine Weitergabe an Dritte. Unter „Konto-Einstellungen“ kannst du jederzeit alle Daten herunterladen oder das Konto löschen. Dann werden E-Mail, Name, Passwort, Punkte und Favoriten sofort gelöscht; Bestellungen und Belege bleiben nach der BAO 7 Jahre aufbewahrt, aber nicht mehr mit dir verknüpft. Fragen beantwortet das Personal.",
     forgot: "Passwort vergessen? Das Personal kann es an der Kasse neu setzen.",
+    fewLeft: "Heute nur noch {n}",
     cart: "Warenkorb", addToCart: "In den Warenkorb", added: "Hinzugefügt: {name}", cartEmpty: "Der Warenkorb ist leer", total: "Gesamt", note: "Notiz", notePlaceholder: "z. B. weniger scharf, ohne Koriander", placeOrder: "Bestellen", placing: "Wird bestellt …",
     dineIn: "Hier essen · Tisch {table}", pickup: "Zum Abholen", channel: "Wie?", noTable: "Bitte den QR-Code am Tisch scannen", pickupNeedsAccount: "Zum Abholen bitte anmelden", payInStore: "Bezahlung im Restaurant",
     limits: "Pro Bestellung höchstens {items} Stück, {amount}", reward: "Prämie", rewardCost: "{points} Punkte", pointsNeeded: "{points} Punkte nötig",
@@ -51,7 +54,8 @@ const copy = {
     refused: {
       ORDERING_OFF: "Online-Bestellung ist nicht verfügbar – bitte Service rufen", ORDERING_CLOSED: "Derzeit keine Online-Bestellungen", TABLE_NOT_OPEN: "Der Tisch ist noch nicht freigegeben – bitte den Service fragen",
       TABLE_LOCKED: "Der Tisch wird gerade abgerechnet", TOO_SOON: "Gerade bestellt – bitte in {seconds} Sekunden noch einmal", ORDER_TOO_LARGE: "Zu groß für eine Online-Bestellung – bitte aufteilen oder den Service fragen",
-      SIGN_IN_REQUIRED: "Bitte zuerst anmelden", TOO_MANY_PICKUPS: "Es warten noch Bestellungen auf Abholung", NOT_ENOUGH_POINTS: "Zu wenig Punkte für diese Prämie", PAYMENT_UNAVAILABLE: "Online-Zahlung noch nicht möglich – bitte im Restaurant bezahlen", BAD_CHANNEL: "Bitte hier essen oder abholen wählen"
+      SIGN_IN_REQUIRED: "Bitte zuerst anmelden", TOO_MANY_PICKUPS: "Es warten noch Bestellungen auf Abholung", NOT_ENOUGH_POINTS: "Zu wenig Punkte für diese Prämie", PAYMENT_UNAVAILABLE: "Online-Zahlung noch nicht möglich – bitte im Restaurant bezahlen", BAD_CHANNEL: "Bitte hier essen oder abholen wählen",
+      SOLD_OUT: "{dish}: heute nur noch {left} Portionen – bitte Menge ändern oder etwas anderes wählen"
     } as Record<GuestOrderRefusal, string>,
     failed: "Nicht bestellt: {message}", offline: "Keine Verbindung – die Bestellung wurde nicht gesendet, bitte gleich noch einmal"
   },
@@ -67,6 +71,7 @@ const copy = {
     privacy: "privacy notice", registerConsent: "By registering you confirm you have read the {privacy}.",
     privacyBody: "{restaurant} keeps only this for your account: your e-mail, name, password (encrypted — nobody can read it), favourites, points history and the orders placed with your account. It is used for signing in, pickup, points and favourites only — no advertising, never passed on. Under Account settings you can download all of it or delete the account at any time. Deleting removes your e-mail, name, password, points and favourites at once; orders and receipts are kept for 7 years under Austrian tax law, no longer linked to you. For anything else, ask the staff.",
     forgot: "Forgot your password? The staff can set a new one at the counter.",
+    fewLeft: "Only {n} left today",
     cart: "Cart", addToCart: "Add to cart", added: "Added: {name}", cartEmpty: "Your cart is empty", total: "Total", note: "Note", notePlaceholder: "e.g. less spicy, no coriander", placeOrder: "Place order", placing: "Placing order…",
     dineIn: "Eat in · table {table}", pickup: "Pickup", channel: "How?", noTable: "Scan the QR code on your table to order", pickupNeedsAccount: "Sign in to order for pickup", payInStore: "Pay at the restaurant",
     limits: "Up to {items} items, {amount} per order", reward: "Reward", rewardCost: "{points} points", pointsNeeded: "{points} points needed",
@@ -75,7 +80,8 @@ const copy = {
     refused: {
       ORDERING_OFF: "Ordering from the menu is not available – please call a waiter", ORDERING_CLOSED: "Not taking orders right now", TABLE_NOT_OPEN: "Your table is not open for ordering yet – please ask a waiter",
       TABLE_LOCKED: "Your table's bill is being settled", TOO_SOON: "You just ordered – please try again in {seconds} seconds", ORDER_TOO_LARGE: "Too large for an order from the menu – split it or ask a waiter",
-      SIGN_IN_REQUIRED: "Please sign in first", TOO_MANY_PICKUPS: "You have pickups waiting – please collect them first", NOT_ENOUGH_POINTS: "Not enough points for this reward", PAYMENT_UNAVAILABLE: "Online payment is not available yet – please pay at the restaurant", BAD_CHANNEL: "Please choose eat in or pickup"
+      SIGN_IN_REQUIRED: "Please sign in first", TOO_MANY_PICKUPS: "You have pickups waiting – please collect them first", NOT_ENOUGH_POINTS: "Not enough points for this reward", PAYMENT_UNAVAILABLE: "Online payment is not available yet – please pay at the restaurant", BAD_CHANNEL: "Please choose eat in or pickup",
+      SOLD_OUT: "{dish}: only {left} left today – please change the quantity or pick another dish"
     } as Record<GuestOrderRefusal, string>,
     failed: "Not ordered: {message}", offline: "No connection – the order was not sent, please try again"
   }

@@ -16,6 +16,7 @@
  * already sent back, and the kitchen does not cook it twice.
  */
 import { now, uuid } from "./core.mjs";
+import { leftToday, restaurantDay, TAKE_STOCK_SQL } from "./stock.mjs";
 import {
   assertDeliveryTransition, DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, DELIVERY_RETENTION_DAYS, DELIVERY_STATUSES, deliveryError, deliveryOrderView,
   deliveryTickets, OPEN_DELIVERY_STATUSES, readDeliveryOrder, REJECT_REASONS
@@ -59,7 +60,7 @@ export function createDeliveryStore(driver, { settings }) {
     const skus = [...new Set(items.map((item) => item.sku.toUpperCase()).filter(Boolean))];
     if (!skus.length) return new Map();
     const rows = await driver.all(
-      `SELECT sku, name_zh, name_de, name_en, print_station FROM products WHERE UPPER(sku) IN (${skus.map(() => "?").join(", ")})`,
+      `SELECT id, sku, name_zh, name_de, name_en, print_station, available FROM products WHERE UPPER(sku) IN (${skus.map(() => "?").join(", ")})`,
       ...skus
     );
     return new Map(rows.map((row) => [row.sku.toUpperCase(), row]));
@@ -73,6 +74,51 @@ export function createDeliveryStore(driver, { settings }) {
       const payload = kind === "void" ? { ...ticket.payload, kind: "void", reason } : ticket.payload;
       await driver.run(PRINT_SQL, uuid(), ticket.station, JSON.stringify(payload), at, at);
     }
+  }
+
+  /** Today's portions (shared/stock.mjs) of the dishes named by SKU, by product id. */
+  async function stockOf(products) {
+    const ids = [...products.values()].map((product) => String(product.id));
+    if (!ids.length) return new Map();
+    const rows = await driver.all(`SELECT * FROM product_stock WHERE product_id IN (${ids.map(() => "?").join(", ")})`, ...ids);
+    return new Map(rows.map((row) => [String(row.product_id), row]));
+  }
+
+  /** How many of each of our dishes an order asks for, by product id. */
+  function demandOf(order, products) {
+    const demand = new Map();
+    for (const item of order.items) {
+      const product = item.sku ? products.get(item.sku.toUpperCase()) : null;
+      if (product) demand.set(String(product.id), { product, quantity: (demand.get(String(product.id))?.quantity ?? 0) + item.quantity });
+    }
+    return demand;
+  }
+
+  /**
+   * An accepted order's portions come off today's count, as a waiter's would.
+   * Never refused here: the floor said yes, knowing what it had.
+   */
+  async function takeStock(row) {
+    const order = deliveryOrderView(row);
+    const products = await productsFor(order.items);
+    const today = restaurantDay((await settings()).timeZone);
+    const at = now();
+    for (const [id, { quantity }] of demandOf(order, products)) await driver.run(TAKE_STOCK_SQL, today, quantity, today, at, id, today);
+  }
+
+  /**
+   * What the floor should know before saying yes: the dishes in an order that
+   * are sold out, by hand or by count, or have fewer portions left than it asks for.
+   */
+  async function shortages(order, today) {
+    const products = await productsFor(order.items);
+    const stock = await stockOf(products);
+    const short = [];
+    for (const [id, { product, quantity }] of demandOf(order, products)) {
+      const left = product.available ? leftToday(stock.get(id), today) : 0;
+      if (left !== null && quantity > left) short.push({ sku: product.sku, name: product.name_zh || product.name_de || product.name_en || product.sku, wanted: quantity, left });
+    }
+    return short;
   }
 
   async function setStatus(id, status, fields = {}) {
@@ -123,7 +169,10 @@ export function createDeliveryStore(driver, { settings }) {
         throw error;
       }
       const row = await byId(id);
-      if (autoAccept) await queueTickets(row);
+      if (autoAccept) {
+        await queueTickets(row);
+        await takeStock(row);
+      }
       return { order: deliveryOrderView(row), created: true, autoAccepted: autoAccept };
     },
 
@@ -158,6 +207,7 @@ export function createDeliveryStore(driver, { settings }) {
         if (!Number.isInteger(minutes) || minutes < 5 || minutes > 180) throw deliveryError("Preparation time is 5 to 180 minutes", "BAD_PREP");
         const updated = await setStatus(id, status, { prep_minutes: minutes });
         await queueTickets(updated);
+        await takeStock(updated);
         return { order: deliveryOrderView(updated), previous: row.status };
       }
       if (action === "reject") {
@@ -183,10 +233,31 @@ export function createDeliveryStore(driver, { settings }) {
       return row ? deliveryOrderView(row) : null;
     },
 
+    /**
+     * The kitchen's view: what is being cooked and what waits for its rider,
+     * soonest due first. `readyBy` is when the floor told the platform it
+     * would be ready (the time it was accepted, plus the minutes it said).
+     */
+    async kitchen() {
+      const rows = await driver.all("SELECT * FROM delivery_orders WHERE status IN ('accepted', 'ready') ORDER BY created_at LIMIT 200");
+      const orders = rows.map((row) => {
+        const order = deliveryOrderView(row);
+        const readyBy = row.status === "accepted" && row.prep_minutes ? new Date(Date.parse(row.updated_at) + row.prep_minutes * 60_000).toISOString() : null;
+        return { ...order, readyBy };
+      });
+      const due = (order) => Date.parse(order.readyBy ?? order.dueAt ?? order.createdAt);
+      return orders.sort((a, b) => (a.status === b.status ? due(a) - due(b) : a.status === "accepted" ? -1 : 1));
+    },
+
     /** The orders the floor still has to do something about, oldest first. */
     async open() {
       const rows = await driver.all(`SELECT * FROM delivery_orders WHERE status IN (${OPEN_SQL}) ORDER BY created_at LIMIT 200`);
-      return rows.map(deliveryOrderView);
+      const today = restaurantDay((await settings()).timeZone);
+      // A new one says, before anyone accepts it, which of its dishes the kitchen is out of.
+      return Promise.all(rows.map(async (row) => {
+        const order = deliveryOrderView(row);
+        return row.status === "new" ? { ...order, shortages: await shortages(order, today) } : order;
+      }));
     },
 
     /**

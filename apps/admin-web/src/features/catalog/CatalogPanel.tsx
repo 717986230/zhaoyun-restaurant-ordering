@@ -14,7 +14,8 @@ interface Props {
   mediaUrl: (path: string) => string;
   onFilter: (filter: ProductFilter) => void;
   onEdit: (product: Product | null) => void;
-  onSave: (input: AdminProductInput, id: string | null, media: File | null) => Promise<boolean>;
+  /** `dailyLimit` only when it changed (每日限量): portions a day, or null for no limit. */
+  onSave: (input: AdminProductInput, id: string | null, media: File | null, dailyLimit?: number | null) => Promise<boolean>;
   onDelete: (id: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onDuplicate: (id: string) => Promise<void>;
@@ -191,7 +192,12 @@ export function CatalogPanel(props: Props) {
       published: data.get("published") === "on"
     };
     const mediaInput = formElement.elements.namedItem("media") as HTMLInputElement;
-    if (await props.onSave(input, props.editing?.id ?? null, mediaInput.files?.[0] ?? null)) setEditorOpen(false);
+    // 每日限量: empty is as many as ordered; saved on its own, and only when it changed.
+    const limitText = readText(data, "dailyLimit");
+    const dailyLimit = limitText ? Number(limitText) : null;
+    if (dailyLimit !== null && (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 9999)) return setFormError(t("dailyLimitInvalid"));
+    const limitChanged = dailyLimit !== (props.editing?.dailyLimit ?? null);
+    if (await props.onSave(input, props.editing?.id ?? null, mediaInput.files?.[0] ?? null, limitChanged ? dailyLimit : undefined)) setEditorOpen(false);
   }
 
   const product = props.editing;
@@ -227,6 +233,8 @@ export function CatalogPanel(props: Props) {
       <fieldset className="allergen-picker"><legend>{t("fieldAllergens")}</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {language === "zh" ? allergen.zh : allergen.de}</span></label>)}</fieldset>
       <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>{t("fieldMedia")}</b><small>{t("fieldMediaHint")}</small></label>
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
+      <label className="daily-limit"><span>{t("fieldDailyLimit")}</span><input name="dailyLimit" id="dailyLimit" type="number" min="1" max="9999" step="1" inputMode="numeric" defaultValue={product?.dailyLimit ?? ""} placeholder={t("dailyLimitNone")} />
+        <small className="settings-hint">{product?.leftToday !== undefined && product?.leftToday !== null ? t("dailyLimitToday", { n: product.leftToday }) : t("dailyLimitHint")}</small></label>
       <BundleFieldset product={product} products={props.products} mediaUrl={props.mediaUrl} />
       {/* What a restaurant rarely touches: numbering, printing, tax and the raw
           option groups. Folded away so the form is the dish, not the plumbing. */}
@@ -256,7 +264,7 @@ export function CatalogPanel(props: Props) {
       </header>
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}</div>
       <div className="product-list">{rows.length ? rows.map((row) => {
-        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}{row.leftToday === 0 && <em className="draft-mark">{t("stockOutToday")}</em>}{row.leftToday ? <em className="draft-mark">{t("stockLeftToday", { n: row.leftToday })}</em> : null}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
     </section>
   </div></section>;

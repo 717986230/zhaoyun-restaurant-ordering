@@ -48,6 +48,7 @@ import {
 import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
 import { createDeliveryStore } from "./delivery-store.mjs";
+import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
 import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
 import {
@@ -143,19 +144,42 @@ export function createStore(driver) {
     return map;
   }
 
+  /** The dishes' limits and today's portions (shared/stock.mjs), by product id, and the restaurant's day. */
+  async function stockFor(ids = null) {
+    const rows = ids ? await selectByIds("SELECT * FROM product_stock WHERE product_id IN (?)", ids) : await all("SELECT * FROM product_stock");
+    return { stock: new Map(rows.map((row) => [String(row.product_id), row])), today: restaurantDay((await getSettings()).timeZone) };
+  }
+
   async function getProduct(id) {
     const row = await first("SELECT * FROM products WHERE id = ?", String(id));
     if (!row) return null;
     const media = await mediaFor([row.id]);
-    return mapProduct(row, media.get(row.id));
+    const { stock, today } = await stockFor([String(row.id)]);
+    return mapProduct(row, media.get(row.id), stockView(stock.get(String(row.id)), today));
   }
 
+  /**
+   * The dishes, each with its daily limit and what is left today. The guests'
+   * catalogue (`publishedOnly`) leaves out what is sold out, by hand or by
+   * count; the staff see it all, a dish counted out with `leftToday` 0.
+   */
   async function listProducts(publishedOnly = false) {
     const rows = publishedOnly
       ? await all("SELECT * FROM products WHERE published = 1 AND available = 1 ORDER BY sort_order, created_at")
       : await all("SELECT * FROM products ORDER BY sort_order, created_at");
     const media = await mediaFor(rows.map((row) => row.id));
-    return rows.map((row) => mapProduct(row, media.get(row.id)));
+    const { stock, today } = await stockFor();
+    const products = rows.map((row) => mapProduct(row, media.get(row.id), stockView(stock.get(String(row.id)), today)));
+    return publishedOnly ? products.filter((product) => product.leftToday !== 0) : products;
+  }
+
+  /** A dish's daily limit, or today's portions, set by the floor or the owner (shared/stock.mjs). */
+  async function setStock(id, input) {
+    const change = normalizeStockInput(input);
+    if (!(await first("SELECT id FROM products WHERE id = ?", String(id)))) return null;
+    const { stock, today } = await stockFor([String(id)]);
+    await batch([setStockStatement(sql, id, stock.get(String(id)), change, today, now())]);
+    return getProduct(id);
   }
 
   async function saveProduct(input, id) {
@@ -333,6 +357,10 @@ export function createStore(driver) {
     const pickupNo = guestPlan ? guestPlan.pickupNo : pos && isTakeaway(input.table) ? Number(String(input.table).slice(TAKEAWAY_PREFIX.length)) || null : null;
     const plan = guestPlan?.plan ?? planOrder(input, products, { timeZone, setsSchedule }, { staffName: pos?.staff?.name, pickupNo });
     const { id, orderNo, clientRequestId, table, note, totalCents, timestamp } = plan.order;
+    // Portions left today (每日限量): an order for more than there is says which dish and how many.
+    const demand = stockDemand(plan.items);
+    const { stock, today } = await stockFor([...demand.keys()]);
+    assertStock(demand, products, stock, today);
 
     // A locked table is one whose bill is being settled. Refusing here is the
     // whole point of the lock: an order that lands mid-settle is either missing
@@ -360,6 +388,7 @@ export function createStore(driver) {
       // The guests are seated: their phones may order too.
       ...(pos ? (openTableStatements(table, settings, pos.staff?.name)) : []),
       ...(guestPlan ? (guestPlan.statements) : []),
+      ...takeStockStatements(sql, demand, stock, today, timestamp),
       await journalStatement(last, "order.created", id, { ...orderJournalPayload(plan), ...(pos ? { staffName: pos.staff?.name ?? null, pickupNo } : {}), ...(guestPlan ? guestPlan.journal : {}) }, timestamp)
     ];
 
@@ -796,6 +825,8 @@ export function createStore(driver) {
       const entry = plan.void;
       await batch([
         sql(INSERT_VOID_SQL, entry.id, entry.orderItemId, entry.orderId, entry.table, entry.quantity, entry.amountCents, entry.reason, entry.staffId, entry.staffName, at),
+        // Not cooked after all: the portions go back on today's count.
+        sql(RETURN_STOCK_SQL, entry.quantity, at, String(plan.productId ?? ""), restaurantDay((await getSettings()).timeZone)),
         sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)", plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at),
         await journalStatement(last, plan.journal.kind, plan.journal.ref, plan.journal.payload, at),
         // The last open dish voided, and the rest paid: the table is settled.
@@ -862,6 +893,7 @@ export function createStore(driver) {
   return {
     listProducts,
     getProduct,
+    setStock,
     saveProduct,
     deleteProduct: async (id) => (await run("DELETE FROM products WHERE id = ?", String(id))) > 0,
     addMedia,

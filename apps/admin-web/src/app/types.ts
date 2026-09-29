@@ -1,4 +1,4 @@
-import type { PosStaffActivity, ApiAccount, ApiBill, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
+import type { PosStaffActivity, ApiAccount, ApiBill, ApiDeliveryOrder, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings } from "@zhaoyun/contracts";
 import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
@@ -38,6 +38,8 @@ export interface AdminState {
   orders: ApiOrder[];
   requests: ApiServiceRequest[];
   failedJobs: ApiPrintJob[];
+  /** The delivery platforms' orders the kitchen is cooking or that wait for their rider. */
+  deliveryOrders: ApiDeliveryOrder[];
   bill: ApiBill | null;
   tables: RestaurantTable[];
   tableOverview: TableOverview[];

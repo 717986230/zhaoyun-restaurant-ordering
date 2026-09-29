@@ -76,7 +76,10 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
         setError(g(language, "offline"));
       } else {
         if (failure.code === "SIGN_IN_REQUIRED") dispatch({ type: "sheet", sheet: "account" });
-        setError(refusal(language, failure.code, { seconds: failure.retryAfter ?? 60 }) ?? g(language, "failed", { message: failure.message }));
+        // A dish counted out for today (每日限量) is named, with how many there still are.
+        const soldOut = failure.code === "SOLD_OUT" ? products.find((product) => product.sku === failure.details.sku) : undefined;
+        const dish = soldOut ? productName(soldOut, language) : String(failure.details.sku ?? "");
+        setError(refusal(language, failure.code, { seconds: failure.retryAfter ?? 60, dish, left: Number(failure.details.left ?? 0) }) ?? g(language, "failed", { message: failure.message }));
         // A refusal is final for this cart as sent: a changed one is a new order.
         attempt.current = null;
       }

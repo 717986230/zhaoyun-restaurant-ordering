@@ -387,6 +387,13 @@ CREATE TABLE delivery_orders (
       updated_at TEXT NOT NULL,
       UNIQUE (provider, external_id)
     );
+CREATE TABLE product_stock (
+      product_id TEXT PRIMARY KEY,
+      daily_limit INTEGER,
+      stock_day TEXT,
+      stock_left INTEGER,
+      updated_at TEXT NOT NULL
+    );
 CREATE TABLE discovered_printers (
       address TEXT NOT NULL,
       port INTEGER NOT NULL,

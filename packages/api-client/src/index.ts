@@ -33,7 +33,9 @@ export function toProduct(product: ApiCatalogProduct): Product {
     media: (product.media ?? []).map((media) => ({ ...media })),
     available: product.available ?? true,
     published: product.published ?? true,
-    printStation: product.printStation ?? (product.kind === "drink" ? "bar" : product.kind === "sushi" ? "sushi" : "kitchen")
+    printStation: product.printStation ?? (product.kind === "drink" ? "bar" : product.kind === "sushi" ? "sushi" : "kitchen"),
+    dailyLimit: product.dailyLimit ?? null,
+    leftToday: product.leftToday ?? null
   };
 }
 
@@ -187,13 +189,16 @@ export class ApiError extends Error {
   readonly code: string | undefined;
   /** For a pause (429): how many seconds. */
   readonly retryAfter: number | undefined;
+  /** The whole refusal as the server wrote it: a dish sold out says which (`sku`) and how many are left (`left`). */
+  readonly details: Record<string, unknown>;
 
-  constructor(message: string, status: number, code?: string, retryAfter?: number) {
+  constructor(message: string, status: number, code?: string, retryAfter?: number, details: Record<string, unknown> = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.retryAfter = retryAfter;
+    this.details = details;
   }
 }
 
@@ -222,7 +227,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   }
   if (!response.ok) {
     const retryAfter = Number(response.headers.get("retry-after")) || undefined;
-    throw new ApiError(payload.error || `Request failed (${response.status})`, response.status, payload.code, retryAfter);
+    throw new ApiError(payload.error || `Request failed (${response.status})`, response.status, payload.code, retryAfter, payload as Record<string, unknown>);
   }
   return payload as T;
 }
@@ -319,6 +324,10 @@ export class AdminApi {
   createProduct(product: AdminProductInput): Promise<{ product: ApiCatalogProduct }> { return this.#request("/api/admin/products", { method: "POST", body: JSON.stringify(product) }); }
   updateProduct(id: string, product: AdminProductInput): Promise<{ product: ApiCatalogProduct }> { return this.#request(`/api/admin/products/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(product) }); }
   deleteProduct(id: string): Promise<void> { return this.#request(`/api/admin/products/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  /** 每日限量: a dish's portions each day, today's, or both; null for no limit. */
+  setProductStock(id: string, stock: { dailyLimit?: number | null; leftToday?: number | null }): Promise<{ product: ApiCatalogProduct }> {
+    return this.#request(`/api/admin/products/${encodeURIComponent(id)}/stock`, { method: "PUT", body: JSON.stringify(stock) });
+  }
   /** A new, unpublished copy of a dish, photos and all. */
   duplicateProduct(id: string): Promise<{ product: ApiCatalogProduct }> { return this.#request(`/api/admin/products/${encodeURIComponent(id)}/duplicate`, { method: "POST" }); }
   /** Moves every dish of one category to another, new or existing, and
@@ -413,6 +422,8 @@ export class AdminApi {
     return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });
   }
   deliveryPlatforms(): Promise<{ providers: ApiDeliveryPlatform[] }> { return this.#request("/api/admin/delivery/status"); }
+  /** What the kitchen cooks from the platforms, soonest due first (the kitchen screen may read it too). */
+  deliveryKitchen(): Promise<{ orders: ApiDeliveryOrder[] }> { return this.#request("/api/admin/delivery/kitchen"); }
   /** A made-up order in the platform's own shape, through the whole path; a test order counts for nothing. */
   deliveryTestOrder(provider: DeliveryProvider): Promise<{ order: ApiDeliveryOrder }> {
     return this.#request(`/api/admin/delivery/test/${provider}`, { method: "POST" });
@@ -496,6 +507,10 @@ export class PosApi {
 
   /** Every published dish, the sold-out ones too (marked), so they can be switched back on. */
   catalog(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/pos/catalog"); }
+  /** 每日限量: a dish's portions each day, today's, or both; null for no limit. */
+  setStock(productId: string, stock: { dailyLimit?: number | null; leftToday?: number | null }): Promise<{ product: ApiCatalogProduct }> {
+    return this.#request(`/api/pos/products/${encodeURIComponent(productId)}/stock`, { method: "PUT", body: JSON.stringify(stock) });
+  }
   /** 沽清: sold out, or back on. The guests' menus follow at once. */
   setAvailable(productId: string, available: boolean): Promise<{ product: ApiCatalogProduct }> {
     return this.#request(`/api/pos/products/${encodeURIComponent(productId)}/availability`, { method: "PUT", body: JSON.stringify({ available }) });

@@ -78,6 +78,10 @@ export function DeliveryOrders({ pos, orders, onDone }: { pos: Pos; orders: ApiD
           {item.note && <small>{item.note}</small>}
         </li>)}</ol>
         {order.notes && <p className="pos-delivery-note">{order.notes}</p>}
+        {/* Out of a dish, or short of it today: known before saying yes. */}
+        {order.shortages && order.shortages.length > 0 && <p className="pos-delivery-short" role="alert">
+          ⚠ {order.shortages.map((short) => short.left ? t("deliveryShort", { name: short.name, left: short.left, wanted: short.wanted }) : t("deliveryOut", { name: short.name })).join(" · ")}
+        </p>}
         <p className="pos-delivery-meta">
           {order.customerName && <span>{order.customerName}</span>}
           <span>{money(order.totalCents)} · {t(order.paidOnline ? "deliveryPaid" : "deliveryCash")}</span>

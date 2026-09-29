@@ -212,6 +212,10 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-dishes button.soldout span { color: var(--p-warn); font-weight: 700; }
 .pos-dishes.choosing-soldout button { outline: 2px dashed var(--p-warn); outline-offset: -4px; }
 .pos-soldout-mode { justify-self: start; min-height: 40px; }
+.pos-dish-modes { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 每日限量: the portions left today, on the dish. */
+.pos-dishes button { position: relative; }
+.pos-stock-left { position: absolute; top: 4px; right: 4px; padding: 1px 6px; border-radius: 999px; background: var(--p-seated); color: var(--p-ink); font-size: 11px; font-style: normal; font-weight: 700; }
 .pos-soldout-mode.on { border-color: var(--p-warn); background: var(--p-warn-wash); color: var(--p-warn); font-weight: 700; }
 
 .pos-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.55); }
@@ -578,6 +582,15 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-delivery-note {
   margin: 0;
   font-weight: 650;
+}
+
+.pos-delivery-short {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--p-card);
+  color: var(--p-warn);
+  font-weight: 700;
 }
 
 .pos-delivery-sync {

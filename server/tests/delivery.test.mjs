@@ -125,3 +125,38 @@ test("the kitchen's ticket names the platform, its number, and when it is due", 
   assert.match(text, /2 x Ramen/);
   assert.match(text, /Extra Ei/);
 });
+
+test("a new order says which dishes the kitchen is out of, and accepting it takes today's portions", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-delivery-stock-"));
+  const app = await buildServer({
+    databasePath: path.join(directory, "restaurant.sqlite"),
+    uploadDir: path.join(directory, "media"),
+    adminToken: ADMIN,
+    delivery: { lieferando: { webhookSecret: SECRET } },
+    logger: false
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const call = async (method, url, payload, headers = { "x-admin-token": ADMIN }) => {
+    const response = await app.inject({ method, url, headers, ...(payload ? { payload } : {}) });
+    return { status: response.statusCode, json: response.body ? response.json() : {} };
+  };
+  await call("PUT", "/api/admin/settings", { delivery: { lieferando: { enabled: true, autoAccept: false, prepMinutes: 20 }, foodora: { enabled: false, autoAccept: false, prepMinutes: 20 } } });
+  assert.equal((await call("PUT", "/api/admin/products/photo-r1/stock", { dailyLimit: 1 })).status, 200);
+
+  const hook = await call("POST", "/api/delivery/lieferando/orders", { OrderId: "jet-stock-1", FriendlyOrderReference: "ST1", Items: [{ Reference: "R1", Name: "Ramen", Quantity: 2, UnitPrice: 12.5 }] }, { authorization: `Bearer ${SECRET}` });
+  assert.equal(hook.status, 201);
+
+  const device = (await call("POST", "/api/admin/pos-devices", { name: "Counter" })).json.token;
+  const staff = (await call("POST", "/api/admin/staff", { name: "Li", pin: "1234" })).json.staff;
+  const token = (await call("POST", "/api/pos/sign-in", { staffId: staff.id, pin: "1234" }, { "x-device-token": device })).json.token;
+  const floor = (await call("GET", "/api/pos/floor", null, { "x-admin-token": token })).json;
+  assert.deepEqual(floor.delivery[0].shortages, [{ sku: "R1", name: "蔬菜拉面", wanted: 2, left: 1 }], "known before anyone says yes");
+
+  assert.equal((await call("POST", `/api/admin/delivery/orders/${hook.json.id}/accept`, {})).json.order.status, "accepted", "the floor may still say yes");
+  const ramen = (await call("GET", "/api/admin/products")).json.products.find((product) => product.id === "photo-r1");
+  assert.equal(ramen.leftToday, 0, "and the count is down to nothing, not below");
+  assert.equal((await call("GET", "/api/pos/floor", null, { "x-admin-token": token })).json.delivery[0].shortages, undefined, "accepted: nothing more to warn about");
+});
