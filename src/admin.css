@@ -4062,3 +4062,22 @@ em.voided {
     justify-content: flex-start;
   }
 }
+
+/* Delivery platforms: the totals per platform, each platform's switches, its connection. */
+#deliveryPanel .settings-page { grid-template-columns: minmax(0, 1fr); }
+.dl-totals { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.dl-totals li { padding: 6px 12px; border: 1px solid var(--a-line); border-radius: 999px; background: var(--a-card); font-size: 13px; }
+.dl-items { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.dl-items li { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; }
+.dl-items small { grid-column: 1 / -1; color: var(--a-muted); }
+.dl-platform { display: grid; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--a-line); border-radius: 10px; }
+.dl-platform legend { padding: 0 6px; font-weight: 700; }
+.dl-connection { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.dl-connection .ok { color: var(--a-accent-ink); }
+.dl-connection .missing { color: var(--a-muted); }
+.dl-platform .res-link { align-items: end; }
+.dl-platform .res-link label { display: grid; flex: 1; gap: 4px; min-width: 0; }
+.dl-platform .res-link input { width: 100%; }
+.dl-pill-new { background: var(--a-danger-wash); color: var(--a-danger); }
+.dl-pill-accepted, .dl-pill-ready { background: var(--a-accent-wash); color: var(--a-accent-ink); }
+.dl-pill-rejected, .dl-pill-cancelled { color: var(--a-muted); }

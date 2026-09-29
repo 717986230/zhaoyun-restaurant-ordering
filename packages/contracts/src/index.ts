@@ -263,6 +263,8 @@ export interface ApiSalesReport {
   hours: Array<{ hour: number; receipts: number; grossCents: number }>;
   items: Array<{ name: string; names: { zh: string; de: string; en: string } | null; quantity: number; grossCents: number }>;
   staff: Array<{ name: string; receipts: number; grossCents: number }>;
+  /** The delivery platforms' orders over the same days: not in the receipts, the platform collects the money. */
+  delivery?: ApiDeliveryTotals[];
 }
 
 /** One entry of the journal (DEP 131), chained to the one before by its hash. */
@@ -365,7 +367,71 @@ export interface ApiSettings {
   loyalty: ApiLoyalty;
   /** Online table bookings and their rules (shared/reservations.mjs). */
   reservations: ApiReservationSettings;
+  /** The delivery platforms: which are on, and how their orders come in (shared/delivery.mjs). */
+  delivery: ApiDeliverySettings;
 }
+
+/** Lieferando (Just Eat Takeaway) and foodora (Delivery Hero). */
+export type DeliveryProvider = "lieferando" | "foodora";
+export type DeliveryStatus = "new" | "accepted" | "ready" | "completed" | "rejected" | "cancelled";
+export type DeliveryRejectReason = "TOO_BUSY" | "CLOSED" | "ITEM_UNAVAILABLE" | "OUTSIDE_DELIVERY_AREA" | "OTHER";
+/** One platform's switches. */
+export interface ApiDeliveryPlatformSettings {
+  enabled: boolean;
+  /** To the kitchen on arrival, without anyone saying yes. */
+  autoAccept: boolean;
+  /** Minutes an order takes, told to the platform on accepting. */
+  prepMinutes: number;
+  /** The restaurant's id at the platform, for the owner's reference. */
+  storeId: string;
+}
+export type ApiDeliverySettings = Record<DeliveryProvider, ApiDeliveryPlatformSettings>;
+/** A platform as the console sees it: its switches, and whether this deployment holds its secrets (never the secrets). */
+export interface ApiDeliveryPlatform extends ApiDeliveryPlatformSettings {
+  id: DeliveryProvider;
+  name: string;
+  webhook: boolean;
+  api: boolean;
+  ordersPath: string;
+  eventsPath: string;
+}
+export interface ApiDeliveryLine {
+  sku: string;
+  name: string;
+  quantity: number;
+  unitCents: number;
+  options: Array<{ name: string; quantity: number; unitCents: number }>;
+  note: string;
+}
+/** An order from a delivery platform (shared/delivery.mjs, deliveryOrderView). */
+export interface ApiDeliveryOrder {
+  id: string;
+  provider: DeliveryProvider;
+  providerName: string;
+  externalId: string;
+  reference: string;
+  status: DeliveryStatus;
+  type: "delivery" | "pickup";
+  placedAt: string | null;
+  dueAt: string | null;
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  notes: string;
+  items: ApiDeliveryLine[];
+  totalCents: number;
+  deliveryFeeCents: number;
+  paidOnline: boolean;
+  test: boolean;
+  prepMinutes: number | null;
+  rejectReason: string | null;
+  /** What the platform said to our answer: sent, failed, or nothing to send (not connected, a test order). */
+  sync: { status: "none" | "sent" | "failed"; error: string | null; at: string | null };
+  createdAt: string;
+  updatedAt: string;
+}
+/** Per platform, over some days: orders cooked and their money, and those turned down or cancelled. */
+export interface ApiDeliveryTotals { provider: DeliveryProvider; name: string; orders: number; grossCents: number; rejected: number; cancelled: number }
 
 /** The owner's rules for online bookings. */
 export interface ApiReservationSettings {

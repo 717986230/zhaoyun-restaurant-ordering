@@ -478,6 +478,142 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   color: var(--p-ink);
 }
 
+/* The delivery platforms' orders: above the room, loud while one is new. */
+.pos-delivery {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  background: var(--p-card);
+  color: var(--p-ink);
+}
+
+.pos-floor .pos-delivery h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.pos-delivery > ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pos-delivery > ul > li {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+}
+
+.pos-delivery > ul > li[data-status="new"] {
+  border: 2px solid var(--p-warn);
+  background: var(--p-warn-wash);
+}
+
+.pos-delivery header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.pos-delivery header b {
+  font-size: 22px;
+}
+
+.pos-delivery header em {
+  color: var(--p-warn);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.pos-delivery li[data-status="accepted"] header em,
+.pos-delivery li[data-status="ready"] header em {
+  color: var(--p-accent);
+}
+
+.pos-delivery .pos-test {
+  color: var(--p-muted);
+}
+
+.pos-platform {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--p-head);
+  color: var(--p-bg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pos-delivery ol {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pos-delivery ol li {
+  display: grid;
+}
+
+.pos-delivery small,
+.pos-delivery-meta {
+  color: var(--p-muted);
+}
+
+.pos-delivery-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.pos-delivery-note {
+  margin: 0;
+  font-weight: 650;
+}
+
+.pos-delivery-sync {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--p-warn);
+  font-size: 13px;
+}
+
+.pos-delivery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pos-prep {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.pos-prep button {
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.pos-delivery-actions .pos-primary {
+  flex: 1;
+  min-width: 150px;
+}
+
 .pos-call-badge {
   display: inline-block;
   margin-top: 4px;

@@ -4,6 +4,7 @@ import type {
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
+  ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
   ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
@@ -72,6 +73,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     guestOrdering: { ...GUEST_ORDERING_DEFAULTS, hours: [] },
     loyalty: { ...LOYALTY_DEFAULTS, rewards: [] },
     reservations: { ...RESERVATION_DEFAULTS, hours: RESERVATION_DEFAULTS.hours.map((range) => ({ ...range, days: [...range.days] })), closedDates: [], tables: [] },
+    delivery: { lieferando: { ...DELIVERY_PLATFORM_DEFAULTS }, foodora: { ...DELIVERY_PLATFORM_DEFAULTS } },
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
   } as ApiSettings;
 }
@@ -89,6 +91,14 @@ export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   intervalMinutes: 30, durationMinutes: 120, capacity: 40, maxParty: 8, leadMinutes: 60, daysAhead: 60, autoConfirm: true, closedDates: [], note: "", tables: [],
   maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2
 };
+
+/** shared/delivery.mjs, DELIVERY_SETTING_DEFAULTS (the same for each platform). */
+export const DELIVERY_PLATFORM_DEFAULTS = { enabled: false, autoAccept: false, prepMinutes: 20, storeId: "" };
+
+/** The delivery platforms' orders over some days, and what each brought in. */
+export interface DeliveryList { from: string; to: string; totals: ApiDeliveryTotals[]; orders: ApiDeliveryOrder[] }
+/** What the floor does with a platform's order; resend tells the platform the last step again. */
+export type DeliveryAction = "accept" | "reject" | "ready" | "complete" | "resend";
 
 /** The floor's list of bookings over some days. */
 export interface ReservationList { reservations: ApiReservation[]; today: string; from: string; to: string; capacity: number; durationMinutes: number }
@@ -396,6 +406,17 @@ export class AdminApi {
     return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
   }
   deleteReservation(id: string): Promise<void> { return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  deliveryOrders(from: string, to: string, filter: { provider?: DeliveryProvider | ""; status?: DeliveryStatus | "" } = {}): Promise<DeliveryList> {
+    return this.#request(`/api/admin/delivery/orders?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&provider=${encodeURIComponent(filter.provider ?? "")}&status=${encodeURIComponent(filter.status ?? "")}`);
+  }
+  deliveryAction(id: string, action: DeliveryAction, options: { prepMinutes?: number; reason?: DeliveryRejectReason } = {}): Promise<{ order: ApiDeliveryOrder }> {
+    return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });
+  }
+  deliveryPlatforms(): Promise<{ providers: ApiDeliveryPlatform[] }> { return this.#request("/api/admin/delivery/status"); }
+  /** A made-up order in the platform's own shape, through the whole path; a test order counts for nothing. */
+  deliveryTestOrder(provider: DeliveryProvider): Promise<{ order: ApiDeliveryOrder }> {
+    return this.#request(`/api/admin/delivery/test/${provider}`, { method: "POST" });
+  }
 
   /** The console's live channel: every change on the floor and in the menu. */
   live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
@@ -483,7 +504,10 @@ export class PosApi {
   voidItem(table: string, orderItemId: string, quantity: number, reason: string): Promise<{ void: PosVoid }> {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/void`, { method: "POST", body: JSON.stringify({ orderItemId, quantity, reason }) });
   }
-  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  deliveryAction(id: string, action: DeliveryAction, options: { prepMinutes?: number; reason?: DeliveryRejectReason } = {}): Promise<{ order: ApiDeliveryOrder }> {
+    return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });
+  }
   /** A booking seated, finished or marked as never come, or given its table. */
   updateReservation(id: string, command: ReservationUpdateCommand): Promise<{ reservation: ApiReservation }> {
     return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
