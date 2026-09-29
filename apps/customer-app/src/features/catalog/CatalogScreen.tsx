@@ -216,6 +216,10 @@ function SunIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></svg>;
 }
 
+function SearchIcon() {
+  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l5.5 5.5" /></svg>;
+}
+
 function PersonIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" /><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6" /></svg>;
 }
@@ -396,8 +400,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
             {facts(product).length > 0 && <div className="meta">{facts(product).map((fact) => <span key={fact}>{fact}</span>)}</div>}
           </div>
           <div className="detail-buy">
-            <FewLeft product={product} language={state.language} />
-            <div className="buyline"><strong>{formatPrice(ordering.open ? product.priceCents + optionsCents : product.priceCents, state.language)}</strong>
+            <div className="buyline"><span className="buy-price"><strong>{formatPrice(ordering.open ? product.priceCents + optionsCents : product.priceCents, state.language)}</strong><FewLeft product={product} language={state.language} /></span>
               {ordering.open && <div className="qty" role="group" onClick={(event) => event.stopPropagation()}>
                 <button type="button" aria-label="−" onClick={() => dispatch({ type: "detail-quantity", quantity: state.detailQuantity - 1 })}>−</button>
                 <span>{state.detailQuantity}</span>
@@ -564,6 +567,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     if (category !== state.category) dispatch({ type: "category", category });
   }
 
+  // Headings only where more than one category is on the page: the whole menu, not a search or one category.
+  const sectioned = !query && !onFavorites && state.category === "ALLE";
   const pageKey = `${state.category}|${query}`;
   const [rows, setRows] = useState({ key: pageKey, limit: FIRST_ROWS });
   const rowLimit = rows.key === pageKey ? rows.limit : FIRST_ROWS;
@@ -636,7 +641,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""} ${onFeatured || onSets ? "on-featured" : ""} ${state.searchOpen ? "search-open" : ""}`} data-featured-template={onFeatured ? featured?.template : onSets ? "framed" : undefined}>
     <header className="topbar">
-      <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}>⌕</button>
+      <button id="searchBtn" className="icon-btn" aria-label={t(state.language, "search")} onClick={() => dispatch({ type: "toggle-search" })}><SearchIcon /></button>
       {/* The hidden way into the admin console: seven taps within four
           seconds. On the web it opens admin.html, which asks for the password;
           in the Android kiosk shell it asks for the kiosk PIN first. */}
@@ -681,7 +686,10 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
           {onFeatured && featured ? <FeaturedPage title={featured.title || t(state.language, "featuredDefault")} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
-            : visible.length ? visible.slice(0, rowLimit).map((product, index) => <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
+            : visible.length ? visible.slice(0, rowLimit).flatMap((product, index, shown) => [
+              // The whole menu reads as the printed one does: each category under its own heading.
+              ...(sectioned && (index === 0 || shown[index - 1]!.category !== product.category) ? [<h2 key={`section-${index}-${product.category}`} className="list-section">{pageName(product.category)}</h2>] : []),
+              <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
             <div className="summary">
               <DishPicture product={product} byId={byId} size="thumb" />
               {/* The code sits on its own small line above the name: drink
@@ -703,7 +711,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
                   dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
                 }}>+</button>}
             </div>
-          </article>) : query && products.length
+          </article>]) : query && products.length
             // A search that found nothing says what was looked for and offers the way back.
             ? <div className="empty search-empty">
               <strong>{t(state.language, "noResults").replace("{query}", () => state.query.trim())}</strong>
@@ -724,7 +732,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     {/* Outside the list: the list is transformed while a page turns, and a
         fixed button inside it would move with the page. */}
     {ordering.open && cart.count > 0 && !activeProduct && <button type="button" id="cartBar" className="cartbar" onClick={() => dispatch({ type: "sheet", sheet: "cart" })}>
-      <span>{g(state.language, "cart")}</span><b>{cart.count}</b><em>{formatPrice(cart.totalCents, state.language)}</em>
+      <b>{cart.count}</b><span>{g(state.language, "cart")}</span><em>{formatPrice(cart.totalCents, state.language)}</em>
+      <svg className="cartbar-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" /></svg>
     </button>}
     {/* Calling a waiter to the table this phone scanned: in the other bottom
         corner from "back to top", above the cart when there is one. */}
