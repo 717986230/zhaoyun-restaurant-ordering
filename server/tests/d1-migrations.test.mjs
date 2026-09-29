@@ -47,7 +47,8 @@ const incremental = [
   { file: "0059_discovered_printers.sql", drop: "DROP TABLE discovered_printers;" },
   { file: "0060_receipts_created.sql", drop: "DROP INDEX idx_receipts_created;" },
   { file: "0061_auth_throttle.sql", drop: "DROP TABLE auth_throttle;" },
-  { file: "0062_reservations.sql", drop: "DROP INDEX idx_reservations_customer; DROP INDEX idx_reservations_date; DROP TABLE reservations;" }
+  { file: "0062_reservations.sql", drop: "DROP INDEX idx_reservations_customer; DROP INDEX idx_reservations_date; DROP TABLE reservations;" },
+  { file: "0063_delivery_orders.sql", drop: "DROP INDEX idx_delivery_orders_status; DROP INDEX idx_delivery_orders_created; DROP TABLE delivery_orders;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")

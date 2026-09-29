@@ -11,6 +11,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { DELIVERY_TEST_SECRETS } from "../shared/contract-suite.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.WORKER_TEST_PORT || 8798);
@@ -63,7 +64,8 @@ try {
   // uses too (there it is `wrangler secret put ADMIN_TOKEN`).
   writeFileSync(
     path.join(state, ".dev.vars"),
-    `ADMIN_TOKEN = "${ADMIN_TOKEN}"\nSTAFF_TOKEN = "${STAFF_TOKEN}"\nKITCHEN_TOKEN = "${KITCHEN_TOKEN}"\n`
+    `ADMIN_TOKEN = "${ADMIN_TOKEN}"\nSTAFF_TOKEN = "${STAFF_TOKEN}"\nKITCHEN_TOKEN = "${KITCHEN_TOKEN}"\n` +
+    `LIEFERANDO_WEBHOOK_SECRET = "${DELIVERY_TEST_SECRETS.lieferando}"\nFOODORA_WEBHOOK_SECRET = "${DELIVERY_TEST_SECRETS.foodora}"\n`
   );
 
   const wranglerArgs = ["wrangler", "d1", "migrations", "apply", "zhaoyun-ordering", "--local", `--persist-to=${state}`];
@@ -74,7 +76,9 @@ try {
     `--persist-to=${state}`,
     "--var", `ADMIN_TOKEN:${ADMIN_TOKEN}`,
     "--var", `STAFF_TOKEN:${STAFF_TOKEN}`,
-    "--var", `KITCHEN_TOKEN:${KITCHEN_TOKEN}`
+    "--var", `KITCHEN_TOKEN:${KITCHEN_TOKEN}`,
+    "--var", `LIEFERANDO_WEBHOOK_SECRET:${DELIVERY_TEST_SECRETS.lieferando}`,
+    "--var", `FOODORA_WEBHOOK_SECRET:${DELIVERY_TEST_SECRETS.foodora}`
   ], { cwd: root, stdio: ["ignore", "pipe", "pipe"], detached: true });
   children.push(dev);
   dev.stdout.on("data", (chunk) => { devLog += chunk; });

@@ -10,6 +10,7 @@ import { DEFAULT_TIME_ZONE, normalizeSchedule, normalizeTimeZone } from "../src/
 import { GUEST_ORDERING_DEFAULTS, normalizeGuestOrdering, orderingMenuView } from "./ordering.mjs";
 import { LOYALTY_DEFAULTS, normalizeLoyalty } from "./customer.mjs";
 import { normalizeReservationSettings } from "./reservations.mjs";
+import { normalizeDeliverySettings } from "./delivery.mjs";
 
 // The colour hexes themselves live in packages/domain/src/themes.ts, next to
 // the guest app that renders them; the backend only ever needs to know which
@@ -282,6 +283,8 @@ export const APP_SETTINGS = {
   loyalty: { key: "loyalty", fallback: () => ({ ...LOYALTY_DEFAULTS, rewards: [] }), normalize: (value) => normalizeLoyalty(value) },
   // Guests booking a table online, and the rules they book under (shared/reservations.mjs).
   reservations: { key: "reservations", fallback: () => normalizeReservationSettings({}), normalize: normalizeReservationSettings },
+  // The delivery platforms: which are on, whether their orders go to the kitchen unasked, and how long one takes (shared/delivery.mjs).
+  delivery: { key: "delivery", fallback: () => normalizeDeliverySettings({}), normalize: normalizeDeliverySettings },
   featuredTemplate: {
     key: "featured_template",
     fallback: () => DEFAULT_FEATURED_TEMPLATE,

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { TableOverview } from "@zhaoyun/api-client";
-import type { ApiPrintJob, ApiReservation, ApiServiceRequest, PosClaim, ReservationUpdateCommand } from "@zhaoyun/contracts";
+import type { ApiDeliveryOrder, ApiPrintJob, ApiReservation, ApiServiceRequest, PosClaim, ReservationUpdateCommand } from "@zhaoyun/contracts";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 import type { PosKey } from "./i18n";
+import { DeliveryOrders } from "./Delivery";
 
 const TAKEAWAY = /^TA-/i;
 /** The poll under the live channel: quick while it is down, slow while it is up. */
@@ -161,6 +162,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const [claims, setClaims] = useState<PosClaim[]>([]);
   const [requests, setRequests] = useState<ApiServiceRequest[]>([]);
   const [bookings, setBookings] = useState<ApiReservation[]>([]);
+  const [delivery, setDelivery] = useState<ApiDeliveryOrder[]>([]);
   // This device: the tables it has open are its own, every other device's are locked to it.
   const [deviceId, setDeviceId] = useState("");
 
@@ -172,6 +174,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       setDeviceId(floor.deviceId ?? "");
       setRequests(floor.requests ?? []);
       setBookings(floor.reservations ?? []);
+      setDelivery(floor.delivery ?? []);
     } catch (error) { pos.failed(error); }
   }, [pos.failed]);
 
@@ -226,6 +229,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   return <section className="pos-floor">
     <FailedPrints pos={pos} />
     <ServiceCalls pos={pos} requests={requests} onDone={() => void load()} />
+    <DeliveryOrders pos={pos} orders={delivery} onDone={() => void load()} />
     <TodayBookings pos={pos} bookings={bookings} onDone={() => void load()} />
     <div className="pos-floor-bar">
       <form onSubmit={openTyped} className="pos-open-table">

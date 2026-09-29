@@ -170,6 +170,14 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
           </table>
         </section>
 
+        {report.delivery?.some((entry) => entry.orders || entry.rejected || entry.cancelled) && <section className="report-card" id="reportDelivery">
+          <h2>{t("dlReportTitle")}</h2>
+          <table className="report-table">
+            <thead><tr><th>{t("dlPlatform")}</th><th>{t("dlOrders")}</th><th>{t("reportGross")}</th><th>{t("dlStatus_rejected")}</th><th>{t("dlStatus_cancelled")}</th></tr></thead>
+            <tbody>{report.delivery.map((entry) => <tr key={entry.provider}><td>{entry.name}</td><td>{entry.orders}</td><td>{money(entry.grossCents)}</td><td>{entry.rejected}</td><td>{entry.cancelled}</td></tr>)}</tbody>
+          </table>
+        </section>}
+
         <section className="report-card report-card-wide">
           <div className="report-card-head">
             <h2>{t("reportItems")}</h2>

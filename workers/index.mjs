@@ -9,6 +9,7 @@
 import { createApi, createApiState, SECURITY_HEADERS } from "../shared/http.mjs";
 import { createStore } from "../shared/store.mjs";
 import { d1Driver } from "./d1-driver.mjs";
+import { deliveryConfig } from "../shared/delivery.mjs";
 import { openLive, publishLive } from "./live.mjs";
 
 export { LiveHub } from "./live.mjs";
@@ -69,7 +70,9 @@ export default {
       },
       publish: (event) => ctx?.waitUntil(publishLive(env, event)),
       // VERSION is the commit, set by the deploy (wrangler deploy --var VERSION:<sha>).
-      version: env.VERSION || null
+      version: env.VERSION || null,
+      // The delivery platforms' secrets (wrangler secret put LIEFERANDO_WEBHOOK_SECRET, …; docs/DELIVERY.md).
+      delivery: deliveryConfig(env)
     });
 
     // Cloudflare's own id for the request (cf-ray) where there is one: the same id its logs show.

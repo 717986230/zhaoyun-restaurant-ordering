@@ -53,7 +53,9 @@ export function registerRoutes(app, { database, realtime, config }) {
     uploads: saveUpload,
     publish: (event) => realtime.publish(event),
     realtimeClients: () => realtime.size(),
-    version: config.version ?? null
+    version: config.version ?? null,
+    delivery: config.delivery ?? {},
+    ...(config.deliveryFetch ? { fetch: config.deliveryFetch } : {})
   });
 
   /** A Fastify request as the web's Request, for shared/http.mjs. */

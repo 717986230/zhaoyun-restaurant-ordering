@@ -11,6 +11,13 @@
  * `{ status, json }`.
  */
 import { wallClock } from "../src/schedule.js";
+import { signJwt } from "./delivery.mjs";
+
+/** The platforms' webhook secrets the test deployments are given (server/tests/contract.test.mjs, scripts/worker-test.mjs). */
+export const DELIVERY_TEST_SECRETS = {
+  lieferando: "contract-lieferando-webhook-secret-0123456789",
+  foodora: "contract-foodora-webhook-secret-0123456789abc"
+};
 
 const EVERY_DAY = [1, 2, 3, 4, 5, 6, 7];
 const addDaysTo = (date, days) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -1937,6 +1944,124 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.deepEqual([after.status, after.name, after.phone, after.customerId], ["cancelled", "", "", null]);
 
       await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
+    }],
+
+    ["delivery platforms: their orders come in by webhook once each, the floor accepts and the kitchen prints, a cancel voids, the report counts them", async () => {
+      const stamp = Date.now().toString(36);
+      const { timeZone } = (await call("GET", "/api/admin/settings", { admin: true })).json;
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const records = async (query = "") => (await call("GET", `/api/admin/delivery/orders?from=${today}&to=${today}${query}`, { role: "staff" })).json;
+      const hook = (provider, payload, secret = DELIVERY_TEST_SECRETS[provider], kind = "orders") =>
+        call("POST", `/api/delivery/${provider}/${kind}`, { body: payload, headers: secret ? { authorization: `Bearer ${secret}` } : {} });
+      const jet = (id, extra = {}) => ({
+        OrderId: `jet-${stamp}-${id}`, FriendlyOrderReference: `${id}${stamp.slice(-3)}`.toUpperCase(),
+        Fulfilment: { Method: "Delivery", DueDate: new Date(Date.now() + 40 * 60_000).toISOString(), Address: { Lines: ["Kärntner Straße 1"], PostalCode: "1010", City: "Wien" } },
+        Customer: { Name: "Anna", PhoneNumber: "+43 660 1234567" },
+        Items: [{ Reference: "R1", Name: "Ramen", Quantity: 2, UnitPrice: 12.5, Items: [{ Name: "Extra Ei", Quantity: 1, UnitPrice: 1.5 }] }, { Name: "Mochi", Quantity: 1, UnitPrice: "4,00" }],
+        TotalPrice: 33.0, DeliveryCost: 2.5,
+        ...extra
+      });
+
+      // Who is calling: the platform's secret, or nothing.
+      assert.equal((await hook("lieferando", jet("a"), "")).status, 401);
+      assert.equal((await hook("lieferando", jet("a"), "wrong-secret")).status, 401);
+      assert.equal((await hook("uber", jet("a"))).status, 404);
+      // Not switched on: the platform keeps it on its own tablet.
+      const off = await hook("lieferando", jet("a"));
+      assert.deepEqual([off.status, off.json.code], [409, "DELIVERY_OFF"]);
+
+      const board = { lieferando: { enabled: true, autoAccept: false, prepMinutes: 25, storeId: "" }, foodora: { enabled: true, autoAccept: true, prepMinutes: 15, storeId: "" } };
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { delivery: { ...board, foodora: { ...board.foodora, prepMinutes: 2 } } } })).status, 400, "5 to 180 minutes");
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { delivery: board } })).status, 200);
+      const status = await call("GET", "/api/admin/delivery/status", { admin: true });
+      assert.deepEqual(status.json.providers.map((entry) => [entry.id, entry.enabled, entry.webhook, entry.ordersPath]), [["lieferando", true, true, "/api/delivery/lieferando/orders"], ["foodora", true, true, "/api/delivery/foodora/orders"]]);
+      assert.equal((await call("GET", "/api/admin/delivery/status", { role: "staff" })).status, 403, "the manager's");
+
+      // An order that is not one is refused in words.
+      assert.deepEqual([(await hook("lieferando", { OrderId: "x", Items: [] })).json.code], ["INVALID"]);
+
+      // In, once: the platform sending it again gets the same order back.
+      const first = await hook("lieferando", jet("a"));
+      assert.equal(first.status, 201);
+      assert.equal(first.json.status, "new", "waiting for the floor");
+      const again = await hook("lieferando", jet("a"));
+      assert.deepEqual([again.status, again.json.id, again.json.duplicate], [200, first.json.id, true]);
+      let order = (await records("&provider=lieferando")).orders.find((entry) => entry.id === first.json.id);
+      assert.equal(order.totalCents, 3300);
+      assert.equal(order.deliveryFeeCents, 250);
+      assert.equal(order.type, "delivery");
+      assert.match(order.address, /Kärntner Straße 1, 1010 Wien/);
+      assert.deepEqual(order.items.map((item) => [item.name, item.quantity, item.unitCents]), [["Ramen", 2, 1250], ["Mochi", 1, 400]]);
+      assert.equal(order.items[0].options[0].name, "Extra Ei");
+
+      const jobsFor = async (reference) => (await call("GET", "/api/admin/print-jobs?status=queued&limit=200", { role: "staff" })).json.jobs.filter((job) => job.payload?.delivery?.reference === reference);
+      assert.equal((await jobsFor(order.reference)).length, 0, "nothing is cooked before someone says yes");
+
+      // The floor: accept (the kitchen gets its tickets), then ready, then handed over.
+      assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/accept`, { role: "staff", body: { prepMinutes: 2 } })).status, 400);
+      const accepted = await call("POST", `/api/admin/delivery/orders/${order.id}/accept`, { role: "staff", body: { prepMinutes: 30 } });
+      assert.equal(accepted.status, 200);
+      assert.deepEqual([accepted.json.order.status, accepted.json.order.prepMinutes, accepted.json.order.sync.status], ["accepted", 30, "none"], "no API access configured: nothing to tell");
+      const tickets = await jobsFor(order.reference);
+      assert.ok(tickets.length >= 1, "the kitchen has it");
+      const ramen = tickets.flatMap((job) => job.payload.items).find((item) => item.sku === "R1");
+      assert.ok(ramen, "the platform's PLU names our dish");
+      assert.deepEqual(ramen.modifiers.map((modifier) => modifier.name), ["Extra Ei"]);
+      assert.equal(tickets[0].payload.delivery.name, "Lieferando");
+      const twice = await call("POST", `/api/admin/delivery/orders/${order.id}/accept`, { role: "staff", body: {} });
+      assert.deepEqual([twice.status, twice.json.code], [409, "BAD_TRANSITION"]);
+      assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/ready`, { role: "staff", body: {} })).json.order.status, "ready");
+      assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/complete`, { role: "staff", body: {} })).json.order.status, "completed");
+      assert.equal((await call("POST", `/api/admin/delivery/orders/${order.id}/fly`, { role: "staff", body: {} })).status, 404);
+
+      // Turned down, with a reason the platform knows.
+      const second = await hook("lieferando", jet("b"));
+      const rejected = await call("POST", `/api/admin/delivery/orders/${second.json.id}/reject`, { role: "staff", body: { reason: "TOO_BUSY" } });
+      assert.deepEqual([rejected.json.order.status, rejected.json.order.rejectReason], ["rejected", "TOO_BUSY"]);
+      assert.equal((await call("POST", `/api/admin/delivery/orders/${second.json.id}/reject`, { role: "staff", body: { reason: "BORED" } })).status, 400);
+
+      // foodora signs its calls as a JWT, and this one goes to the kitchen unasked.
+      const token = `fd-${stamp}`;
+      const signed = await signJwt({ iss: "foodora", exp: Math.floor(Date.now() / 1000) + 300 }, DELIVERY_TEST_SECRETS.foodora);
+      const expired = await signJwt({ exp: Math.floor(Date.now() / 1000) - 10 }, DELIVERY_TEST_SECRETS.foodora);
+      const foodoraOrder = {
+        token, code: `F${stamp.slice(-4)}`, expeditionType: "pickup", createdAt: new Date().toISOString(),
+        customer: { firstName: "Max", lastName: "M.", mobilePhone: "+43 699 1" },
+        pickup: { pickupTime: new Date(Date.now() + 20 * 60_000).toISOString() },
+        products: [{ remoteCode: "R1", name: "Ramen", quantity: "1", unitPrice: "12.50", selectedToppings: [{ name: "Scharf", price: "0.00", quantity: 1 }] }],
+        price: { grandTotal: "12.50" }, payment: { status: "paid" }
+      };
+      assert.equal((await hook("foodora", foodoraOrder, expired)).status, 401, "an expired token is no proof");
+      const fd = await hook("foodora", foodoraOrder, signed);
+      assert.deepEqual([fd.status, fd.json.status], [201, "accepted"]);
+      const fdTickets = await jobsFor(foodoraOrder.code);
+      assert.ok(fdTickets.length >= 1, "accepted on arrival: the kitchen has it");
+      assert.equal(fdTickets[0].payload.delivery.type, "pickup");
+
+      // The platform cancels it: the kitchen, already cooking, gets a void.
+      const unknown = await hook("foodora", { orderToken: "nobody", status: "ORDER_CANCELLED" }, signed, "events");
+      assert.deepEqual([unknown.status, unknown.json.ignored], [200, true]);
+      const cancelled = await hook("foodora", { orderToken: token, status: "ORDER_CANCELLED", reason: "customer" }, signed, "events");
+      assert.deepEqual([cancelled.status, cancelled.json.status], [200, "cancelled"]);
+      assert.ok((await jobsFor(foodoraOrder.code)).some((job) => job.payload.kind === "void"), "a void ticket for the kitchen");
+
+      // A made-up order to try the whole path; it counts for nothing.
+      const sample = await call("POST", "/api/admin/delivery/test/lieferando", { admin: true });
+      assert.deepEqual([sample.status, sample.json.order.test, sample.json.order.status], [201, true, "new"]);
+      assert.equal((await call("POST", "/api/admin/delivery/test/lieferando", { role: "staff" })).status, 403);
+
+      // The POS sees what is still to do; the report counts what was cooked.
+      const open = (await records("&status=new")).orders.map((entry) => entry.id);
+      assert.ok(open.includes(sample.json.order.id));
+      const totals = (await records()).totals;
+      const lieferando = totals.find((entry) => entry.provider === "lieferando");
+      assert.ok(lieferando.orders >= 1 && lieferando.grossCents >= 3300 && lieferando.rejected >= 1);
+      assert.ok(totals.find((entry) => entry.provider === "foodora").cancelled >= 1);
+      const report = await call("GET", `/api/admin/reports/sales?from=${today}&to=${today}`, { admin: true });
+      assert.deepEqual(report.json.report.delivery.map((entry) => entry.provider), ["lieferando", "foodora"], "the platforms beside the register");
+      assert.equal((await call("GET", `/api/admin/delivery/orders?from=${today}&to=2099-01-01`, { role: "staff" })).json.code, "BAD_RANGE");
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { delivery: { lieferando: { enabled: false }, foodora: { enabled: false } } } });
     }],
 
     ["an unknown API route is a JSON 404, not the web app", async () => {
