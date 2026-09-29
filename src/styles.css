@@ -4044,9 +4044,8 @@ button:focus-visible,
 }
 
 /* ---------------------------------------------------------------------------
-   The list, refined (2026-09): the whole menu under category headings like
-   the printed one, a clearer "+", a cart bar that reads as the next step,
-   and two columns where a tablet has the room. The rows stay the deck of
+   The list, refined (2026-09): a clearer "+", a cart bar that reads as the
+   next step, and two columns where a tablet has the room. The rows stay the deck of
    cards they were — each laid a little over the one before, its shadow on
    it — which is what the page turn flips.
    ------------------------------------------------------------------------ */
@@ -4093,28 +4092,6 @@ button:focus-visible,
 
 .row-price {
   font-variant-numeric: tabular-nums;
-}
-
-/* The category a run of dishes belongs to, in the whole-menu view. */
-.list-section {
-  margin: 22px 4px 10px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--ink-2);
-  font: italic 400 19px/1.2 Georgia, "Noto Serif SC", serif;
-  letter-spacing: 0.02em;
-}
-
-.list-section::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--line);
-}
-
-.stack-page > .list-section:first-child {
-  margin-top: 6px;
 }
 
 /* "+": a button, not a ring. */
