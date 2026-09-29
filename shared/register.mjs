@@ -28,6 +28,8 @@ export const PAYMENT_TYPES = ["cash", "card", "voucher"];
 /** The hash the first journal entry follows. */
 export const GENESIS_HASH = "0".repeat(64);
 export const MAX_VOUCHER_CENTS = 100_000;
+/** A tip is at most this much on one payment: a slip of the finger, not a guest's generosity. */
+export const MAX_TIP_CENTS = 50_000;
 
 /**
  * How much of an order line receipts have paid for. A receipt cancelled by
@@ -224,6 +226,10 @@ function cents(value, what) {
   return amount;
 }
 
+function given(value) {
+  return value !== undefined && value !== null && value !== "";
+}
+
 function voucherCode() {
   // No 0/O or 1/I: read aloud or typed from paper, they get mixed up.
   const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -249,9 +255,14 @@ export function normalizeVoucherCode(value) {
  * - `input.discountPercent`: a discount on the dishes (not on vouchers), as
  *   one line per receipt that takes it off each VAT rate in proportion —
  *   the pickup discount of a takeaway, or the owner's for a regular.
- * - `input.payments`: [{ type, amount, tendered?, voucherCode? }], adding up
- *   to the total exactly; cash may be handed over with more (`tendered`),
- *   and the change is worked out.
+ * - `input.payments`: [{ type, amount, tendered?, voucherCode?, tip? }],
+ *   adding up to the total exactly; cash may be handed over with more
+ *   (`tendered`), and the change is worked out.
+ * - A payment by cash or card may carry a tip (Trinkgeld, `tip`): the
+ *   guest's "make it 50". It is the staff's, not the restaurant's — not in
+ *   the total, not in the VAT, not in the takings — so it is kept on the
+ *   payment beside its amount, and cash handed over pays for both before
+ *   any change.
  *
  * `itemRows` are the order lines named, each with its order's table_no,
  * status and billed_at, and paid_quantity (ORDER_ITEMS_SQL). `voucherRows`
@@ -332,11 +343,17 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
     if (!PAYMENT_TYPES.includes(type)) throw new Error("Payment is cash, card or voucher");
     const amountCents = cents(payment.amount, "A payment");
     const entry = { type, amountCents };
-    if (type === "cash" && payment.tendered !== undefined && payment.tendered !== null && payment.tendered !== "") {
+    const tipCents = given(payment.tip) ? Math.round(Number(payment.tip) * 100) : 0;
+    if (!Number.isFinite(tipCents) || tipCents < 0 || tipCents > MAX_TIP_CENTS) throw new Error("A tip is 0 to 500 euros");
+    if (tipCents) {
+      if (type === "voucher") throw new Error("A tip is paid in cash or by card");
+      entry.tipCents = tipCents;
+    }
+    if (type === "cash" && given(payment.tendered)) {
       const tenderedCents = cents(payment.tendered, "The cash handed over");
-      if (tenderedCents < amountCents) throw new Error("Less cash was handed over than it pays");
+      if (tenderedCents < amountCents + tipCents) throw new Error("Less cash was handed over than it pays");
       entry.tenderedCents = tenderedCents;
-      entry.changeCents = tenderedCents - amountCents;
+      entry.changeCents = tenderedCents - amountCents - tipCents;
     }
     if (type === "voucher") {
       if (vouchers.length) throw new Error("A voucher cannot pay for a voucher");
@@ -396,7 +413,9 @@ export function planStorno(original, { receiptNo, reason, soldVoucherRows, role,
   const payments = parseJson(original.payments_json, []).map((payment) => ({
     type: payment.type,
     amountCents: -payment.amountCents,
-    ...(payment.voucherCode ? { voucherCode: payment.voucherCode } : {})
+    ...(payment.voucherCode ? { voucherCode: payment.voucherCode } : {}),
+    // The tip goes back with the sale: the guest who is refunded is refunded the tip too.
+    ...(payment.tipCents ? { tipCents: -payment.tipCents } : {})
   }));
   const receipt = {
     id: uuid(),
@@ -492,11 +511,13 @@ export function closingPrintPayload(view, settings) {
  * The day's closing (Z report) over the receipts since the last one: how
  * many, the number range, the takings per VAT rate and per payment type,
  * vouchers sold, and the cash that should be in the drawer. Stornos count
- * negative, so a cancelled sale adds up to nothing.
+ * negative, so a cancelled sale adds up to nothing. Tips are beside the
+ * takings, per way paid: the staff's money, not the restaurant's.
  */
 export function closingTotals(rows) {
   const vatParts = [];
   const payments = Object.fromEntries(PAYMENT_TYPES.map((type) => [type, 0]));
+  const tips = { cash: 0, card: 0 };
   let grossCents = 0;
   let vouchersSoldCents = 0;
   let discountCents = 0;
@@ -506,7 +527,10 @@ export function closingTotals(rows) {
     if (row.type === "storno") stornos += 1; else sales += 1;
     grossCents += row.total_cents;
     for (const group of parseJson(row.vat_json, [])) vatParts.push({ percent: group.percent, cents: group.grossCents });
-    for (const payment of parseJson(row.payments_json, [])) payments[payment.type] += payment.amountCents;
+    for (const payment of parseJson(row.payments_json, [])) {
+      payments[payment.type] += payment.amountCents;
+      if (payment.tipCents && payment.type in tips) tips[payment.type] += payment.tipCents;
+    }
     for (const line of parseJson(row.lines_json, [])) {
       if (line.kind === "voucher") vouchersSoldCents += line.totalCents;
       if (line.kind === "discount") discountCents += line.totalCents;
@@ -523,7 +547,9 @@ export function closingTotals(rows) {
     payments,
     vouchersSoldCents,
     discountCents,
-    cashCents: payments.cash
+    cashCents: payments.cash,
+    tips,
+    tipsCents: tips.cash + tips.card
   };
 }
 

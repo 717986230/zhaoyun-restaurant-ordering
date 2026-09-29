@@ -233,10 +233,20 @@ test("an order sent on one tablet shows at once on the other and on the admin bo
   await Promise.all([counter.close(), phone.close(), office.close()]);
 });
 
-test("a takeaway gets a pickup number and its discount; the waiter settles the shift", async ({ page, request }, testInfo) => {
+test("a takeaway gets a pickup number, its discount and a tip; the waiter settles; the drawer is counted", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
   const [dish] = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => product.kind === "food" && !product.bundleItems?.length);
   await pairAndSignIn(page, "Tablet takeaway", "Li", "1234");
+
+  // The shift starts with the drawer opened on its float.
+  await page.getByRole("button", { name: "记录与结算" }).click();
+  const drawer = page.locator(".pos-drawer");
+  await expect(drawer).toContainText("钱箱还没开班");
+  await drawer.getByLabel("备用金").fill("150");
+  await drawer.getByRole("button", { name: "开班" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已开班");
+  await expect(drawer.locator('[data-figure="expected"]')).toContainText("150.00");
+  await page.getByRole("button", { name: "← 返回" }).click();
 
   await page.getByRole("button", { name: "+ 外带自取" }).click();
   await expect(page.locator(".pos-ticket h1")).toHaveText(/取餐号 \d+/);
@@ -253,6 +263,11 @@ test("a takeaway gets a pickup number and its discount; the waiter settles the s
   const due = cents - Math.round(cents * 0.1);
   await expect(page.locator(".pos-total b")).toHaveText(new RegExp((due / 100).toFixed(2).replace(".", "\\.")));
   await page.getByRole("button", { name: "+ 现金" }).click();
+  // "Mach es rund": the tip that brings it to the next whole euro, beside the total.
+  await page.getByRole("button", { name: "凑整" }).click();
+  const tip = 100 - (due % 100 || 100);
+  await expect(page.locator(".pos-payments").getByLabel("小费")).toHaveValue((tip / 100).toFixed(2));
+  if (tip) await expect(page.locator(".pos-tip-total")).toContainText("小费不计入小票合计");
   await page.getByRole("button", { name: "收款并开小票" }).click();
   await expect(page.locator(".pos-toast")).toContainText("已结清");
 
@@ -264,6 +279,23 @@ test("a takeaway gets a pickup number and its discount; the waiter settles the s
   await expect(page.locator(".pos-records")).toContainText("上次结算以后没有小票");
   const receipt = (await (await admin(request, "get", "/api/admin/receipts?limit=1")).json()).receipts[0];
   expect(receipt.lines.find((line) => line.kind === "discount").totalCents).toBe(-(cents - due));
+  expect(receipt.totalCents).toBe(due);
+  expect(receipt.payments[0].tipCents ?? 0).toBe(tip);
+
+  // Ten euros out for vegetables, then the count: the sum alone, and it adds up.
+  await drawer.getByLabel("金额").fill("10");
+  await drawer.getByLabel("用途").fill("买菜");
+  await drawer.getByRole("button", { name: "记一笔" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已记取出");
+  await expect(drawer.locator(".pos-movements")).toContainText("买菜");
+  const expected = 15000 + due - 1000;
+  await expect(drawer.locator('[data-figure="expected"]')).toContainText((expected / 100).toFixed(2));
+  await drawer.getByRole("button", { name: "点钞交班" }).click();
+  await drawer.getByLabel("或直接填总数").fill((expected / 100).toFixed(2));
+  await expect(drawer.locator('[data-figure="difference"]')).toHaveClass(/pos-even/);
+  await drawer.getByRole("button", { name: "确认交班" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已交班");
+  await expect(drawer).toContainText("钱箱还没开班");
 });
 
 test("the manager cancels a receipt with a reason, closes the day, and exports a journal that checks out", async ({ page }, testInfo) => {

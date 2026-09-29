@@ -214,7 +214,8 @@ export interface ApiReceipt {
   }>;
   vat: Array<{ percent: number; grossCents: number; netCents: number; vatCents: number }>;
   totalCents: number;
-  payments: Array<{ type: PaymentType; amountCents: number; tenderedCents?: number; changeCents?: number; voucherCode?: string }>;
+  /** `tipCents`: Trinkgeld paid with it, beside the amount and not in the total. */
+  payments: Array<{ type: PaymentType; amountCents: number; tenderedCents?: number; changeCents?: number; voucherCode?: string; tipCents?: number }>;
   refersTo: string | null;
   refersToNo: number | null;
   reason: string | null;
@@ -236,7 +237,7 @@ export interface CheckoutCommand {
   discountPercent?: number;
   items?: Array<{ orderItemId: string; quantity: number }>;
   vouchers?: Array<{ amount: number }>;
-  payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string }>;
+  payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number }>;
 }
 
 export interface ApiVoucher { code: string; valueCents: number; balanceCents: number; voided: boolean; createdAt: string }
@@ -252,6 +253,9 @@ export interface ApiClosingTotals {
   vouchersSoldCents: number;
   discountCents?: number;
   cashCents: number;
+  /** Trinkgeld per way paid: the staff's, not in the takings (absent on closings from before tips). */
+  tips?: { cash: number; card: number };
+  tipsCents?: number;
 }
 
 export interface ApiClosing { id: string; closingNo: number; totals: ApiClosingTotals; createdAt: string }
@@ -265,7 +269,7 @@ export interface ApiSalesReport {
   days: Array<{ date: string; receipts: number; grossCents: number }>;
   hours: Array<{ hour: number; receipts: number; grossCents: number }>;
   items: Array<{ name: string; names: { zh: string; de: string; en: string } | null; quantity: number; grossCents: number }>;
-  staff: Array<{ name: string; receipts: number; grossCents: number }>;
+  staff: Array<{ name: string; receipts: number; grossCents: number; tipsCents?: number }>;
   /** The delivery platforms' orders over the same days: not in the receipts, the platform collects the money. */
   delivery?: ApiDeliveryTotals[];
 }
@@ -294,14 +298,49 @@ export interface PosStaffActivity extends PosStaff {
   /** The tables they have open now. */
   tables: string[];
   /** Since their last settlement: what they took, the cash they hold included. */
-  shift: ApiClosingTotals & { receipts: number; voids: PosVoidTotals };
+  shift: ApiClosingTotals & { receipts: number; voids: PosVoidTotals; handInCents?: number };
 }
 
 /** What a waiter voided since their last settlement (退菜). */
 export interface PosVoidTotals { count: number; cents: number }
 /** Dishes taken off a bill after they went to the kitchen. */
 export interface PosVoid { id: string; orderItemId: string; quantity: number; amountCents: number; reason: string; staffName: string | null; createdAt: string }
-export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number; voids?: PosVoidTotals }; createdAt: string }
+/** The cash drawer (shared/drawer.mjs): what should be in it, and once counted what was. */
+export interface PosDrawerTotals {
+  floatCents: number;
+  receipts: number;
+  firstReceiptNo: number | null;
+  lastReceiptNo: number | null;
+  cashSalesCents: number;
+  /** Paid out of the till to the staff: they came in on the card terminal. */
+  cardTipsCents: number;
+  /** Kept by the staff, never in the drawer: shown for the record. */
+  cashTipsCents: number;
+  inCents: number;
+  outCents: number;
+  expectedCents: number;
+  countedCents?: number;
+  /** Over when positive, short when negative. */
+  differenceCents?: number;
+}
+export interface PosDrawerMovement { id: string; kind: "in" | "out"; amountCents: number; reason: string; staffName: string | null; createdAt: string }
+export interface PosDrawer {
+  id: string;
+  open: boolean;
+  openedAt: string;
+  openedBy: string | null;
+  closedAt: string | null;
+  closedBy: string | null;
+  note: string | null;
+  /** Cents of each note or coin → how many, when counted that way. */
+  counts: Record<string, number> | null;
+  totals: PosDrawerTotals;
+  movements: PosDrawerMovement[];
+}
+export interface DrawerCloseCommand { counts?: Record<string, number>; amount?: number; note?: string }
+
+/** `handInCents`: the cash they took less the card tips they keep back (absent on settlements from before tips). */
+export interface PosSettlement { id: string; staffId: string; staffName: string; totals: ApiClosingTotals & { receipts: number; voids?: PosVoidTotals; handInCents?: number }; createdAt: string }
 
 export interface ApiServiceRequest {
   id: string;

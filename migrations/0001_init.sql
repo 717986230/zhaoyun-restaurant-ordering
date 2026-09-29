@@ -394,6 +394,31 @@ CREATE TABLE product_stock (
       stock_left INTEGER,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE drawer_sessions (
+      id TEXT PRIMARY KEY,
+      open_flag INTEGER UNIQUE,
+      after_receipt_no INTEGER NOT NULL,
+      float_cents INTEGER NOT NULL,
+      opened_by TEXT,
+      opened_at TEXT NOT NULL,
+      closed_at TEXT,
+      closed_by TEXT,
+      last_receipt_no INTEGER,
+      counted_cents INTEGER,
+      counts_json TEXT,
+      totals_json TEXT,
+      note TEXT
+    );
+CREATE TABLE drawer_movements (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES drawer_sessions(id),
+      kind TEXT NOT NULL CHECK (kind IN ('in','out')),
+      amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+      reason TEXT NOT NULL,
+      staff_id TEXT,
+      staff_name TEXT,
+      created_at TEXT NOT NULL
+    );
 CREATE TABLE discovered_printers (
       address TEXT NOT NULL,
       port INTEGER NOT NULL,
@@ -404,6 +429,8 @@ CREATE TABLE discovered_printers (
     );
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
+CREATE INDEX idx_drawer_sessions_closed ON drawer_sessions(closed_at);
+CREATE INDEX idx_drawer_movements_session ON drawer_movements(session_id);
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
 CREATE INDEX idx_admin_sessions_expiry ON admin_sessions(expires_at);
 CREATE INDEX idx_account_sessions_expiry ON account_sessions(expires_at);

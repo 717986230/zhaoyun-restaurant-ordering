@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ApiClosingTotals, ApiJournalExport, ApiReceipt, PaymentType, PosSettlement, PosStaff } from "@zhaoyun/contracts";
 import { api } from "./App";
 import type { Pos, Screen } from "./App";
+import { DrawerCard } from "./Drawer";
 
 const PAYMENTS: PaymentType[] = ["cash", "card", "voucher"];
 
@@ -98,6 +99,7 @@ export function Records({ pos, go }: { pos: Pos; go: (screen: Screen) => void })
     <dt>{t("takings")}</dt><dd>{money(totals.grossCents)}</dd>
     {totals.vat.map((group) => <Fragment key={group.percent}><dt>{group.percent}%</dt><dd>{money(group.grossCents)}</dd></Fragment>)}
     {PAYMENTS.map((type) => <Fragment key={type}><dt>{t(type)}</dt><dd>{money(totals.payments[type])}</dd></Fragment>)}
+    {totals.tipsCents ? <><dt>{t("tips")}</dt><dd data-figure="tips">{money(totals.tipsCents)}</dd></> : null}
   </dl>;
   const whoseName = staff.find((person) => person.id === whose)?.name ?? pos.staff.name;
 
@@ -108,6 +110,7 @@ export function Records({ pos, go }: { pos: Pos; go: (screen: Screen) => void })
     </div>
 
     <div className="pos-records-grid">
+      <DrawerCard pos={pos} />
       <article className="pos-card">
         <h2>{manager ? t("waiters") : t("mySettlement")}</h2>
         {manager && <select value={whose} onChange={(event) => setWhose(event.target.value)} aria-label={t("waiters")}>
@@ -117,7 +120,8 @@ export function Records({ pos, go }: { pos: Pos; go: (screen: Screen) => void })
           <p>{t("settlementOf", { name: whoseName })} · {t("settlementLead", { count: mine.receipts, first: mine.firstReceiptNo ?? "", last: mine.lastReceiptNo ?? "" })}</p>
           {figures(mine)}
           {mine.voids?.count ? <p className="pos-voids">{t("voidsLine", { count: mine.voids.count, amount: money(mine.voids.cents) })}</p> : null}
-          <p className="pos-cash">{t("cashToHandIn")}: <b>{money(mine.payments.cash)}</b></p>
+          <p className="pos-cash">{t("cashToHandIn")}: <b data-figure="hand-in">{money(mine.handInCents ?? mine.payments.cash)}</b></p>
+          {mine.tips?.card ? <p className="pos-muted">{t("cardTipsKept", { amount: money(mine.tips.card) })}</p> : null}
           <button type="button" className="pos-primary" onClick={() => void settle()}>{t("settle")}</button>
         </> : <p className="pos-muted">{t("settlementNothing")}</p>}
       </article>

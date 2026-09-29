@@ -5,7 +5,7 @@ import type { Pos, Screen } from "./App";
 
 const HOLD_MS = 30_000;
 const PAY_KEYS: Record<PaymentType, "cash" | "card" | "voucher"> = { cash: "cash", card: "card", voucher: "voucher" };
-interface Payment { type: PaymentType; amount: string; tendered: string; voucherCode: string; balanceCents: number | null }
+interface Payment { type: PaymentType; amount: string; tendered: string; voucherCode: string; balanceCents: number | null; tip: string }
 
 const toCents = (text: string) => Math.round(Number(String(text).replace(",", ".")) * 100) || 0;
 const toAmount = (cents: number) => (cents / 100).toFixed(2);
@@ -15,7 +15,8 @@ const toAmount = (cents: number) => (cents / 100).toFixed(2);
  * Together: one receipt for everything. Separately: each guest's own lines,
  * one receipt each, until the table is paid. Cash (with the change worked
  * out), card or voucher, in any mix that adds up; a takeaway gets its pickup
- * discount.
+ * discount. Cash and card take a tip beside the amount ("mach 50"): the
+ * staff's, not in the total.
  */
 export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (screen: Screen) => void }) {
   const { t, money, language } = pos;
@@ -69,7 +70,9 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const paidCents = payments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
   const remaining = totalCents - paidCents;
   const cash = payments.find((payment) => payment.type === "cash" && payment.tendered);
-  const change = cash ? toCents(cash.tendered) - toCents(cash.amount) : 0;
+  // The cash handed over pays the amount and the tip; what is left is the change.
+  const change = cash ? toCents(cash.tendered) - toCents(cash.amount) - toCents(cash.tip) : 0;
+  const tipCents = payments.reduce((sum, payment) => sum + (payment.type === "voucher" ? 0 : toCents(payment.tip)), 0);
   // A reward bought with points is a receipt of nothing to pay: no payment on it.
   const picked = Object.values(picks).some((count) => count > 0);
   const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && !busy;
@@ -80,8 +83,16 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     setPicks(next ? {} : Object.fromEntries(lines.map((item) => [item.orderItemId, item.qty])));
   };
   const pick = (id: string, quantity: number, max: number) => setPicks((current) => ({ ...current, [id]: Math.max(0, Math.min(max, quantity)) }));
-  const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null }]);
+  const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "" }]);
   const edit = (index: number, change: Partial<Payment>) => setPayments((current) => current.map((payment, at) => (at === index ? { ...payment, ...change } : payment)));
+  /** Aufrunden: the tip that brings amount and tip to the next whole euro — again for the one after. */
+  const roundUp = (index: number) => {
+    const payment = payments[index];
+    if (!payment) return;
+    const amount = toCents(payment.amount);
+    const paid = amount + toCents(payment.tip);
+    edit(index, { tip: toAmount((Math.floor(paid / 100) + 1) * 100 - amount) });
+  };
 
   async function checkVoucher(index: number) {
     const code = payments[index]?.voucherCode;
@@ -104,11 +115,13 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
           type: payment.type,
           amount: toCents(payment.amount) / 100,
           ...(payment.type === "cash" && payment.tendered ? { tendered: toCents(payment.tendered) / 100 } : {}),
-          ...(payment.type === "voucher" ? { voucherCode: payment.voucherCode } : {})
+          ...(payment.type === "voucher" ? { voucherCode: payment.voucherCode } : {}),
+          ...(payment.type !== "voucher" && toCents(payment.tip) > 0 ? { tip: toCents(payment.tip) / 100 } : {})
         }))
       });
       const given = receipt.payments.find((payment) => payment.changeCents);
-      pos.notify(t("issued", { no: receipt.receiptNo, change: given?.changeCents ? t("issuedChange", { amount: money(given.changeCents) }) : "" }));
+      const tipped = receipt.payments.reduce((sum, payment) => sum + (payment.tipCents ?? 0), 0);
+      pos.notify(t("issued", { no: receipt.receiptNo, change: (given?.changeCents ? t("issuedChange", { amount: money(given.changeCents) }) : "") + (tipped ? t("issuedTip", { amount: money(tipped) }) : "") }));
       requestId.current = crypto.randomUUID();
       setPayments([]);
       const left = await load(separate ? "none" : "all");
@@ -156,11 +169,13 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       <ul className="pos-payments">{payments.map((payment, index) => <li key={index}>
         <b>{t(PAY_KEYS[payment.type])}</b>
         <label><span>{t("amount")}</span><input inputMode="decimal" value={payment.amount} onChange={(event) => edit(index, { amount: event.target.value })} /></label>
-        {payment.type === "cash" && <label><span>{t("tendered")}</span><input inputMode="decimal" placeholder={payment.amount} value={payment.tendered} onChange={(event) => edit(index, { tendered: event.target.value })} /></label>}
+        {payment.type === "cash" && <label><span>{t("tendered")}</span><input inputMode="decimal" placeholder={toAmount(toCents(payment.amount) + toCents(payment.tip))} value={payment.tendered} onChange={(event) => edit(index, { tendered: event.target.value })} /></label>}
+        {payment.type !== "voucher" && <label className="pos-tip"><span>{t("tip")}</span><input inputMode="decimal" placeholder="0.00" value={payment.tip} onChange={(event) => edit(index, { tip: event.target.value })} /><button type="button" data-action="round-up" onClick={() => roundUp(index)}>{t("roundUp")}</button></label>}
         {payment.type === "voucher" && <label><span>{t("voucherCode")}</span><input value={payment.voucherCode} autoCapitalize="characters" onChange={(event) => edit(index, { voucherCode: event.target.value.toUpperCase(), balanceCents: null })} onBlur={() => void checkVoucher(index)} /></label>}
         {payment.balanceCents !== null && <small>{t("balance", { amount: money(payment.balanceCents) })}</small>}
         <button type="button" aria-label={t("remove")} onClick={() => setPayments((current) => current.filter((_, at) => at !== index))}>✕</button>
       </li>)}</ul>
+      {tipCents > 0 && <p className="pos-tip-total">{t("tipLine", { amount: money(tipCents), total: money(totalCents + tipCents) })}</p>}
       {change > 0 && <p className="pos-change">{t("change", { amount: money(change) })}</p>}
       {picked && totalCents === 0 && <p className="pos-remaining">{t("payNothing")}</p>}
       {totalCents > 0 && remaining !== 0 && <p className="pos-remaining">{remaining > 0 ? t("remaining", { amount: money(remaining) }) : t("over", { amount: money(-remaining) })}</p>}

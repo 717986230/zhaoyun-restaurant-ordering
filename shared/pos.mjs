@@ -94,12 +94,23 @@ export function assertClaim(row, deviceId, at = now()) {
 
 /**
  * A waiter's settlement: the receipts they took since their last one — how
- * much in cash they hand in, by card, by voucher, the sales and stornos.
+ * much in cash they hand in, by card, by voucher, the sales and stornos —
+ * from their receipts since their last settlement, and the dishes they
+ * voided (OPEN_STAFF_VOIDS_SQL).
+ *
+ * Their tips are theirs (Kellnerbrieftasche): the cash tips they already
+ * hold, and the card tips came in on the restaurant's terminal, so they keep
+ * that much back of the cash they took. `handInCents` is what is left to
+ * hand in.
  */
-/** A waiter's receipts since their last settlement, and the dishes they voided (OPEN_STAFF_VOIDS_SQL). */
 export function settlementTotals(rows, voidRows = []) {
   const totals = closingTotals(rows);
-  return { ...totals, receipts: rows.length, voids: { count: voidRows.length, cents: voidRows.reduce((sum, row) => sum + row.amount_cents, 0) } };
+  return {
+    ...totals,
+    receipts: rows.length,
+    voids: { count: voidRows.length, cents: voidRows.reduce((sum, row) => sum + row.amount_cents, 0) },
+    handInCents: totals.payments.cash - totals.tips.card
+  };
 }
 
 export function settlementView(row) {

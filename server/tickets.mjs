@@ -30,7 +30,8 @@ export const labels = {
     unsigned: "测试小票 · 未签名（RKSV）", receipt: "小票", register: "收银机", storno: "冲销", stornoOf: "冲销小票 {no}",
     sum: "合计", cash: "现金", card: "银行卡", voucher: "代金券", tendered: "收", change: "找零", gross: "含税",
     voucherCode: "代金券码", closing: "日结", sales: "销售", stornos: "冲销", receipts: "小票", vouchersSold: "售出代金券", uid: "UID",
-    waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣",
+    waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣", tip: "小费", tips: "小费（不计营业额）", handIn: "应交现金",
+    drawer: "点钞 · 交班", float: "备用金", cashSales: "现金收入", payIn: "存入", payOut: "取出", cardTips: "卡付小费（付给员工）", expected: "应有现金", counted: "实点现金", difference: "差额", opened: "开班", countedBy: "点钞",
     voidTicket: "*** 退菜 · 停止制作 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***",
     guestDineIn: "*** 顾客扫码点餐 ***", guestPickup: "*** 线上自取 ***",
     deliveryDelivery: "外送", deliveryPickup: "到店自取", due: "取餐时间",
@@ -46,7 +47,8 @@ export const labels = {
     unsigned: "TESTBELEG – NICHT SIGNIERT", receipt: "Beleg", register: "Kasse", storno: "STORNO", stornoOf: "Storno zu Beleg {no}",
     sum: "SUMME", cash: "Bar", card: "Karte", voucher: "Gutschein", tendered: "gegeben", change: "Rückgeld", gross: "Brutto",
     voucherCode: "Gutschein-Code", closing: "TAGESABSCHLUSS", sales: "Verkäufe", stornos: "Stornos", receipts: "Belege", vouchersSold: "Gutscheine verkauft", uid: "UID",
-    waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt",
+    waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt", tip: "Trinkgeld", tips: "Trinkgeld (kein Umsatz)", handIn: "Abzugeben bar",
+    drawer: "KASSENSTURZ", float: "Wechselgeld Anfang", cashSales: "Bareinnahmen", payIn: "Einlage", payOut: "Entnahme", cardTips: "Kartentrinkgeld ausbezahlt", expected: "Soll", counted: "Ist (gezählt)", difference: "Differenz", opened: "Geöffnet", countedBy: "Gezählt",
     voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***",
     guestDineIn: "*** GAST-BESTELLUNG (QR) ***", guestPickup: "*** ONLINE – ABHOLUNG ***",
     deliveryDelivery: "LIEFERUNG", deliveryPickup: "ABHOLUNG", due: "Fertig um",
@@ -62,7 +64,8 @@ export const labels = {
     unsigned: "TEST RECEIPT – NOT SIGNED", receipt: "Receipt", register: "Register", storno: "CANCELLATION", stornoOf: "Cancels receipt {no}",
     sum: "TOTAL", cash: "Cash", card: "Card", voucher: "Voucher", tendered: "given", change: "change", gross: "Gross",
     voucherCode: "Voucher code", closing: "DAY CLOSING", sales: "sales", stornos: "cancellations", receipts: "Receipts", vouchersSold: "Vouchers sold", uid: "UID",
-    waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount",
+    waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount", tip: "Tip", tips: "Tips (not takings)", handIn: "Cash to hand in",
+    drawer: "CASH COUNT", float: "Float", cashSales: "Cash sales", payIn: "Paid in", payOut: "Paid out", cardTips: "Card tips paid out", expected: "Expected", counted: "Counted", difference: "Difference", opened: "Opened", countedBy: "Counted",
     voidTicket: "*** VOID – STOP COOKING ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***",
     guestDineIn: "*** GUEST ORDER (QR) ***", guestPickup: "*** ONLINE PICKUP ***",
     deliveryDelivery: "DELIVERY", deliveryPickup: "COLLECTION", due: "Ready by",
@@ -309,6 +312,8 @@ function receiptLines(payload, context) {
   lines.push(rule);
   for (const payment of receipt.payments) {
     lines.push({ left: `${copy[payment.type] ?? payment.type}${payment.voucherCode ? ` ${payment.voucherCode}` : ""}`, right: euros(payment.amountCents) });
+    // Below the payment and outside the sum: a tip is not part of the sale.
+    if (payment.tipCents) lines.push({ left: `  + ${copy.tip}`, right: euros(payment.tipCents) });
     if (payment.tenderedCents) lines.push(`  ${copy.tendered} ${euros(payment.tenderedCents)}  ${copy.change} ${euros(payment.changeCents)}`);
   }
   for (const line of receipt.lines) if (line.kind === "voucher" && receipt.type === "sale") lines.push(rule, `${copy.voucherCode}: ${line.code}`, { left: copy.voucher, right: euros(line.totalCents) });
@@ -333,7 +338,7 @@ function closingLines(payload, context) {
   lines.push(rule);
   for (const [type, amount] of Object.entries(totals.payments)) lines.push({ left: copy[type] ?? type, right: euros(amount) });
   if (totals.vouchersSoldCents) lines.push({ left: copy.vouchersSold, right: euros(totals.vouchersSoldCents) });
-  lines.push(rule, "\n");
+  lines.push(...tipLines(totals, copy, rule), rule, "\n");
   return lines;
 }
 
@@ -352,8 +357,56 @@ function settlementLines(payload, context) {
     rule,
     ...Object.entries(totals.payments).map(([type, amount]) => ({ left: copy[type] ?? type, right: euros(amount) })),
     ...(totals.voids?.count ? [{ left: `${copy.voids} ${totals.voids.count}x`, right: euros(-totals.voids.cents) }] : []),
+    ...tipLines(totals, copy, rule),
+    ...(totals.handInCents !== undefined ? [rule, { left: copy.handIn, right: euros(totals.handInCents) }] : []),
     rule,
     "\n"
+  ];
+}
+
+/**
+ * The drawer counted at the end of a shift (Kassensturz): what should be in
+ * it, line by line, against what was counted, and every movement with why.
+ */
+function drawerLines(payload, context) {
+  const { copy, rule } = context;
+  const { drawer } = payload;
+  const totals = drawer.totals;
+  const lines = [
+    { text: copy.drawer, bold: true, center: true },
+    ...companyLines(payload.company, copy),
+    `${copy.opened}: ${at(drawer.openedAt)}${drawer.openedBy ? ` ${drawer.openedBy}` : ""}`,
+    `${copy.countedBy}: ${at(drawer.closedAt)}${drawer.closedBy ? ` ${drawer.closedBy}` : ""}`,
+    ...(totals.receipts ? [`${copy.receipts} ${totals.firstReceiptNo}–${totals.lastReceiptNo}`] : []),
+    rule,
+    { left: copy.float, right: euros(totals.floatCents) },
+    { left: `+ ${copy.cashSales}`, right: euros(totals.cashSalesCents) }
+  ];
+  for (const movement of drawer.movements) {
+    lines.push({ left: `${movement.kind === "in" ? "+" : "-"} ${movement.kind === "in" ? copy.payIn : copy.payOut}`, right: euros(movement.kind === "in" ? movement.amountCents : -movement.amountCents) });
+    lines.push(`    ${movement.reason}${movement.staffName ? ` (${movement.staffName})` : ""}`);
+  }
+  if (totals.cardTipsCents) lines.push({ left: `- ${copy.cardTips}`, right: euros(-totals.cardTipsCents) });
+  lines.push(rule, { left: copy.expected, right: euros(totals.expectedCents) }, { left: copy.counted, right: euros(totals.countedCents) });
+  lines.push({ text: `${copy.difference} ${totals.differenceCents > 0 ? "+" : ""}${euros(totals.differenceCents)}`, bold: true });
+  if (drawer.counts) {
+    lines.push(rule);
+    for (const [cents, count] of Object.entries(drawer.counts).sort(([left], [right]) => Number(right) - Number(left))) {
+      lines.push({ left: `${count} x ${euros(Number(cents))}`, right: euros(Number(cents) * count) });
+    }
+  }
+  if (drawer.note) lines.push(rule, drawer.note);
+  lines.push(rule, "\n");
+  return lines;
+}
+
+/** Tips, apart from the takings, per way paid (none printed when there were none). */
+function tipLines(totals, copy, rule) {
+  if (!totals.tipsCents) return [];
+  return [
+    rule,
+    copy.tips,
+    ...Object.entries(totals.tips).filter(([, amount]) => amount).map(([type, amount]) => ({ left: `  ${copy[type] ?? type}`, right: euros(amount) }))
   ];
 }
 
@@ -386,7 +439,7 @@ function testLines(payload, context) {
   ];
 }
 
-const BUILDERS = { bill: billLines, receipt: receiptLines, closing: closingLines, settlement: settlementLines, test: testLines };
+const BUILDERS = { bill: billLines, receipt: receiptLines, closing: closingLines, settlement: settlementLines, drawer: drawerLines, test: testLines };
 const KITCHEN = new Set([undefined, "order", "void"]);
 
 /**
