@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs } from "../src/index";
+import { drinkTabs, NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "../src/index";
 
 const tabs = [NAV_FEATURED, NAV_SETS, NAV_ALL, "RAMEN", "SUSHI", "DRINKS"];
 
@@ -20,5 +20,21 @@ describe("the menu's tab order", () => {
 
   it("a page that is not on the menu is passed over", () => {
     expect(orderNavTabs([NAV_ALL, "RAMEN"], [NAV_SETS, "RAMEN"])).toEqual(["RAMEN", NAV_ALL]);
+  });
+});
+
+describe("the drinks page", () => {
+  const drinks = new Set(["COFFEE", "TEA", "BEER"]);
+
+  it("takes the place of the first drink category, and the others drop out", () => {
+    expect(drinkTabs(["RAMEN", "COFFEE", "SUSHI", "TEA", "BEER"], drinks)).toEqual(["RAMEN", NAV_DRINKS, "SUSHI"]);
+  });
+
+  it("is not there on a menu with no drinks", () => {
+    expect(drinkTabs(["RAMEN", "SUSHI"], drinks)).toEqual(["RAMEN", "SUSHI"]);
+  });
+
+  it("can be pinned like any other tab", () => {
+    expect(orderNavTabs([NAV_ALL, ...drinkTabs(["RAMEN", "BEER"], drinks)], [NAV_DRINKS])).toEqual([NAV_DRINKS, NAV_ALL, "RAMEN"]);
   });
 });
