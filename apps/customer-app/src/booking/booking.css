@@ -11,10 +11,10 @@ html.bk-root body {
 .bk-page {
   max-width: 640px;
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
   color: var(--ink);
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .bk-head {
@@ -62,15 +62,15 @@ html.bk-root body {
 
 .bk-form {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 .bk-card {
   background: var(--panel);
   border: 1px solid var(--line-soft);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 14px;
+  padding: 14px 16px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 .bk-card h2 {
   margin: 0;
@@ -311,7 +311,9 @@ html.bk-root body {
   outline-offset: 1px;
 }
 .bk-other-date {
-  max-width: 260px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
 }
 
 .bk-note {

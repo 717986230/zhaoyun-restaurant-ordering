@@ -1499,25 +1499,29 @@ html.plt-android .menu.detail-open .stack {
 /* Options and add-ons, read rather than picked. There is nothing to order
    into, so this is the same data the (dormant) cart's modifier picker used —
    read as a sentence instead of a form: "口味要求: 加面 +2,50 · 不要香菜". */
+/* A group's name on its line, its choices as chips under it: an option and
+   its price ("Extra Chili +€ 0,50") never split across lines. */
 .dish-options-group {
-  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
   color: var(--muted);
   font-size: 12px;
-  line-height: 1.7;
+  line-height: 1.4;
 }
 
 .dish-options-group b {
+  flex-basis: 100%;
   color: var(--ink);
   font-weight: 500;
 }
 
 .dish-options-group span {
-  margin-left: 8px;
-}
-
-.dish-options-group span:not(:last-child)::after {
-  content: " · ";
-  color: var(--faint);
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 

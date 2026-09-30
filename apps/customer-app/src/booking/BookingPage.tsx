@@ -484,16 +484,15 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
       <p className="bk-muted">{b(language, "staysFor", { minutes: info.durationMinutes })}</p>
     </section>
 
-    {seatSelection ? <section className="bk-card" id="bookingSeats">
-      <h2>{b(language, "seat")}{time ? <span className="bk-muted"> · {time}</span> : null}</h2>
-      {!time
-        ? <p className="bk-muted">{b(language, "pickTimeFirst")}</p>
-        : tables === null
+    {/* Only once there is a time: an empty card before it said nothing. */}
+    {seatSelection && time ? <section className="bk-card" id="bookingSeats">
+      <h2>{b(language, "seat")} <span className="bk-muted">· {time}</span></h2>
+      {tables === null
           ? <p className="bk-muted">{b(language, "tablesLoading")}</p>
           : !tables.some((choice) => choice.available)
             ? <p className="bk-muted" id="bookingNoTables">{b(language, "noTables", { n: party })}</p>
             : null}
-      {time && tables?.length ? <div className="bk-tables" role="radiogroup" aria-label={b(language, "seat")}>
+      {tables?.length ? <div className="bk-tables" role="radiogroup" aria-label={b(language, "seat")}>
         {tables.map((choice) => <button key={choice.table} type="button" role="radio" aria-checked={choice.table === table} data-table={choice.table}
           disabled={!choice.available} className={`bk-table ${choice.table === table ? "active" : ""}`} onClick={() => setTable(choice.table)}>
           <strong>{b(language, "tableName", { table: choice.table })}</strong>
