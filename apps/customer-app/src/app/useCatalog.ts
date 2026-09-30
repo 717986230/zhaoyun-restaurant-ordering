@@ -18,6 +18,15 @@ interface Catalog {
 
 /** The menu settings from the last catalogue this phone saw, read before the
  *  first render so a restaurant whose default is light does not flash dark. */
+/** The 菜单样式 this phone last saw, for the booking page's colours. */
+export function cachedMenuTheme(): MenuThemeId | undefined {
+  try {
+    return (JSON.parse(localStorage.getItem(cacheKey) || "null") as Catalog | null)?.theme;
+  } catch {
+    return undefined;
+  }
+}
+
 export function cachedMenuSettings(): ApiMenuSettings | undefined {
   try {
     const cached = JSON.parse(localStorage.getItem(cacheKey) || "null") as Catalog | null;
