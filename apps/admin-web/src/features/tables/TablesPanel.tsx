@@ -113,7 +113,7 @@ export function TablesPanel(props: Props) {
     </div>
 
     {editing && <section className="table-editor" aria-label={t("tablesEdit")}>
-      <p>{t("tablesEditLead")}</p>
+      
       <form className="table-editor-add" onSubmit={(event) => void addTable(event)}>
         <label><span>{t("tableNumber")}</span>
           <input key={nextNumber(room)} name="table" required maxLength={8} pattern="[A-Za-z0-9][A-Za-z0-9\-]{0,7}" autoCapitalize="characters" defaultValue={nextNumber(room)} />
@@ -150,12 +150,15 @@ export function TablesPanel(props: Props) {
       </div>
       {held && <span className="table-open-on" title={lockedTitle}>{t("tableLockedOnPos", { name: holder })}</span>}
       {table.orderingUntil && <span className="table-ordering">{t("tableOrderingUntil", { time: formatTime(table.orderingUntil, language) })}</span>}
-      <small className="table-tile-meta">
-        {table.label || "—"}
-        {table.since ? ` · ${t("tableSince", { time: formatTime(table.since, language) })}` : ""}
-        {table.registered ? "" : ` · ${t("tableUnregistered")}`}
-        {table.enabled ? "" : ` · ${t("tableDisabled")}`}
-      </small>
+      {(() => {
+        const meta = [
+          table.label,
+          table.since ? t("tableSince", { time: formatTime(table.since, language) }) : "",
+          table.registered ? "" : t("tableUnregistered"),
+          table.enabled ? "" : t("tableDisabled")
+        ].filter(Boolean).join(" · ");
+        return meta ? <small className="table-tile-meta">{meta}</small> : null;
+      })()}
 
       {table.orders.length ? <>
         <ul className="table-tile-orders">{table.orders.map((order) => <li key={order.id}>
@@ -171,7 +174,7 @@ export function TablesPanel(props: Props) {
           {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}
         </li>)}</ul>
         <div className="table-tile-total"><span>{t("tableOpen")}</span><b>{formatMoney(euro(table.total), language)}</b></div>
-      </> : <p className="table-tile-empty">{t("tableNoOrders")}</p>}
+      </> : null}
 
       {editing && !table.table.startsWith("TA-") ? (renaming === table.table
         ? <form className="table-rename" onSubmit={(event) => void rename(event, table)}>

@@ -226,7 +226,7 @@ export function CatalogPanel(props: Props) {
         </select></label>
         <label><span>{t("fieldCategory")}</span><input name="category" required defaultValue={product?.category ?? ""} placeholder="RAMEN / BAO / WINE" /></label>
       </div>
-      {product?.bundleItems?.length ? <small className="settings-hint">{t("vatSetHint")}</small> : null}
+      
       <label><span>{t("fieldDescription")}</span><textarea name="description" rows={3} defaultValue={product?.description ?? ""} /></label>
       <label><span>{t("fieldIngredients")}</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
       <div className="field-grid three"><label><span>{t("fieldTime")}</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>{t("fieldPortion")}</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>{t("fieldLevel")}</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
@@ -234,7 +234,7 @@ export function CatalogPanel(props: Props) {
       <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>{t("fieldMedia")}</b><small>{t("fieldMediaHint")}</small></label>
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
       <label className="daily-limit"><span>{t("fieldDailyLimit")}</span><input name="dailyLimit" id="dailyLimit" type="number" min="1" max="9999" step="1" inputMode="numeric" defaultValue={product?.dailyLimit ?? ""} placeholder={t("dailyLimitNone")} />
-        <small className="settings-hint">{product?.leftToday !== undefined && product?.leftToday !== null ? t("dailyLimitToday", { n: product.leftToday }) : t("dailyLimitHint")}</small></label>
+        {product?.leftToday !== undefined && product?.leftToday !== null ? <small className="settings-hint">{t("dailyLimitToday", { n: product.leftToday })}</small> : null}</label>
       <BundleFieldset product={product} products={props.products} mediaUrl={props.mediaUrl} />
       {/* What a restaurant rarely touches: numbering, printing, tax and the raw
           option groups. Folded away so the form is the dish, not the plumbing. */}

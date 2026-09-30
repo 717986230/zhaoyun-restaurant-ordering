@@ -316,14 +316,14 @@ button {
 }
 
 .editor-pane {
-  padding: 28px clamp(22px, 4vw, 48px);
+  padding: 18px clamp(14px, 3vw, 32px);
   border-right: 1px solid var(--a-line);
   background: var(--a-card);
 }
 
 .list-pane {
   min-width: 0;
-  padding: 28px clamp(20px, 3vw, 42px);
+  padding: 18px clamp(14px, 2.5vw, 28px);
 }
 
 .form-title,
@@ -362,7 +362,7 @@ h2 {
 
 .editor-form {
   display: grid;
-  gap: 15px;
+  gap: 12px;
 }
 
 .editor-form label {
@@ -523,7 +523,7 @@ h2 {
 .filter-tabs {
   display: flex;
   gap: 6px;
-  margin: 24px 0 14px;
+  margin: 14px 0 10px;
 }
 
 .filter-tabs button {
@@ -649,7 +649,7 @@ h2 {
 }
 
 .printer-toolbar {
-  padding: 28px clamp(20px, 4vw, 48px) 22px;
+  padding: 18px clamp(14px, 3vw, 32px) 14px;
   border-bottom: 1px solid var(--a-line);
   background: var(--a-card);
 }
@@ -658,11 +658,11 @@ h2 {
   display: grid;
   grid-template-columns: 1fr minmax(360px, 40%);
   gap: 30px;
-  padding: 28px clamp(20px, 4vw, 48px);
+  padding: 18px clamp(14px, 3vw, 32px);
 }
 
 .discovered {
-  padding: 22px clamp(20px, 4vw, 48px);
+  padding: 14px clamp(14px, 3vw, 32px);
   border-bottom: 1px solid var(--a-line);
   background: var(--a-stripe);
 }
@@ -734,7 +734,7 @@ h2 {
 }
 
 .system-pane {
-  padding: 38px clamp(22px, 5vw, 64px);
+  padding: 20px clamp(14px, 3vw, 32px);
 }
 
 .admin-empty {
@@ -1756,9 +1756,9 @@ em.voided {
 .settings-page {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 24px clamp(14px, 4vw, 40px) 48px;
+  padding: 16px clamp(12px, 3vw, 32px) 40px;
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 
 .settings-title {
@@ -1771,12 +1771,12 @@ em.voided {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 12px 0 4px;
+  margin: 4px 0 0;
 }
 
 .settings-group {
-  margin: 18px 0 10px;
-  padding-bottom: 6px;
+  margin: 12px 0 2px;
+  padding-bottom: 4px;
   border-bottom: 1px solid var(--a-line);
   color: var(--a-ink-2);
   font-size: 17px;
@@ -1790,12 +1790,12 @@ em.voided {
    across both. */
 .settings-grid {
   columns: 2 420px;
-  column-gap: 16px;
+  column-gap: 12px;
 }
 
 .settings-grid > * {
   break-inside: avoid;
-  margin: 0 0 16px;
+  margin: 0 0 10px;
 }
 
 .settings-grid > .wide {
@@ -1804,8 +1804,8 @@ em.voided {
 
 .settings-card {
   display: grid;
-  gap: 12px;
-  padding: 18px;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid var(--a-line);
   border-radius: 8px;
   background: var(--a-card);
@@ -1939,7 +1939,7 @@ em.voided {
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: 5px;
   background: var(--a-card);
   color: var(--a-ink-2);
   font-weight: 600;
@@ -2594,7 +2594,7 @@ em.voided {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 12px;
-  padding: 16px 18px;
+  padding: 12px 14px;
   cursor: pointer;
   list-style: none;
 }
@@ -2645,8 +2645,8 @@ em.voided {
 
 .settings-body {
   display: grid;
-  gap: 12px;
-  padding: 0 18px 18px;
+  gap: 10px;
+  padding: 0 14px 14px;
 }
 
 /* The dish editor's save, pinned to the foot of the form while it scrolls. */
@@ -3898,11 +3898,16 @@ em.voided {
   gap: 6px;
 }
 
+/* Days on their own line; from – to and remove level under them. */
 .res-period {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
+}
+
+.res-period .schedule-days {
+  grid-column: 1 / -1;
 }
 
 .res-closed,
@@ -3913,9 +3918,32 @@ em.voided {
   gap: 8px;
 }
 
-.res-link input {
-  flex: 1 1 260px;
-  min-height: 38px;
+.editor-form .res-closed input,
+.editor-form .res-link input {
+  flex: 1 1 180px;
+  width: auto;
+}
+
+.res-closed button,
+.res-link button {
+  flex: none;
+}
+
+/* Buttons that add a line sit at the start, as wide as their words. */
+.settings-body > .ghost-action {
+  justify-self: start;
+}
+
+/* A field and its one button on a line, bottoms level. */
+.res-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.res-inline label {
+  flex: 1 1 220px;
 }
 
 .res-views {
@@ -3938,10 +3966,6 @@ em.voided {
   gap: 4px;
   color: var(--a-muted);
   font-size: 12px;
-}
-
-.res-search input {
-  min-width: 220px;
 }
 
 #reservationsPanel .settings-page {
@@ -4110,4 +4134,152 @@ em.voided {
   color: var(--a-warn-solid);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* One height for every field and button in the console, so a row that mixes
+   them lines up. Low specificity: a form that styles its own fields keeps it. */
+.admin-shell :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select) {
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 5px;
+  background: var(--a-card);
+  color: var(--a-ink);
+}
+
+.admin-shell :where(.primary-action, .ghost-action) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Filter bars (reports, delivery): fields and buttons in even columns,
+   bottoms level, whatever the width. */
+.report-dates,
+.res-filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  align-items: end;
+  gap: 8px;
+}
+
+.report-dates input,
+.report-dates select,
+.res-filter input,
+.res-filter select {
+  width: 100%;
+}
+
+.report-range {
+  display: grid;
+  justify-content: stretch;
+}
+
+.report-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+}
+
+.report-presets button {
+  padding-inline: 6px;
+}
+
+@media (min-width: 900px) {
+  .report-range {
+    grid-template-columns: auto minmax(0, 420px);
+    justify-content: space-between;
+    align-items: end;
+  }
+
+  .report-presets {
+    display: flex;
+  }
+}
+
+/* A table's buttons share its width evenly, the same on every card. */
+.table-tile > .board-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: auto;
+}
+
+.table-tile > .board-actions > .table-in-use {
+  grid-column: 1 / -1;
+}
+
+/* A time period's from and to fit a phone's width. */
+.res-period input {
+  min-width: 0;
+  padding-inline: 8px;
+}
+
+/* A filter bar's buttons: a row of their own under the fields, even widths. */
+.filter-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 700px) {
+  .filter-actions {
+    display: flex;
+  }
+}
+
+@media (max-width: 599px) {
+  .report-dates > button {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Inside a page (not across the top of the console) a banner is a card. */
+.settings-page > .admin-banner {
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.res-views,
+.res-day-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.res-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.res-day-nav .ghost-action[aria-label] {
+  min-width: 40px;
+  padding-inline: 0;
+  font-size: 18px;
+}
+
+/* A switch in a form reads like any other line of text, not a field label. */
+.editor-form .settings-switch > span {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+#tablesPanel {
+  padding: 16px clamp(12px, 3vw, 32px) 40px;
+}
+
+.editor-form .settings-switch {
+  min-height: 32px;
+}
+
+.editor-form > .ghost-action {
+  justify-self: start;
 }

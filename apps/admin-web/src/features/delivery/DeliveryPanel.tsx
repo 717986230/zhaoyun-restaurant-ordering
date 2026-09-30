@@ -97,7 +97,7 @@ export function DeliveryPanel({ api, role, settings, notify, failed, onSaveSetti
     <div className="list-head">
       <div>
         <h1>{t("dlTitle")}</h1>
-        <p>{t("dlLead")}</p>
+        
       </div>
     </div>
 
@@ -117,9 +117,11 @@ export function DeliveryPanel({ api, role, settings, notify, failed, onSaveSetti
           <option value="">{t("dlAllStatuses")}</option>
           {STATUSES.map((status) => <option key={status} value={status}>{t(statusKey(status))}</option>)}
         </select></label>
-        <button type="submit" className="ghost-action">{t("resShow")}</button>
-        <button type="button" className="ghost-action" onClick={() => setFilter({ ...filter, from: shift(today, -6), to: today })}>{t("reportWeek")}</button>
-        <button type="button" className="ghost-action" disabled={!orders.length} onClick={exportCsv}>⬇ {t("resExport")}</button>
+        <div className="filter-actions">
+          <button type="submit" className="ghost-action">{t("resShow")}</button>
+          <button type="button" className="ghost-action" onClick={() => setFilter({ ...filter, from: shift(today, -6), to: today })}>{t("reportWeek")}</button>
+          <button type="button" className="ghost-action" disabled={!orders.length} onClick={exportCsv}>⬇ {t("resExport")}</button>
+        </div>
       </form>
       <ul className="dl-totals" id="dlTotals">{(list?.totals ?? []).map((entry) => <li key={entry.provider} data-provider={entry.provider}>
         {t("dlTotals", { name: entry.name, orders: entry.orders, money: money(entry.grossCents), rejected: entry.rejected, cancelled: entry.cancelled })}
@@ -203,6 +205,7 @@ function DeliverySettings({ api, value, notify, failed, onSave, onTest }: {
 
   return <details className="settings-card settings-section dl-settings" open={!PROVIDERS.some((provider) => value[provider].enabled)}>
     <summary><h2>{t("dlSettings")}</h2></summary>
+    <div className="settings-body editor-form">
     {PROVIDERS.map((provider) => {
       const platform = platforms.find((entry) => entry.id === provider);
       const name = platform?.name ?? (provider === "lieferando" ? "Lieferando" : "foodora");
@@ -229,5 +232,6 @@ function DeliverySettings({ api, value, notify, failed, onSave, onTest }: {
       </fieldset>;
     })}
     <button type="button" className="primary-action" id="dlSave" disabled={!valid} onClick={() => void onSave(draft)}>{t("dlSave")}</button>
+    </div>
   </details>;
 }

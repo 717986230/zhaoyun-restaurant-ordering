@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { expect, test } from "./support/test.js";
+import { openSettingsCards } from "./support/admin.js";
 import { isolateLive } from "./support/live.js";
 
 const require = createRequire(import.meta.url);
@@ -29,6 +30,7 @@ test.beforeEach(async ({ page }) => {
   // restaurant turns on once guests can order; these tests run with it on.
   appSettings = { restaurantName: "赵云", menuTitle: "La Carte", menuDefaultScheme: "dark", showTableNumber: true, showOrdering: true, featuredEnabled: false, featuredTitle: "", featuredProductIds: [] };
   await page.addInitScript(() => sessionStorage.setItem("zy_admin_token", "test-admin"));
+  await openSettingsCards(page);
   await page.route("**/api/health", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
   await page.route("**/api/admin/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ role: "manager" }) }));
   await page.route("**/api/admin/settings", async (route) => {
@@ -698,18 +700,23 @@ test("the promotions and set menus pages are given hours in settings, and have t
   await expect.poll(() => saves.at(-1)?.featuredSchedule).toEqual({ days: [1, 2, 3, 4, 5], from: "11:00", to: "14:30" });
 });
 
-test("a settings card folds to its title and what is set in it, and stays folded", async ({ page }) => {
+test("a settings card opens folded to its title and what is set in it, and stays as it was left", async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem("zy_admin_opened", "[]"));
+  await page.reload();
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
   const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "餐厅", exact: true }) });
+  await expect(card.getByLabel("餐厅名称")).toBeHidden();
+  await expect(card.locator(".settings-summary")).toHaveText("赵云 · La Carte");
+  await card.locator("summary").click();
+  await expect(card.getByLabel("餐厅名称")).toBeVisible();
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
   await expect(card.getByLabel("餐厅名称")).toBeVisible();
   await card.locator("summary").click();
   await expect(card.getByLabel("餐厅名称")).toBeHidden();
-  await expect(card.locator(".settings-summary")).toHaveText("赵云 · La Carte");
   await page.reload();
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
   await expect(card.getByLabel("餐厅名称")).toBeHidden();
-  await card.locator("summary").click();
-  await expect(card.getByLabel("餐厅名称")).toBeVisible();
 });
 
 test("on a computer, a long set's editor keeps its save button on screen", async ({ page }) => {
@@ -844,7 +851,6 @@ test("VAT is kept per dish and per category: counts, a mixed category marked, a 
   // The rate is on the dish form itself, not folded away.
   await page.locator(".product-row", { hasText: "s1" }).click();
   await expect(page.locator('select[name="vatPercent"]')).toBeVisible();
-  await expect(page.getByText("套餐的税率按里面各道菜的价格比例自动拆分")).toBeVisible();
 });
 
 test("the console and the POS each install as their own app, opening straight to themselves, not through the menu", async ({ page, request }) => {
@@ -997,7 +1003,7 @@ test("a station with dishes and no printer is called out, and the setup steps sh
   await page.route("**/api/admin/printers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ printers: [], bridges: [], queue: { waiting: 0, failed: 0 }, discovered: [] }) }));
   await page.reload();
   await page.locator(".admin-tabs button", { hasText: "打印" }).click();
-  await expect(page.locator(".print-warning")).toHaveText("⚠ 厨房有 1 道菜，但还没有能用的网口打印机，这些菜的制作单打不出来。");
+  await expect(page.locator(".print-warning")).toHaveText("⚠ 厨房（1 道菜）还没有能用的打印机，制作单打不出来。");
   await expect(page.locator(".print-bridge")).toContainText("还没有连接打印桥");
   await expect(page.locator(".bridge-steps > li")).toHaveCount(4);
 });
@@ -1078,7 +1084,7 @@ test("the manager adds, renumbers and removes tables, and a table open on a POS 
   const two = page.locator(".table-tile[data-table='2']");
   await expect(two).toHaveClass(/claimed/);
   await expect(two.locator(".table-open-on")).toHaveText("🔒 小孙 正在 POS 上操作");
-  await expect(two.getByRole("button", { name: "开台（允许扫码点餐）" })).toBeDisabled();
+  await expect(two.getByRole("button", { name: "开台扫码" })).toBeDisabled();
 
   // The defaults are set up once, then edited.
   await page.getByRole("button", { name: "编辑桌台" }).click();
