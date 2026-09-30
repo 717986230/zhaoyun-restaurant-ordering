@@ -561,9 +561,9 @@ export function SettingsPanel(props: Props) {
         </form>
         {/* The menu's own code, with no table in it: for the door, a flyer, social media. */}
         <div className="qr-actions">
-          <button className="primary-action" type="button" onClick={() => void downloadQrCard({ url: menuUrl(props.storage.baseUrl), restaurantName: settings?.restaurantName ?? "", menuLanguages: offered })}>⬇ {t("downloadMenuQr")}</button>
-          {props.tables.length === 0 && <button className="primary-action" type="button" onClick={() => void registerNumbered()}>{t("numberedTables", { count: floorCount })}</button>}
-          {props.tables.length > 0 && <button className="ghost-action settings-cards-button" onClick={() => { setCardTables(null); setShowCards(true); }}>{t("printCards")}</button>}
+          <button className="ghost-action" type="button" onClick={() => void downloadQrCard({ url: menuUrl(props.storage.baseUrl), restaurantName: settings?.restaurantName ?? "", menuLanguages: offered })}>⬇ {t("downloadMenuQr")}</button>
+          {props.tables.length === 0 && <button className="ghost-action" type="button" onClick={() => void registerNumbered()}>{t("numberedTables", { count: floorCount })}</button>}
+          {props.tables.length > 0 && <button className="ghost-action" onClick={() => { setCardTables(null); setShowCards(true); }}>{t("printCards")}</button>}
         </div>
         {showCards && <TableCards
           tables={cardTables ?? props.tables}

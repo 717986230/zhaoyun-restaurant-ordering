@@ -224,7 +224,7 @@ export function CatalogPanel(props: Props) {
           {!product && <option value="">{t("vatByKind")}</option>}
           {[["10", t("vatFood")], ["13", "13%"], ["20", t("vatDrink")]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <label><span>{t("fieldCategory")}</span><input name="category" required defaultValue={product?.category ?? ""} placeholder="RAMEN / BAO / WINE" /></label>
+        <label><span>{t("fieldCategory")}</span><input name="category" required defaultValue={product?.category ?? ""} placeholder="RAMEN" /></label>
       </div>
       
       <label><span>{t("fieldDescription")}</span><textarea name="description" rows={3} defaultValue={product?.description ?? ""} /></label>
