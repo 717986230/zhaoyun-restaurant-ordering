@@ -452,6 +452,11 @@ export const TableBody = Type.Object({
 const Email = Type.String({ minLength: 3, maxLength: 254 });
 export const CustomerRegisterBody = Type.Object({ email: Email, name: Type.Optional(Type.String({ maxLength: 40 })), password: Password }, { additionalProperties: false });
 export const CustomerSignInBody = Type.Object({ email: Type.String({ maxLength: 254 }), password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
+// A code to the guest's email, and the code back (shared/email-verify.mjs).
+export const EmailCodeBody = Type.Object({ language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
+export const EmailVerifyBody = Type.Object({ code: Type.String({ minLength: 1, maxLength: 12 }) }, { additionalProperties: false });
+// The console's test email to the owner's own address.
+export const MailTestBody = Type.Object({ to: Type.String({ minLength: 3, maxLength: 254 }), language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
 // Every change is made against the password in force.
 export const CustomerUpdateBody = Type.Object({
   currentPassword: Type.String({ maxLength: 200 }),

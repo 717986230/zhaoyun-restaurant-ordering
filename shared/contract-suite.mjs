@@ -21,6 +21,23 @@ export const DELIVERY_TEST_SECRETS = {
 
 const EVERY_DAY = [1, 2, 3, 4, 5, 6, 7];
 const addDaysTo = (date, days) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * A guest proves their email before booking (shared/email-verify.mjs): a
+ * code asked for, read from the outbox the tests run with (MAIL_OUTBOX), and
+ * typed back. Returns the six digits.
+ */
+async function verifyEmail(call, assert, customerToken) {
+  const { customer } = (await call("GET", "/api/customer", { customerToken })).json;
+  const asked = await call("POST", "/api/customer/email-code", { customerToken, body: { language: "de" } });
+  assert.equal(asked.status, 201, JSON.stringify(asked.json));
+  const message = (await call("GET", "/api/admin/mail/outbox?limit=50", { admin: true })).json.messages.find((entry) => entry.to === customer.email);
+  const code = message.text.match(/\b(\d{6})\b/)[1];
+  const verified = await call("POST", "/api/customer/email-verify", { customerToken, body: { code } });
+  assert.equal(verified.status, 200, JSON.stringify(verified.json));
+  assert.equal(verified.json.customer.emailVerified, true);
+  return code;
+}
 const clockTime = (minute) => {
   const wrapped = ((minute % 1440) + 1440) % 1440;
   return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
@@ -1308,7 +1325,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const registered = await call("POST", "/api/customer/register", { body: guest });
       assert.equal(registered.status, 201, JSON.stringify(registered.json));
       assert.ok(registered.json.token);
-      assert.deepEqual({ ...registered.json.customer, id: "", createdAt: "" }, { id: "", email: "mei.lin@example.com", name: "Mei", points: 0, createdAt: "" });
+      assert.deepEqual({ ...registered.json.customer, id: "", createdAt: "" }, { id: "", email: "mei.lin@example.com", name: "Mei", points: 0, createdAt: "", emailVerified: false });
       const again = await call("POST", "/api/customer/register", { body: { ...guest, email: "mei.lin@example.com" } });
       assert.equal(again.status, 409);
       assert.equal(again.json.code, "EMAIL_TAKEN");
@@ -1806,6 +1823,30 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(signedOut.json.code, "SIGN_IN_REQUIRED");
       guestToken = (await call("POST", "/api/customer/register", { body: { email: `anna-${Date.now().toString(36)}@example.com`, password: "secret123", name: "Anna" } })).json.token;
       assert.ok(guestToken, "a guest signs up to book");
+
+      // …and proves the email is theirs: a code to it, typed back.
+      assert.equal(booking.emailVerification, true, "the page asks for the code where mail goes out");
+      assert.equal((await call("GET", "/api/customer", { customerToken: guestToken })).json.customer.emailVerified, false);
+      const unverified = await book({ date: addDaysTo(booking.today, 7), time: "18:00", party: 2, ...guest });
+      assert.deepEqual([unverified.status, unverified.json.code], [403, "EMAIL_UNVERIFIED"]);
+      assert.equal((await call("POST", "/api/customer/email-verify", { customerToken: guestToken, body: { code: "123456" } })).json.code, "CODE_EXPIRED", "nothing sent yet");
+      const sent = await call("POST", "/api/customer/email-code", { customerToken: guestToken, body: { language: "zh" } });
+      assert.equal(sent.status, 201);
+      assert.match(sent.json.sentTo, /^a•+@example\.com$/, "where it went, not the whole address");
+      const tooSoon = await call("POST", "/api/customer/email-code", { customerToken: guestToken, body: {} });
+      assert.deepEqual([tooSoon.status, tooSoon.json.code], [429, "CODE_TOO_SOON"], "once a minute");
+      const mailed = (await call("GET", "/api/admin/mail/outbox", { admin: true })).json.messages[0];
+      assert.match(mailed.subject, /验证码/, "in the guest's language");
+      const code = mailed.text.match(/\b(\d{6})\b/)[1];
+      const wrong = await call("POST", "/api/customer/email-verify", { customerToken: guestToken, body: { code: code === "000000" ? "000001" : "000000" } });
+      assert.deepEqual([wrong.status, wrong.json.code, wrong.json.attemptsLeft], [400, "WRONG_CODE", 4]);
+      assert.equal((await call("POST", "/api/customer/email-verify", { customerToken: guestToken, body: { code: ` ${code} ` } })).json.customer.emailVerified, true);
+      assert.equal((await call("GET", "/api/customer", { customerToken: guestToken })).json.customer.emailVerified, true);
+      assert.equal((await call("POST", "/api/customer/email-code", { customerToken: guestToken, body: {} })).json.code, "ALREADY_VERIFIED");
+      assert.equal((await call("GET", "/api/admin/mail/outbox", { role: "staff" })).status, 403, "the outbox is the manager's");
+      assert.deepEqual((await call("GET", "/api/admin/mail", { admin: true })).json, { configured: true, provider: "outbox", sender: null });
+      assert.equal((await call("POST", "/api/admin/mail/test", { admin: true, body: { to: "owner@example.com" } })).json.sent, true);
+      assert.equal((await call("GET", "/api/admin/mail/outbox", { admin: true })).json.messages[0].to, "owner@example.com", "the owner's test email");
       assert.equal(booking.capacity, undefined, "how many seats there are is the restaurant's business");
       const addDays = (date, days) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
       const day = addDays(booking.today, 7);
@@ -1847,7 +1888,9 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await refused({ time: "21:00" }, 409, "SLOT_UNAVAILABLE");
       assert.equal((await refused({ date: addDays(booking.today, -1) }, 409, "SLOT_UNAVAILABLE")).reason, "PAST");
       assert.equal((await refused({ date: addDays(booking.today, 31) }, 409, "SLOT_UNAVAILABLE")).reason, "TOO_FAR");
-      await refused({ phone: "call me" }, 400);
+      await refused({ phone: "call me" }, 400, "BAD_PHONE");
+      await refused({ phone: "+43 1 5877777" }, 400, "NOT_MOBILE");
+      await refused({ phone: "0660 12" }, 400, "BAD_PHONE");
       await refused({ email: "not-an-email" }, 400);
       await refused({ date: "2030-02-30" }, 400);
       assert.equal((await book({ date: day, time: "13:00", party: 2, name: "X" })).status, 400, "a guest leaves a number to call");
@@ -1929,6 +1972,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("GET", `/api/reservations/availability?date=${day}&party=2`)).json.tables, undefined, "tables only for a time");
 
       const customerToken = (await call("POST", "/api/customer/register", { body: { email: `dora-${Date.now().toString(36)}@example.com`, password: "secret123" } })).json.token;
+      await verifyEmail(call, assert, customerToken);
       const book = (body) => call("POST", "/api/reservations", { customerToken, body: { date: day, time: "19:00", party: 3, name: "Dora", phone: "0660 4444444", ...body } });
       assert.equal((await book({})).json.code, "TABLE_REQUIRED", "the guest picks one");
       assert.equal((await book({ table: "S1" })).json.code, "TABLE_TOO_SMALL");
@@ -1957,7 +2001,11 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const { booking } = (await call("GET", "/api/reservations/availability")).json;
       assert.deepEqual([booking.maxActivePerGuest, booking.maxPerDayPerGuest], [2, 1]);
       const stamp = Date.now().toString(36);
-      const signUp = async (name) => (await call("POST", "/api/customer/register", { body: { email: `${name}-${stamp}@example.com`, password: "secret123", name } })).json.token;
+      const signUp = async (name) => {
+        const token = (await call("POST", "/api/customer/register", { body: { email: `${name}-${stamp}@example.com`, password: "secret123", name } })).json.token;
+        await verifyEmail(call, assert, token);
+        return token;
+      };
       const eva = await signUp("eva");
       const day = (offset) => addDaysTo(booking.today, offset);
       const book = (customerToken, date, body = {}) => call("POST", "/api/reservations", { customerToken, body: { date, time: "18:00", party: 2, name: "Eva", ...body } });

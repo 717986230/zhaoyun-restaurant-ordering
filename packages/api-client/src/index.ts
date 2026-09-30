@@ -1,4 +1,4 @@
-import type {
+import type { ApiMailStatus,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
@@ -320,6 +320,9 @@ export class AdminApi {
 
   mediaUrl(path: string): string { return `${this.storage.baseUrl}${path}`; }
   health(): Promise<{ ok: boolean }> { return this.#request("/api/health"); }
+  /** Whether the guests' email codes go out, and a test email to the owner (shared/mail.mjs). */
+  mailStatus(): Promise<ApiMailStatus> { return this.#request("/api/admin/mail"); }
+  sendTestMail(to: string, language?: string): Promise<{ sent: boolean }> { return this.#request("/api/admin/mail/test", { method: "POST", body: JSON.stringify({ to, ...(language ? { language } : {}) }) }); }
   products(): Promise<{ products: ApiCatalogProduct[] }> { return this.#request("/api/admin/products"); }
   createProduct(product: AdminProductInput): Promise<{ product: ApiCatalogProduct }> { return this.#request("/api/admin/products", { method: "POST", body: JSON.stringify(product) }); }
   updateProduct(id: string, product: AdminProductInput): Promise<{ product: ApiCatalogProduct }> { return this.#request(`/api/admin/products/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(product) }); }
@@ -645,6 +648,9 @@ export class RestaurantApi {
   }
   /** The signed-in guest's own bookings. */
   myReservations(): Promise<{ reservations: ApiGuestReservation[] }> { return this.#request("/api/customer/reservations"); }
+  /** A code to the signed-in guest's email; they type it back to book (shared/email-verify.mjs). */
+  requestEmailCode(language?: string): Promise<{ sentTo: string; retryAfter: number }> { return this.#request("/api/customer/email-code", { method: "POST", body: JSON.stringify(language ? { language } : {}) }); }
+  verifyEmail(code: string): Promise<{ customer: ApiCustomer }> { return this.#request("/api/customer/email-verify", { method: "POST", body: JSON.stringify({ code }) }); }
   cancelReservation(id: string, token: string): Promise<{ reservation: ApiGuestReservation }> {
     return this.#request(`/api/reservations/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: { "x-reservation-token": token } });
   }

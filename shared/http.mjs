@@ -15,12 +15,14 @@
  */
 import { Value } from "@sinclair/typebox/value";
 import {
-  CategoryRenameBody, CategoryVatBody, CheckoutBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
+  CategoryRenameBody, CategoryVatBody, CheckoutBody, EmailCodeBody, EmailVerifyBody, MailTestBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
+import { brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
@@ -77,7 +79,10 @@ function coded(error) {
     error: error.message || "Request failed",
     ...(error.code ? { code: error.code } : {}),
     // A dish sold out for today (shared/stock.mjs): which, and how many are left.
-    ...(error.code === "SOLD_OUT" ? { sku: error.sku, left: error.left } : {})
+    ...(error.code === "SOLD_OUT" ? { sku: error.sku, left: error.left } : {}),
+    // An email code (shared/email-verify.mjs): how long to wait, how many tries are left.
+    ...(error.retryAfter ? { retryAfter: error.retryAfter } : {}),
+    ...(error.attemptsLeft !== undefined ? { attemptsLeft: error.attemptsLeft } : {})
   }, status, error.retryAfter ? { "retry-after": String(error.retryAfter) } : {});
 }
 
@@ -161,7 +166,9 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     // Table bookings from one address (a restaurant's or a hotel's Wi-Fi is many
     // guests): a burst, not a script filling the evening. The guest's account
     // and its limits (shared/reservations.mjs, guestLimit) do the rest.
-    reservationLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 60 })
+    reservationLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 60 }),
+    // Email codes from one address: each account has its own limits too (shared/email-verify.mjs).
+    mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 })
   };
 }
 
@@ -179,7 +186,7 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
  * `handle(request, { ip })` answers with a Response, or null for anything that
  * is not the API's — the web app, a picture the database does not have.
  */
-export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients, version = null, delivery = {}, fetch: send = (...args) => fetch(...args) }) {
+export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients, version = null, delivery = {}, mail = null, fetch: send = (...args) => fetch(...args) }) {
   const options = { realtimeClients, version };
   // foodora's bearer token, kept between calls until it runs out (per isolate on a Worker).
   const platformTokens = new Map();
@@ -275,6 +282,27 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
   }
 
   /** A burst from one device to a public route: a 429 with how long to wait, or nothing. */
+  /**
+   * One email (shared/mail.mjs): through Brevo, or into the outbox for the
+   * tests. False when it could not go; why is in the log, never the key.
+   */
+  async function sendMail(message) {
+    if (!mail) return false;
+    if (mail.provider === "outbox") {
+      await store.customers.recordOutbox(message);
+      return true;
+    }
+    const { url: address, init } = brevoRequest(mail, message, (await store.getSettings()).restaurantName);
+    try {
+      const response = await send(address, init);
+      if (response.ok) return true;
+      console.error(JSON.stringify({ level: "error", msg: "mail not sent", status: response.status, detail: (await response.text()).slice(0, 300) }));
+    } catch (error) {
+      console.error(JSON.stringify({ level: "error", msg: "mail not sent", error: String(error?.message ?? error) }));
+    }
+    return false;
+  }
+
   function throttlePublic(limiter, ctx, message) {
     const { allowed, retryAfter } = limiter.check(ctx.ip || "unknown");
     return allowed ? null : json({ error: message, retryAfter }, 429, { "retry-after": String(retryAfter) });
@@ -507,6 +535,24 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
         if (rest === "reservations" && method === "GET") return json({ reservations: await store.reservations.forCustomer(customer.id) }, 200, { "cache-control": "no-store" });
+        // Proving the account's email before booking: a code to it, and the code back.
+        if (rest === "email-code" && method === "POST") {
+          if (!mail) return json({ error: "Email verification is not set up", code: "VERIFICATION_OFF" }, 409);
+          const limited = throttlePublic(state.mailLimiter, ctx, "Too many codes from this device");
+          if (limited) return limited;
+          const { value, invalid } = await body(request, EmailCodeBody);
+          if (invalid) return invalid;
+          const issued = await customers.issueEmailCode(customer.id);
+          const settings = await store.getSettings();
+          const message = { to: issued.email, ...codeMessage(issued.code, { language: value.language, restaurant: settings.restaurantName, minutes: EMAIL_CODE_TTL_MS / 60_000 }) };
+          if (!(await sendMail(message))) return json({ error: "The email could not be sent — please try again", code: "MAIL_FAILED" }, 502);
+          return json({ sentTo: maskEmail(issued.email), retryAfter: EMAIL_CODE_RESEND_MS / 1000 }, 201);
+        }
+        if (rest === "email-verify" && method === "POST") {
+          const { value, invalid } = await body(request, EmailVerifyBody);
+          if (invalid) return invalid;
+          return json({ customer: await customers.verifyEmailCode(customer.id, value.code) });
+        }
       } catch (error) {
         return coded(error);
       }
@@ -576,7 +622,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       try {
         if (path.length === 3 && path[2] === "availability" && method === "GET") {
           const date = url.searchParams.get("date");
-          if (!date) return json({ booking: await reservations.booking() });
+          // Whether a guest proves their email first: only where there is mail to send the code with.
+          if (!date) return json({ booking: { ...(await reservations.booking()), emailVerification: Boolean(mail) } });
           return json(await reservations.availability(date, url.searchParams.get("party") ?? undefined, url.searchParams.get("time")));
         }
         if (path.length === 2 && method === "POST") {
@@ -586,6 +633,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           if (invalid) return invalid;
           // From the guest's own account: signed in, or no booking.
           const customer = await store.customers.session(request.headers.get("x-customer-token"));
+          if (mail && customer && !customer.emailVerified) return json({ error: "Please verify your email address first", code: "EMAIL_UNVERIFIED" }, 403);
           return json(await reservations.create(value, { customer }), 201);
         }
         const token = request.headers.get("x-reservation-token");
@@ -1058,6 +1106,31 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
        * each time. Which platforms are connected, and a made-up order to try
        * the whole path with, are the manager's.
        */
+      /**
+       * Mail (shared/mail.mjs): whether it goes out and from whom, and a test
+       * message to the owner's own address. The outbox is the tests' inbox.
+       */
+      if (path[2] === "mail") {
+        const { denied } = await gate("manager");
+        if (denied) return denied;
+        if (path.length === 3 && method === "GET") return json(mailStatus(mail));
+        if (path.length === 4 && path[3] === "test" && method === "POST") {
+          const { value, invalid } = await body(request, MailTestBody);
+          if (invalid) return invalid;
+          if (!mail) return json({ error: "Mail is not set up", code: "VERIFICATION_OFF" }, 409);
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.to)) return fail("That is not an email address");
+          const settings = await store.getSettings();
+          return (await sendMail({ to: value.to.trim(), ...testMessage({ language: value.language, restaurant: settings.restaurantName }) }))
+            ? json({ sent: true })
+            : json({ error: "The email could not be sent — check the Brevo key, the sender and the authorised IPs", code: "MAIL_FAILED" }, 502);
+        }
+        if (path.length === 4 && path[3] === "outbox" && method === "GET") {
+          if (mail?.provider !== "outbox") return fail("Not found", 404);
+          return json({ messages: await store.customers.outbox(limit) });
+        }
+        return fail("Not found", 404);
+      }
+
       if (path[2] === "delivery") {
         const manager = path[3] === "status" || path[3] === "test";
         // The kitchen screen sees what it cooks and says when it is ready; nothing else.

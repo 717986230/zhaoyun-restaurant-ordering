@@ -567,8 +567,6 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     if (category !== state.category) dispatch({ type: "category", category });
   }
 
-  // Headings only where more than one category is on the page: the whole menu, not a search or one category.
-  const sectioned = !query && !onFavorites && state.category === "ALLE";
   const pageKey = `${state.category}|${query}`;
   // The page the menu opens on comes whole: nothing turns in, so there is no
   // animation to keep light, and a fling straight away must never meet an
@@ -693,9 +691,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
           {onFeatured && featured ? <FeaturedPage title={featured.title || t(state.language, "featuredDefault")} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
-            : visible.length ? visible.slice(0, rowLimit).flatMap((product, index, shown) => [
-              // The whole menu reads as the printed one does: each category under its own heading.
-              ...(sectioned && (index === 0 || shown[index - 1]!.category !== product.category) ? [<h2 key={`section-${index}-${product.category}`} className="list-section">{pageName(product.category)}</h2>] : []),
+            : visible.length ? visible.slice(0, rowLimit).map((product, index) =>
               <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
             <div className="summary">
               <DishPicture product={product} byId={byId} size="thumb" />
@@ -718,7 +714,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
                   dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
                 }}>+</button>}
             </div>
-          </article>]) : query && products.length
+          </article>) : query && products.length
             // A search that found nothing says what was looked for and offers the way back.
             ? <div className="empty search-empty">
               <strong>{t(state.language, "noResults").replace("{query}", () => state.query.trim())}</strong>

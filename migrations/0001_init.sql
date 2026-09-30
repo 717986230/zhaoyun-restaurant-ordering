@@ -394,6 +394,28 @@ CREATE TABLE product_stock (
       stock_left INTEGER,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE email_codes (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE customer_verified_emails (
+      customer_id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      verified_at TEXT NOT NULL
+    );
+CREATE TABLE mail_outbox (
+      id TEXT PRIMARY KEY,
+      to_email TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
 CREATE TABLE drawer_sessions (
       id TEXT PRIMARY KEY,
       open_flag INTEGER UNIQUE,
@@ -429,6 +451,7 @@ CREATE TABLE discovered_printers (
     );
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
+CREATE INDEX idx_email_codes_customer ON email_codes(customer_id, created_at);
 CREATE INDEX idx_drawer_sessions_closed ON drawer_sessions(closed_at);
 CREATE INDEX idx_drawer_movements_session ON drawer_movements(session_id);
 CREATE INDEX idx_products_catalog ON products(published, available, sort_order);

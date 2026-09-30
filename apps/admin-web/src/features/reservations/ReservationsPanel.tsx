@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { AdminApi, ReservationList, StaffRole } from "@zhaoyun/api-client";
-import type { ApiReservation, ApiReservationSettings, ApiSettings, ReservationStatus, ReservationUpdateCommand } from "@zhaoyun/contracts";
+import type { ApiMailStatus, ApiReservation, ApiReservationSettings, ApiSettings, ReservationStatus, ReservationUpdateCommand } from "@zhaoyun/contracts";
 import { useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 
@@ -188,6 +188,8 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
     </details>
     </>}
 
+    {role === "manager" && <MailCard api={api} notify={notify} failed={failed} />}
+
     {role === "manager" && rules && <ReservationRules rules={rules} onSave={(reservations) => onSaveSettings({ reservations }, "resSettingsSaved")} notify={notify}
       onImportTables={async () => {
         try {
@@ -304,6 +306,42 @@ function ReservationRecords({ api, timeZone, failed, liveTick }: { api: AdminApi
 }
 
 /** The manager's rules for the booking page. Nothing is saved until "save". */
+/**
+ * The guests' email codes (shared/mail.mjs): on once Brevo is set up, and a
+ * test email the owner sends themselves to see it arrive.
+ */
+function MailCard({ api, notify, failed }: { api: AdminApi; notify: Props["notify"]; failed: Props["failed"] }) {
+  const { t, language } = useI18n();
+  const [status, setStatus] = useState<ApiMailStatus | null>(null);
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api.mailStatus().then(setStatus).catch(() => setStatus(null)); }, [api]);
+  if (!status) return null;
+  async function sendTest(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await api.sendTestMail(to.trim(), language);
+      notify(t("mailTestSent"));
+    } catch (error) {
+      failed(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <section className="settings-card settings-section" id="mailCard">
+    <h2>{t("mailTitle")}</h2>
+    <p className={status.configured ? "muted" : "settings-warning"} id="mailStatus">
+      {!status.configured ? t("mailOff") : status.provider === "outbox" ? t("mailOutbox") : t("mailOn", { sender: status.sender ?? "" })}
+    </p>
+    <p className="muted">{t("mailPhoneNote")}</p>
+    {status.configured ? <form className="field-grid two" onSubmit={(event) => void sendTest(event)}>
+      <label><span>{t("mailTestTo")}</span><input type="email" required maxLength={254} value={to} onChange={(event) => setTo(event.target.value)} /></label>
+      <button type="submit" className="ghost-action" disabled={busy || !to.trim()}>{t("mailTestSend")}</button>
+    </form> : null}
+  </section>;
+}
+
 function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: ApiReservationSettings; onSave: (rules: ApiReservationSettings) => Promise<void>; notify: Props["notify"]; onImportTables: () => Promise<string[]> }) {
   const { t, language } = useI18n();
   const [draft, setDraft] = useState<ApiReservationSettings>(rules);

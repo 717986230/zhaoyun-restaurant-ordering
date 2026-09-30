@@ -46,7 +46,8 @@ export type GuestOrderRefusal =
   | "SIGN_IN_REQUIRED" | "TOO_MANY_PICKUPS" | "NOT_ENOUGH_POINTS" | "PAYMENT_UNAVAILABLE" | "BAD_CHANNEL" | "SOLD_OUT";
 
 /** A guest's own account (shared/customer.mjs). */
-export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string }
+/** `emailVerified`: the address, as it is now, was proved by a code (shared/email-verify.mjs). */
+export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean }
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer }
 export interface CustomerRegisterCommand { email: string; name?: string; password: string }
 /** Every change is made against the password in force. */
@@ -545,6 +546,8 @@ export type ApiGuestReservation = Omit<ApiReservation, "source" | "customerId" |
 /** What the booking page reads before a guest picks anything. */
 export interface ApiBookingInfo {
   enabled: boolean;
+  /** Whether a guest proves their email by a code before booking: only where mail goes out. */
+  emailVerification?: boolean;
   restaurantName: string;
   timeZone: string;
   maxParty: number;
@@ -660,3 +663,6 @@ export interface RealtimeEnvelope {
   table?: string;
   at: string;
 }
+
+/** Mail (shared/mail.mjs): whether it goes out, how, and from whom. */
+export interface ApiMailStatus { configured: boolean; provider: "brevo" | "outbox" | null; sender: string | null }
