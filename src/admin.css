@@ -4283,3 +4283,16 @@ em.voided {
 .editor-form > .ghost-action {
   justify-self: start;
 }
+
+/* Inside a card an empty list is a line, not a page. */
+.settings-body .admin-empty,
+.settings-card .admin-empty {
+  padding: 8px 0;
+  text-align: left;
+}
+
+/* The menu's code and the numbered tables: side by side, equal widths. */
+.qr-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
