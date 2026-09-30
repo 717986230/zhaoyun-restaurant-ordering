@@ -65,7 +65,7 @@ export function TableCards({ tables, restaurantName, menuLanguages, entryUrl, on
     <div className="table-cards-bar">
       <div>
         <b>{t("cardsTitle")}</b>
-        <small>{t("cardsLead")}</small>
+        
       </div>
       <div className="table-cards-actions">
         <button className="primary-action" onClick={() => window.print()}>{t("print")}</button>

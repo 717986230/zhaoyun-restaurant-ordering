@@ -1,4 +1,5 @@
 import { expect, test } from "./support/test.js";
+import { openSettingsCards } from "./support/admin.js";
 import { isolateLive } from "./support/live.js";
 
 /**
@@ -19,6 +20,7 @@ test.beforeEach(({ page }) => isolateLive(page));
 /** The console loads its catalogue, printers and settings the moment it is
  *  through the door; these keep that from erroring past the assertion. */
 async function stubConsole(page) {
+  await openSettingsCards(page);
   await page.route("**/api/health", (route) => route.fulfill({ ...OK, body: JSON.stringify({ ok: true }) }));
   await page.route("**/api/admin/session", (route) => route.fulfill({ ...OK, body: JSON.stringify({ role: "manager", account: ACCOUNT }) }));
   await page.route("**/api/admin/products", (route) => route.fulfill({ ...OK, body: JSON.stringify({ products: [] }) }));

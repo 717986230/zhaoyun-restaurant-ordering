@@ -58,7 +58,7 @@ export function BoardPanel(props: Props) {
   const openRequests = props.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled");
 
   return <section id="boardPanel" className="admin-panel active">
-    <div className="list-head"><div><h1>{t("boardTitle")}</h1><p>{t("boardLead")}</p></div><button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>{t("refresh")}</button></div>
+    <div className="list-head"><div><h1>{t("boardTitle")}</h1></div><button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>{t("refresh")}</button></div>
 
     <div className="board-layout">
       <section className="board-column">

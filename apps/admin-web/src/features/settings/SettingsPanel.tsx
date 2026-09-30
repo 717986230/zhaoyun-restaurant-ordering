@@ -75,12 +75,12 @@ function entryUrl(baseUrl: string, table: RestaurantTable): string {
   return `${menuUrl(baseUrl)}?table=${encodeURIComponent(table.table)}&k=${encodeURIComponent(table.token)}`;
 }
 
-/** Which settings cards the owner has folded, remembered on this device. */
-const FOLDS_KEY = "zy_admin_folded";
+/** Which settings cards the owner has opened, remembered on this device. */
+const OPENED_KEY = "zy_admin_opened";
 
-function readFolded(): string[] {
+function readOpened(): string[] {
   try {
-    const stored = JSON.parse(localStorage.getItem(FOLDS_KEY) ?? "[]");
+    const stored = JSON.parse(localStorage.getItem(OPENED_KEY) ?? "[]");
     return Array.isArray(stored) ? stored.filter((id) => typeof id === "string") : [];
   } catch {
     return [];
@@ -88,18 +88,18 @@ function readFolded(): string[] {
 }
 
 /**
- * A settings card that folds away to its title and a one-line summary of
- * what is set in it. Open until the owner folds it; which cards are folded
- * is remembered on this device, so the page opens the way they left it.
+ * A settings card folded to its title and a one-line summary of what is set
+ * in it, so the page is a short list to pick from. Opened, it stays open on
+ * this device until the owner folds it again.
  */
-export function Section({ title, hint, children, id, wide = false, summary }: { title: string; hint?: string; children: ReactNode; id: string; wide?: boolean; summary?: string }) {
-  const [open, setOpen] = useState(() => !readFolded().includes(id));
+export function Section({ title, children, id, wide = false, summary }: { title: string; children: ReactNode; id: string; wide?: boolean; summary?: string }) {
+  const [open, setOpen] = useState(() => readOpened().includes(id));
   function toggle(next: boolean) {
     setOpen(next);
     try {
-      const folded = readFolded().filter((item) => item !== id);
-      localStorage.setItem(FOLDS_KEY, JSON.stringify(next ? folded : [...folded, id]));
-    } catch { /* storage refused: it folds for this visit only */ }
+      const opened = readOpened().filter((item) => item !== id);
+      localStorage.setItem(OPENED_KEY, JSON.stringify(next ? [...opened, id] : opened));
+    } catch { /* storage refused: it stays open for this visit only */ }
   }
   return <details className={`settings-card settings-section ${wide ? "wide" : ""}`} open={open} onToggle={(event) => { if (event.currentTarget.open !== open) toggle(event.currentTarget.open); }}>
     <summary>
@@ -107,7 +107,6 @@ export function Section({ title, hint, children, id, wide = false, summary }: { 
       {summary && <span className="settings-summary">{summary}</span>}
     </summary>
     <div className="settings-body" role="group" aria-labelledby={`${id}-title`}>
-      {hint && <p className="settings-hint">{hint}</p>}
       {children}
     </div>
   </details>;
@@ -243,7 +242,7 @@ function TabNames({ settings, products, onSave, onRename }: { settings: ApiSetti
             onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void rename(tab); } }} />
           <button type="button" className="primary-action" onClick={() => void rename(tab)}>{t(merging ? "doMerge" : "doRename")}</button>
           <button type="button" className="ghost-action" onClick={() => setRenaming(null)}>{t("cancel")}</button>
-          <small>{t("categoryNameHint")}</small>
+          
         </div>}
       </li>;
     })}</ul>
@@ -427,9 +426,9 @@ export function SettingsPanel(props: Props) {
         {/* Keyed on the saved values so the fields show what the server kept
             (trimmed, spaces collapsed) once a save comes back. */}
         <form key={`${settings.restaurantName}|${settings.menuTitle}|${settings.timeZone}`} className="editor-form" onSubmit={saveRestaurant}>
-          <label><span>{t("restaurantName")}</span><input name="restaurantName" required maxLength={40} defaultValue={settings.restaurantName} /><small>{t("restaurantNameHint")}</small></label>
-          <label><span>{t("menuTitle")}</span><input name="menuTitle" required maxLength={24} defaultValue={settings.menuTitle} /><small>{t("menuTitleHint")}</small></label>
-          <label><span>{t("timeZone")}</span><select name="timeZone" defaultValue={settings.timeZone}>{timeZoneOptions(settings.timeZone, language).map(([zone, name]) => <option key={zone} value={zone}>{name}</option>)}</select><small>{t("timeZoneHint")}</small></label>
+          <label><span>{t("restaurantName")}</span><input name="restaurantName" required maxLength={40} defaultValue={settings.restaurantName} /></label>
+          <label><span>{t("menuTitle")}</span><input name="menuTitle" required maxLength={24} defaultValue={settings.menuTitle} /></label>
+          <label><span>{t("timeZone")}</span><select name="timeZone" defaultValue={settings.timeZone}>{timeZoneOptions(settings.timeZone, language).map(([zone, name]) => <option key={zone} value={zone}>{name}</option>)}</select></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>
@@ -440,7 +439,6 @@ export function SettingsPanel(props: Props) {
             on and one to take off again. Each button wears its own pattern. */}
         <p className="settings-label">{t("festiveThemes")}</p>
         <div className="theme-picker festive">{Object.values(MENU_THEMES).filter((theme) => theme.festive).map(themeButton)}</div>
-        <small className="settings-hint">{t("festiveThemesHint")}</small>
         <p className="settings-label">{t("defaultScheme")}</p>
         <div className="scheme-picker" role="group" aria-label={t("defaultScheme")}>{(["dark", "light"] as ColorScheme[]).map((scheme) => <button
           key={scheme}
@@ -449,10 +447,9 @@ export function SettingsPanel(props: Props) {
           aria-pressed={settings.menuDefaultScheme === scheme}
           onClick={() => void props.onSaveSettings({ menuDefaultScheme: scheme }, "appearanceSaved")}
         >{scheme === "dark" ? "☾" : "☀"} {t(scheme === "dark" ? "schemeDark" : "schemeLight")}</button>)}</div>
-        <small className="settings-hint">{t("defaultSchemeHint")}</small>
         <Toggle checked={settings.showTableNumber} label={t("showTableNumber")} onChange={(showTableNumber) => void props.onSaveSettings({ showTableNumber }, "appearanceSaved")} />
       </Section>
-      <Section id="languages" title={t("sectionLanguages")} hint={t("languagesHint")} summary={offered.map((option) => LANGUAGE_INFO[option].name).join(" · ")}>
+      <Section id="languages" title={t("sectionLanguages")} summary={offered.map((option) => LANGUAGE_INFO[option].name).join(" · ")}>
         <div className="language-picker" role="group" aria-label={t("sectionLanguages")}>{MENU_LANGUAGES.map((option) => {
           const on = offered.includes(option);
           // The last one cannot be switched off: a menu has to be in something.
@@ -469,15 +466,15 @@ export function SettingsPanel(props: Props) {
           ><img src={LANGUAGE_INFO[option].flag} alt="" /><span>{LANGUAGE_INFO[option].name}</span></button>;
         })}</div>
       </Section>
-      <Section id="nav" title={t("sectionNav")} hint={t("navHint")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t, language)).join(" · ") : t("navDefault")}>
+      <Section id="nav" title={t("sectionNav")} summary={settings.navPinned.length ? settings.navPinned.map(navLabel(settings, t, language)).join(" · ") : t("navDefault")}>
         <NavOrder settings={settings} products={props.products} onSave={(navPinned) => void props.onSaveSettings({ navPinned }, "navSaved")} />
       </Section>
-      <Section id="tabNames" title={t("sectionTabNames")} hint={t("tabNamesHint")} summary={t("categoryCount", { count: new Set(props.products.map((product) => product.category)).size })}>
+      <Section id="tabNames" title={t("sectionTabNames")} summary={t("categoryCount", { count: new Set(props.products.map((product) => product.category)).size })}>
         <TabNames settings={settings} products={props.products} onSave={(navLabels) => void props.onSaveSettings({ navLabels }, "tabNamesSaved")} onRename={props.onRenameCategory} />
       </Section>
       {/* The biggest card: across the page, what the page is on the left and
           how it looks and what is on it on the right. */}
-      <Section id="featured" title={t("sectionFeatured")} hint={t("featuredHint")} wide summary={settings.featuredEnabled
+      <Section id="featured" title={t("sectionFeatured")} wide summary={settings.featuredEnabled
         ? [t("foldOn"), FEATURED_TEMPLATES.find((template) => template.id === settings.featuredTemplate)?.names[language], t("dishCount", { count: settings.featuredProductIds.length }), settings.featuredSchedule ? describeSchedule(settings.featuredSchedule, t, language) : ""].filter(Boolean).join(" · ")
         : t("foldOff")}>
         <div className="featured-settings">
@@ -514,11 +511,11 @@ export function SettingsPanel(props: Props) {
           </div>
         </div>
       </Section>
-      <Section id="sets" title={t("sectionSets")} hint={t("setsHint")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
+      <Section id="sets" title={t("sectionSets")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>
         <ScheduleEditor key={JSON.stringify(settings.setsSchedule)} value={settings.setsSchedule} timeZone={settings.timeZone} onSave={(setsSchedule) => props.onSaveSettings({ setsSchedule }, "setsSaved")} />
       </Section>
-      <Section id="vat" title={t("sectionVat")} hint={t("vatHint")} wide summary={VAT_RATES.map((rate) => `${rate}% × ${props.products.filter((product) => !product.bundleItems?.length && product.vatPercent === rate).length}`).join(" · ")}>
+      <Section id="vat" title={t("sectionVat")} wide summary={VAT_RATES.map((rate) => `${rate}% × ${props.products.filter((product) => !product.bundleItems?.length && product.vatPercent === rate).length}`).join(" · ")}>
         <VatRates products={props.products} onSet={props.onSetCategoryVat} />
       </Section>
     </div>}
@@ -528,33 +525,33 @@ export function SettingsPanel(props: Props) {
       {settings && <>
       {/* Who the receipts say issued them. The console's own fields; the
           server checks the UID's form and the register id's. */}
-      <Section id="company" title={t("sectionCompany")} hint={t("companyHint")} summary={[settings.companyName || settings.restaurantName, settings.companyUid, settings.cashRegisterId].filter(Boolean).join(" · ")}>
+      <Section id="company" title={t("sectionCompany")} summary={[settings.companyName || settings.restaurantName, settings.companyUid, settings.cashRegisterId].filter(Boolean).join(" · ")}>
         <form key={`${settings.companyName}|${settings.companyAddress}|${settings.companyUid}|${settings.cashRegisterId}|${settings.takeawayDiscountPercent}|${settings.floorTables}`} className="editor-form" onSubmit={(event) => {
           event.preventDefault();
           const data = new FormData(event.currentTarget);
           const text = (name: string) => String(data.get(name) || "").trim();
           void props.onSaveSettings({ companyName: text("companyName"), companyAddress: text("companyAddress"), companyUid: text("companyUid").toUpperCase(), cashRegisterId: text("cashRegisterId").toUpperCase(), takeawayDiscountPercent: Number(text("takeawayDiscountPercent")) || 0, ...(data.has("floorTables") ? { floorTables: Math.max(0, Math.min(200, Math.round(Number(text("floorTables")) || 0))) } : {}) }, "companySaved");
         }}>
-          <label><span>{t("companyName")}</span><input name="companyName" maxLength={80} defaultValue={settings.companyName} placeholder={settings.restaurantName} /><small>{t("companyNameHint")}</small></label>
+          <label><span>{t("companyName")}</span><input name="companyName" maxLength={80} defaultValue={settings.companyName} placeholder={settings.restaurantName} /></label>
           <label><span>{t("companyAddress")}</span><input name="companyAddress" maxLength={160} defaultValue={settings.companyAddress} autoComplete="street-address" /></label>
           <div className="field-grid">
-            <label><span>{t("companyUid")}</span><input name="companyUid" maxLength={16} defaultValue={settings.companyUid} placeholder="ATU12345678" pattern="(ATU|atu)[0-9]{8}" /><small>{t("companyUidHint")}</small></label>
+            <label><span>{t("companyUid")}</span><input name="companyUid" maxLength={16} defaultValue={settings.companyUid} placeholder="ATU12345678" pattern="(ATU|atu)[0-9]{8}" /></label>
             <label><span>{t("cashRegisterId")}</span><input name="cashRegisterId" required maxLength={32} defaultValue={settings.cashRegisterId} /></label>
           </div>
           {/* Only while no table is set up: from then on the room is edited under Tables. */}
-          {props.tables.length === 0 && <label><span>{t("floorTables")}</span><input name="floorTables" type="number" min={0} max={200} step={1} inputMode="numeric" defaultValue={settings.floorTables} /><small>{t("floorTablesHint")}</small></label>}
-          <label><span>{t("takeawayDiscount")}</span><input name="takeawayDiscountPercent" type="number" min={0} max={50} step={1} inputMode="numeric" defaultValue={settings.takeawayDiscountPercent} /><small>{t("takeawayDiscountHint")}</small></label>
+          {props.tables.length === 0 && <label><span>{t("floorTables")}</span><input name="floorTables" type="number" min={0} max={200} step={1} inputMode="numeric" defaultValue={settings.floorTables} /></label>}
+          <label><span>{t("takeawayDiscount")}</span><input name="takeawayDiscountPercent" type="number" min={0} max={50} step={1} inputMode="numeric" defaultValue={settings.takeawayDiscountPercent} /></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>
-      <Section id="modules" title={t("sectionModules")} hint={t("modulesHint")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
+      <Section id="modules" title={t("sectionModules")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
         <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
       </Section>
-      <Section id="staff" title={t("sectionStaff")} hint={t("staffHint")}>
+      <Section id="staff" title={t("sectionStaff")}>
         <StaffCard api={props.api} notify={props.notify} failed={props.failed} />
       </Section>
       </>}
-      <Section id="tables" title={t("sectionTables")} hint={t("tablesHint")} summary={t("tableCount", { count: props.tables.length })}>
+      <Section id="tables" title={t("sectionTables")} summary={t("tableCount", { count: props.tables.length })}>
         <form className="editor-form" onSubmit={(event) => void addTable(event)}>
           <div className="field-grid">
             <label><span>{t("tableNumber")}</span><input name="table" required maxLength={8} placeholder="12 / T-3" /></label>
@@ -588,7 +585,7 @@ export function SettingsPanel(props: Props) {
 
     <h2 className="settings-group" id="group-account">{t("groupAccount")}</h2>
     <div className="settings-grid">
-      <Section id="password" title={t("sectionPassword")} hint={t("passwordHint")}>
+      <Section id="password" title={t("sectionPassword")}>
         {props.account ? <form className="editor-form account-form" key={props.account.id + props.account.login + props.account.name} onSubmit={(event) => void saveAccount(event)}>
           <label><span>{t("gateLogin")}</span><input name="login" required minLength={3} maxLength={64} pattern="[a-zA-Z0-9][a-zA-Z0-9._@\-]{2,63}" autoComplete="username" autoCapitalize="none" defaultValue={props.account.login} /></label>
           <label><span>{t("gateName")}</span><input name="accountName" maxLength={40} autoComplete="name" defaultValue={props.account.name} /></label>
@@ -608,10 +605,9 @@ export function SettingsPanel(props: Props) {
       </Section>
     </div>
 
-    <details className="settings-card settings-fold">
-      <summary>{t("sectionAudit")}</summary>
-      <p className="settings-hint">{t("auditHint")}</p>
-      <div className="audit-list">{props.auditEntries.length ? props.auditEntries.map((entry) => <div className={`audit-row ${entry.status >= 400 ? "denied" : ""}`} key={entry.id}>
+    <details className="settings-card settings-section">
+      <summary><h2>{t("sectionAudit")}</h2></summary>
+      <div className="audit-list settings-body">{props.auditEntries.length ? props.auditEntries.map((entry) => <div className={`audit-row ${entry.status >= 400 ? "denied" : ""}`} key={entry.id}>
         <span className="audit-role">{ROLE_KEYS[entry.role] ? t(ROLE_KEYS[entry.role]) : entry.role}</span>
         <span className="audit-what"><b>{entry.method} {entry.route}</b><small>{new Date(entry.at).toLocaleString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")} · {entry.ip} · {entry.status}{detailSummary(entry)}</small></span>
       </div>) : <div className="admin-empty">{t("auditEmpty")}</div>}</div>
@@ -619,10 +615,9 @@ export function SettingsPanel(props: Props) {
 
     {/* Open by itself only when the console could not reach its backend —
         then the address is the thing to fix. */}
-    <details className="settings-card settings-fold" open={!settings}>
-      <summary>{t("sectionConnection")}</summary>
-      <p className="settings-hint">{t("connectionHint")}</p>
-      <form id="connectionForm" className="editor-form" onSubmit={saveConnection}>
+    <details className="settings-card settings-section" open={!settings}>
+      <summary><h2>{t("sectionConnection")}</h2></summary>
+      <form id="connectionForm" className="editor-form settings-body" onSubmit={saveConnection}>
         <label><span>{t("apiAddress")}</span><input name="baseUrl" required defaultValue={props.storage.baseUrl} placeholder="https://…" /></label>
         <label><span>{t("adminToken")}</span><input name="token" type="password" defaultValue={props.storage.token} autoComplete="off" /></label>
         <button className="primary-action" type="submit">{t("saveConnection")}</button>

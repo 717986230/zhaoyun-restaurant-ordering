@@ -107,7 +107,7 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
     <div className="list-head">
       <div>
         <h1>{t("reportsTitle")}</h1>
-        <p>{t("reportsLead")}</p>
+        
       </div>
     </div>
 

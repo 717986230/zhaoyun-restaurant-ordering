@@ -31,13 +31,13 @@ export function GuestsPanel({ api, settings, products, notify, failed, onSaveSet
   return <section id="guestsPanel" className="admin-panel active"><div className="settings-page">
     <h1 className="settings-title">{t("guestsTitle")}</h1>
     <div className="settings-grid">
-      <Section id="guest-ordering" title={t("sectionOrdering")} hint={t("orderingHint")} summary={t(settings.guestOrdering.enabled ? "orderingOn" : "orderingOff")} wide>
+      <Section id="guest-ordering" title={t("sectionOrdering")} summary={t(settings.guestOrdering.enabled ? "orderingOn" : "orderingOff")} wide>
         <OrderingForm key={JSON.stringify(settings.guestOrdering)} ordering={settings.guestOrdering} timeZone={settings.timeZone} onSave={(guestOrdering) => onSaveSettings({ guestOrdering }, "orderingSaved")} />
       </Section>
-      <Section id="guest-accounts" title={t("sectionGuestAccounts")} hint={t("guestAccountsHint")} summary={t(settings.customerAccounts ? "orderingOn" : "orderingOff")}>
+      <Section id="guest-accounts" title={t("sectionGuestAccounts")} summary={t(settings.customerAccounts ? "orderingOn" : "orderingOff")}>
         <Toggle checked={settings.customerAccounts} label={t("guestAccountsOn")} onChange={(customerAccounts) => void onSaveSettings({ customerAccounts }, "orderingSaved")} />
       </Section>
-      <Section id="guest-loyalty" title={t("sectionLoyalty")} hint={t("loyaltyHint")} summary={t(settings.loyalty.enabled ? "orderingOn" : "orderingOff")}>
+      <Section id="guest-loyalty" title={t("sectionLoyalty")} summary={t(settings.loyalty.enabled ? "orderingOn" : "orderingOff")}>
         <LoyaltyForm key={JSON.stringify(settings.loyalty)} loyalty={settings.loyalty} products={products} onSave={(loyalty) => onSaveSettings({ loyalty }, "loyaltySaved")} />
       </Section>
       <Section id="guest-list" title={t("sectionCustomers")} wide>

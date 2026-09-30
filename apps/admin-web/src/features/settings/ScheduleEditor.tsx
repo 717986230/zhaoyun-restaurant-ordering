@@ -69,7 +69,6 @@ export function ScheduleEditor({ value, timeZone, onSave }: { value: ApiSchedule
         <label><span>{t("scheduleFrom")}</span><input type="time" step={60} required value={from} onChange={(event) => setFrom(event.target.value)} /></label>
         <label><span>{t("scheduleTo")}</span><input type="time" step={60} required value={to} onChange={(event) => setTo(event.target.value)} /></label>
       </div>
-      <small className="settings-hint">{t("scheduleHint")}</small>
       <p className={`schedule-status ${showingNow ? "live" : ""}`} role="status">
         {valid ? `${describeSchedule(draft, t, language)} · ${t(showingNow ? "scheduleShowingNow" : "scheduleHiddenNow")}` : t("scheduleNoDays")}
       </p>

@@ -115,19 +115,19 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
     <div className="list-head">
       <div>
         <h1>{t("resTitle")}</h1>
-        <p>{t("resLead")}</p>
+        
       </div>
     </div>
 
     {rules && !rules.enabled && <p className="admin-banner res-off" role="note">{t("resOff")}</p>}
 
-    <div className="report-presets res-views" role="tablist">
+    <div className="res-views" role="tablist">
       {(["day", "records"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "primary-action" : "ghost-action"} onClick={() => setView(key)}>{t(key === "day" ? "resViewDay" : "resViewRecords")}</button>)}
     </div>
 
     {view === "records" ? <ReservationRecords api={api} timeZone={timeZone} failed={failed} liveTick={liveTick} /> : <>
-    <div className="report-range res-day">
-      <div className="report-presets">
+    <div className="res-day">
+      <div className="res-day-nav">
         <button type="button" className="ghost-action" aria-label={t("resPrev")} onClick={() => setDay(shift(day, -1))}>‹</button>
         <button type="button" className={day === todayIn(timeZone) ? "primary-action" : "ghost-action"} onClick={() => setDay(todayIn(timeZone))}>{t("resToday")}</button>
         <button type="button" className="ghost-action" aria-label={t("resNext")} onClick={() => setDay(shift(day, 1))}>›</button>
@@ -169,7 +169,7 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
 
     <details className="settings-card settings-section res-new">
       <summary><h2>{t("resNew")}</h2></summary>
-      <form className="editor-form" id="resNewForm" onSubmit={(event) => void create(event)}>
+      <form className="editor-form settings-body" id="resNewForm" onSubmit={(event) => void create(event)}>
         <div className="field-grid three">
           <label><span>{t("reportDate")}</span><input name="date" type="date" required defaultValue={day} key={day} /></label>
           <label><span>{t("resTime")}</span><input name="time" type="time" required step={300} defaultValue="19:00" /></label>
@@ -264,8 +264,10 @@ function ReservationRecords({ api, timeZone, failed, liveTick }: { api: AdminApi
         <option value="active">{t("resActiveOnly")}</option>
         {(["pending", "confirmed", "seated", "completed", "cancelled", "declined", "no_show"] as ReservationStatus[]).map((status) => <option key={status} value={status}>{t(statusKey(status))}</option>)}
       </select></label>
-      <button type="submit" className="ghost-action">{t("resShow")}</button>
-      <button type="button" className="ghost-action" disabled={!records.length} onClick={exportCsv}>⬇ {t("resExport")}</button>
+      <div className="filter-actions">
+        <button type="submit" className="ghost-action">{t("resShow")}</button>
+        <button type="button" className="ghost-action" disabled={!records.length} onClick={exportCsv}>⬇ {t("resExport")}</button>
+      </div>
     </form>
     <p className="res-summary">{t("resRecordsCount", { count: records.length })}</p>
     {!records.length ? <div className="admin-empty">{t("resEmpty")}</div> : <div className="res-table-wrap"><table className="report-table res-records-table">
@@ -329,17 +331,18 @@ function MailCard({ api, notify, failed }: { api: AdminApi; notify: Props["notif
       setBusy(false);
     }
   }
-  return <section className="settings-card settings-section" id="mailCard">
-    <h2>{t("mailTitle")}</h2>
-    <p className={status.configured ? "muted" : "settings-warning"} id="mailStatus">
-      {!status.configured ? t("mailOff") : status.provider === "outbox" ? t("mailOutbox") : t("mailOn", { sender: status.sender ?? "" })}
-    </p>
-    <p className="muted">{t("mailPhoneNote")}</p>
-    {status.configured ? <form className="field-grid two" onSubmit={(event) => void sendTest(event)}>
-      <label><span>{t("mailTestTo")}</span><input type="email" required maxLength={254} value={to} onChange={(event) => setTo(event.target.value)} /></label>
-      <button type="submit" className="ghost-action" disabled={busy || !to.trim()}>{t("mailTestSend")}</button>
-    </form> : null}
-  </section>;
+  return <details className="settings-card settings-section" id="mailCard">
+    <summary><h2>{t("mailTitle")}</h2><span className="settings-summary">{t(status.configured ? "orderingOn" : "orderingOff")}</span></summary>
+    <div className="settings-body editor-form">
+      <p className={status.configured ? "settings-hint" : "settings-warning"} id="mailStatus">
+        {!status.configured ? t("mailOff") : status.provider === "outbox" ? t("mailOutbox") : t("mailOn", { sender: status.sender ?? "" })}
+      </p>
+      {status.configured ? <form className="res-inline" onSubmit={(event) => void sendTest(event)}>
+        <label><span>{t("mailTestTo")}</span><input type="email" required maxLength={254} value={to} onChange={(event) => setTo(event.target.value)} /></label>
+        <button type="submit" className="ghost-action" disabled={busy || !to.trim()}>{t("mailTestSend")}</button>
+      </form> : null}
+    </div>
+  </details>;
 }
 
 function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: ApiReservationSettings; onSave: (rules: ApiReservationSettings) => Promise<void>; notify: Props["notify"]; onImportTables: () => Promise<string[]> }) {
@@ -356,7 +359,8 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
     && new Set(draft.tables.map((entry) => entry.table)).size === draft.tables.length;
 
   return <details className="settings-card settings-section res-rules" open={!rules.enabled}>
-    <summary><h2>{t("resSettings")}</h2></summary>
+    <summary><h2>{t("resSettings")}</h2><span className="settings-summary">{t(rules.enabled ? "orderingOn" : "orderingOff")}</span></summary>
+    <div className="settings-body editor-form">
     <label className="settings-switch"><input type="checkbox" id="resEnabled" checked={draft.enabled} onChange={(event) => set("enabled", event.target.checked)} /><span>{t("resEnabled")}</span></label>
     <label className="settings-switch"><input type="checkbox" checked={draft.autoConfirm} onChange={(event) => set("autoConfirm", event.target.checked)} /><span>{t("resAutoConfirm")}</span></label>
 
@@ -370,10 +374,8 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
       <label><span>{t("resLeadTime")}</span><input type="number" min={0} max={10080} step={15} value={draft.leadMinutes} onChange={(event) => set("leadMinutes", Number(event.target.value))} /></label>
       <label><span>{t("resDaysAhead")}</span><input type="number" min={1} max={365} value={draft.daysAhead} onChange={(event) => set("daysAhead", Number(event.target.value))} /></label>
     </div>
-    <small className="settings-hint">{t("resCapacityHint")}</small>
 
     <p className="settings-label">{t("resLimits")}</p>
-    <small className="settings-hint">{t("resLimitsHint")}</small>
     <div className="field-grid three">
       <label><span>{t("resMaxActive")}</span><input type="number" id="resMaxActive" min={1} max={20} value={draft.maxActivePerGuest} onChange={(event) => set("maxActivePerGuest", Number(event.target.value))} /></label>
       <label><span>{t("resMaxPerDay")}</span><input type="number" min={1} max={10} value={draft.maxPerDayPerGuest} onChange={(event) => set("maxPerDayPerGuest", Number(event.target.value))} /></label>
@@ -381,7 +383,6 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
     </div>
 
     <p className="settings-label">{t("resHours")}</p>
-    <small className="settings-hint">{t("resHoursHint")}</small>
     {draft.hours.map((period, index) => <div className="res-period" key={index}>
       <div className="schedule-days" role="group">{[1, 2, 3, 4, 5, 6, 7].map((weekday) => <button key={weekday} type="button" className={period.days.includes(weekday) ? "on" : ""} aria-pressed={period.days.includes(weekday)}
         onClick={() => setPeriod(index, { days: period.days.includes(weekday) ? period.days.filter((item) => item !== weekday) : [...period.days, weekday].sort((a, b) => a - b) })}>{DAY_LABELS[language][weekday - 1]}</button>)}</div>
@@ -400,7 +401,6 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
     </div>
 
     <p className="settings-label">{t("resTables")}</p>
-    <small className="settings-hint">{t("resTablesHint")}</small>
     <div className="res-tables" id="resTables">
       {draft.tables.map((entry, index) => <div className="res-table-row" key={index}>
         <label><span>{t("resTable")}</span><input maxLength={8} value={entry.table} onChange={(event) => set("tables", draft.tables.map((item, at) => (at === index ? { ...item, table: event.target.value.toUpperCase() } : item)))} /></label>
@@ -423,8 +423,8 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
       <input readOnly value={link} id="resLink" onFocus={(event) => event.target.select()} />
       <button type="button" className="ghost-action" onClick={() => void navigator.clipboard?.writeText(link).then(() => notify(t("resCopied")), () => undefined)}>{t("resCopyLink")}</button>
     </div>
-    <small className="settings-hint">{t("resLinkHint")}</small>
 
     <button type="button" className="primary-action" id="resSaveRules" disabled={!valid} onClick={() => void onSave(draft)}>{t("resSaveSettings")}</button>
+    </div>
   </details>;
 }

@@ -158,7 +158,7 @@ export function PrintersPanel(props: Props) {
 
   return <section id="printersPanel" className="admin-panel active">
     <div className="printer-toolbar">
-      <div><h1>{t("printersTitle")}</h1><p>{t("printersLead")}</p></div>
+      <div><h1>{t("printersTitle")}</h1></div>
       <div className="printer-toolbar-actions">
         {props.native && <button className="ghost-action" onClick={() => void props.onDiscover()}>⌕ {t("printersDiscover")}</button>}
         <button className="primary-action" onClick={() => props.onEdit(null)}>＋ {t("printerAdd")}</button>
@@ -176,14 +176,13 @@ export function PrintersPanel(props: Props) {
           {props.queue && (props.queue.waiting > 0 || props.queue.failed > 0) && <p className={`print-queue${props.queue.failed ? " failed" : ""}`}>{t("printerQueue", { waiting: props.queue.waiting, failed: props.queue.failed })}</p>}
         </div>
       </div>
-      <p className="print-bridge-lead">{t("printerBridgeLead")}</p>
       {bridgeLive
         ? <details className="bridge-setup"><summary>{t("bridgeSetupAgain")}</summary>{steps}</details>
         : steps}
     </section>
 
     {uncovered.length > 0 && <div className="print-warning" role="status">
-      {uncovered.map((station) => <p key={station}>⚠ {t("stationWithoutPrinter", { station: t(STATION_KEYS[station]), count: props.dishesPerStation[station] ?? 0 })}</p>)}
+      <p>⚠ {t("stationWithoutPrinter", { stations: uncovered.map((station) => t("stationDishes", { station: t(STATION_KEYS[station]), count: props.dishesPerStation[station] ?? 0 })).join(t("listJoin")) })}</p>
     </div>}
 
     {(props.found.length > 0 || props.discovered.length > 0) && <section className="discovered">
