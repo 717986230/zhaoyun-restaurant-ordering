@@ -431,3 +431,432 @@ html.bk-root body {
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* ————————————————————————————————————————————————————————————————
+   The page as the menu's sibling: the same serif for what matters (the
+   title, the day, the time, the table), numbered steps down the page, and
+   motion that answers a touch without making anyone wait.
+   ———————————————————————————————————————————————————————————————— */
+
+/* :root paints the canvas the menu's deepest shade; a page that scrolls is
+   one colour to the bottom, however short its content. */
+html.bk-root {
+  background: var(--bg);
+}
+html.bk-root body {
+  min-height: 100dvh;
+}
+
+.bk-page {
+  --bk-serif: Georgia, "Noto Serif SC", "Songti SC", serif;
+  --bk-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  gap: 14px;
+}
+
+.bk-head {
+  padding: 12px 0 6px;
+}
+.bk-head h1 {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: clamp(32px, 9vw, 44px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.bk-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  margin-bottom: 8px;
+}
+.bk-account {
+  margin-top: -4px;
+  overflow-wrap: anywhere;
+}
+
+/* Steps: a quiet numeral before each card's title, so the page reads as
+   the order it is filled in. The seat card joins the count only once there
+   is a time to pick a table for. */
+.bk-form {
+  counter-reset: bk-step;
+  gap: 12px;
+}
+.bk-form > .bk-card > h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 17px;
+  letter-spacing: 0.01em;
+}
+.bk-form > .bk-card > h2::before {
+  counter-increment: bk-step;
+  content: counter(bk-step, decimal-leading-zero);
+  font-family: var(--bk-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 15px;
+  color: var(--accent);
+  font-variant-numeric: lining-nums;
+}
+.bk-form > .bk-card > h2 .bk-muted {
+  font-size: 13px;
+}
+
+.bk-card {
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  gap: 12px;
+  transition: border-color 0.25s var(--bk-ease, ease);
+}
+.bk-card:focus-within {
+  border-color: var(--line);
+}
+
+/* Cards arrive once, briefly, one after another. */
+@keyframes bk-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.bk-head,
+.bk-account,
+.bk-page > .bk-card,
+.bk-form > .bk-card {
+  animation: bk-rise 0.45s var(--bk-ease) both;
+}
+.bk-form > .bk-card:nth-child(2) { animation-delay: 0.05s; }
+.bk-form > .bk-card:nth-child(3) { animation-delay: 0.1s; }
+.bk-form > .bk-card:nth-child(4) { animation-delay: 0.15s; }
+.bk-form > .bk-card:nth-child(n + 5) { animation-delay: 0.2s; }
+
+/* The days: the date in the serif, a lift on the chosen one, and the row
+   fading out at its edge where more days wait to be scrolled to. */
+.bk-days {
+  gap: 8px;
+  padding: 2px 2px 6px;
+  margin: 0 -2px;
+}
+@media (max-width: 719px) {
+  .bk-days {
+    mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+    padding-right: 28px;
+  }
+}
+.bk-days button {
+  flex-basis: 66px;
+  border-radius: 14px;
+  padding: 10px 4px 9px;
+  transition: background 0.2s var(--bk-ease), border-color 0.2s var(--bk-ease), color 0.2s, transform 0.2s var(--bk-ease), box-shadow 0.2s;
+}
+.bk-days strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: 24px;
+  line-height: 1.1;
+}
+.bk-days span {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.bk-days button.active {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.bk-days button:not(:disabled):not(.active):hover {
+  border-color: var(--line-strong);
+}
+
+/* The chosen time reads as a time, in the serif and in columns. */
+.bk-field select#bookingTime,
+.bk-field select#bookingParty {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Tables: tiles that answer the finger, the chosen one lifted. */
+.bk-table {
+  border-radius: 16px;
+  min-height: 92px;
+  transition: background 0.2s var(--bk-ease), border-color 0.2s var(--bk-ease), transform 0.2s var(--bk-ease), box-shadow 0.2s;
+}
+.bk-table strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: 17px;
+}
+.bk-table.active {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.bk-table:not(:disabled):not(.active):hover {
+  border-color: var(--line-strong);
+}
+
+/* Fields: a calmer label, a clear focus. */
+.bk-field span {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.bk-field input,
+.bk-field textarea,
+.bk-field select {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.bk-field input:focus,
+.bk-field select:focus,
+.bk-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Every button gives a little under the finger. */
+.bk-primary,
+.bk-secondary,
+.bk-danger,
+.bk-days button,
+.bk-table,
+.bk-tabs button,
+.bk-languages button {
+  -webkit-tap-highlight-color: transparent;
+}
+.bk-primary:not(:disabled):active,
+.bk-secondary:not(:disabled):active,
+.bk-danger:not(:disabled):active,
+.bk-days button:not(:disabled):active,
+.bk-table:not(:disabled):active {
+  transform: scale(0.97);
+}
+.bk-primary,
+.bk-secondary,
+.bk-danger {
+  border-radius: 14px;
+  transition: transform 0.15s var(--bk-ease), background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+.bk-secondary:not(:disabled):hover {
+  border-color: var(--ink-2);
+}
+.bk-primary:focus-visible,
+.bk-secondary:focus-visible,
+.bk-danger:focus-visible,
+.bk-days button:focus-visible,
+.bk-table:focus-visible,
+.bk-languages button:focus-visible,
+.bk-tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The confirm bar: pinned, with the page fading out under it so the two
+   never collide. */
+.bk-primary {
+  min-height: 56px;
+  border-radius: 18px;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  box-shadow: 0 -18px 24px -6px var(--bg), 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* The booking as a ticket: status, then the time large, the day under it,
+   the details on a perforated line, the link and the actions below. */
+.bk-booking {
+  position: relative;
+  gap: 16px;
+  padding: 22px 20px 20px;
+}
+.bk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.bk-status-confirmed::before,
+.bk-status-seated::before,
+.bk-status-pending::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent);
+}
+.bk-status-pending {
+  color: var(--ink-2);
+}
+.bk-when {
+  display: grid;
+  gap: 4px;
+}
+.bk-when strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: clamp(48px, 16vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.bk-when span {
+  font-family: var(--bk-serif);
+  font-size: 18px;
+  color: var(--ink-2);
+}
+.bk-summary {
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+.bk-summary div {
+  grid-template-columns: minmax(84px, 30%) 1fr;
+  align-items: baseline;
+}
+.bk-summary dt {
+  font-size: 13px;
+}
+.bk-summary dd {
+  font-size: 15px;
+}
+#bookingReference {
+  font-size: 17px;
+  letter-spacing: 0.18em;
+}
+.bk-link {
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+.bk-link p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.bk-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.bk-link-row .bk-secondary {
+  min-height: 44px;
+  padding: 8px 16px;
+}
+.bk-link input {
+  min-height: 44px;
+  text-overflow: ellipsis;
+}
+.bk-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+/* The guest's other bookings: the day and time first, the rest on a line. */
+.bk-mine li {
+  padding: 12px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.bk-mine li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.bk-mine strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: 17px;
+}
+.bk-mine .bk-danger {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.bk-note {
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+@media (min-width: 720px) {
+  .bk-page {
+    padding-top: 40px;
+    gap: 16px;
+  }
+  .bk-card {
+    padding: 20px 24px 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-head,
+  .bk-account,
+  .bk-page > .bk-card,
+  .bk-form > .bk-card {
+    animation: none;
+  }
+  .bk-days button,
+  .bk-table,
+  .bk-primary,
+  .bk-secondary,
+  .bk-danger {
+    transition: none;
+  }
+  .bk-days button.active,
+  .bk-table.active {
+    transform: none;
+  }
+}
+
+/* Only the booking's own confirm is pinned; a primary button inside a card
+   (the email code's) stays where it is, with nothing painted over the field
+   above it. */
+.bk-card .bk-primary {
+  position: static;
+  box-shadow: none;
+  min-height: 48px;
+}
+
+/* The row scrolls sideways and so clips anything drawn outside it: the
+   chosen day is lifted and coloured, not shadowed. */
+.bk-days button.active {
+  box-shadow: none;
+}
+
+/* Signing in and proving the email are steps too: the count runs on
+   through them (the guest's own bookings are not a step). */
+.bk-page {
+  counter-reset: bk-step;
+}
+.bk-form {
+  counter-reset: none;
+}
+#bookingSignIn > h2,
+#bookingVerify > h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 17px;
+}
+#bookingSignIn > h2::before,
+#bookingVerify > h2::before {
+  counter-increment: bk-step;
+  content: counter(bk-step, decimal-leading-zero);
+  font-family: var(--bk-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+/* On a wide screen the week fits: the days share the row evenly instead of
+   the last one running into the card's edge. */
+@media (min-width: 720px) {
+  .bk-days {
+    overflow-x: visible;
+  }
+  .bk-days button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .bk-tables {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  }
+}

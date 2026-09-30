@@ -17,7 +17,12 @@ import type { ColorScheme } from "./useColorScheme";
  * celadon is unreadable on white — so the scheme picks which shade is set.
  */
 export function useMenuTheme(themeId: MenuThemeId | undefined, scheme: ColorScheme = "dark"): void {
-  useEffect(() => {
+  useEffect(() => { applyMenuTheme(themeId, scheme); }, [themeId, scheme]);
+}
+
+/** The same, once, for a page that is not the menu (the booking page). */
+export function applyMenuTheme(themeId: MenuThemeId | undefined, scheme: ColorScheme = "dark"): void {
+  {
     const theme = MENU_THEMES[themeId ?? DEFAULT_MENU_THEME] ?? MENU_THEMES[DEFAULT_MENU_THEME];
     const accent = scheme === "light" ? theme.light : theme;
     const root = document.documentElement.style;
@@ -39,5 +44,5 @@ export function useMenuTheme(themeId: MenuThemeId | undefined, scheme: ColorSche
     }
     document.documentElement.dataset.menuTheme = theme.id;
     document.documentElement.toggleAttribute("data-festive", Boolean(theme.festive));
-  }, [themeId, scheme]);
+  }
 }

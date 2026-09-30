@@ -160,6 +160,8 @@ export function BookingPage() {
     history.replaceState(null, "", location.pathname);
   };
 
+  const others = mine.filter((entry) => !(booking && held && entry.id === booking.id));
+
   return <main className="bk-page">
     <header className="bk-head">
       <div>
@@ -188,7 +190,8 @@ export function BookingPage() {
             ? <section className="bk-card bk-message" id="bookingOff"><p>{b(language, "off")}</p></section>
             : <BookingForm language={language} info={info} customer={customer} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />}
 
-    {customer && mine.length ? <MyBookings language={language} bookings={mine} info={info} onChange={() => void loadMine()} /> : null}
+    {/* The booking open above is not listed a second time under it. */}
+    {customer && others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => void loadMine()} /> : null}
   </main>;
 }
 
@@ -210,8 +213,8 @@ function MyBookings({ language, bookings, info, onChange }: { language: BookingL
     {error ? <p className="bk-error" role="alert">{error}</p> : null}
     <ul className="bk-mine">{bookings.map((booking) => <li key={booking.id} data-reference={booking.reference} data-status={booking.status}>
       <span>
-        <strong>{formatDay(language, booking.date)} {booking.time}</strong> · {b(language, "partyOf", { n: booking.party })}{booking.table ? ` · ${b(language, "tableName", { table: booking.table })}` : ""}
-        <small>{booking.reference} · {booking.status === "cancelled" ? b(language, "cancelled") : b(language, booking.status)}</small>
+        <strong>{formatDay(language, booking.date)} · {booking.time}</strong>
+        <small>{[b(language, "partyOf", { n: booking.party }), booking.table ? b(language, "tableName", { table: booking.table }) : "", booking.reference, booking.status === "cancelled" ? b(language, "cancelled") : b(language, booking.status)].filter(Boolean).join(" · ")}</small>
       </span>
       {booking.cancellable ? <button type="button" className="bk-danger" onClick={() => void cancel(booking)}>{b(language, "cancel")}</button> : null}
     </li>)}</ul>
@@ -560,9 +563,13 @@ function BookingDetails({ language, booking, held, info, onChange, onAnother }: 
   const active = booking.status === "pending" || booking.status === "confirmed";
   return <section className="bk-card bk-booking" id="bookingDetails" data-status={booking.status}>
     <p className={`bk-status bk-status-${booking.status}`} id="bookingStatus">{booking.status === "cancelled" ? b(language, "cancelDone") : b(language, booking.status)}</p>
+    {/* The time and the day first and large, as a ticket reads; the rest under it. */}
+    <div className="bk-when">
+      <strong>{booking.time}</strong>
+      <span>{formatDay(language, booking.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+    </div>
     <dl className="bk-summary">
       <div><dt>{b(language, "reference")}</dt><dd id="bookingReference">{booking.reference}</dd></div>
-      <div><dt>{b(language, "date")}</dt><dd>{b(language, "when", { date: formatDay(language, booking.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" }), time: booking.time })}</dd></div>
       <div><dt>{b(language, "party")}</dt><dd>{b(language, "partyOf", { n: booking.party })}</dd></div>
       {booking.table ? <div><dt>{b(language, "yourTable")}</dt><dd id="bookingTable">{b(language, "tableName", { table: booking.table })}</dd></div> : null}
       <div><dt>{b(language, "name")}</dt><dd>{booking.name}</dd></div>
@@ -570,8 +577,10 @@ function BookingDetails({ language, booking, held, info, onChange, onAnother }: 
     </dl>
     {active ? <div className="bk-link">
       <p>{b(language, "keepLink")}</p>
-      <input readOnly value={link} id="bookingLink" onFocus={(event) => event.target.select()} />
-      <button type="button" className="bk-secondary" onClick={() => void copy()}>{copied ? b(language, "copied") : b(language, "copy")}</button>
+      <div className="bk-link-row">
+        <input readOnly value={link} id="bookingLink" onFocus={(event) => event.target.select()} />
+        <button type="button" className="bk-secondary" onClick={() => void copy()}>{copied ? b(language, "copied") : b(language, "copy")}</button>
+      </div>
     </div> : null}
     {error ? <p className="bk-error" role="alert">{error}</p> : null}
     <div className="bk-actions">

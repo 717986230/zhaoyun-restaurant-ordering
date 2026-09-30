@@ -109,7 +109,8 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator("#bookingTable")).toHaveText("4 号桌");
   const reference = (await page.locator("#bookingReference").textContent()).trim();
   expect(reference).toMatch(/^[A-Z2-9]{6}$/);
-  await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toBeVisible();
+  // Shown above, it is not listed a second time under it.
+  await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveCount(0);
 
   // The link opens it again, even on another visit.
   await page.reload();
@@ -117,6 +118,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
 
   // The same day again: one a day, said in words.
   await page.locator("#bookingAnother").click();
+  await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toBeVisible();
   await page.locator("#bookingParty").selectOption("2");
   await day.click();
   await page.locator("#bookingTime").selectOption("13:00");
