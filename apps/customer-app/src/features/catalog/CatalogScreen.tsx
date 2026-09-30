@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { deconstruct, LANGUAGE_INFO, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
+import { deconstruct, drinkTabs, LANGUAGE_INFO, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product, SelectedModifier } from "@zhaoyun/domain";
 import type { NavLabels } from "@zhaoyun/contracts";
@@ -57,6 +57,8 @@ interface Props {
 export const FEATURED_PAGE = NAV_FEATURED;
 /** The set menus' page: every dish that packages others, whatever its category. */
 export const SETS_PAGE = NAV_SETS;
+/** Every drink, whatever its category: coffee, tea, soft drinks, beer, wine. */
+export const DRINKS_PAGE = NAV_DRINKS;
 /** The signed-in guest's favourites; no real category is called this. */
 export const FAVORITES_PAGE = "__favorites__";
 
@@ -504,13 +506,16 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const onFavorites = favorites.length > 0 && state.category === FAVORITES_PAGE && !query;
   // A search looks through everything, sets included; a page shows its own.
   const visible = (query ? products : onFavorites ? favorites : dishes).filter((product) => {
-    const categoryMatch = query || onFavorites || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE || product.category === state.category;
+    const categoryMatch = query || onFavorites || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE
+      || (state.category === DRINKS_PAGE ? product.kind === "drink" : product.category === state.category);
     const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category, ...Object.values(navLabels[product.category] ?? {})].join(" ").toLowerCase();
     return categoryMatch && (!query || text.includes(query));
   });
   // The owner's three first, the rest in their usual order: the promotions
   // page, the set menus, everything, then the categories.
-  const ordered = orderNavTabs([...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...new Set(dishes.map((product) => product.category))], navPinned);
+  // The drinks' categories are one page between them, where the first of them was.
+  const drinkCategories = useMemo(() => new Set(dishes.filter((product) => product.kind === "drink").map((product) => product.category)), [dishes]);
+  const ordered = orderNavTabs([...(featured ? [FEATURED_PAGE] : []), ...(sets.length ? [SETS_PAGE] : []), "ALLE", ...drinkTabs([...new Set(dishes.map((product) => product.category))], drinkCategories)], navPinned);
   // The guest's own page goes just before everything, whatever the owner pinned.
   const categories = favorites.length ? [...ordered.slice(0, ordered.indexOf("ALLE")), FAVORITES_PAGE, ...ordered.slice(ordered.indexOf("ALLE"))] : ordered;
   const activeProduct = state.activeProductId ? byId.get(state.activeProductId) : undefined;
@@ -526,7 +531,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     ? `✦ ${featured?.title || t(state.language, "featuredDefault")}`
     : category === FAVORITES_PAGE ? g(state.language, "favoritesPage")
     : navLabels[category]?.[state.language]
-      || (category === SETS_PAGE ? t(state.language, "setsPage") : category === "ALLE" ? t(state.language, "allCategories") : category));
+      || (category === SETS_PAGE ? t(state.language, "setsPage") : category === DRINKS_PAGE ? t(state.language, "drinksPage") : category === "ALLE" ? t(state.language, "allCategories") : category));
 
   // A guest's first look this visit is the menu's first tab: the one the
   // owner put first, or the promotions page when they chose none and there

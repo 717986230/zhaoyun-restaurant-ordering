@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AdminApi, AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { AccountUpdateCommand, ApiAccount, ApiSettings, ColorScheme, MenuLanguage, NavLabels, VatPercent } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themePattern } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, drinkTabs, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themePattern } from "@zhaoyun/domain";
 import { translate, useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
@@ -138,7 +138,10 @@ function NavOrder({ settings, products, onSave }: { settings: ApiSettings; produ
   // unavailable is not on the menu, so neither is a category of nothing else.
   const live = products.filter((product) => product.published && product.available);
   const hasSets = live.some((product) => product.bundleItems?.length);
-  const categories = [...new Set(live.filter((product) => !product.bundleItems?.length).map((product) => product.category))];
+  const dishes = live.filter((product) => !product.bundleItems?.length);
+  // The drinks are one tab on the menu, whatever categories they are kept in.
+  const drinks = new Set(dishes.filter((product) => product.kind === "drink").map((product) => product.category));
+  const categories = drinkTabs([...new Set(dishes.map((product) => product.category))], drinks);
   // In the menu's usual order, which is also the order the rest keep.
   const options = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
   // A choice whose tab has since gone (an emptied category, a page switched
@@ -170,12 +173,12 @@ function NavOrder({ settings, products, onSave }: { settings: ApiSettings; produ
  *  the rest by the name they gave it in this language, else the default. */
 function navLabel(settings: ApiSettings, t: ReturnType<typeof useI18n>["t"], language: AdminLanguage) {
   return (tab: string) => tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
-    : settings.navLabels[tab]?.[language] || (tab === NAV_SETS ? t("navSets") : tab === NAV_ALL ? t("navAll") : tab);
+    : settings.navLabels[tab]?.[language] || (tab === NAV_SETS ? t("navSets") : tab === NAV_DRINKS ? t("navDrinks") : tab === NAV_ALL ? t("navAll") : tab);
 }
 
 /** The menu's own name for a tab in a language: what an empty field means. */
 function defaultTabName(tab: string, language: MenuLanguage) {
-  return tab === NAV_ALL ? translate(language, "navAll") : tab === NAV_SETS ? translate(language, "navSets") : tab;
+  return tab === NAV_ALL ? translate(language, "navAll") : tab === NAV_SETS ? translate(language, "navSets") : tab === NAV_DRINKS ? translate(language, "navDrinks") : tab;
 }
 
 /** How the server will write a category name, so a merge is known before it is sent. */
@@ -194,7 +197,9 @@ function TabNames({ settings, products, onSave, onRename }: { settings: ApiSetti
   const [target, setTarget] = useState("");
   const counts = new Map<string, number>();
   for (const product of products) counts.set(product.category, (counts.get(product.category) ?? 0) + 1);
-  const tabs = [NAV_ALL, NAV_SETS, ...counts.keys()];
+  // The drinks page is named here like the other pages; the drinks'
+  // own categories keep their rows, to rename or merge them.
+  const tabs = [NAV_ALL, NAV_SETS, ...(products.some((product) => product.kind === "drink") ? [NAV_DRINKS] : []), ...counts.keys()];
   const offered = settings.menuLanguages;
 
   function save(event: FormEvent<HTMLFormElement>) {
@@ -227,7 +232,7 @@ function TabNames({ settings, products, onSave, onRename }: { settings: ApiSetti
       const merging = renaming === tab && counts.has(categoryKey(target)) && categoryKey(target) !== tab;
       return <li key={tab} data-tab={tab}>
         <div className="tab-names-head">
-          <strong>{tab === NAV_ALL ? t("navAll") : tab === NAV_SETS ? t("navSets") : tab}</strong>
+          <strong>{tab === NAV_ALL ? t("navAll") : tab === NAV_SETS ? t("navSets") : tab === NAV_DRINKS ? t("navDrinks") : tab}</strong>
           {category && <small>{t("dishCount", { count: counts.get(tab) ?? 0 })}</small>}
           {category && renaming !== tab && <button type="button" className="ghost-action" onClick={() => open(tab)}>{t("renameCategory")}</button>}
         </div>

@@ -14,6 +14,9 @@
  */
 export const NAV_FEATURED = "__featured__";
 export const NAV_SETS = "__sets__";
+/** Every drink on one page — coffee, tea, soft drinks, beer, wine — whatever
+ *  category each is kept in for the kitchen and the reports. */
+export const NAV_DRINKS = "__drinks__";
 export const NAV_ALL = "ALLE";
 /** Positions the owner chooses: the first, second and third tab. */
 export const NAV_PINNED_MAX = 3;
@@ -25,4 +28,18 @@ export function orderNavTabs(available: readonly string[], pinned: readonly stri
     if (available.includes(tab) && !chosen.includes(tab)) chosen.push(tab);
   }
   return [...chosen, ...available.filter((tab) => !chosen.includes(tab))];
+}
+
+/**
+ * The categories as tabs, the drinks' folded into one: the drinks page takes
+ * the place of the first drink category, and the others drop out. A menu
+ * with no drinks has no drinks page.
+ */
+export function drinkTabs(categories: readonly string[], drinkCategories: ReadonlySet<string>): string[] {
+  const tabs: string[] = [];
+  for (const category of categories) {
+    if (!drinkCategories.has(category)) tabs.push(category);
+    else if (!tabs.includes(NAV_DRINKS)) tabs.push(NAV_DRINKS);
+  }
+  return tabs;
 }

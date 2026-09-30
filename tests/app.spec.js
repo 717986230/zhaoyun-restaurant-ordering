@@ -931,3 +931,29 @@ test.describe("the menu installs as an app", () => {
     });
   });
 });
+
+test("every drink is on one drinks page, whatever category it is kept in", async ({ page }) => {
+  const drink = (id, sku, category, zh, de) => ({
+    id, sku, kind: "drink", category, names: { zh, de, en: de }, description: "", price: 3.5, allergens: [],
+    details: { time: "", people: "", level: "", ingredients: "" }, appearance: { art: "#333", pattern: "dots" }, media: []
+  });
+  const drinks = [drink("d-coffee", "K1", "COFFEE", "咖啡", "Kaffee"), drink("d-tea", "K2", "TEA", "绿茶", "Grüner Tee"), drink("d-beer", "B1", "BEER", "啤酒", "Bier")];
+  await page.unroute("**/api/catalog");
+  await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [...products, ...drinks], theme: "jade", languages: ["zh", "en", "de"] }) }));
+  await page.reload();
+
+  // One tab for them all; the drinks' own categories are no tabs of their own.
+  const chips = page.locator("#chips .chip");
+  await expect(chips.filter({ hasText: "酒水" })).toHaveCount(1);
+  for (const category of ["COFFEE", "TEA", "BEER"]) await expect(chips.filter({ hasText: new RegExp(`^${category}$`) })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "酒水", exact: true }).click();
+  await expect(page.locator(".chip.on")).toHaveText("酒水");
+  for (const sku of ["K1", "K2", "B1"]) await expect(page.locator(".dish-card", { hasText: sku }).first()).toBeVisible();
+  // Nothing from the kitchen on it.
+  await expect(page.locator(".dish-card", { hasText: "黑椒牛柳" })).toHaveCount(0);
+
+  // Named in the guest's language.
+  await page.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.locator(".chip.on")).toHaveText("Getränke");
+});
