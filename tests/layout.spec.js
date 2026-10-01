@@ -9,7 +9,7 @@ import { isolateLive } from "./support/live.js";
  * The other specs use a handful of fixtures; overlaps come from the real data:
  * a drink code twice the width anyone planned for, a German name three words
  * long, a title the owner typed. So this loads the menu the app ships with,
- * all 111 dishes and 7 set menus, and measures every row. It is the one spec the iPhone
+ * every dish and set menu on the bundled menu, and measures every row. It is the one spec the iPhone
  * projects run as well (WebKit, the engine of every browser on iOS), so a
  * page that lays out differently on an iPhone fails here.
  */

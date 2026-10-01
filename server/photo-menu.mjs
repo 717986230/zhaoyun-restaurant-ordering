@@ -191,4 +191,6 @@ export const photoMenuDishes = [
   item("COFFEE-CAPPUCCINO", "drink", "COFFEE", "Cappuccino", "Cappuccino", "卡布奇诺", 4.2, ["G"], "Kaffee, Milch"),
   item("COFFEE-LATTE", "drink", "COFFEE", "Latte Macchiato", "Latte Macchiato", "拿铁咖啡", 4.5, ["G"], "Kaffee, Milch"),
   item("TEA", "drink", "TEA", "Jasmintee, Grüntee, Schwarztee", "Jasmine, Green or Black Tea", "茉莉花茶、绿茶、红茶", 3.5, [], "Tee")
-];
+// Hot pot is off the menu for now (migrations/0068_hide_hot_pot.sql): its
+// dishes are kept, unpublished, for the day it comes back.
+].map((dish) => (dish.cat === "HOT POT" ? { ...dish, published: false } : dish));
