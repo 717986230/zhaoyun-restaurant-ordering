@@ -30,22 +30,13 @@
     "alternatives": []
   },
   "photo-r3": {
-    "query": "beef ramen noodle soup",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Tomato ramen with beef 20200906.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Tomato_ramen_with_beef_20200906.jpg",
-    "author": "Ecliptics",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 29004,
-    "alternatives": [
-      "File:2020-05-06 05 02 25 Inner packaging of a Maruchan Instant Lunch Beef Flavor Ramen Noodle Soup in the Franklin Farm section of Oak Hill, Fairfax County, Virginia.jpg",
-      "File:2020-05-06 05 12 28 Maruchan Instant Lunch Beef Flavor Ramen Noodle Soup after the addition of hot water in the Franklin Farm section of Oak Hill, Fairfax County, Virginia.jpg",
-      "File:2020-05-06 05 03 43 Maruchan Instant Lunch Beef Flavor Ramen Noodle Soup before the addition of hot water in the Franklin Farm section of Oak Hill, Fairfax County, Virginia.jpg",
-      "File:2020-05-06 05 12 22 Maruchan Instant Lunch Beef Flavor Ramen Noodle Soup after the addition of hot water in the Franklin Farm section of Oak Hill, Fairfax County, Virginia.jpg",
-      "File:2020-05-06 05 03 24 Maruchan Instant Lunch Beef Flavor Ramen Noodle Soup before the addition of hot water in the Franklin Farm section of Oak Hill, Fairfax County, Virginia.jpg"
-    ]
+    "source": "foodora",
+    "title": "Ramen with Beef",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757167/6524abc3-845c-4bf1-9761-5fd301c6cd6b.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 38717
   },
   "photo-r4": {
     "query": "shrimp ramen",
@@ -66,56 +57,31 @@
     ]
   },
   "photo-t1": {
-    "query": "shuizhu beef",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Szechuan beef Sichuan cuisine 四川菜 Shuizhu roupian 23 January 2025 Filipinas5.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Szechuan_beef_Sichuan_cuisine_%E5%9B%9B%E5%B7%9D%E8%8F%9C_Shuizhu_roupian_23_January_2025_Filipinas5.jpg",
-    "author": "Unknown",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 33031,
-    "alternatives": [
-      "File:Shuizhu Roupian on T8 (20260430102820).jpg",
-      "File:Szechuan beef Sichuan cuisine 四川菜 Shuizhu roupian Red braised pork belly 红烧肉 hóngshāoròu Fresh Buffet Solaire 23 January 2025 Filipinas3.jpg",
-      "File:Shuizhu Roupian at Daqian Restaurant, Dachenglu (20260126131419).jpg",
-      "File:Shuizhu Roupian on T8 (20260430102904).jpg",
-      "File:Shuizhu Roupian at Daqian Restaurant, Dachenglu (20260126131330).jpg"
-    ]
+    "source": "foodora",
+    "title": "Szechuan Boiled Beef",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310717.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 20943
   },
   "photo-t2": {
-    "query": "laziji chongqing chicken",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Laziji at Beijing Yibin Hostel (20210625111300).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Laziji_at_Beijing_Yibin_Hostel_(20210625111300).jpg",
-    "author": "N509FZ",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 44515,
-    "alternatives": [
-      "File:Laziji 辣子鸡.jpg",
-      "File:La Zi Ji (Chicken with Chiles) (2269517013).jpg",
-      "File:辣子鸡.jpg",
-      "File:沾益辣子鸡.jpg",
-      "File:Spicy chicken (La-zi-ji).jpg"
-    ]
+    "source": "foodora",
+    "title": "Spicy Crispy Chicken",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310719.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 17902
   },
   "photo-t3": {
-    "query": "stir fried shrimp chili peppers",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Udang Tumis Bawang Putih Cili.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Udang_Tumis_Bawang_Putih_Cili.jpg",
-    "author": "Mdsheth1986",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 31311,
-    "alternatives": [
-      "File:Stuffed Peppers (1337055553).jpg",
-      "File:HK TKL 調景嶺 Tiu Keng Leng 彩明街 Choi Ming Street 景嶺道 King Ling Road 彩明商場 Choi Ming Shopping Centre 茶魚飯后 restaurant menu January 2023 Px3.jpg",
-      "File:HK Sai Kung District 將軍澳 TKO 康城路1號 Lohas Park Road Montara LOHAS Park 日出康城商場 The Lohas Shopping Mall shop FRESH 新鮮生活 Supermarket cooked food October 2022 Px3 01.jpg"
-    ]
+    "source": "foodora",
+    "title": "Spicy Crispy King Prawns",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038489/e1fa7e6c-ee82-4825-8c80-ef694c61a703.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 36632
   },
   "photo-t4": {
     "query": "mapo tofu",
@@ -154,22 +120,13 @@
     ]
   },
   "photo-a1": {
-    "query": "gua bao",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Fish Gua Bao 2023.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Fish_Gua_Bao_2023.jpg",
-    "author": "Sleeps-Darkly",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 26025,
-    "alternatives": [
-      "File:Gua bao a València. 刈包.jpg",
-      "File:Gua Bao VLC - 1.jpeg",
-      "File:Taiwanese Gua Bao @ Bao & Bing, London.jpg",
-      "File:Gua Bao VLC - 3.jpeg",
-      "File:Gua Bao VLC - 2.jpeg"
-    ]
+    "source": "foodora",
+    "title": "Veggie Bao",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/12010495.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 16003
   },
   "photo-a2": {
     "query": "gua bao",
@@ -460,22 +417,13 @@
     "alternatives": []
   },
   "photo-m3": {
-    "query": "avocado maki",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Avocado maki (7368416680).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Avocado_maki_(7368416680).jpg",
-    "author": "Lablascovegmenu from London",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 23629,
-    "alternatives": [
-      "File:Avocado maki rolls - Makis de aguacate (5123466252).jpg",
-      "File:California roll from Sarku Japan with wasabi and ginger.jpg",
-      "File:Maki Sushi Perú.jpg",
-      "File:California Sushi mit Kaviar (26545022496).jpg",
-      "File:Vegetarian Sushi Maki roll.jpg"
-    ]
+    "source": "foodora",
+    "title": "Avocado Maki",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310669.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 13067
   },
   "photo-m5": {
     "query": "mango avocado sushi roll",
@@ -522,100 +470,58 @@
     ]
   },
   "photo-s1-9": {
-    "query": null,
-    "pick": 0,
-    "pinned": "File:Salmon Sashimi with Calamansi.JPG",
-    "file": "File:Salmon Sashimi with Calamansi.JPG",
-    "page": "https://commons.wikimedia.org/wiki/File:Salmon_Sashimi_with_Calamansi.JPG",
-    "author": "User:Paraluman",
-    "license": "CC BY 3.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
-    "bytes": 15161,
-    "alternatives": []
+    "source": "foodora",
+    "title": "Sake Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004628-parent/fc2e9b7d-6f15-4869-99eb-fe189705e91b.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 28158
   },
   "photo-s1-18": {
-    "query": "salmon sashimi",
-    "pick": 1,
-    "pinned": null,
-    "file": "File:Salmon sashimi slices.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Salmon_sashimi_slices.jpg",
-    "author": "CNEcija12345",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 25948,
-    "alternatives": [
-      "File:Sashimi of São Paulo.jpg",
-      "File:Salmon Sashimi ingredients.png",
-      "File:Salmon Sashimi with Calamansi.JPG",
-      "File:Salmon sashimi appetizers.jpeg",
-      "File:Salmon sashimi fish.jpg"
-    ]
+    "source": "foodora",
+    "title": "Sake Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004628-parent/fc2e9b7d-6f15-4869-99eb-fe189705e91b.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 28158
   },
   "photo-s2-9": {
-    "query": null,
-    "pick": 0,
-    "pinned": "File:Mixed Sashimi - Taro 2025-10-24.jpg",
-    "file": "File:Mixed Sashimi - Taro 2025-10-24.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Mixed_Sashimi_-_Taro_2025-10-24.jpg",
-    "author": "Andy Li",
-    "license": "CC0",
-    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 31486,
-    "alternatives": []
+    "source": "foodora",
+    "title": "Sake Maguro Sashimi Set",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004629-parent/94ceb481-5d49-4ae2-bbe3-8169d9125c6c.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 25282
   },
   "photo-s2-18": {
-    "query": "salmon tuna sashimi",
-    "pick": 1,
-    "pinned": null,
-    "file": "File:Sashimi Set Ichiban Sushi.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Sashimi_Set_Ichiban_Sushi.jpg",
-    "author": "Gunawan Kartapranata",
-    "license": "CC BY-SA 3.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 24576,
-    "alternatives": [
-      "File:Sashimi of São Paulo.jpg",
-      "File:Daily Catch- Amberjack, amberjack belly, salmon, octopus, fluke, ocean trout, bigeye tuna, sea urchin with ikura.jpg",
-      "File:Mixed Sashimi - Taro 2025-10-24.jpg",
-      "File:Sashimi Bowl from Donggang Seafood Market in Pingtung, Taiwan - Flickr - midnightbreakfastcafe.jpg",
-      "File:202407171815 IMG 7123.jpg"
-    ]
+    "source": "foodora",
+    "title": "Sake Maguro Sashimi Set",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004629-parent/94ceb481-5d49-4ae2-bbe3-8169d9125c6c.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 25282
   },
   "photo-s3-9": {
-    "query": "sashimi platter",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Deluxe sashimi platter 01.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Deluxe_sashimi_platter_01.jpg",
-    "author": "T.Tseng",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 32093,
-    "alternatives": [
-      "File:Deluxe sashimi platter 03.jpg",
-      "File:Deluxe sashimi platter 02.jpg",
-      "File:Salmon Sushi and Sashimi Platter - W Sushi.jpg",
-      "File:Freshippo sashimi platter.jpg",
-      "File:Sushi Sashimi Medium Platter - Yama-ya (2570349350).jpg"
-    ]
+    "source": "foodora",
+    "title": "Mix Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004627-parent/1ce003f1-b421-44f1-8550-cc493093817b.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 30658
   },
   "photo-s3-18": {
-    "query": "sashimi platter",
-    "pick": 1,
-    "pinned": null,
-    "file": "File:Deluxe sashimi platter 02.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Deluxe_sashimi_platter_02.jpg",
-    "author": "T.Tseng",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 29244,
-    "alternatives": [
-      "File:Deluxe sashimi platter 01.jpg",
-      "File:Deluxe sashimi platter 03.jpg",
-      "File:Salmon Sushi and Sashimi Platter - W Sushi.jpg",
-      "File:Freshippo sashimi platter.jpg",
-      "File:Sushi Sashimi Medium Platter - Yama-ya (2570349350).jpg"
-    ]
+    "source": "foodora",
+    "title": "Mix Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004627-parent/1ce003f1-b421-44f1-8550-cc493093817b.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 30658
   },
   "photo-x1": {
     "query": "rainbow roll sushi",
@@ -635,64 +541,40 @@
     ]
   },
   "photo-x2": {
-    "query": "tempura sushi roll",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Tempura Roll sushi at Mizuya.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Tempura_Roll_sushi_at_Mizuya.jpg",
-    "author": "julie corsi",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 25787,
-    "alternatives": [
-      "File:Sushi-Tempura Roll uncovered (24155104951).jpg",
-      "File:Sushi-Tempura Roll covered (24155104881).jpg",
-      "File:Teriyaki Chicken Sushi Roll and Avocado and Prawn Tempura Sushi Rolls - Sakura Kaiten Sushi.jpg",
-      "File:Spider Roll and Tempura Shrimp Roll fancy maki.jpg",
-      "File:Chicken Teriyaki Bento + Shrimp Tempura + California Rolls @ Hiro Sushi (5691301632).jpg"
-    ]
+    "source": "foodora",
+    "title": "Crunchy Salmon Roll",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757169/c787b831-24ef-4cd2-b12e-1231bd059629.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 32540
   },
   "photo-x3": {
-    "query": "alaska roll sushi",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Alaska Roll, Nijiya Market.JPG",
-    "page": "https://commons.wikimedia.org/wiki/File:Alaska_Roll,_Nijiya_Market.JPG",
-    "author": "BrokenSphere",
-    "license": "CC BY-SA 3.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 35561,
-    "alternatives": []
+    "source": "foodora",
+    "title": "Pink Alaska",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757181/83fbbb2a-fc23-4c2b-8f90-3579fde563ba.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 25299
   },
   "photo-x4": {
-    "query": null,
-    "pick": 0,
-    "pinned": "File:Spicy tuna roll.jpg",
-    "file": "File:Spicy tuna roll.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Spicy_tuna_roll.jpg",
-    "author": "CNEcija12345",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 32120,
-    "alternatives": []
+    "source": "foodora",
+    "title": "Spicy Tuna",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757170/a55e7f3d-eb8c-4814-938b-be1dcad718db.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 33826
   },
   "photo-x5": {
-    "query": "dragon roll sushi",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Golden Maki Vegetarian Dragon sushi roll.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Golden_Maki_Vegetarian_Dragon_sushi_roll.jpg",
-    "author": "Loozrboy",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 39554,
-    "alternatives": [
-      "File:Double dragon roll and mangodise roll (3433624078).jpg",
-      "File:Double dragon roll (3432813605).jpg",
-      "File:Double Dragon Roll (brightness adjusted) (3432983831).jpg",
-      "File:Spider Crab Roll, Dragon Roll, Salmon and Avocado Roll - Kenzan GPO AUD4.50, AUD4.10, AUD3.50 (3127711932).jpg",
-      "File:Double Dragon roll (not quite so bright) (3433802362).jpg"
-    ]
+    "source": "foodora",
+    "title": "Dragon Roll",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/12004669.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 15281
   },
   "photo-x6": {
     "query": "duck sushi roll",
@@ -709,70 +591,40 @@
     ]
   },
   "photo-x7": {
-    "query": "uramaki sushi roll",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Sushi1.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Sushi1.jpg",
-    "author": "tomek strabski (Strab on sxc.hu)",
-    "license": "CC BY-SA 2.5",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5",
-    "bytes": 38071,
-    "alternatives": [
-      "File:Sunny Sushi rainbow roll.JPG",
-      "File:Rainbow Roll Cake.png",
-      "File:Golden Maki Rainbow Roll sushi.jpg",
-      "File:Sen rainbow roll sushi 1.jpg",
-      "File:Sen rainbow roll sushi 2.jpg"
-    ]
+    "source": "foodora",
+    "title": "Sweet Power",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757179/465342e9-d04e-40cb-9177-9881e38561f0.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 26808
   },
   "photo-x8": {
-    "query": "cucumber avocado uramaki",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Atún Picante (Nikkei)-Spicy tuna 'uramaki', cucumber, avocado, cilantro, ají limo, puffed quinoa.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:At%C3%BAn_Picante_(Nikkei)-Spicy_tuna_%27uramaki%27,_cucumber,_avocado,_cilantro,_aj%C3%AD_limo,_puffed_quinoa.jpg",
-    "author": "Lou Stejskal",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 28797,
-    "alternatives": [
-      "File:Sunny Sushi rainbow roll.JPG",
-      "File:Rainbow Roll Cake.png",
-      "File:Golden Maki Rainbow Roll sushi.jpg",
-      "File:Sen rainbow roll sushi 1.jpg",
-      "File:Sen rainbow roll sushi 2.jpg"
-    ]
+    "source": "foodora",
+    "title": "Sweet Green",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757187/c482261d-50c0-47f3-a93d-0f61d8f5475e.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 34491
   },
   "photo-x9": {
-    "query": "california roll",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:California roll from Sarku Japan with wasabi and ginger.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:California_roll_from_Sarku_Japan_with_wasabi_and_ginger.jpg",
-    "author": "Ser Amantio di Nicolao",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 24175,
-    "alternatives": [
-      "File:Teriyaki chicken meal (with extra chicken) with white rice and vegetables, and a side order of California roll with wasabi and ginger, at Sarku Japan.jpg",
-      "File:California Sushi mit Kaviar (26545022496).jpg",
-      "File:California Rolls.JPG",
-      "File:California rolls de chez Hatori (Beaune, janvier 2021).jpg",
-      "File:Tempura California roll with tobiko.jpg"
-    ]
+    "source": "foodora",
+    "title": "Mikado Roll",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757186/17f7335c-2612-4fa4-a723-0919b7b0474d.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 32185
   },
   "photo-b1": {
-    "query": null,
-    "pick": 0,
-    "pinned": "File:Chinese honey sesame chicken (cropped).jpg",
-    "file": "File:Chinese honey sesame chicken (cropped).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Chinese_honey_sesame_chicken_(cropped).jpg",
-    "author": "Nithyasrm",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 37054,
-    "alternatives": []
+    "source": "foodora",
+    "title": "Sesam Chicken",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12980991/5d57217f-4be6-4523-bf00-53990a0c475b.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 30112
   },
   "photo-b2": {
     "query": "thai red curry chicken",
@@ -865,22 +717,13 @@
     ]
   },
   "photo-b7": {
-    "query": "kung pao chicken",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Kung Pao Chicken at Yujiayan Restaurant (20230510123120).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Kung_Pao_Chicken_at_Yujiayan_Restaurant_(20230510123120).jpg",
-    "author": "N509FZ",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 34825,
-    "alternatives": [
-      "File:Uncooked raw kung pao chicken.jpg",
-      "File:Kung Pao Chicken at Liqiaoshun Restaurant (20220310175424).jpg",
-      "File:Rice topped with Kung Pao Chicken at Beixinqiao (20221101114219).jpg",
-      "File:Kung-pao-shanghai.jpg",
-      "File:Kung Pao chicken (western version) -1.jpg"
-    ]
+    "source": "foodora",
+    "title": "Crispy Duck",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310728.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 16930
   },
   "photo-b8": {
     "query": "salmon teriyaki",
@@ -949,40 +792,22 @@
     "alternatives": []
   },
   "photo-b12": {
-    "query": "tteokbokki",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Korean.snacks-Tteokbokki-08.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Korean.snacks-Tteokbokki-08.jpg",
-    "author": "by jetalone (flickr)",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 27660,
-    "alternatives": [
-      "File:Chicken Rice Pasta - Korpan.jpg",
-      "File:Beef rice pasta - Korpan.jpg",
-      "File:Vegen rice pasta (spicy ver.) - Korpan.jpg",
-      "File:Vegen rice pasta (spicy ver.) - korpan.jpg",
-      "File:Tteokbokki making process step 3.jpg"
-    ]
+    "source": "foodora",
+    "title": "Fried with Vegetables",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038475/c9dd8a8a-3811-4b63-80fc-0e286bdf20ea.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 43193
   },
   "photo-b13": {
-    "query": "tteok-bokki",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Tteok-bokki 1.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Tteok-bokki_1.jpg",
-    "author": "Jens Ohlig",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 32202,
-    "alternatives": [
-      "File:Tteok-bokki of Bonchon.jpg",
-      "File:Tteok-bokki and kimbap at a Seoul snack bar.jpg",
-      "File:Tteok-bokki 6.jpg",
-      "File:Tteok-bokki 8.jpg",
-      "File:Tteok-bokki 5.jpg"
-    ]
+    "source": "foodora",
+    "title": "Fried with Schrimp",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038479/f9357be4-ef76-4316-8005-e0d92ecdcdb0.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 30557
   },
   "photo-b14": {
     "query": "jiaozi dumplings plate",
@@ -1046,19 +871,13 @@
     ]
   },
   "photo-v3": {
-    "query": "goi cuon shrimp",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Sommerruller med rejer og svinekød (5674880455).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Sommerruller_med_rejer_og_svinek%C3%B8d_(5674880455).jpg",
-    "author": "cyclonebill from Copenhagen, Denmark",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 26006,
-    "alternatives": [
-      "File:Viet soft rolls with a black bean dipping sauce.jpg",
-      "File:Spring rolls with peanut sauce.jpg"
-    ]
+    "source": "foodora",
+    "title": "Summerrolls Shrimp",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/12004613.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 13402
   },
   "photo-v4": {
     "query": "spring rolls fried",
@@ -1079,22 +898,13 @@
     ]
   },
   "photo-v5": {
-    "query": "gyoza",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Gyoza no Antei - 3.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Gyoza_no_Antei_-_3.jpg",
-    "author": "Enming Yan / 闫恩铭",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 32289,
-    "alternatives": [
-      "File:Gyoza - Tora.jpg",
-      "File:Jiaozi-close-look.jpg",
-      "File:10pc Gyoza plate.jpg",
-      "File:Gyoza Houhi.jpg",
-      "File:Missgyoza production gyoza dumpling Manufacturer.jpg"
-    ]
+    "source": "foodora",
+    "title": "Veggie Gyoza 6 Stk.",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038464/f0a647a7-0599-4f60-82b2-d9971af9aeb7.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 32665
   },
   "photo-v6": {
     "query": "gyoza",
@@ -1337,22 +1147,13 @@
     ]
   },
   "photo-u2": {
-    "query": "yaki udon",
-    "pick": 1,
-    "pinned": null,
-    "file": "File:Seafood Yaki Udon - Taro 2025-10-24.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Seafood_Yaki_Udon_-_Taro_2025-10-24.jpg",
-    "author": "Andy Li",
-    "license": "CC0",
-    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 28417,
-    "alternatives": [
-      "File:Yaki udon and tofu curry rice - Pompoko.jpg",
-      "File:Yaki-udon.jpg",
-      "File:Yaki udon in Daegu.jpg",
-      "File:Udon by udono.jpg",
-      "File:Black pepper tofu fried udon - Stir Fry by CK.jpg"
-    ]
+    "source": "foodora",
+    "title": "Yaki Udon Toriniku",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038471/edd4847a-85a0-48eb-a56f-f2011bcb2160.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 25183
   },
   "photo-u3": {
     "query": null,
@@ -1481,22 +1282,13 @@
     ]
   },
   "photo-dr-cola": {
-    "query": "glass of cola with ice",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Tumbler of cola with ice (cropped).jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Tumbler_of_cola_with_ice_(cropped).jpg",
-    "author": "Simon Cousins from High Wycombe, England",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 20068,
-    "alternatives": [
-      "File:Glass of Cola.jpg",
-      "File:Glass cola.jpg",
-      "File:Bottle of Coca-Cola with a glass (52267699916).jpg",
-      "File:Ice in a glass.jpg",
-      "File:Coca cola glass.jpg"
-    ]
+    "source": "foodora",
+    "title": "Coca-Cola 0,5l",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/products/11310680.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 6340
   },
   "photo-dr-eistee": {
     "query": "iced tea glass",
@@ -1535,16 +1327,13 @@
     ]
   },
   "photo-dr-aloe": {
-    "query": null,
-    "pick": 0,
-    "pinned": "File:Grapefruit and aloe jelly drink.jpg",
-    "file": "File:Grapefruit and aloe jelly drink.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Grapefruit_and_aloe_jelly_drink.jpg",
-    "author": "ben dalton",
-    "license": "CC BY-SA 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 27109,
-    "alternatives": []
+    "source": "foodora",
+    "title": "Aloe Vera 0,5l",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/products/11310686.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 6840
   },
   "photo-dr-apple": {
     "query": null,
@@ -1577,22 +1366,13 @@
     ]
   },
   "photo-dr-redbull": {
-    "query": "red bull energy drink can",
-    "pick": 0,
-    "pinned": null,
-    "file": "File:Red Bull energy drinks.jpg",
-    "page": "https://commons.wikimedia.org/wiki/File:Red_Bull_energy_drinks.jpg",
-    "author": "Oto Zapletal",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 29042,
-    "alternatives": [
-      "File:Red Bell Energy Drink 250ml can.jpg",
-      "File:Red Bull Energy Drink, Dongguan, China 1 May 2024.jpg",
-      "File:Energy Drink (49536560336).jpg",
-      "File:Energy drinks collection.jpg",
-      "File:Teneke kutulu içecekler.jpg"
-    ]
+    "source": "foodora",
+    "title": "Red Bull Energy Drink, 250ml",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310689.jpg",
+    "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
+    "author": "Chiri Kitchen",
+    "license": null,
+    "bytes": 10415
   },
   "photo-beer-wiesel-fass": {
     "query": "glass of beer with foam",

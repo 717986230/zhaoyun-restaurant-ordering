@@ -1,0 +1,119 @@
+{
+  "_comment": "The restaurant's own dish photos on its foodora page (https://www.foodora.at/restaurant/ymou/chiri-kitchen), per dish: the foodora product it is (`title`) and the image (`url`). Only photos without foodora's \"Referenzbild\" / \"Das gezeigte Bild\" stamp are listed: those are foodora's stock pictures, not this kitchen's. scripts/import-foodora-photos.mjs fetches them into server/dish-photos/.",
+  "photo-r3": {
+    "title": "Ramen with Beef",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757167/6524abc3-845c-4bf1-9761-5fd301c6cd6b.jpg"
+  },
+  "photo-t1": {
+    "title": "Szechuan Boiled Beef",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310717.jpg"
+  },
+  "photo-t2": {
+    "title": "Spicy Crispy Chicken",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310719.jpg"
+  },
+  "photo-t3": {
+    "title": "Spicy Crispy King Prawns",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038489/e1fa7e6c-ee82-4825-8c80-ef694c61a703.jpg"
+  },
+  "photo-a1": {
+    "title": "Veggie Bao",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/12010495.jpg"
+  },
+  "photo-m3": {
+    "title": "Avocado Maki",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310669.jpg"
+  },
+  "photo-s1-9": {
+    "title": "Sake Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004628-parent/fc2e9b7d-6f15-4869-99eb-fe189705e91b.jpg"
+  },
+  "photo-s1-18": {
+    "title": "Sake Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004628-parent/fc2e9b7d-6f15-4869-99eb-fe189705e91b.jpg"
+  },
+  "photo-s2-9": {
+    "title": "Sake Maguro Sashimi Set",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004629-parent/94ceb481-5d49-4ae2-bbe3-8169d9125c6c.jpg"
+  },
+  "photo-s2-18": {
+    "title": "Sake Maguro Sashimi Set",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004629-parent/94ceb481-5d49-4ae2-bbe3-8169d9125c6c.jpg"
+  },
+  "photo-s3-9": {
+    "title": "Mix Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004627-parent/1ce003f1-b421-44f1-8550-cc493093817b.jpg"
+  },
+  "photo-s3-18": {
+    "title": "Mix Set Sashimi",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12004627-parent/1ce003f1-b421-44f1-8550-cc493093817b.jpg"
+  },
+  "photo-x2": {
+    "title": "Crunchy Salmon Roll",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757169/c787b831-24ef-4cd2-b12e-1231bd059629.jpg"
+  },
+  "photo-x3": {
+    "title": "Pink Alaska",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757181/83fbbb2a-fc23-4c2b-8f90-3579fde563ba.jpg"
+  },
+  "photo-x4": {
+    "title": "Spicy Tuna",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757170/a55e7f3d-eb8c-4814-938b-be1dcad718db.jpg"
+  },
+  "photo-x5": {
+    "title": "Dragon Roll",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/12004669.jpg"
+  },
+  "photo-x7": {
+    "title": "Sweet Power",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757179/465342e9-d04e-40cb-9177-9881e38561f0.jpg"
+  },
+  "photo-x8": {
+    "title": "Sweet Green",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757187/c482261d-50c0-47f3-a93d-0f61d8f5475e.jpg"
+  },
+  "photo-x9": {
+    "title": "Mikado Roll",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11757186/17f7335c-2612-4fa4-a723-0919b7b0474d.jpg"
+  },
+  "photo-b1": {
+    "title": "Sesam Chicken",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/12980991/5d57217f-4be6-4523-bf00-53990a0c475b.jpg"
+  },
+  "photo-b7": {
+    "title": "Crispy Duck",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310728.jpg"
+  },
+  "photo-b12": {
+    "title": "Fried with Vegetables",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038475/c9dd8a8a-3811-4b63-80fc-0e286bdf20ea.jpg"
+  },
+  "photo-b13": {
+    "title": "Fried with Schrimp",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038479/f9357be4-ef76-4316-8005-e0d92ecdcdb0.jpg"
+  },
+  "photo-v3": {
+    "title": "Summerrolls Shrimp",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/12004613.jpg"
+  },
+  "photo-v5": {
+    "title": "Veggie Gyoza 6 Stk.",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038464/f0a647a7-0599-4f60-82b2-d9971af9aeb7.jpg"
+  },
+  "photo-u2": {
+    "title": "Yaki Udon Toriniku",
+    "url": "https://images.deliveryhero.io/image/global-menu-service/MJM_AT/vendor/ymou/product/11038471/edd4847a-85a0-48eb-a56f-f2011bcb2160.jpg"
+  },
+  "photo-dr-cola": {
+    "title": "Coca-Cola 0,5l",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/products/11310680.jpg"
+  },
+  "photo-dr-aloe": {
+    "title": "Aloe Vera 0,5l",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/products/11310686.jpg"
+  },
+  "photo-dr-redbull": {
+    "title": "Red Bull Energy Drink, 250ml",
+    "url": "https://foodora.dhmedia.io/image/fd-mj/Products/11310689.jpg"
+  }
+}

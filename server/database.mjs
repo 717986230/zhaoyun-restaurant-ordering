@@ -730,6 +730,13 @@ function seedPhotos(sql, db) {
     for (const photo of photos) {
       if (sql.get("SELECT 1 AS seen FROM media_files WHERE id = ?", photo.fileId)) continue;
       sql.run("INSERT INTO media_files (id, content_type, bytes, credit, source_url, created_at) VALUES (?, ?, ?, ?, ?, ?)", photo.fileId, photo.contentType, photo.bytes, photo.credit, photo.sourceUrl, now());
+      // A new photo for a dish still showing the one seeded before takes its
+      // place; a photo the owner uploaded is not a seeded one and stays.
+      const seeded = sql.get("SELECT id FROM product_media WHERE product_id = ? AND id LIKE 'seed-%'", photo.productId);
+      if (seeded) {
+        sql.run("UPDATE product_media SET url = ? WHERE id = ?", `/media/${photo.fileId}`, seeded.id);
+        continue;
+      }
       if (sql.get("SELECT id FROM products WHERE id = ?", photo.productId) && !sql.get("SELECT COUNT(*) AS count FROM product_media WHERE product_id = ?", photo.productId).count) {
         sql.run("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", `seed-${photo.fileId}`, photo.productId, "image", `/media/${photo.fileId}`, null, 0, now());
       }

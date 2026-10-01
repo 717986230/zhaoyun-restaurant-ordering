@@ -22,7 +22,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import sharp from "sharp";
+import { shrink } from "./photo-shrink.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "server", "dish-photos");
@@ -33,7 +33,6 @@ delete wanted._comment;
 const API = "https://commons.wikimedia.org/w/api.php";
 // Wikimedia asks every client to say who it is.
 const USER_AGENT = "zhaoyun-menu-photos/1.0 (https://github.com/717986230/zhaoyun-restaurant-ordering)";
-const MAX_BYTES = 45_000;
 const FREE = /^(cc0|public domain|pd|cc by(-sa)? \d(\.\d)?( [a-z]+)?|cc-by(-sa)?-\d)/i;
 const NOT_FREE = /\b(nc|nd)\b|non-?commercial|no-?deriv/i;
 
@@ -91,20 +90,6 @@ function describe(page, trusted = false) {
   };
 }
 
-/**
- * 480×360 and at most MAX_BYTES: hex-encoded, one photo is one SQL statement
- * in the D1 migration, and D1 refuses a statement over 100 KB.
- */
-async function shrink(buffer) {
-  for (const width of [480, 400]) {
-    for (let quality = 78; quality >= 36; quality -= 6) {
-      const out = await sharp(buffer).rotate().resize(width, (width * 3) / 4, { fit: "cover", position: "attention" }).jpeg({ quality, mozjpeg: true }).toBuffer();
-      if (out.length <= MAX_BYTES) return out;
-    }
-  }
-  throw new Error(`cannot get the photo under ${MAX_BYTES} bytes`);
-}
-
 async function main() {
   mkdirSync(outDir, { recursive: true });
   const credits = existsSync(creditsFile) ? JSON.parse(readFileSync(creditsFile, "utf8")) : {};
@@ -115,6 +100,9 @@ async function main() {
 
   for (const [id, want] of Object.entries(wanted)) {
     const have = credits[id];
+    // The restaurant's own photo, taken from its foodora page: never swapped
+    // for a stock one, not even on a forced run.
+    if (have?.source === "foodora") continue;
     const unchanged = have && have.query === want.query && (have.pick ?? 0) === (want.pick ?? 0) && (have.pinned ?? null) === (want.file ?? null);
     if (!force && unchanged && existsSync(path.join(outDir, `${id}.jpg`))) continue;
 

@@ -14,9 +14,13 @@ import { fileURLToPath } from "node:url";
 
 export const DISH_PHOTO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "dish-photos");
 
-/** "Jane Doe · CC BY-SA 4.0 · Wikimedia Commons" — what the menu prints under the photo. */
+/**
+ * What the menu prints under the photo: "Jane Doe · CC BY-SA 4.0 · Wikimedia
+ * Commons", or "Chiri Kitchen · foodora" for the restaurant's own.
+ */
 export function creditLine(credit) {
-  return [credit.author, credit.license, "Wikimedia Commons"].filter(Boolean).join(" · ");
+  const source = credit.source === "foodora" ? "foodora" : "Wikimedia Commons";
+  return [credit.author, credit.license, source].filter(Boolean).join(" · ");
 }
 
 /**
@@ -39,7 +43,9 @@ export function dishPhotos(directory = DISH_PHOTO_DIR) {
       contentType: "image/jpeg",
       bytes,
       credit: creditLine(credit),
-      sourceUrl: credit.page || null
+      sourceUrl: credit.page || null,
+      // Which ones replace a photo an earlier deploy already put in place.
+      replaces: credit.source === "foodora"
     }];
   });
 }

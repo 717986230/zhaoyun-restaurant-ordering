@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { generate, generatePhotos, generateSets, committed, PHOTO_MIGRATION_LAST } from "../../scripts/export-d1-migrations.mjs";
+import { generate, generatePhotos, generatePhotoRefresh, generateSets, committed, PHOTO_MIGRATION_LAST } from "../../scripts/export-d1-migrations.mjs";
 import { dishPhotos } from "../dish-photos.mjs";
 
 function schemaOf(db) {
@@ -58,7 +58,7 @@ const incremental = [
 }))
   // The photo parts each create media_files, so each has to stand alone on a
   // database deployed before that table existed.
-  .concat(committed().photos.map((part) => ({ file: part.name, drop: "DROP TABLE media_files;", sql: part.sql })));
+  .concat([...committed().photos, ...committed().refresh].map((part) => ({ file: part.name, drop: "DROP TABLE media_files;", sql: part.sql })));
 
 test("the committed migrations match the schema and seed the server creates", () => {
   const generated = generate();
@@ -66,6 +66,7 @@ test("the committed migrations match the schema and seed the server creates", ()
   assert.equal(onDisk.schema, generated.schema, "migrations/0001_init.sql is stale — run: npm run d1:migrations");
   assert.equal(onDisk.catalog, generated.catalog, "migrations/0002_seed_catalog.sql is stale — run: npm run d1:migrations");
   assert.deepEqual(onDisk.photos, generatePhotos(), "the dish photo migrations are stale — run: npm run d1:migrations");
+  assert.deepEqual(onDisk.refresh, generatePhotoRefresh(), "the foodora photo migrations are stale — run: npm run d1:migrations");
   assert.equal(onDisk.sets, generateSets(), "migrations/0050_set_menus.sql is stale — run: npm run d1:migrations");
   // The photo parts are numbered from 0005 up; they must never reach the set menus' number.
   for (const part of onDisk.photos) assert.ok(Number(part.name.slice(0, 4)) <= PHOTO_MIGRATION_LAST, `${part.name} would collide with 0050`);
@@ -116,6 +117,71 @@ test("the photo migrations give D1 the dishes' photos, byte for byte", () => {
   if (photos.length) assert.deepEqual(withOwn.map((item) => item.url), ["/media/own.jpg"]);
   // Apart from the dish given its own picture above, D1 and the Node server agree.
   assert.deepEqual(migrated.media.filter((item) => item.url !== "/media/own.jpg"), seeded.filter((item) => item.product_id !== photos[0]?.productId));
+});
+
+/**
+ * A D1 that took the photo parts before the restaurant's own foodora photos
+ * existed still shows the old pictures: those parts never run again. The
+ * refresh swaps each seeded picture for the new one and drops the old bytes,
+ * and leaves alone a picture the owner uploaded.
+ */
+test("the foodora photo migrations replace the seeded photos an earlier deploy put in D1", () => {
+  const sql = committed();
+  const replacing = dishPhotos().filter((photo) => photo.replaces);
+  assert.ok(replacing.length > 0, "expected photos from foodora");
+  assert.ok(sql.refresh.length > 0, "expected the foodora photo migrations");
+  const [owned, ...seededBefore] = replacing;
+  const migrated = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    db.exec("CREATE TABLE IF NOT EXISTS media_files (id TEXT PRIMARY KEY, content_type TEXT NOT NULL, bytes BLOB NOT NULL, credit TEXT, source_url TEXT, created_at TEXT NOT NULL)");
+    const media = db.prepare("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, 'image', ?, NULL, 0, 'x')");
+    const bytes = db.prepare("INSERT INTO media_files (id, content_type, bytes, credit, source_url, created_at) VALUES (?, 'image/jpeg', X'00', 'old', NULL, 'x')");
+    for (const photo of seededBefore) {
+      bytes.run(`dish-${photo.productId}-old.jpg`);
+      media.run(`seed-dish-${photo.productId}-old.jpg`, photo.productId, `/media/dish-${photo.productId}-old.jpg`);
+    }
+    media.run("own", owned.productId, "/media/own.jpg");
+    for (const part of sql.refresh) db.exec(part.sql);
+    const result = {
+      media: db.prepare("SELECT product_id, url FROM product_media").all(),
+      files: db.prepare("SELECT id FROM media_files").all().map((row) => row.id)
+    };
+    db.close();
+    return result;
+  });
+
+  for (const part of sql.refresh) {
+    for (const statement of part.sql.split("\n")) assert.ok(statement.length < 100_000, `${part.name} has a ${statement.length}-byte statement`);
+  }
+  for (const photo of seededBefore) {
+    assert.deepEqual(migrated.media.filter((item) => item.product_id === photo.productId).map((item) => item.url), [`/media/${photo.fileId}`]);
+    assert.ok(migrated.files.includes(photo.fileId), `${photo.fileId} is missing from D1`);
+    assert.ok(!migrated.files.includes(`dish-${photo.productId}-old.jpg`), `the old photo of ${photo.productId} is still stored`);
+  }
+  assert.deepEqual(migrated.media.filter((item) => item.product_id === owned.productId).map((item) => item.url), ["/media/own.jpg"]);
+});
+
+/**
+ * The Node server's database gets the same swap when it starts: a dish still
+ * showing a photo seeded earlier shows the new one.
+ */
+test("the Node server swaps a seeded photo for its replacement on start", () => {
+  const [photo] = dishPhotos().filter((item) => item.replaces);
+  const url = inTempDatabase((file) => {
+    createDatabase(file).close();
+    let db = new DatabaseSync(file);
+    db.prepare("DELETE FROM media_files WHERE id = ?").run(photo.fileId);
+    db.prepare("UPDATE product_media SET url = '/media/dish-old.jpg' WHERE product_id = ?").run(photo.productId);
+    db.close();
+    createDatabase(file).close();
+    db = new DatabaseSync(file);
+    const rows = db.prepare("SELECT url FROM product_media WHERE product_id = ?").all(photo.productId).map((row) => row.url);
+    db.close();
+    return rows;
+  });
+  assert.deepEqual(url, [`/media/${photo.fileId}`]);
 });
 
 /**
