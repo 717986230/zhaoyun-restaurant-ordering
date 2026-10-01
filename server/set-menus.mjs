@@ -33,7 +33,9 @@ export const SET_MENUS = [
     id: "set-hot-pot-for-two", sku: "SET-3", price: 59.9, people: "2 Personen", time: "35 min",
     names: { zh: "双人火锅套餐", de: "Hot-Pot-Menü für zwei", en: "Hot Pot Set for Two" },
     description: "Rind- und Meeresfrüchte-Hot-Pot, Reis und Mochi zum Abschluss.",
-    items: [["photo-h2", 1], ["photo-h3", 1], ["photo-side-rice", 2], ["photo-d1", 2]]
+    items: [["photo-h2", 1], ["photo-h3", 1], ["photo-side-rice", 2], ["photo-d1", 2]],
+    // Off the menu with the hot pot dishes (migrations/0068_hide_hot_pot.sql).
+    published: false
   },
   {
     id: "set-szechuan", sku: "SET-4", price: 33.9, people: "2 Personen", time: "25 min",
@@ -83,6 +85,7 @@ export function setMenuProducts(dishes, firstSortOrder = 1000) {
       details: { time: set.time, people: set.people, level: "", ingredients: "" },
       bundleItems: set.items.map(([productId, quantity]) => ({ productId, quantity })),
       sortOrder: firstSortOrder + index,
+      published: set.published !== false,
       printStation: "kitchen",
       vatPercent: 10
     }];

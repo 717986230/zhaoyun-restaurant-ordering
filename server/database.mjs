@@ -702,6 +702,7 @@ function seedDishes(sql, db) {
     appearance: { art: dish.art, pattern: dish.pattern },
     modifiers: dish.modifiers || [],
     sortOrder: index,
+    published: dish.published !== false,
     printStation: dish.station || (dish.kind === "drink" ? "bar" : dish.kind === "sushi" ? "sushi" : "kitchen")
   })));
 }

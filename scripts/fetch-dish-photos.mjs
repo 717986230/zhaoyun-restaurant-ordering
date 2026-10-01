@@ -103,7 +103,7 @@ async function main() {
     // The restaurant's own photo, taken from its foodora page: never swapped
     // for a stock one, not even on a forced run.
     if (have?.source === "foodora") continue;
-    const unchanged = have && have.query === want.query && (have.pick ?? 0) === (want.pick ?? 0) && (have.pinned ?? null) === (want.file ?? null);
+    const unchanged = have && (have.query ?? null) === (want.query ?? null) && (have.pick ?? 0) === (want.pick ?? 0) && (have.pinned ?? null) === (want.file ?? null);
     if (!force && unchanged && existsSync(path.join(outDir, `${id}.jpg`))) continue;
 
     try {
