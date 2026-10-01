@@ -51,7 +51,9 @@ const incremental = [
   { file: "0063_delivery_orders.sql", drop: "DROP INDEX idx_delivery_orders_status; DROP INDEX idx_delivery_orders_created; DROP TABLE delivery_orders;" },
   { file: "0064_product_stock.sql", drop: "DROP TABLE product_stock;" },
   { file: "0065_cash_drawer.sql", drop: "DROP INDEX idx_drawer_movements_session; DROP TABLE drawer_movements; DROP INDEX idx_drawer_sessions_closed; DROP TABLE drawer_sessions;" },
-  { file: "0066_email_verification.sql", drop: "DROP TABLE mail_outbox; DROP TABLE customer_verified_emails; DROP INDEX idx_email_codes_customer; DROP TABLE email_codes;" }
+  { file: "0066_email_verification.sql", drop: "DROP TABLE mail_outbox; DROP TABLE customer_verified_emails; DROP INDEX idx_email_codes_customer; DROP TABLE email_codes;" },
+  // Data only: it changes no table, on any database.
+  { file: "0068_hide_hot_pot.sql", drop: "" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")
@@ -272,6 +274,27 @@ test("the incremental migrations are no-ops on a fresh database and bring a depl
     });
     assert.deepEqual(deployed, expected, `${migration.file} must give an already-deployed database what it adds`);
   }
+});
+
+/**
+ * 0068 hides hot pot: its dishes and the hot pot set leave the guest menu, so
+ * its tab goes too, and every other dish stays as it was.
+ */
+test("0068 takes the hot pot dishes and the hot pot set off the menu, nothing else", () => {
+  const sql = committed();
+  const result = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    db.exec(sql.sets);
+    db.exec(readFileSync(path.join(migrationsDir, "0068_hide_hot_pot.sql"), "utf8"));
+    const rows = db.prepare("SELECT id, category, published FROM products").all();
+    db.close();
+    return rows;
+  });
+  const hidden = result.filter((row) => !row.published).map((row) => row.id).sort();
+  assert.deepEqual(hidden, ["photo-h1", "photo-h2", "photo-h3", "photo-h4", "set-hot-pot-for-two"]);
+  assert.ok(result.filter((row) => row.published).every((row) => row.category !== "HOT POT"));
 });
 
 /**
