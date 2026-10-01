@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-01（四）· 菜品图片：换成店里自己在 foodora 上的照片
+
+### Changed
+
+- **29 道菜换成 Chiri Kitchen 自己在 foodora 上的照片**，替换原来 Wikimedia Commons 的图：牛肉拉面、水煮牛肉、辣子鸡、香辣虾、素食刈包、牛油果卷、三种刺身拼盘（各两种份量）、8 款 Chiri Rolls、芝麻鸡、宫保脆皮鸭、两款辣炒年糕、虾仁春卷、素食锅贴、鸡肉炒乌冬、可乐、芦荟汁、红牛。照片下的署名为「Chiri Kitchen · foodora」。
+  - 印着 foodora「Referenzbild」/「Das gezeigte Bild」字样的是 foodora 的通用示意图，不是店里的照片，没有用，那些菜保留原图。
+  - 线上数据库由迁移 0067 替换：只换仍在用原始种子图片的菜，店主在管理台自己上传过照片的菜不动；旧图片数据随之删除。
+- 对应关系在 `scripts/foodora-photos.json`，导入脚本 `scripts/import-foodora-photos.mjs`；Wikimedia 抓图脚本不会再覆盖这些照片。
+
 ## 2026-09-30（三）· 菜单：饮品合并到「酒水」
 
 ### Changed
