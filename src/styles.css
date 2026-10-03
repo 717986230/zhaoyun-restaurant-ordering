@@ -1517,7 +1517,9 @@ html.plt-android .menu.detail-open .stack {
   font-weight: 500;
 }
 
-.dish-options-group span {
+/* Only where the options are read, not chosen: a choosable option is a pill
+   already (its label), and the span in it drew a second one inside. */
+.dish-options:not(.choosing) .dish-options-group span {
   padding: 3px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -4256,3 +4258,28 @@ button:focus-visible,
   backdrop-filter: none;
 }
 
+
+/* ---------------------------------------------------------------------------
+   Names that wrap well (2026-10): a long dish name broke with one word left
+   alone on the second line ("Salmon Tuna Sashimi 9 / pcs"); the browser now
+   evens the lines out, so it reads "Salmon Tuna / Sashimi 9 pcs".
+   ------------------------------------------------------------------------ */
+.dish-card .row-text h3,
+.dish-card .row-text p,
+.detail-heading h3 {
+  text-wrap: balance;
+}
+
+/* The cart's note is a label over its field, not a card: the box around it
+   and the field's own border made a frame inside a frame. */
+.note-label {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 4px 0 12px;
+}
+
+/* A choosable group's name lines up with its chips (a legend is indented by default). */
+.dish-options.choosing .dish-options-group legend {
+  padding: 0;
+}

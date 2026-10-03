@@ -363,6 +363,16 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
     dispatch({ type: "close-product" });
   }
 
+  // Escape closes the dish, as it closes a sheet — unless a sheet is open over
+  // it (signing in to keep a favourite), which then closes first on its own.
+  const sheetOpen = Boolean(state.sheet);
+  useEffect(() => {
+    if (sheetOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") dispatch({ type: "close-product" }); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen, dispatch]);
+
   return <motion.div id="dishOverlay" className="dish-overlay open" aria-hidden="false"
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
     transition={{ duration: seconds(DURATION.backdrop), ease: EASE }}
