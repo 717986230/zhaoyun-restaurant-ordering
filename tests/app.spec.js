@@ -376,6 +376,14 @@ test("detail flip is animated when the device does not ask for reduced motion", 
   await expect(page.locator(".detail-flip-inner")).toHaveCSS("transform", flippedTransform, { timeout: 2000 });
 });
 
+test("Escape closes an open dish, as it closes a sheet", async ({ page }) => {
+  await page.locator(".dish-card").first().click();
+  await expect(page.locator("#dishOverlay")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#dishOverlay")).toHaveCount(0);
+  await expect(page.locator("#searchBtn")).toBeEnabled();
+});
+
 test("layout keeps the menu's main controls visible", async ({ page }) => {
   await expect(page.locator(".topbar")).toBeInViewport();
   await expect(page.locator("#chips")).toBeInViewport();
