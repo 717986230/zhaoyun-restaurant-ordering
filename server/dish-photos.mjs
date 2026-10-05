@@ -44,8 +44,8 @@ export function dishPhotos(directory = DISH_PHOTO_DIR) {
       bytes,
       credit: creditLine(credit),
       sourceUrl: credit.page || null,
-      // Which ones replace a photo an earlier deploy already put in place.
-      replaces: credit.source === "foodora"
+      // At 800×600: replaces the 480×360 copy an earlier deploy put in D1.
+      hd: Boolean(credit.hd)
     }];
   });
 }

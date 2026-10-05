@@ -8,14 +8,15 @@
     "author": "Wiki Asmah",
     "license": "CC BY 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
-    "bytes": 39714,
+    "bytes": 43036,
     "alternatives": [
       "File:Vegetarian Ramen 20260716 - 01.jpg",
       "File:Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49021050081).jpg",
       "File:Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49020524758).jpg",
       "File:Pumpkin @ Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49020524178).jpg",
       "File:Ajitama egg @ Vegetarian ramen @ Yatta ! Ramen @ Annecy-le-Vieux (49020522648).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-r2": {
     "query": "shoyu ramen chicken chashu",
@@ -26,8 +27,9 @@
     "author": "Andy Li",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 31599,
-    "alternatives": []
+    "bytes": 43600,
+    "alternatives": [],
+    "hd": true
   },
   "photo-r3": {
     "source": "foodora",
@@ -36,7 +38,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 38717
+    "bytes": 44836,
+    "hd": true
   },
   "photo-r4": {
     "query": "shrimp ramen",
@@ -47,14 +50,15 @@
     "author": "Ceeseven",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 27573,
+    "bytes": 43501,
     "alternatives": [
       "File:Shrimp tonkotsu ramen - Goemon Hand Roll Bar 2024-09-12.jpg",
       "File:Shrimp ramen in garlic chili paste (4838883909).jpg",
       "File:Shrimp and pork-bone salt ramen of Ramen Haruki.jpg",
       "File:Mmm... spicy shrimp ramen (5620912624).jpg",
       "File:Mmm... spicy shrimp ramen (6802589509).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-t1": {
     "source": "foodora",
@@ -63,7 +67,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 20943
+    "bytes": 42762,
+    "hd": true
   },
   "photo-t2": {
     "source": "foodora",
@@ -72,7 +77,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 17902
+    "bytes": 39944,
+    "hd": true
   },
   "photo-t3": {
     "source": "foodora",
@@ -81,7 +87,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 36632
+    "bytes": 43093,
+    "hd": true
   },
   "photo-t4": {
     "query": "mapo tofu",
@@ -92,14 +99,15 @@
     "author": "Sichuanfoodlover",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 31879,
+    "bytes": 43956,
     "alternatives": [
       "File:Mapo Tofu with rice.jpg",
       "File:Chen Mapo Tofu.jpg",
       "File:Mapo tofu in big bowl.jpg",
       "File:Mapo Tofu (8840681150).jpg",
       "File:Mapo Tofu (麻婆豆腐).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-t4c": {
     "query": "mapo tofu",
@@ -110,14 +118,15 @@
     "author": "ZhengZhou",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 34128,
+    "bytes": 44654,
     "alternatives": [
       "File:Authentic Mapo Tofu.jpg",
       "File:Mapo Tofu with rice.jpg",
       "File:Mapo tofu in big bowl.jpg",
       "File:Mapo Tofu (8840681150).jpg",
       "File:Mapo Tofu (麻婆豆腐).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-a1": {
     "source": "foodora",
@@ -126,7 +135,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 16003
+    "bytes": 42657,
+    "hd": true
   },
   "photo-a2": {
     "query": "gua bao",
@@ -137,14 +147,15 @@
     "author": "Coentor",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 20130,
+    "bytes": 38991,
     "alternatives": [
       "File:Fish Gua Bao 2023.jpg",
       "File:Gua bao a València. 刈包.jpg",
       "File:Taiwanese Gua Bao @ Bao & Bing, London.jpg",
       "File:Gua Bao VLC - 3.jpeg",
       "File:Gua Bao VLC - 2.jpeg"
-    ]
+    ],
+    "hd": true
   },
   "photo-a3": {
     "query": "gua bao",
@@ -155,14 +166,15 @@
     "author": "Coentor",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 15458,
+    "bytes": 40852,
     "alternatives": [
       "File:Fish Gua Bao 2023.jpg",
       "File:Gua bao a València. 刈包.jpg",
       "File:Gua Bao VLC - 1.jpeg",
       "File:Taiwanese Gua Bao @ Bao & Bing, London.jpg",
       "File:Gua Bao VLC - 2.jpeg"
-    ]
+    ],
+    "hd": true
   },
   "photo-a4": {
     "query": "peking duck bun",
@@ -173,10 +185,11 @@
     "author": "Peachyeung316",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 21107,
+    "bytes": 41329,
     "alternatives": [
       "File:Yank Sing Peking Duck (24441687246).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-h1": {
     "query": "vegetable hot pot chinese",
@@ -187,14 +200,15 @@
     "author": "Hollyhe888",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 37549,
+    "bytes": 44639,
     "alternatives": [
       "File:Thai suki, Thai hot pot ingredients, Bangkok, Thailand.jpg",
       "File:Thai suki, Thai hot pot preparation, Dining in Bangkok, Thailand.jpg",
       "File:Hot pot 19.03.16.jpg",
       "File:SZ 深圳 Shenzhen 南山區 Nanshan 萬科里東里 China Vanke Lane In Street East Mall shop 昌井韓國烤肉自助餐廳 ChangJing Korean Barbecue Meat Buffet Restaurant n hot pot food July 2025 R12S 31.jpg",
       "File:SZ 深圳 Shenzhen 南山區 Nanshan 萬科里東里 China Vanke Lane In Street East Mall shop 昌井韓國烤肉自助餐廳 ChangJing Korean Barbecue Meat Buffet Restaurant n hot pot food July 2025 R12S 33.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-h2": {
     "query": "beef hot pot",
@@ -205,14 +219,15 @@
     "author": "N509FZ",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 41654,
+    "bytes": 43395,
     "alternatives": [
       "File:Beef hot pot.jpg",
       "File:Chaoshan Cuisine3.jpg",
       "File:Freshippo family portrait hot pot beef slices.jpg",
       "File:Mok Beef King Hot Pot in Tuen Mun.jpg",
       "File:Raw Beef Ribeye Slices for Hot Pot.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-h3": {
     "query": "seafood steamboat",
@@ -223,14 +238,15 @@
     "author": "Wee Keat Chin",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 32970,
+    "bytes": 43697,
     "alternatives": [
       "File:Kupang, lokan dan mentarang Kak Jue 20250619 200234.jpg",
       "File:Processed seafood.jpg",
       "File:Cherry Point and Cowart's Wharf, Virginia Historical Marker No. O-53, Lottsburg, Virginia (14506245023).jpg",
       "File:Jeju Island 20141128 31 (15734917147).jpg",
       "File:Jeju Island 20141128 33 (15298415914).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-h4": {
     "query": "instant-boiled mutton",
@@ -241,14 +257,15 @@
     "author": "N509FZ",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 35855,
+    "bytes": 42416,
     "alternatives": [
       "File:Instant-boiled mutton hot pot at Yangfang Shengli before dipping (20200111153525).jpg",
       "File:Instant-boiled mutton with sesame sauce.jpg",
       "File:Northeast China Style Instant-boiled Mutton Hot Pot at Louwailou in Changchun 20260318.jpg",
       "File:Instant-boiled mutton.JPG",
       "File:Instant-boiled mutton of Beijing.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n1-6": {
     "query": "salmon nigiri",
@@ -259,14 +276,15 @@
     "author": "Wilfredor",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 29279,
+    "bytes": 41598,
     "alternatives": [
       "File:Flower Love Sushi.jpg",
       "File:Various sushi, beautiful October night at midnight.jpg",
       "File:Nigiri Sushi (26478725732).jpg",
       "File:Nigiri Sushi (25966163204).jpg",
       "File:Sky Terrace Sushi Bar - July 2021 - Sarah Stierch 5.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n1-10": {
     "query": "salmon nigiri",
@@ -277,14 +295,15 @@
     "author": "Yumi Kimura",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 28609,
+    "bytes": 41766,
     "alternatives": [
       "File:Sashimi of São Paulo.jpg",
       "File:Flower Love Sushi.jpg",
       "File:Nigiri Sushi (26478725732).jpg",
       "File:Nigiri Sushi (25966163204).jpg",
       "File:Sky Terrace Sushi Bar - July 2021 - Sarah Stierch 5.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n2-6": {
     "query": "nigiri sushi assortment",
@@ -295,10 +314,11 @@
     "author": "RightCowLeftCoast",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 21015,
+    "bytes": 40505,
     "alternatives": [
       "File:Hand rolls and assorted nigiri sushi.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n2-10": {
     "query": "nigiri sushi assortment",
@@ -309,10 +329,11 @@
     "author": "RightCowLeftCoast",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 23302,
+    "bytes": 42329,
     "alternatives": [
       "File:Nigiri assortment.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n3-6": {
     "query": "salmon tuna nigiri",
@@ -323,14 +344,15 @@
     "author": "Think Draw from Dubai, UAE",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 18689,
+    "bytes": 39425,
     "alternatives": [
       "File:Shige Sushi and Izakaya - December 2023 - Sarah Stierch 03.jpg",
       "File:2009-1227-BarMasa-Sushi.jpg",
       "File:Sushi Bento Set By Banej.jpg",
       "File:Vancouver sushi pieces dllu.jpg",
       "File:Mixed Selection Menu 20 Pieces - Sakura Sushi & Bento 2025-06-04.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n3-10": {
     "query": "salmon tuna nigiri",
@@ -341,14 +363,15 @@
     "author": "Bobak Ha'Eri",
     "license": "CC BY 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
-    "bytes": 21724,
+    "bytes": 42875,
     "alternatives": [
       "File:Salmon sushi cut.jpg",
       "File:Shige Sushi and Izakaya - December 2023 - Sarah Stierch 03.jpg",
       "File:Sushi Bento Set By Banej.jpg",
       "File:Vancouver sushi pieces dllu.jpg",
       "File:Mixed Selection Menu 20 Pieces - Sakura Sushi & Bento 2025-06-04.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n4-6": {
     "query": "maguro nigiri",
@@ -359,14 +382,15 @@
     "author": "Zheng Zhou",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 17461,
+    "bytes": 40642,
     "alternatives": [
       "File:Maguro Otoro (fatty tuna) Nigiri.jpg",
       "File:Maguro Chutoro (moderately fatty tuna) Nigiri.jpg",
       "File:8nig maguro kihada s.jpg",
       "File:DSC01825 The Buffet at Bellagio.jpg",
       "File:Salmon sushi cut.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-n4-10": {
     "query": "tuna nigiri sushi",
@@ -377,14 +401,15 @@
     "author": "Daderot",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 33242,
+    "bytes": 42175,
     "alternatives": [
       "File:Salmon and Tuna Nigiri Sushi, 2008.jpg",
       "File:Tuna nigiri sushi - Sushiko (2648979899).jpg",
       "File:Maguro Otoro (fatty tuna) Nigiri.jpg",
       "File:Maguro Chutoro (moderately fatty tuna) Nigiri.jpg",
       "File:Unagi nigiri sushi - Sushiko (2648979137).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-m1": {
     "query": "kappa maki",
@@ -395,14 +420,15 @@
     "author": "Lablascovegmenu from London",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 32529,
+    "bytes": 44194,
     "alternatives": [
       "File:Kappamaki Vegan maki rolls (4992658407).jpg",
       "File:Kappamaki 1.jpg",
       "File:At Kyoto 2024 189.jpg",
       "File:Hosomaki-zushi (sushi).jpg",
       "File:NGO Minami Kasadera Monzen Kappa Sushi Ehomaki 20230203.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-m2": {
     "query": "hosomaki salmon",
@@ -413,8 +439,9 @@
     "author": "RoyTek",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 28761,
-    "alternatives": []
+    "bytes": 44355,
+    "alternatives": [],
+    "hd": true
   },
   "photo-m3": {
     "source": "foodora",
@@ -423,7 +450,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 13067
+    "bytes": 37303,
+    "hd": true
   },
   "photo-m5": {
     "query": "mango avocado sushi roll",
@@ -434,10 +462,11 @@
     "author": "Loozrboy",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 29679,
+    "bytes": 42348,
     "alternatives": [
       "File:My new chopsticks and chopsticks rest that I bought in San Francisco.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-m6": {
     "query": "ebi avocado sushi roll",
@@ -448,8 +477,9 @@
     "author": "Geoff Peters from Vancouver, BC, Canada",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 20111,
-    "alternatives": []
+    "bytes": 44598,
+    "alternatives": [],
+    "hd": true
   },
   "photo-m7": {
     "query": "salmon avocado roll sushi",
@@ -460,14 +490,15 @@
     "author": "Geoff Peters from Vancouver, BC, Canada",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 23112,
+    "bytes": 44898,
     "alternatives": [
       "File:Roasted Salmon Skin sushi roll, Soft Shell Crab sushi roll, Salmon and Avocado sushi roll, Miso Soup - Kenzan GPO (2673449759).jpg",
       "File:Spider Crab Roll, Dragon Roll, Salmon and Avocado Roll - Kenzan GPO AUD4.50, AUD4.10, AUD3.50 (3127711932).jpg",
       "File:Smoked Salmon Sushi Roll - Tokui Sushi (2741121024).jpg",
       "File:Sushi roll.png",
       "File:Homemade sushi rolls, 2009.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-s1-9": {
     "source": "foodora",
@@ -476,7 +507,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 28158
+    "bytes": 42538,
+    "hd": true
   },
   "photo-s1-18": {
     "source": "foodora",
@@ -485,7 +517,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 28158
+    "bytes": 42538,
+    "hd": true
   },
   "photo-s2-9": {
     "source": "foodora",
@@ -494,7 +527,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 25282
+    "bytes": 44787,
+    "hd": true
   },
   "photo-s2-18": {
     "source": "foodora",
@@ -503,7 +537,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 25282
+    "bytes": 44787,
+    "hd": true
   },
   "photo-s3-9": {
     "source": "foodora",
@@ -512,7 +547,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 30658
+    "bytes": 43575,
+    "hd": true
   },
   "photo-s3-18": {
     "source": "foodora",
@@ -521,7 +557,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 30658
+    "bytes": 43575,
+    "hd": true
   },
   "photo-x1": {
     "query": "rainbow roll sushi",
@@ -532,13 +569,14 @@
     "author": "BrokenSphere",
     "license": "CC BY 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
-    "bytes": 19771,
+    "bytes": 39753,
     "alternatives": [
       "File:Sen rainbow roll sushi 2.jpg",
       "File:Sen rainbow roll sushi 1.jpg",
       "File:Golden Maki Rainbow Roll sushi.jpg",
       "File:Colourful sushi.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-x2": {
     "source": "foodora",
@@ -547,7 +585,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 32540
+    "bytes": 44219,
+    "hd": true
   },
   "photo-x3": {
     "source": "foodora",
@@ -556,7 +595,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 25299
+    "bytes": 42901,
+    "hd": true
   },
   "photo-x4": {
     "source": "foodora",
@@ -565,7 +605,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 33826
+    "bytes": 42529,
+    "hd": true
   },
   "photo-x5": {
     "source": "foodora",
@@ -574,7 +615,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 15281
+    "bytes": 43764,
+    "hd": true
   },
   "photo-x6": {
     "query": "duck sushi roll",
@@ -585,10 +627,11 @@
     "author": "Jazz Guy from New Jersey, United States",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 28628,
+    "bytes": 44617,
     "alternatives": [
       "File:Sawa Sushi and Hibachi, Eatontown, NJ (3056513713).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-x7": {
     "source": "foodora",
@@ -597,7 +640,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 26808
+    "bytes": 44026,
+    "hd": true
   },
   "photo-x8": {
     "source": "foodora",
@@ -606,7 +650,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 34491
+    "bytes": 42979,
+    "hd": true
   },
   "photo-x9": {
     "source": "foodora",
@@ -615,7 +660,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 32185
+    "bytes": 44646,
+    "hd": true
   },
   "photo-b1": {
     "source": "foodora",
@@ -624,7 +670,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 30112
+    "bytes": 44204,
+    "hd": true
   },
   "photo-b2": {
     "query": "thai red curry chicken",
@@ -635,14 +682,15 @@
     "author": "Andy Li",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 31943,
+    "bytes": 43748,
     "alternatives": [
       "File:Pam Real Thai Las Vegas - Red Curry with Chicken.jpg",
       "File:Red chicken curry, Aiyara Thai restaurant, Paris 001.jpg",
       "File:Thai Green Curry,JasminRice,Chilli Basil Chicken , HomeMade.jpg",
       "File:Thai green chicken curry and roti.jpg",
       "File:Making red curry with Chicken.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b3": {
     "query": "sweet and sour chicken pineapple",
@@ -653,14 +701,15 @@
     "author": "PattayaPatrol",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 20180,
+    "bytes": 39050,
     "alternatives": [
       "File:Chinese Food - Pineapple Chicken.JPG",
       "File:ESEAP2026 Day2 Afternoon Tea 01.jpg",
       "File:Dinner at Unithai 2023-08-17.jpg",
       "File:Comida china en restaurante Imperial King, Mexicali 03.jpg",
       "File:HK Sai Kung District 將軍澳 TKO 康城路1號 Lohas Park Road Montara LOHAS Park 日出康城商場 The Lohas Shopping Mall shop FRESH 新鮮生活 Supermarket cooked food October 2022 Px3 01.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b4": {
     "query": "chicken katsu",
@@ -671,14 +720,15 @@
     "author": "Ocdp",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 31363,
+    "bytes": 44415,
     "alternatives": [
       "File:Chicken katsu curry rice - Korpan.jpg",
       "File:Chicken katsu curry rice - Korpan 2023-08-23.jpg",
       "File:Cheesy chicken katsu and rice - Betterday, Brighton 2024-01-19.jpg",
       "File:Katsu Chicken Curry Don - Memo Wall Japanese Cuisine.jpg",
       "File:Chicken katsu with chili sauce.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b5": {
     "query": "chili beef stir fry",
@@ -689,14 +739,15 @@
     "author": "Saigonamthuc",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 20554,
+    "bytes": 40098,
     "alternatives": [
       "File:Chili @ Stir-fried Spicy Beef Ragout @ Resto des Amis @ Paris (32381368233).jpg",
       "File:Beef and Broccoli.jpg",
       "File:DFC 5522 Crispy stir-fried pork with fragrant basil leaves - a savory Thai favorite sizzling with garlic and spice.jpg",
       "File:HK TKL 調景嶺 Tiu Keng Leng 彩明街 Choi Ming Street 景嶺道 King Ling Road 彩明商場 Choi Ming Shopping Centre 茶魚飯后 restaurant menu January 2023 Px3.jpg",
       "File:HK Sai Kung District 將軍澳 TKO 康城路1號 Lohas Park Road Montara LOHAS Park 日出康城商場 The Lohas Shopping Mall shop FRESH 新鮮生活 Supermarket cooked food October 2022 Px3 01.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b6": {
     "query": "bulgogi",
@@ -707,14 +758,15 @@
     "author": "Debbie Tingzon",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 43629,
+    "bytes": 42758,
     "alternatives": [
       "File:Korean.cuisine-Bulgogi-01.jpg",
       "File:Bulgogi 4.jpg",
       "File:Bulgogi 1.jpg",
       "File:Bulgogi (Marinated beef. Served with rice) - Kogi 2023-09-11.jpg",
       "File:Dak-bulgogi.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b7": {
     "source": "foodora",
@@ -723,7 +775,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 16930
+    "bytes": 44969,
+    "hd": true
   },
   "photo-b8": {
     "query": "salmon teriyaki",
@@ -734,14 +787,15 @@
     "author": "Andy Li",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 39245,
+    "bytes": 42967,
     "alternatives": [
       "File:Salmon Teriyaki at restaurant Same Same But Different.jpg",
       "File:Teriyaki salmon.jpg",
       "File:Liat Portal for Foodie Disorder - Oven-baked teriyaki salmon with vegetables.jpg",
       "File:Grilled Teriyaki Salmon (10900376705).jpg",
       "File:Flickr - Roger T Wong - 20100130-45-Teriyaki salmon at Wagamama in Christchurch.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b9": {
     "query": "tom yum prawns",
@@ -752,14 +806,15 @@
     "author": "Andy Li",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 30195,
+    "bytes": 43496,
     "alternatives": [
       "File:Tom yum kung flavored noodles.jpg",
       "File:Tom Yum Koong Soup with Prawn and Straw Mushroom.jpg",
       "File:Tom yum goong at Thai Orchid Villa Kamppi.jpg",
       "File:Tom yum goong on a plate at Thai Orchid Villa Kamppi.jpg",
       "File:Tom yam kung 1.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b10": {
     "query": "bok choy tofu",
@@ -770,14 +825,15 @@
     "author": "FASTILY",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 33357,
+    "bytes": 44161,
     "alternatives": [
       "File:Citrus-Tahini Bowl with Grilled Tofu & Bok Choy (13431238424).jpg",
       "File:Tofu and bok choy.jpg",
       "File:TofuBokchoy.jpg",
       "File:9665Sautéed winged bean and green shingkang with tofu 01.jpg",
       "File:9665Sautéed winged bean and green shingkang with tofu 05.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b11": {
     "query": null,
@@ -788,8 +844,9 @@
     "author": "Helito",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 26019,
-    "alternatives": []
+    "bytes": 41725,
+    "alternatives": [],
+    "hd": true
   },
   "photo-b12": {
     "source": "foodora",
@@ -798,7 +855,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 43193
+    "bytes": 43651,
+    "hd": true
   },
   "photo-b13": {
     "source": "foodora",
@@ -807,7 +865,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 30557
+    "bytes": 44968,
+    "hd": true
   },
   "photo-b14": {
     "query": "jiaozi dumplings plate",
@@ -818,11 +877,12 @@
     "author": "David Pursehouse from Kawasaki, Japan",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 22557,
+    "bytes": 43107,
     "alternatives": [
       "File:Potstickers with sauce - Massachusetts.jpg",
       "File:2015 年 10 月北京市水餃餐館價格.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-b15": {
     "query": "boiled dumplings jiaozi",
@@ -833,12 +893,13 @@
     "author": "Blue Lotus from Kichijoji, Tokyo",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 39342,
+    "bytes": 43714,
     "alternatives": [
       "File:Boiled dumplings @ Restaurant Phénix @ Paris (34495218496).jpg",
       "File:Jiaozi with Pork & Chive by Banej.jpg",
       "File:Jiaozi with Pork & Chive by Banej-1.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v1": {
     "query": null,
@@ -849,8 +910,9 @@
     "author": "yomi955",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 30802,
-    "alternatives": []
+    "bytes": 42174,
+    "alternatives": [],
+    "hd": true
   },
   "photo-v2": {
     "query": "goi cuon summer roll",
@@ -861,14 +923,15 @@
     "author": "Phuongnhu",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 14477,
+    "bytes": 32388,
     "alternatives": [
       "File:Summer roll.jpg",
       "File:Gỏi cuốn at a Vietnamese-style restaurant in Beijing (20180103175625).jpg",
       "File:Gỏi cuốn (49358210697).jpg",
       "File:Rollos goi cuon, Mazatlán, 31 de mayo de 2023.jpg",
       "File:Gỏi cuốn.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v3": {
     "source": "foodora",
@@ -877,7 +940,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 13402
+    "bytes": 37317,
+    "hd": true
   },
   "photo-v4": {
     "query": "spring rolls fried",
@@ -888,14 +952,15 @@
     "author": "Vyacheslav Argenberg",
     "license": "CC BY 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
-    "bytes": 20873,
+    "bytes": 42220,
     "alternatives": [
       "File:Fried Spring Rolls (54538849838).jpg",
       "File:Kim's Mum's Spring Rolls - baked, not fried (544018597).jpg",
       "File:Boshan Fried Spring Rolls.jpg",
       "File:Deep Fried Spring Roll.jpg",
       "File:Golden Vegetable Spring Rolls Served with Dipping Sauce.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v5": {
     "source": "foodora",
@@ -904,7 +969,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 32665
+    "bytes": 44983,
+    "hd": true
   },
   "photo-v6": {
     "query": "gyoza",
@@ -915,14 +981,15 @@
     "author": "Unknown",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
-    "bytes": 15545,
+    "bytes": 32879,
     "alternatives": [
       "File:Gyoza no Antei - 3.jpg",
       "File:Gyoza - Tora.jpg",
       "File:10pc Gyoza plate.jpg",
       "File:Gyoza Houhi.jpg",
       "File:Missgyoza production gyoza dumpling Manufacturer.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v7": {
     "query": "gyoza",
@@ -933,14 +1000,15 @@
     "author": "Kykk wiki",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 27662,
+    "bytes": 43475,
     "alternatives": [
       "File:Gyoza no Antei - 3.jpg",
       "File:Gyoza - Tora.jpg",
       "File:Jiaozi-close-look.jpg",
       "File:10pc Gyoza plate.jpg",
       "File:Missgyoza production gyoza dumpling Manufacturer.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v8": {
     "query": "takoyaki",
@@ -951,14 +1019,15 @@
     "author": "heiwa4126",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 33575,
+    "bytes": 44434,
     "alternatives": [
       "File:Takoyaki balls (1).jpg",
       "File:Takoyaki dish.jpg",
       "File:Takoyaki de pulpo.jpg",
       "File:Takoyaki Wanaka at LaLaport Kadoma Kuromon Ichiba Market.jpg",
       "File:Takoyaki - Tora Taverna Japonesa.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v9": {
     "query": "baechu kimchi",
@@ -969,14 +1038,15 @@
     "author": "Unknown",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 30955,
+    "bytes": 44261,
     "alternatives": [
       "File:Baechu kimchi.jpg",
       "File:Baechu-gimchi.jpg",
       "File:Ramyeon with baechu-gimchi.jpg",
       "File:Korean cuisine-Kimchi-08.jpg",
       "File:Baechu-gimchi 1.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v10": {
     "query": null,
@@ -987,8 +1057,9 @@
     "author": "Nowforever",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 24324,
-    "alternatives": []
+    "bytes": 41681,
+    "alternatives": [],
+    "hd": true
   },
   "photo-v11": {
     "query": "salmon tartare",
@@ -999,14 +1070,15 @@
     "author": "Benny's Chop House",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 25839,
+    "bytes": 41384,
     "alternatives": [
       "File:Salmon tartare at Kuźnia Kulturalna Restaurant in Wilanów, 2022.jpg",
       "File:Salmon tartare in Loża Restaurant & Drink Bar, Kraków, 2022.jpg",
       "File:Salmon tartare Vikings Luxury Dinner Buffet 26 January 2025 Philippines9.jpg",
       "File:Salmon tartare at Riverbar & Kitchen, Brisbane, Queensland.jpg",
       "File:Merci Nat pour ce repas ! Tartare de saumon et crumble d'avocat parmesan ... Je reviendrai ! (7817300488).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v12": {
     "query": "coconut shrimp",
@@ -1017,14 +1089,15 @@
     "author": "Stephanie Richard",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 29551,
+    "bytes": 41991,
     "alternatives": [
       "File:Coconut shrimp at a Bubba Gump restaurant.jpg",
       "File:Coconut Shrimp at the Swiss Hotel - May 2023 - Sarah Stierch.jpg",
       "File:Coconut Shrimps (starter) - Chipwick 2026-09-15.jpg",
       "File:Coconut Crusted Shrimp on California Zephyr - June 2022 - Sarah Stierch.jpg",
       "File:Coconut shrimp at \"Lety's\".jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v13": {
     "query": null,
@@ -1035,8 +1108,9 @@
     "author": "avlxyz",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 24782,
-    "alternatives": []
+    "bytes": 43000,
+    "alternatives": [],
+    "hd": true
   },
   "photo-v14": {
     "query": "miso soup",
@@ -1047,14 +1121,15 @@
     "author": "Ocdp",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 14762,
+    "bytes": 37358,
     "alternatives": [
       "File:Miso Soup 001.jpg",
       "File:Uchimame-no-misoshiru, Miso soup, Japan.jpg",
       "File:Littleneck clam miso soup 001.jpg",
       "File:Miso soup - Massachusetts.jpg",
       "File:Chicken curry, miso soup, Idstein.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v15": {
     "query": "wonton soup",
@@ -1065,14 +1140,15 @@
     "author": "Grueslayer",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 29152,
+    "bytes": 43367,
     "alternatives": [
       "File:Wonton.jpg",
       "File:Thai Soup and Wonton.jpg",
       "File:Wonton soup at 65 Huguosi St (20211221173225).jpg",
       "File:Wonton soup at 65 Huguosi St (20211221172925).jpg",
       "File:Wonton 1.JPG"
-    ]
+    ],
+    "hd": true
   },
   "photo-v16": {
     "query": "tom yum goong",
@@ -1083,14 +1159,15 @@
     "author": "kisocci",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-    "bytes": 23519,
+    "bytes": 41830,
     "alternatives": [
       "File:Tom Yum Goong Noodle Soup - Nok Nok Kitchen at The Cow 2024-03-28.jpg",
       "File:Siam Garden Tom yum goong ac.jpg",
       "File:Tom yum goong at Thai Orchid Villa Kamppi.jpg",
       "File:Tom yum goong on a plate at Thai Orchid Villa Kamppi.jpg",
       "File:Cup Noodle Tom yum goong noodle.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v17": {
     "query": "tom kha gai",
@@ -1101,14 +1178,15 @@
     "author": "lydiajoy1",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 24124,
+    "bytes": 41324,
     "alternatives": [
       "File:Flickr preppybyday 4711943668--Tom kha gai.jpg",
       "File:Tom kha gai soup.jpg",
       "File:Tom kha gai at Siam Taste (4433895523).jpg",
       "File:Thom Kha Gai Soup.jpg",
       "File:Tom Kha Gai - Thai Food.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-v18": {
     "query": "har gow",
@@ -1119,14 +1197,15 @@
     "author": "N509FZ",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 34532,
+    "bytes": 42818,
     "alternatives": [
       "File:Xiajiao.jpg",
       "File:Dim sum at Yu Garden restaurant, Hamburg.jpg",
       "File:Har gow (27871753892).jpg",
       "File:HÁ CẢO.jpg",
       "File:3 pieces of har gow at Plum Blossom Room 20230125.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-u1": {
     "query": "yaki udon",
@@ -1137,14 +1216,15 @@
     "author": "Andy Li",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 24434,
+    "bytes": 42570,
     "alternatives": [
       "File:Yaki-udon.jpg",
       "File:Seafood Yaki Udon - Taro 2025-10-24.jpg",
       "File:Yaki udon in Daegu.jpg",
       "File:Udon by udono.jpg",
       "File:Black pepper tofu fried udon - Stir Fry by CK.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-u2": {
     "source": "foodora",
@@ -1153,7 +1233,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 25183
+    "bytes": 42501,
+    "hd": true
   },
   "photo-u3": {
     "query": null,
@@ -1164,8 +1245,9 @@
     "author": "Flickr.com user \"Blue Lotus\"",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 25443,
-    "alternatives": []
+    "bytes": 44055,
+    "alternatives": [],
+    "hd": true
   },
   "photo-u4": {
     "query": "fried udon noodles",
@@ -1176,14 +1258,15 @@
     "author": "Andy Li",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 28344,
+    "bytes": 43744,
     "alternatives": [
       "File:Sara udon in Nagasaki.jpg",
       "File:Sara udon by Charles Haynes in Bangalore, India.jpg",
       "File:餃子の王将 皿うどん (4580922222).jpg",
       "File:Thai stir-fry style udon noodles - Itsu 2024-09-19.jpg",
       "File:Afternoon Tea Set C - Stir-fried Shredded Duck with Udon Noodles - CK Bistro 2024-01-16.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-u5": {
     "query": null,
@@ -1194,8 +1277,9 @@
     "author": "Arumdaum",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 30986,
-    "alternatives": []
+    "bytes": 44976,
+    "alternatives": [],
+    "hd": true
   },
   "photo-side-rice": {
     "query": "bowl of steamed white rice",
@@ -1206,14 +1290,15 @@
     "author": "Anna Frodesiak",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 15210,
+    "bytes": 38862,
     "alternatives": [
       "File:A bowl of rice.jpg",
       "File:HK 中環 Central L-Place 大戶屋日本餐廳 Ootoya Japanese style Restaurant food dinner 白飯 white rice bowl with seasoning n steamed egg May 2019 SSG 02.jpg",
       "File:White rice, Resto des Amis, Montparnasse, Paris 001.jpg",
       "File:HK SYP Sai Ying Pun Pokfulam Road Third Street Hang Fai Building shop 鴻興茶餐廳 Hung Hing Restaurant food white rice bowl August 2021 SS2.jpg",
       "File:HK CWB 銅鑼灣 Causeway Bay 溫莎大廈 Windsor House mall shop 稻香 Tao Heung Group 迎囍酒家 Cheers Chinese Restaurant white rice October 2025 N13P 01.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-side-fried-rice": {
     "query": "egg fried rice",
@@ -1224,14 +1309,15 @@
     "author": "daSupremo",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 23087,
+    "bytes": 42476,
     "alternatives": [
       "File:Egg Fried Rice.jpg",
       "File:Blanket fried rice.jpg",
       "File:A bilao of salted egg, seafood, porkchop and fried rice.jpg",
       "File:Fried Rice with Egg and Dalmote.jpg",
       "File:Kimchi Fried Rice, Farm Egg.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-d1": {
     "query": "mochi daifuku",
@@ -1242,14 +1328,15 @@
     "author": "No machine-readable author provided. Lyzzy assumed (based on copyright claims).",
     "license": "CC BY 2.5",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.5",
-    "bytes": 15599,
+    "bytes": 33209,
     "alternatives": [
       "File:Two pieces of daifuku mochi on a decorative plate.jpg",
       "File:Daifuku close-up.jpg",
       "File:Daifuku 001.jpg",
       "File:Daifuku 002.jpg",
       "File:Daifuku - 03.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-d2": {
     "query": null,
@@ -1260,8 +1347,9 @@
     "author": "Gzzz",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 19321,
-    "alternatives": []
+    "bytes": 41478,
+    "alternatives": [],
+    "hd": true
   },
   "photo-d3": {
     "query": "apple dumplings dessert",
@@ -1272,14 +1360,15 @@
     "author": "Valereee",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 34949,
+    "bytes": 43829,
     "alternatives": [
       "File:AppleDumpling.jpg",
       "File:Apple dumplings in a pan, waiting to be baked.jpg",
       "File:Apple dumpling, ready to bake.jpg",
       "File:Baked apple dumplings in a pan (cropped square).jpg",
       "File:Quartered apples on pastry dough to make apple dumplings.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-dr-cola": {
     "source": "foodora",
@@ -1288,7 +1377,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 6340
+    "bytes": 13953,
+    "hd": true
   },
   "photo-dr-eistee": {
     "query": "iced tea glass",
@@ -1299,14 +1389,15 @@
     "author": "Evan Swigart from Chicago, USA",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 11894,
+    "bytes": 25955,
     "alternatives": [
       "File:Iced tea with ice cubes.jpg",
       "File:Swee-Touch-Nee-Tea Discontinued Bottled Iced Tea.jpg",
       "File:NCI iced tea.jpg",
       "File:Iced Tea with Lemon, First Watch, Melbourne, Florida.jpg",
       "File:Glass of Iced Tea.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-dr-water": {
     "query": "glass of sparkling water",
@@ -1317,14 +1408,15 @@
     "author": "Tony Webster",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 14607,
+    "bytes": 32039,
     "alternatives": [
       "File:DFC 1644 A chilled glass of sparkling water with a lime wedge branded Prime Burger Thailand set against warm out-of-focus bokeh lights.jpg",
       "File:Sparkling drops. jpg.jpg",
       "File:Bottle of Vess Sparkling Seltzer Water - DPLA - 18f722737af1be7c17886f6dc42b5c34 (page 1).jpg",
       "File:Bottle of Vess Sparkling Seltzer Water - DPLA - 18f722737af1be7c17886f6dc42b5c34 (page 2).jpg",
       "File:Drents Museum sidecar 8931.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-dr-aloe": {
     "source": "foodora",
@@ -1333,7 +1425,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 6840
+    "bytes": 15253,
+    "hd": true
   },
   "photo-dr-apple": {
     "query": null,
@@ -1344,8 +1437,9 @@
     "author": "Zigzig20s",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 10512,
-    "alternatives": []
+    "bytes": 23934,
+    "alternatives": [],
+    "hd": true
   },
   "photo-dr-orange": {
     "query": "glass of orange juice",
@@ -1356,14 +1450,15 @@
     "author": "Agency of the United States Department of Agriculture Edited Version by: Arad",
     "license": "Public domain",
     "licenseUrl": null,
-    "bytes": 11791,
+    "bytes": 26331,
     "alternatives": [
       "File:(a glass of orange juice bread with and jelly and a waffle).jpg",
       "File:(glass of orange juice a banana a waffle Breakfast cereal with milk).jpg",
       "File:Close-up of a glass bottle of Ribbon orange juice, 2016.jpg",
       "File:(a glass of orange juice, a waffle on a nice plate with silverware).jpg",
       "File:(a glass of orange juice a banana a waffle Breakfast cereal with milk).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-dr-redbull": {
     "source": "foodora",
@@ -1372,7 +1467,8 @@
     "page": "https://www.foodora.at/restaurant/ymou/chiri-kitchen",
     "author": "Chiri Kitchen",
     "license": null,
-    "bytes": 10415
+    "bytes": 23260,
+    "hd": true
   },
   "photo-beer-wiesel-fass": {
     "query": "glass of beer with foam",
@@ -1383,14 +1479,15 @@
     "author": "Public Domain Images",
     "license": "Public domain",
     "licenseUrl": null,
-    "bytes": 10816,
+    "bytes": 24466,
     "alternatives": [
       "File:Mug of beer from above (ubt 2005).jpg",
       "File:A typical night of Football ritual and beer in the American glass cup.jpg",
       "File:Piwo kozicowe 2.jpg",
       "File:Cerveza modelo especial.jpg",
       "File:Koeketiene glass and bottle.jpeg"
-    ]
+    ],
+    "hd": true
   },
   "photo-beer-wiesel-stamm": {
     "query": "Märzen beer",
@@ -1401,14 +1498,15 @@
     "author": "Voll Damm",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 13582,
+    "bytes": 27902,
     "alternatives": [
       "File:Voll-Damm en Botella 25cl.jpg",
       "File:Voll-Damm Lata de 33cl.jpg",
       "File:Cerveza Voll-Damm en los años 90.jpg",
       "File:Paulaner Oktoberfest Marzen 11.2oz bottle and beer mug.jpg",
       "File:Gösser Märzen can.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-beer-nonalc": {
     "query": "non-alcoholic beer glass",
@@ -1419,14 +1517,15 @@
     "author": "JIP",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 16221,
+    "bytes": 43384,
     "alternatives": [
       "File:038 Peroni non-alcoholic beer - bottled low alcohol Italian beer brand.jpg",
       "File:Four non-alcoholic beers.jpg",
       "File:Craft beer and non-alcoholic cocktail at restaurant Plaza.jpg",
       "File:Alcohol-free beer in Haukilahti.jpg",
       "File:Alcohol free beer.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-beer-japan": {
     "query": null,
@@ -1437,8 +1536,9 @@
     "author": "Yuet Man Lee",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 16435,
-    "alternatives": []
+    "bytes": 39518,
+    "alternatives": [],
+    "hd": true
   },
   "photo-wine-white": {
     "query": null,
@@ -1449,8 +1549,9 @@
     "author": "Evan Swigart from Chicago, USA",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 12345,
-    "alternatives": []
+    "bytes": 26221,
+    "alternatives": [],
+    "hd": true
   },
   "photo-wine-red": {
     "query": "glass of red wine",
@@ -1461,14 +1562,15 @@
     "author": "Fabio Ingrosso",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "bytes": 19117,
+    "bytes": 41225,
     "alternatives": [
       "File:Red and white wine in glass.jpg",
       "File:Offering a glass of red wine.jpg",
       "File:020260524 140002 Red wine in glass.jpg",
       "File:Close-up of red wine being poured into a glass with a blurred outdoor backdrop.jpg",
       "File:Glass of Red Wine with a bottle of Red Wine - Evan Swigart.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-wine-spritzer": {
     "query": null,
@@ -1479,8 +1581,9 @@
     "author": "Geolina163",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 28497,
-    "alternatives": []
+    "bytes": 42511,
+    "alternatives": [],
+    "hd": true
   },
   "photo-aperol": {
     "query": "aperol spritz",
@@ -1491,14 +1594,15 @@
     "author": "Missvain",
     "license": "CC BY 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
-    "bytes": 30421,
+    "bytes": 44632,
     "alternatives": [
       "File:Aperol Spritz 2014a.jpg",
       "File:Aperol Spritz - July 2024 - Sarah Stierch.jpg",
       "File:Aperol spritz - Bistro Don Giovanni - Sarah Stierch 2018 04.jpg",
       "File:Aperol Apritz.jpg",
       "File:Aperol Spritz (Aperol Spritz Original Bar) (42171686322).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-aperol-prosecco": {
     "query": "aperol spritz",
@@ -1509,14 +1613,15 @@
     "author": "Missvain",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 23336,
+    "bytes": 42733,
     "alternatives": [
       "File:Aperol Spritz - Santa Ynez Kitchen - Sarah Stierch.jpg",
       "File:Aperol Spritz 2014a.jpg",
       "File:Aperol spritz - Bistro Don Giovanni - Sarah Stierch 2018 04.jpg",
       "File:Aperol Apritz.jpg",
       "File:Aperol Spritz (Aperol Spritz Original Bar) (42171686322).jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-hugo": {
     "query": "hugo cocktail",
@@ -1527,14 +1632,15 @@
     "author": "User:Koever",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 18399,
+    "bytes": 38253,
     "alternatives": [
       "File:Hugo Frizzante.jpg",
       "File:Hauser Weinimport Craft Hugo.jpg",
       "File:Glitzernde Cocktailgläser Weihnachtsmarkt 02.jpg",
       "File:Glitzernde Cocktailgläser Weihnachtsmarkt 01.jpg",
       "File:15-09-26-RalfR-WLC-0063.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-sake": {
     "query": "tokkuri",
@@ -1545,14 +1651,15 @@
     "author": "User:Kentin",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "bytes": 40483,
+    "bytes": 42974,
     "alternatives": [
       "File:Tokkuri sake and takowasa3.JPG",
       "File:Tokkuri sake and takowasa2.JPG",
       "File:Tokkuri sake.JPG",
       "File:Tokkuri sake2.JPG",
       "File:Sky Terrace Sushi Bar - July 2021 - Sarah Stierch 3.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-coffee-espresso": {
     "query": null,
@@ -1563,8 +1670,9 @@
     "author": "Kritzolina",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 28420,
-    "alternatives": []
+    "bytes": 42647,
+    "alternatives": [],
+    "hd": true
   },
   "photo-coffee-cappuccino": {
     "query": null,
@@ -1575,8 +1683,9 @@
     "author": "Robert Smith",
     "license": "CC BY 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
-    "bytes": 18900,
-    "alternatives": []
+    "bytes": 39173,
+    "alternatives": [],
+    "hd": true
   },
   "photo-coffee-latte": {
     "query": "latte macchiato",
@@ -1587,14 +1696,15 @@
     "author": "Andy Li",
     "license": "CC0",
     "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "bytes": 26055,
+    "bytes": 41829,
     "alternatives": [
       "File:Latte macchiato.jpg",
       "File:2023-09-28 Latte Macchiato.jpg",
       "File:2023-09-27 Latte Macchiato.jpg",
       "File:Latte Macchiato 2.jpg",
       "File:Latte macchiato with view on Maydan of Heroes.jpg"
-    ]
+    ],
+    "hd": true
   },
   "photo-tea": {
     "query": null,
@@ -1605,7 +1715,8 @@
     "author": "JIP",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "bytes": 11633,
-    "alternatives": []
+    "bytes": 25562,
+    "alternatives": [],
+    "hd": true
   }
 }
