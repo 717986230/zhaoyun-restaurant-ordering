@@ -4,7 +4,7 @@
  *
  *   node scripts/import-foodora-photos.mjs
  *
- * Each photo goes through the same 480×360 / 45 KB shrink as every other dish
+ * Each photo goes through the same 800×600 / 45 KB shrink as every other dish
  * photo, into server/dish-photos/<product id>.jpg, and its credits.json entry
  * says it came from foodora — which scripts/fetch-dish-photos.mjs then leaves
  * alone. Run `npm run d1:migrations` and `npm run catalog:bundle` afterwards:
@@ -32,7 +32,7 @@ for (const [id, want] of Object.entries(wanted)) {
     failures.push(`${id}: not a dish with a photo`);
     continue;
   }
-  if (credits[id].source === "foodora" && credits[id].url === want.url) continue;
+  if (credits[id].source === "foodora" && credits[id].url === want.url && credits[id].hd) continue;
   try {
     const response = await fetch(want.url);
     if (!response.ok) throw new Error(`download ${response.status} ${want.url}`);
@@ -45,7 +45,8 @@ for (const [id, want] of Object.entries(wanted)) {
       page: VENDOR_PAGE,
       author: "Chiri Kitchen",
       license: null,
-      bytes: jpeg.length
+      bytes: jpeg.length,
+      hd: true
     };
     console.log(`${id}: ${want.title} (${jpeg.length} B)`);
   } catch (error) {

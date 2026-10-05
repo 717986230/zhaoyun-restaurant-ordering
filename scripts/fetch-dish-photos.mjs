@@ -10,7 +10,7 @@
  * only when its entry there changes (or its file is missing), so correcting one
  * wrong photo does not reshuffle the other hundred. Output:
  *
- *   server/dish-photos/<product id>.jpg   480×360, at most ~45 KB
+ *   server/dish-photos/<product id>.jpg   800×600 (640 at the least), at most 45 KB
  *   server/dish-photos/credits.json       who, which licence, where from
  *
  * The images go into D1 through the migration scripts/export-dish-photos.mjs
@@ -53,7 +53,8 @@ async function api(params) {
 const INFO = {
   prop: "imageinfo",
   iiprop: "url|size|mime|extmetadata",
-  iiurlwidth: "640",
+  // Twice what the menu keeps (800 wide), so the shrink has detail to keep.
+  iiurlwidth: "1600",
   iiextmetadatafilter: "LicenseShortName|Artist|LicenseUrl"
 };
 
@@ -90,6 +91,12 @@ function describe(page, trusted = false) {
   };
 }
 
+async function download(chosen) {
+  const response = await fetch(chosen.thumb, { headers: { "User-Agent": USER_AGENT } });
+  if (!response.ok) throw new Error(`download ${response.status} ${chosen.thumb}`);
+  return shrink(Buffer.from(await response.arrayBuffer()));
+}
+
 async function main() {
   mkdirSync(outDir, { recursive: true });
   const credits = existsSync(creditsFile) ? JSON.parse(readFileSync(creditsFile, "utf8")) : {};
@@ -104,7 +111,22 @@ async function main() {
     // for a stock one, not even on a forced run.
     if (have?.source === "foodora") continue;
     const unchanged = have && (have.query ?? null) === (want.query ?? null) && (have.pick ?? 0) === (want.pick ?? 0) && (have.pinned ?? null) === (want.file ?? null);
-    if (!force && unchanged && existsSync(path.join(outDir, `${id}.jpg`))) continue;
+    if (!force && unchanged && existsSync(path.join(outDir, `${id}.jpg`))) {
+      if (have.hd || !have.file) continue;
+      // Kept from before photos were 800 wide: the same picture again, sharper.
+      try {
+        const chosen = await pinned(have.file);
+        const jpeg = await download(chosen);
+        writeFileSync(path.join(outDir, `${id}.jpg`), jpeg);
+        credits[id] = { ...have, bytes: jpeg.length, hd: true };
+        fetched += 1;
+        console.log(`${id}: ${have.file} again, sharper (${jpeg.length} B)`);
+      } catch (error) {
+        failures.push(`${id}: ${error.message}`);
+        console.error(`${id}: ${error.message}`);
+      }
+      continue;
+    }
 
     try {
       // Two dishes never share a picture unless someone pinned it that way.
@@ -120,9 +142,7 @@ async function main() {
         chosen = free[want.pick ?? 0] ?? free[0];
         if (!chosen) throw new Error(`nothing usable for "${want.query}"`);
       }
-      const response = await fetch(chosen.thumb, { headers: { "User-Agent": USER_AGENT } });
-      if (!response.ok) throw new Error(`download ${response.status} ${chosen.thumb}`);
-      const jpeg = await shrink(Buffer.from(await response.arrayBuffer()));
+      const jpeg = await download(chosen);
       writeFileSync(path.join(outDir, `${id}.jpg`), jpeg);
       credits[id] = {
         query: want.query ?? null,
@@ -134,6 +154,7 @@ async function main() {
         license: chosen.license,
         licenseUrl: chosen.licenseUrl,
         bytes: jpeg.length,
+        hd: true,
         // The next few, so a wrong photo can be swapped by naming one.
         alternatives: ranked.filter((candidate) => candidate.file !== chosen.file).slice(0, 5).map((candidate) => candidate.file)
       };

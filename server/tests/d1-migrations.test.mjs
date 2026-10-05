@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
-import { generate, generatePhotos, generatePhotoRefresh, generateSets, committed, PHOTO_MIGRATION_LAST } from "../../scripts/export-d1-migrations.mjs";
+import { generate, generatePhotos, generatePhotoRefresh, generateSets, committed, PHOTO_MIGRATION_LAST, REFRESH_HD_LAST } from "../../scripts/export-d1-migrations.mjs";
 import { dishPhotos } from "../dish-photos.mjs";
 
 function schemaOf(db) {
@@ -68,7 +68,9 @@ test("the committed migrations match the schema and seed the server creates", ()
   assert.equal(onDisk.schema, generated.schema, "migrations/0001_init.sql is stale — run: npm run d1:migrations");
   assert.equal(onDisk.catalog, generated.catalog, "migrations/0002_seed_catalog.sql is stale — run: npm run d1:migrations");
   assert.deepEqual(onDisk.photos, generatePhotos(), "the dish photo migrations are stale — run: npm run d1:migrations");
-  assert.deepEqual(onDisk.refresh, generatePhotoRefresh(), "the foodora photo migrations are stale — run: npm run d1:migrations");
+  assert.deepEqual(onDisk.refresh, generatePhotoRefresh(), "the photo refresh migrations are stale — run: npm run d1:migrations");
+  // The 800×600 batch keeps to 0100–0119, clear of the hand-written migrations.
+  for (const part of onDisk.refresh) assert.ok(Number(part.name.slice(0, 4)) <= REFRESH_HD_LAST, `${part.name} runs past ${REFRESH_HD_LAST}`);
   assert.equal(onDisk.sets, generateSets(), "migrations/0050_set_menus.sql is stale — run: npm run d1:migrations");
   // The photo parts are numbered from 0005 up; they must never reach the set menus' number.
   for (const part of onDisk.photos) assert.ok(Number(part.name.slice(0, 4)) <= PHOTO_MIGRATION_LAST, `${part.name} would collide with 0050`);
@@ -122,16 +124,16 @@ test("the photo migrations give D1 the dishes' photos, byte for byte", () => {
 });
 
 /**
- * A D1 that took the photo parts before the restaurant's own foodora photos
- * existed still shows the old pictures: those parts never run again. The
- * refresh swaps each seeded picture for the new one and drops the old bytes,
- * and leaves alone a picture the owner uploaded.
+ * A D1 that took the photo parts while the photos were 480×360 still shows
+ * those: the parts never run again. The refresh swaps each seeded picture for
+ * its 800×600 copy and drops the old bytes, and leaves alone a picture the
+ * owner uploaded.
  */
-test("the foodora photo migrations replace the seeded photos an earlier deploy put in D1", () => {
+test("the photo refresh migrations replace the seeded photos an earlier deploy put in D1", () => {
   const sql = committed();
-  const replacing = dishPhotos().filter((photo) => photo.replaces);
-  assert.ok(replacing.length > 0, "expected photos from foodora");
-  assert.ok(sql.refresh.length > 0, "expected the foodora photo migrations");
+  const replacing = dishPhotos().filter((photo) => photo.hd);
+  assert.ok(replacing.length > 0, "expected photos at 800×600");
+  assert.ok(sql.refresh.length > 0, "expected the photo refresh migrations");
   const [owned, ...seededBefore] = replacing;
   const migrated = inTempDatabase((file) => {
     const db = new DatabaseSync(file);
@@ -170,7 +172,7 @@ test("the foodora photo migrations replace the seeded photos an earlier deploy p
  * showing a photo seeded earlier shows the new one.
  */
 test("the Node server swaps a seeded photo for its replacement on start", () => {
-  const [photo] = dishPhotos().filter((item) => item.replaces);
+  const [photo] = dishPhotos().filter((item) => item.hd);
   const url = inTempDatabase((file) => {
     createDatabase(file).close();
     let db = new DatabaseSync(file);
