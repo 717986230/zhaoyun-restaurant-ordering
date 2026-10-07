@@ -6,6 +6,7 @@ import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 import type { PosKey } from "./i18n";
 import { DeliveryOrders } from "./Delivery";
+import { BookingScanner } from "./BookingScanner";
 
 const TAKEAWAY = /^TA-/i;
 /** The poll under the live channel: quick while it is down, slow while it is up. */
@@ -124,21 +125,46 @@ function ServiceCalls({ pos, requests, onDone }: { pos: Pos; requests: ApiServic
  */
 function TodayBookings({ pos, bookings, onDone }: { pos: Pos; bookings: ApiReservation[]; onDone: () => void }) {
   const { t } = pos;
+  const [scanning, setScanning] = useState(false);
   if (!bookings.length) return null;
-  async function change(booking: ApiReservation, command: ReservationUpdateCommand) {
+  async function change(booking: ApiReservation, command: ReservationUpdateCommand): Promise<boolean> {
     try {
       await api.updateReservation(booking.id, command);
       onDone();
-    } catch (error) { pos.failed(error); }
+      return true;
+    } catch (error) {
+      pos.failed(error);
+      return false;
+    }
   }
-  function seat(booking: ApiReservation) {
+  async function seat(booking: ApiReservation): Promise<string | null> {
     const table = window.prompt(t("bookingTablePrompt", { name: booking.name, party: booking.party }), booking.table ?? "");
+    if (table === null) return null;
+    const chosen = table.trim().toUpperCase();
+    return (await change(booking, { status: "seated", table: chosen })) ? chosen : null;
+  }
+  /**
+   * Checked in at the door, from the QR code on the guest's phone: today's
+   * booking with that number is seated — at the table they picked, or at the
+   * one the waiter gives them.
+   */
+  async function checkIn(reference: string) {
+    setScanning(false);
+    const booking = bookings.find((entry) => entry.reference.toUpperCase() === reference);
+    if (!booking) return pos.notify(t("scanNotToday", { reference }), "error");
+    if (booking.status === "seated") return pos.notify(t("scanAlready", { name: booking.name }), "error");
+    if (booking.status !== "confirmed" && booking.status !== "pending") return pos.notify(t("scanCancelled", { reference }), "error");
+    const table = booking.table
+      ? ((await change(booking, { status: "seated", table: booking.table })) ? booking.table : null)
+      : await seat(booking);
     if (table === null) return;
-    void change(booking, { status: "seated", table: table.trim().toUpperCase() });
+    pos.notify(table ? t("checkedIn", { name: booking.name, party: booking.party, table: t("table", { table }) }) : t("checkedInNoTable", { name: booking.name, party: booking.party }));
   }
   const guests = bookings.reduce((total, booking) => total + booking.party, 0);
-  return <details className="pos-bookings" open>
-    <summary><h2>📅 {t("bookings", { count: bookings.length, guests })}</h2></summary>
+  return <><details className="pos-bookings" open>
+    <summary><h2>📅 {t("bookings", { count: bookings.length, guests })}</h2>
+      <button type="button" className="pos-scan-open" id="posScanBooking" onClick={(event) => { event.preventDefault(); setScanning(true); }}>{t("scanBooking")}</button>
+    </summary>
     <ul>{bookings.map((booking) => <li key={booking.id} data-booking={booking.reference} data-status={booking.status}>
       <span>
         <b>{booking.time}</b> · {booking.name} · {booking.party} 👤{booking.table ? ` · ${t("table", { table: booking.table })}` : ""}
@@ -148,11 +174,13 @@ function TodayBookings({ pos, bookings, onDone }: { pos: Pos; bookings: ApiReser
       {booking.status === "seated"
         ? <button type="button" onClick={() => void change(booking, { status: "completed" })}>{t("bookingFinish")}</button>
         : <>
-          <button type="button" onClick={() => seat(booking)}>{t("bookingSeat")}</button>
+          <button type="button" onClick={() => void seat(booking)}>{t("bookingSeat")}</button>
           <button type="button" className="pos-quiet" onClick={() => void change(booking, { status: "no_show" })}>{t("bookingNoShow")}</button>
         </>}
     </li>)}</ul>
-  </details>;
+  </details>
+  {scanning && <BookingScanner pos={pos} onFound={(reference) => void checkIn(reference)} onClose={() => setScanning(false)} />}
+  </>;
 }
 
 /** The room: every table and what is open on it, and the takeaways waiting. */

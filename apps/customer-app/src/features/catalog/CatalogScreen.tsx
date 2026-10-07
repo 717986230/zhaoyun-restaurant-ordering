@@ -2,6 +2,8 @@ import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, drinkTabs, LANGUAGE_INFO, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
+import { RollingNumber } from "../../components/RollingNumber";
+import { flyToCart } from "../../app/motion";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product, SelectedModifier } from "@zhaoyun/domain";
 import type { NavLabels } from "@zhaoyun/contracts";
 import { allergenLabel } from "../../../../../src/allergens.js";
@@ -79,14 +81,17 @@ export function isSet(product: Product): boolean {
  * `prefers-reduced-motion` block cannot reach these JS-driven animations, so
  * every duration goes through `useReducedMotion` below instead.
  */
-const EASE = [0.2, 0.8, 0.2, 1] as const;
+const EASE = [0.2, 0.7, 0.2, 1] as const;
 const DURATION = { backdrop: 0.2, card: 0.32, page: 0.46 };
 // A page's rows arrive in two steps: a screenful with the page, the rest the
 // moment it has finished turning. "All" is 111 dishes, and building every row
 // at once froze a phone for a third of a second in the middle of the turn.
 const FIRST_ROWS = 14;
 /** The card turns like a card: quick off the mark, settling without a wobble. */
-const FLIP_SPRING = { type: "spring", stiffness: 150, damping: 22, mass: 1 } as const;
+// ② Flip to reveal: 180° about the Y axis in 0.8 s on cubic-bezier(.3,.7,.2,1);
+// the faces swap at 90° (each hides its back). A tap mid-turn reverses from
+// where the card is, as a tween in motion starts from the current angle.
+const FLIP = { duration: 0.8, ease: [0.3, 0.7, 0.2, 1] } as const;
 
 function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
   return names[language] || names.de || names.en;
@@ -393,7 +398,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
       <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}
         initial={false}
         animate={{ rotateY: state.productFlipped ? 180 : 0, scale: reduceMotion ? 1 : [1, 0.86, 1] }}
-        transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP_SPRING, scale: { duration: 0.62, times: [0, 0.45, 1], ease: EASE } }}>
+        transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP, scale: { duration: 0.8, times: [0, 0.45, 1], ease: EASE } }}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
             <span className="number">{product.sku}</span><span className="cat">{categoryName}</span>
@@ -725,6 +730,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
               {ordering.open && <button type="button" className="quick-add" aria-label={`${g(state.language, "addToCart")}: ${productName(product, state.language)}`}
                 onClick={(event) => {
                   event.stopPropagation();
+                  flyToCart(event.currentTarget);
                   dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [] });
                   dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
                 }}>+</button>}
@@ -750,7 +756,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     {/* Outside the list: the list is transformed while a page turns, and a
         fixed button inside it would move with the page. */}
     {ordering.open && cart.count > 0 && !activeProduct && <button type="button" id="cartBar" className="cartbar" onClick={() => dispatch({ type: "sheet", sheet: "cart" })}>
-      <b>{cart.count}</b><span>{g(state.language, "cart")}</span><em>{formatPrice(cart.totalCents, state.language)}</em>
+      <b><RollingNumber text={String(cart.count)} value={cart.count} /></b><span>{g(state.language, "cart")}</span><em><RollingNumber text={formatPrice(cart.totalCents, state.language)} value={cart.totalCents} /></em>
       <svg className="cartbar-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" /></svg>
     </button>}
     {/* Calling a waiter to the table this phone scanned: in the other bottom

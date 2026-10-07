@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import jsQR from "jsqr";
 import { expect, test } from "./support/test.js";
 
 /**
@@ -66,7 +67,6 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.getByRole("tab", { name: "注册" }).click();
   await page.locator("#bookingEmailLogin").fill("mia@example.com");
   await page.locator("#bookingPassword").fill("secret123");
-  await page.locator("#bookingSignIn").getByLabel("称呼（可不填）").fill("Mia");
   await page.locator("#bookingSignInSubmit").click();
   await expect(page.locator("#bookingAccount")).toContainText("mia@example.com");
 
@@ -84,13 +84,15 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingEmailCode").fill(code);
   await page.locator("#bookingVerifySubmit").click();
   await expect(page.locator("#bookingVerify")).toHaveCount(0);
-  await expect(page.locator("#bookingName")).toHaveValue("Mia");
+  // Asked once, in the details: not again at sign-up, and no second email.
+  await expect(page.locator("#bookingEmail")).toHaveCount(0);
+  await page.locator("#bookingName").fill("Mia");
 
   // Three at the table: a date, a time, then a table big enough.
-  await page.locator("#bookingParty").selectOption("3");
+  await page.locator('[data-party="3"]').click();
   const day = page.locator(".bk-days button:not([disabled])").nth(2);
   await day.click();
-  await page.locator("#bookingTime").selectOption("19:00");
+  await page.locator('[data-time="19:00"]').click();
   await expect(page.locator('[data-table="2"]')).toBeDisabled();
   await expect(page.locator('[data-table="2"]')).toContainText("座位不够");
   await page.locator('[data-table="4"]').click();
@@ -111,6 +113,23 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   expect(reference).toMatch(/^[A-Z2-9]{6}$/);
   // Shown above, it is not listed a second time under it.
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveCount(0);
+  // A tap turns the ticket over to the number, to show at the door; another turns it back.
+  await page.locator("#bookingPass").click();
+  await expect(page.locator("#bookingPass")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".bk-pass-back strong")).toHaveText(reference);
+  // With the QR code the waiter scans at the door: it reads "ZYRES:" and the number.
+  const qr = page.locator("#bookingQr");
+  await expect(qr).toBeVisible();
+  await expect(qr).toHaveAttribute("alt", `预约二维码 ${reference}`);
+  expect(await qr.evaluate(async (image) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 240;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, 240, 240);
+    return Array.from(context.getImageData(0, 0, 240, 240).data);
+  }).then((pixels) => jsQR(Uint8ClampedArray.from(pixels), 240, 240)?.data)).toBe(`ZYRES:${reference}`);
+  await page.locator("#bookingPass").click();
+  await expect(page.locator("#bookingPass")).toHaveAttribute("aria-pressed", "false");
 
   // The link opens it again, even on another visit.
   await page.reload();
@@ -119,16 +138,16 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   // The same day again: one a day, said in words.
   await page.locator("#bookingAnother").click();
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toBeVisible();
-  await page.locator("#bookingParty").selectOption("2");
+  await page.locator('[data-party="2"]').click();
   await day.click();
-  await page.locator("#bookingTime").selectOption("13:00");
+  await page.locator('[data-time="13:00"]').click();
   await page.locator('[data-table="2"]').click();
   await page.locator("#bookingPhone").fill("+43 660 1112233");
   await page.locator("#bookingSubmit").click();
   await expect(page.locator("#bookingError")).toHaveText("同一天最多预约 1 次。");
 
   // The table taken at 19:00 is taken for the whole stay.
-  await page.locator("#bookingTime").selectOption("20:00");
+  await page.locator('[data-time="20:00"]').click();
   await expect(page.locator('[data-table="4"]')).toBeDisabled();
   await expect(page.locator('[data-table="4"]')).toContainText("已订");
 

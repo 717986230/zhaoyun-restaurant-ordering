@@ -71,6 +71,9 @@
   --shadow-3: 0 30px 70px rgba(0, 0, 0, 0.72);
   --inset-art: inset 0 0 35px rgba(0, 0, 0, 0.72);
   --scrim: rgba(0, 0, 0, 0.32);
+  /* Behind a glass sheet the room is blurred, so it needs less dimming. */
+  --glass-scrim: rgba(0, 0, 0, 0.16);
+  --glass-lift: 0 -18px 50px rgba(0, 0, 0, 0.28);
   --art-sheen: rgba(255, 255, 255, 0.14);
   --art-shade: rgba(0, 0, 0, 0.72);
 
@@ -89,6 +92,8 @@
   --pull: 0;
   /* A row's place on a freshly turned page, for its cascade; set inline. */
   --row: 0;
+  /* Set per digit by RollingNumber: how long a changed digit waits to roll. */
+  --roll-delay: 0ms;
   /* How tall a dish card may grow; set per screen on the card itself. */
   --detail-max: 70vh;
 
@@ -4282,4 +4287,197 @@ button:focus-visible,
 /* A choosable group's name lines up with its chips (a legend is indented by default). */
 .dish-options.choosing .dish-options-group legend {
   padding: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Frosted glass sheets (2026-10): the cart, the account and the orders open
+   as a pane of frosted glass. The room behind blurs from sharp to 26px (the
+   scrim's backdrop, animated in Sheet.tsx), the pane is the menu style's own
+   panel colour at 42%, and it floats up from 94% to its full size on
+   cubic-bezier(.2,.7,.2,1); its rows land 4 frames (67 ms) apart, the whole
+   thing done within a second. The pane needs no blur of its own: it sits on
+   the scrim, whose backdrop is already the blurred menu.
+   ------------------------------------------------------------------------ */
+.sheet-scrim {
+  background: var(--glass-scrim);
+}
+
+.sheet {
+  position: relative;
+  border-color: color-mix(in srgb, var(--ink) 16%, transparent);
+  border-radius: 22px 22px 0 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ink) 8%, transparent), transparent 140px),
+    color-mix(in srgb, var(--panel) 42%, transparent);
+  box-shadow: var(--glass-lift), inset 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+  transform-origin: 50% 100%;
+}
+
+/* Where the room cannot blur (or colours cannot mix), clear glass would be
+   unreadable: there the pane stays the solid panel it was. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sheet-scrim {
+    background: var(--scrim);
+  }
+
+  .sheet {
+    background: var(--panel);
+  }
+}
+
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .sheet {
+    background: var(--panel);
+  }
+}
+
+/* The handle: pull the sheet down by it to close. */
+.sheet-grip {
+  display: grid;
+  place-items: center;
+  height: 18px;
+  margin-bottom: -8px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet-grip span {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.sheet-head {
+  touch-action: none;
+  border-bottom-color: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.sheet-close {
+  border-color: color-mix(in srgb, var(--ink) 18%, transparent);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+/* Cards and fields inside sit on the glass as frosted tiles, not as holes in it. */
+.sheet :is(.row, .order, input:not([type="checkbox"], [type="radio"]), textarea, select) {
+  background-color: color-mix(in srgb, var(--panel) 55%, transparent);
+}
+
+/* The rows land one after another, 4 frames apart, after the pane has
+   mostly risen; the seventh and later land with the sixth. */
+.sheet-body > * {
+  animation: sheet-row-in 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  animation-delay: 0.12s;
+}
+.sheet-body > :nth-child(2) { animation-delay: calc(0.12s + 67ms); }
+.sheet-body > :nth-child(3) { animation-delay: calc(0.12s + 133ms); }
+.sheet-body > :nth-child(4) { animation-delay: calc(0.12s + 200ms); }
+.sheet-body > :nth-child(5) { animation-delay: calc(0.12s + 267ms); }
+.sheet-body > :nth-child(n + 6) { animation-delay: calc(0.12s + 333ms); }
+
+@keyframes sheet-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-grip {
+    display: none;
+  }
+
+  .sheet-body > * {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion, to the prompts in docs/motion-prompts.md (2026-10).
+   ------------------------------------------------------------------------ */
+
+/* ② Flip to reveal: perspective 1200px (the turn itself is in CatalogScreen). */
+.dish-detail-card {
+  perspective: 1200px;
+}
+
+/* ④ Fly to cart: the round copy of the dish that arcs into the cart bar. */
+.fly-ghost {
+  position: fixed;
+  z-index: 120;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  background: var(--accent) center / cover no-repeat;
+  box-shadow: var(--shadow-1);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* ⑦ Number roll: a changed digit rolls in from below (up) or above (down),
+   360 ms, the ones first, each place further left 40 ms later. */
+.rolling {
+  display: inline-flex;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  vertical-align: bottom;
+}
+
+.roll {
+  display: inline-block;
+  animation: 0.36s cubic-bezier(0.2, 0.7, 0.2, 1) var(--roll-delay) backwards;
+}
+
+.roll-up {
+  animation-name: roll-up;
+}
+
+.roll-down {
+  animation-name: roll-down;
+}
+
+@keyframes roll-up {
+  from {
+    opacity: 0;
+    transform: translateY(80%);
+  }
+}
+
+@keyframes roll-down {
+  from {
+    opacity: 0;
+    transform: translateY(-80%);
+  }
+}
+
+/* ⑥ Toast: in on the landing curve (280 ms), out faster on ease-in (180 ms).
+   It stays at the top, under the header — never over the button just tapped. */
+.toast {
+  transform: translate(-50%, -16px);
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
+}
+
+.toast.show {
+  transition: opacity 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* ⑤ Press feedback: the round "+" gives under the finger and springs back. */
+.quick-add {
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.quick-add:active {
+  transform: scale(0.9);
+  transition-duration: 0.09s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roll {
+    animation: none;
+  }
+
+  .toast,
+  .toast.show {
+    transition: none;
+  }
 }

@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import { resolve } from "node:path";
 import react from "@vitejs/plugin-react";
-import { headersFile, WEB_HEADERS } from "./shared/web-headers.mjs";
+import { headersFile, headersFor } from "./shared/web-headers.mjs";
 
 // Three things serve these files and they disagree about where the root is:
 // the Worker and the Capacitor shell both serve them from `/`, while a GitHub
@@ -17,6 +17,16 @@ export default defineConfig({
     apply: "build",
     generateBundle() {
       this.emitFile({ type: "asset", fileName: "_headers", source: headersFile() });
+    }
+  }, {
+    // The browser tests on CI run against the build under the same policy as
+    // production, page by page. The dev server goes without: its hot reload runs inline scripts.
+    name: "zhaoyun-preview-headers",
+    configurePreviewServer(server) {
+      server.middlewares.use((request, response, next) => {
+        for (const [name, value] of Object.entries(headersFor(request.url))) response.setHeader(name, value);
+        next();
+      });
     }
   }],
   build: {
@@ -35,10 +45,5 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 5173
-  },
-  // The browser tests on CI run against the build under the same policy as
-  // production. The dev server goes without: its hot reload runs inline scripts.
-  preview: {
-    headers: WEB_HEADERS
   }
 });

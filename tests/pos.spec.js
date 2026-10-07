@@ -191,6 +191,53 @@ test("a guest's call is on the waiter's floor at once, and gone once they deal w
   await expect(page.locator(".pos-table[data-table='6'] .pos-call-badge")).toHaveCount(0);
 });
 
+test("a booking is checked in at the door by its number: seated at its table, or at the one the waiter gives", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const { today } = await (await admin(request, "get", "/api/admin/reservations")).json();
+  const book = async (data) => (await (await admin(request, "post", "/api/admin/reservations", { date: today, party: 2, phone: "0660 1112233", ...data })).json()).reservation;
+  const gruber = await book({ time: "23:00", name: "Fam. Gruber", party: 4, table: "7" });
+  const novak = await book({ time: "23:30", name: "Novak" });
+
+  await pairAndSignIn(page, "Tablet door", "Li", "1234");
+  const bookings = page.locator(".pos-bookings");
+  await expect(bookings).toContainText("Fam. Gruber");
+  const toast = page.locator(".pos-toast");
+
+  // The QR code holds "ZYRES:" and the number; typed, the number alone does.
+  await page.locator("#posScanBooking").click();
+  const scanner = page.getByRole("dialog", { name: "扫码核销" });
+  await expect(scanner).toBeVisible();
+  await scanner.locator("#posScanReference").fill(gruber.reference.toLowerCase());
+  await scanner.getByRole("button", { name: "核销", exact: true }).click();
+  await expect(scanner).toHaveCount(0);
+  await expect(toast).toHaveText(`已核销：Fam. Gruber · 4 位 · 桌 7`);
+  await expect(bookings.locator(`[data-booking="${gruber.reference}"]`)).toHaveAttribute("data-status", "seated");
+
+  // Twice is said, not done again; a number that is not today's is said too.
+  await page.locator("#posScanBooking").click();
+  await scanner.locator("#posScanReference").fill(gruber.reference);
+  await scanner.locator("#posScanReference").press("Enter");
+  await expect(toast).toHaveText("Fam. Gruber 已经入座了");
+  await page.locator("#posScanBooking").click();
+  await scanner.locator("#posScanReference").fill("ZZZZ99");
+  await scanner.locator("#posScanReference").press("Enter");
+  await expect(toast).toHaveText("今天没有这个预约：ZZZZ99");
+
+  // No table booked: the waiter is asked for one.
+  page.once("dialog", (dialog) => dialog.accept("8"));
+  await page.locator("#posScanBooking").click();
+  await scanner.locator("#posScanReference").fill(`ZYRES:${novak.reference}`);
+  await scanner.locator("#posScanReference").press("Enter");
+  await expect(toast).toHaveText("已核销：Novak · 2 位 · 桌 8");
+  await expect(bookings.locator(`[data-booking="${novak.reference}"]`)).toHaveAttribute("data-status", "seated");
+
+  // Escape closes it without a word.
+  await page.locator("#posScanBooking").click();
+  await expect(scanner).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(scanner).toHaveCount(0);
+});
+
 test("an order sent on one tablet shows at once on the other and on the admin board", async ({ browser, request }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
   const [dish] = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => product.kind === "food" && !product.bundleItems?.length);

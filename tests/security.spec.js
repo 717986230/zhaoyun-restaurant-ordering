@@ -15,6 +15,8 @@ for (const page of ["/", "/admin.html", "/pos.html", "/book.html"]) {
     expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect(headers["x-frame-options"]).toBe("DENY");
     expect(headers["strict-transport-security"]).toContain("max-age=");
-    expect(headers["permissions-policy"]).toContain("camera=()");
+    // The POS scans booking QR codes at the door; every other page keeps the camera shut.
+    expect(headers["permissions-policy"]).toContain(page === "/pos.html" ? "camera=(self)" : "camera=()");
+    expect(headers["permissions-policy"]).toContain("microphone=()");
   });
 }

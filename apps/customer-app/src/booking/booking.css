@@ -860,3 +860,230 @@ html.bk-root body {
     grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
   }
 }
+
+/* ② Flip to reveal (docs/motion-prompts.md): the ticket turns 180° about
+   its upright, perspective 1200px, 0.8 s on cubic-bezier(.3,.7,.2,1); each
+   face hides its back, so the faces swap at 90°. The back is the booking
+   number, large, to show at the door. A tap mid-turn turns it back from where
+   it is. */
+.bk-pass {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  perspective: 1200px;
+  -webkit-tap-highlight-color: transparent;
+}
+.bk-pass-inner {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+.bk-pass.flipped .bk-pass-inner {
+  transform: rotateY(180deg);
+}
+.bk-pass-face {
+  grid-area: 1 / 1;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.bk-pass-back {
+  transform: rotateY(180deg);
+}
+.bk-pass-front strong,
+.bk-pass-back strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: clamp(48px, 16vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.bk-pass-back strong {
+  font-size: clamp(36px, 12vw, 52px);
+  letter-spacing: 0.04em;
+}
+.bk-pass-face > span,
+.bk-pass-face > small:not(.bk-pass-hint) {
+  font-family: var(--bk-serif);
+  font-size: 18px;
+  color: var(--ink-2);
+}
+.bk-pass-face > small:not(.bk-pass-hint) {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.bk-pass-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.bk-pass:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-pass-inner {
+    transition: none;
+  }
+}
+/* The ticket's own wrappers are spans (a button holds phrasing content): the
+   older ".bk-when span" rule for the date must not reach them. */
+.bk-pass .bk-pass-inner,
+.bk-pass .bk-pass-face {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--ink);
+}
+
+/* The back of the ticket: one white rectangle, like a boarding pass — the
+   QR code large in the middle for the waiter to scan at the door, the number
+   and who under it to read out if the camera will not. White and dark ink
+   whatever the page's colours, so any camera finds the code's edges. */
+.bk-pass .bk-pass-code {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 18px 16px 16px;
+  border-radius: 14px;
+  background: var(--light-panel);
+  color: var(--light-ink);
+  text-align: center;
+}
+.bk-pass-qr {
+  width: min(240px, 72%);
+  height: auto;
+  aspect-ratio: 1;
+  margin-bottom: 8px;
+}
+.bk-pass .bk-pass-code small {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--light-ink);
+  opacity: 0.6;
+}
+.bk-pass .bk-pass-code strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: clamp(32px, 10vw, 44px);
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+  color: var(--light-ink);
+}
+.bk-pass .bk-pass-code span {
+  font-family: var(--bk-serif);
+  font-size: 16px;
+  color: var(--light-ink);
+}
+.bk-pass .bk-pass-scan {
+  margin-top: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink-2);
+  text-align: center;
+}
+.bk-pass-back .bk-pass-hint {
+  text-align: center;
+}
+/* Both faces are the same rectangle, so the flip turns one into the other:
+   the front's time and day in the middle of a frame as tall as the code. */
+.bk-pass-face {
+  grid-template-rows: 1fr auto;
+}
+.bk-pass-back {
+  grid-template-rows: 1fr auto auto;
+}
+.bk-pass .bk-pass-stub {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+.bk-pass .bk-pass-stub span {
+  font-family: var(--bk-serif);
+  font-size: 18px;
+  color: var(--ink-2);
+}
+.bk-pass-front .bk-pass-hint {
+  text-align: center;
+}
+
+/* One tap per choice (2026-10): the party and the time are buttons, not
+   lists — a list was a tap to open, a scroll and a tap to pick. */
+.bk-choices {
+  display: grid;
+  gap: 8px;
+}
+.bk-party {
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+}
+.bk-times {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+.bk-choices button {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.bk-choices button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.bk-choices button:active:not(:disabled) {
+  transform: scale(0.96);
+  transition-duration: 0.09s;
+}
+.bk-choices button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.bk-choices button small {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
+}
+.bk-more {
+  margin-top: 10px;
+}
+/* The step brought up the screen lands a little below the top edge. */
+.bk-card,
+.bk-finish {
+  scroll-margin-top: 12px;
+}
+.bk-finish {
+  display: grid;
+  gap: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-choices button {
+    transition: none;
+  }
+}
