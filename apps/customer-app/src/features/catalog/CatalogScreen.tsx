@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deconstruct, drinkTabs, LANGUAGE_INFO, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
 import { RollingNumber } from "../../components/RollingNumber";
-import { MoonIcon, SunIcon } from "../../components/SchemeIcons";
+import { CalendarIcon, MoonIcon, PersonIcon, SunIcon } from "../../components/LineIcons";
 import { flyToCart } from "../../app/motion";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product, SelectedModifier } from "@zhaoyun/domain";
 import type { NavLabels } from "@zhaoyun/contracts";
@@ -223,16 +223,8 @@ function SearchIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l5.5 5.5" /></svg>;
 }
 
-function PersonIcon() {
-  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" /><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6" /></svg>;
-}
-
 function ReceiptIcon() {
   return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z" /><path d="M9 8.5h6M9 12h6M9 15.5h3.5" /></svg>;
-}
-
-function CalendarIcon() {
-  return <svg className="scheme-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></svg>;
 }
 
 function BellIcon() {
@@ -686,8 +678,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           aria-label={t(state.language, scheme === "dark" ? "lightMode" : "darkMode")}
           onClick={onToggleScheme}
         >{scheme === "dark" ? <SunIcon /> : <MoonIcon />}</button>
-        {/* Booking a table, for a guest reading the menu away from one. */}
-        {reservations && !table && <a id="bookBtn" className="icon-btn guest-toggle" href={`book.html?lang=${state.language}`} aria-label={g(state.language, "bookTable")} title={g(state.language, "bookTable")}><CalendarIcon /></a>}
+        {/* Booking a table, for a guest reading the menu away from one: a glass panel over the menu. */}
+        {reservations && !table && <button type="button" id="bookBtn" className="icon-btn guest-toggle" aria-label={g(state.language, "bookTable")} title={g(state.language, "bookTable")} onClick={() => dispatch({ type: "sheet", sheet: "booking" })}><CalendarIcon /></button>}
         {/* The guest's account; without accounts, the orders this phone placed. */}
         {account
           ? <button id="accountBtn" className={`icon-btn guest-toggle ${account.signedIn ? "on" : ""}`} aria-label={g(state.language, "account")} onClick={() => dispatch({ type: "sheet", sheet: "account" })}><PersonIcon /></button>

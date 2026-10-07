@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence } from "motion/react";
 import type { ApiBookingInfo, ApiCustomer, ApiGuestReservation, ApiReservationSlot, ApiTableChoice } from "@zhaoyun/contracts";
 import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
 import { apiBaseUrl, customerToken, setCustomerToken } from "../app/api";
-import { useColorScheme } from "../app/useColorScheme";
-import { MoonIcon, SunIcon } from "../components/SchemeIcons";
-import { LANGUAGE_INFO } from "@zhaoyun/domain";
-import { b, bookingError, formatDay, initialLanguage, rememberLanguage } from "./booking-i18n";
+import { Sheet } from "../components/Sheet";
+import { CalendarIcon, PersonIcon, QrIcon, RefreshIcon } from "../components/LineIcons";
+import { b, bookingError, formatDay, initialLanguage } from "./booking-i18n";
 import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
 import { checkMobile } from "../../../../shared/phone.mjs";
 
@@ -63,11 +64,17 @@ function refusal(language: BookingLanguage, error: unknown, info: ApiBookingInfo
 }
 
 /**
- * The guest's booking page (/book): how many, which day, which time, who —
- * and afterwards their booking, which the link they keep opens again.
+ * Booking a table, in a pane of frosted glass (components/Sheet.tsx, as the
+ * cart): how many, which day, which time, who — and afterwards the booking,
+ * which the link the guest keeps opens again. Over the menu it opens from the
+ * calendar in the top bar, in the menu's language, and closes back to it; on
+ * its own (/book.html, from a website or Google Maps) closing it goes to the
+ * menu. No language or light/dark switch of its own: the menu's are the ones.
  */
-export function BookingPage() {
-  const [language, setLanguage] = useState<BookingLanguage>(initialLanguage);
+export function BookingPage({ language: menuLanguage, onClose }: { language?: BookingLanguage; onClose: () => void }) {
+  const standalone = !menuLanguage;
+  const [ownLanguage, setLanguage] = useState<BookingLanguage>(initialLanguage);
+  const language = menuLanguage ?? ownLanguage;
   const [info, setInfo] = useState<ApiBookingInfo | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [held, setHeld] = useState<Held | null>(() => heldFromLink());
@@ -76,8 +83,6 @@ export function BookingPage() {
   // The signed-in guest: booking needs one (against fake bookings), and their bookings are listed.
   const [customer, setCustomer] = useState<ApiCustomer | null>(null);
   const [mine, setMine] = useState<ApiGuestReservation[]>([]);
-  // Light or dark, as on the menu (the same choice, kept on this phone).
-  const [scheme, toggleScheme] = useColorScheme(undefined);
   // The guest's other bookings and their account open over the page from the dock.
   const [sheet, setSheet] = useState<"bookings" | "account" | null>(null);
 
@@ -141,60 +146,42 @@ export function BookingPage() {
   // Once, for whatever the page opened with.
   }, []);
 
+  // On its own page, the page is the booking; over the menu, the menu keeps its own title.
   useEffect(() => {
+    if (!standalone) return;
     document.documentElement.lang = language === "zh" ? "zh-CN" : language;
     document.title = info?.restaurantName ? `${b(language, "title")} · ${info.restaurantName}` : b(language, "title");
-  }, [language, info]);
-
-  const chooseLanguage = (next: BookingLanguage) => {
-    setLanguage(next);
-    rememberLanguage(next);
-  };
+  }, [standalone, language, info]);
 
   const booked = (reservation: ApiGuestReservation, token: string) => {
     const next = { id: reservation.id, token };
     remember(next);
     setHeld(next);
     setBooking({ ...reservation, cancellable: true });
-    history.replaceState(null, "", linkFor(next));
-    window.scrollTo({ top: 0 });
+    if (standalone) history.replaceState(null, "", linkFor(next));
+    document.querySelector("#bookingModal .sheet-body")?.scrollTo({ top: 0 });
     void loadMine();
   };
 
   const startOver = () => {
     setBooking(null);
     setNotFound(false);
-    history.replaceState(null, "", location.pathname);
+    if (standalone) history.replaceState(null, "", location.pathname);
   };
 
-  // The languages the menu offers (an older server: all three), and the one in use among them.
+  // On its own page: one of the languages the menu offers (an older server: all three).
   const languages = (info?.languages ?? BOOKING_LANGUAGES).filter((code): code is BookingLanguage => (BOOKING_LANGUAGES as readonly string[]).includes(code));
   useEffect(() => {
-    if (languages.length && !languages.includes(language)) setLanguage(languages[0]!);
-  }, [languages.join(","), language]);
+    if (standalone && languages.length && !languages.includes(ownLanguage)) setLanguage(languages[0]!);
+  }, [standalone, languages.join(","), ownLanguage]);
 
   const others = mine.filter((entry) => !(booking && held && entry.id === booking.id));
   // The name and number of the guest's latest booking, to start the next one from.
   const latest = mine.find((entry) => entry.phone);
   const recent = useMemo(() => (latest ? { name: latest.name, phone: latest.phone } : null), [latest?.name, latest?.phone]);
 
-  return <main className="bk-page">
-    <header className="bk-head">
-      <div>
-        <p className="bk-eyebrow">{info?.restaurantName ?? ""}</p>
-        <h1>{booking ? b(language, "myBooking") : b(language, "title")}</h1>
-      </div>
-      {/* The menu's own capsule: a flag per language the menu offers, then the sun or the moon. */}
-      <div className="topbar-end bk-topbar">
-        {languages.length > 1 && <div className="flags" role="group" aria-label="Language" id="bookingLanguages">{languages.map((code) => <button key={code} type="button"
-          className={`flag ${code === language ? "on" : ""}`} data-lang={code} aria-label={LANGUAGE_INFO[code].name} aria-pressed={code === language}
-          onClick={() => chooseLanguage(code)}><img src={LANGUAGE_INFO[code].flag} alt="" /></button>)}</div>}
-        <button type="button" className="icon-btn scheme-toggle" id="bookingTheme" aria-label={b(language, scheme === "dark" ? "themeLight" : "themeDark")} onClick={toggleScheme}>
-          {scheme === "dark" ? <SunIcon /> : <MoonIcon />}
-        </button>
-      </div>
-    </header>
-
+  return <Sheet id="bookingModal" className="bk-modal" title={booking ? b(language, "myBooking") : b(language, "title")} closeLabel={b(language, "close")} onClose={onClose}>
+  <div className="bk-page">
     {notFound && !booking ? <section className="bk-card bk-message" id="bookingNotFound">
       <p>{b(language, "notFound")}</p>
       <button type="button" className="bk-secondary" onClick={startOver}>{b(language, "another")}</button>
@@ -214,39 +201,28 @@ export function BookingPage() {
               <BookingForm language={language} info={info} customer={customer} recent={recent} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />
             </>}
 
-    {/* The guest's other bookings and their account: one tap each, from the corner. */}
+    {/* The guest's other bookings and their account: two round buttons, raised off the bottom corner. */}
     <nav className="bk-dock" aria-label={b(language, "account")}>
-      <button type="button" id="bookingDockBookings" aria-haspopup="dialog" onClick={() => setSheet("bookings")}>
-        <span aria-hidden="true">📅</span>{b(language, "myBookings")}{customer && others.length ? <b className="bk-dock-count">{others.length}</b> : null}
+      <button type="button" id="bookingDockBookings" aria-haspopup="dialog" aria-label={b(language, "myBookings")} title={b(language, "myBookings")} onClick={() => setSheet("bookings")}>
+        <CalendarIcon />{customer && others.length ? <b className="bk-dock-count">{others.length}</b> : null}
       </button>
-      <button type="button" id="bookingDockAccount" aria-haspopup="dialog" onClick={() => setSheet("account")}>
-        <span aria-hidden="true">👤</span>{b(language, "account")}
+      <button type="button" id="bookingDockAccount" aria-haspopup="dialog" aria-label={b(language, "account")} title={b(language, "account")} onClick={() => setSheet("account")}>
+        <PersonIcon />
       </button>
     </nav>
-    {sheet ? <BookingSheet language={language} title={b(language, sheet === "bookings" ? "myBookings" : "account")} onClose={() => setSheet(null)}>
+  </div>
+  {/* A second pane of glass over the first, outside it so it covers the whole screen. */}
+  {createPortal(<AnimatePresence>
+    {sheet ? <Sheet key={sheet} id="bookingPanel" title={b(language, sheet === "bookings" ? "myBookings" : "account")} closeLabel={b(language, "close")} onClose={() => setSheet(null)}>
       {!customer
         ? <p className="bk-muted" id="bookingSignInToSee">{b(language, "signInToSee")}</p>
         : sheet === "bookings"
           // The booking open on the page is not listed a second time.
           ? others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => void loadMine()} /> : <p className="bk-muted">{b(language, "noBookings")}</p>
           : <AccountPanel language={language} info={info} customer={customer} onRefreshed={setCustomer} onSignOut={() => { setSheet(null); void signOut(); }} />}
-    </BookingSheet> : null}
-  </main>;
-}
-
-/** A panel over the page, from the bottom: the guest's bookings or account. Escape or the scrim closes it. */
-function BookingSheet({ language, title, onClose, children }: { language: BookingLanguage; title: string; onClose: () => void; children: ReactNode }) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return <div className="bk-sheet" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="bk-sheet-panel" role="dialog" aria-modal="true" aria-label={title} id="bookingSheet">
-      <header><h2>{title}</h2><button type="button" className="bk-sheet-close" aria-label={b(language, "close")} onClick={onClose}>×</button></header>
-      {children}
-    </section>
-  </div>;
+    </Sheet> : null}
+  </AnimatePresence>, document.body)}
+  </Sheet>;
 }
 
 /** The guest's account: who, how many points, the rule, the member code behind a tap, and signing out. */
@@ -262,7 +238,7 @@ function AccountPanel({ language, info, customer, onRefreshed, onSignOut }: {
     <p className="bk-account-points"><b id="bookingPoints">{b(language, "pointsBalance", { points: customer.points })}</b></p>
     {info?.minPoints ? <p className="bk-muted" id="bookingMemberRule">{b(language, "memberRule", { min: info.minPoints, welcome: info.welcomePoints ?? 0, noShow: info.noShowPoints ?? 0 })}</p> : null}
     <MemberCode language={language} customer={customer} id="accountMemberQr" />
-    <button type="button" className="bk-secondary" id="bookingSignOut" onClick={onSignOut}>{b(language, "signOut")}</button>
+    <button type="button" className="bk-text-button bk-sign-out" id="bookingSignOut" onClick={onSignOut}>{b(language, "signOut")}</button>
   </div>;
 }
 
@@ -271,8 +247,8 @@ function MemberCode({ language, customer, id }: { language: BookingLanguage; cus
   const [shown, setShown] = useState(false);
   const qr = useQr(shown ? `ZYMEM:${customer.id}` : "");
   return <>
-    <button type="button" className="bk-secondary" id={`${id}Toggle`} aria-expanded={shown} onClick={() => setShown((value) => !value)}>
-      {b(language, shown ? "hideMemberCode" : "showMemberCode")}
+    <button type="button" className="bk-pill" id={`${id}Toggle`} aria-expanded={shown} onClick={() => setShown((value) => !value)}>
+      <QrIcon />{b(language, shown ? "hideMemberCode" : "showMemberCode")}
     </button>
     {shown && qr ? <span className="bk-member-code"><img id={id} src={qr} alt={b(language, "memberQrAlt")} width="220" height="220" /></span> : null}
   </>;
@@ -687,7 +663,7 @@ function MemberCard({ language, info, customer, onRefreshed }: { language: Booki
     <p className="bk-member-short">{b(language, "pointsShortLine", { min: info.minPoints ?? 0, points: customer.points, welcome: info.welcomePoints ?? 0 })}</p>
     <div className="bk-member-actions">
       <MemberCode language={language} customer={customer} id="bookingMemberQr" />
-      <button type="button" className="bk-secondary" id="bookingRefreshPoints" disabled={busy} onClick={() => void refresh()}>{b(language, "memberRefresh")}</button>
+      <button type="button" className="bk-text-button" id="bookingRefreshPoints" disabled={busy} onClick={() => void refresh()}><RefreshIcon />{b(language, "memberRefresh")}</button>
     </div>
   </section>;
 }

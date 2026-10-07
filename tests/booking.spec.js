@@ -76,14 +76,9 @@ test.beforeEach(async ({ page }, testInfo) => {
 test("a guest signs up, picks day, time and table, sees the booking and cancels it; the limits say no in words", async ({ page, request }) => {
   await page.goto("/book.html?lang=zh");
   await expect(page.getByRole("heading", { name: "预约餐桌" })).toBeVisible();
-  // Top-right: the language, and light or dark, as on the menu.
-  // The menu's own capsule: its flags, the one in use on the accent.
-  await expect(page.locator('#bookingLanguages .flag[aria-pressed="true"]')).toHaveAttribute("data-lang", "zh");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.locator("#bookingTheme").click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await page.locator("#bookingTheme").click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  // A pane of glass, in the language it was opened in: no switch of its own (the menu has them).
+  await expect(page.locator("#bookingModal")).toBeVisible();
+  await expect(page.locator("#bookingModal .flag, #bookingModal .scheme-toggle")).toHaveCount(0);
 
   // Nothing is booked without an account.
   await expect(page.locator("#bookingSignIn")).toBeVisible();
@@ -95,8 +90,10 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   // The account is one tap away, in the dock at the bottom-right.
   await page.locator("#bookingDockAccount").click();
   await expect(page.locator("#bookingAccount")).toContainText("mia@example.com");
+  // Escape closes the panel on top, not the booking under it.
   await page.keyboard.press("Escape");
-  await expect(page.locator("#bookingSheet")).toHaveCount(0);
+  await expect(page.locator("#bookingPanel")).toHaveCount(0);
+  await expect(page.locator("#bookingModal")).toBeVisible();
 
   // The email proved first: a code to it, typed back (read here from the test server's outbox).
   await expect(page.locator("#bookingVerify")).toContainText("mia@example.com");
@@ -131,7 +128,8 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingDockAccount").click();
   await expect(page.locator("#bookingPoints")).toHaveText("10 积分");
   await expect(page.locator("#bookingMemberRule")).toHaveText("预约需要 10 积分。首次到店消费后赠送 10 积分；预约未按时到店会扣 5 积分。");
-  await page.locator("#bookingSheet .bk-sheet-close").click();
+  await page.locator("#bookingPanel .sheet-close").click();
+  await expect(page.locator("#bookingPanel")).toHaveCount(0);
 
   // Asked once, in the details: not again at sign-up, and no second email.
   await expect(page.locator("#bookingEmail")).toHaveCount(0);
@@ -191,6 +189,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingDockBookings").click();
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(page.locator("#bookingPanel")).toHaveCount(0);
   await page.locator("#bookingParty").fill("2");
   await page.locator("#bookingDate").selectOption(day);
   await page.locator("#bookingTime").selectOption("13:00");
@@ -211,10 +210,22 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveAttribute("data-status", "cancelled");
 });
 
-test("the menu links to the booking page when bookings are on", async ({ page }) => {
+test("the menu opens the booking over itself, in glass, and closing it goes back to the menu", async ({ page }) => {
   await page.goto("/");
+  await page.locator("#bookBtn").click();
+  await expect(page.locator("#bookingModal")).toBeVisible();
+  await expect(page.locator("#bookingModal .sheet-head h2")).toHaveText("预约餐桌");
+  await page.locator("#bookingModal .sheet-close").click();
+  await expect(page.locator("#bookingModal")).toHaveCount(0);
   await expect(page.locator("#bookBtn")).toBeVisible();
-  await expect(page.locator("#bookBtn")).toHaveAttribute("href", /book\.html\?lang=/);
+});
+
+test("the booking on its own page closes to the menu", async ({ page }) => {
+  await page.goto("/book.html?lang=en");
+  await expect(page.locator("#bookingModal")).toBeVisible();
+  await page.locator("#bookingModal .sheet-close").click();
+  await expect(page).toHaveURL(/\/(index\.html)?(\?.*)?$/);
+  await expect(page.locator("#bookBtn")).toBeVisible();
 });
 
 test("the console's records find a booking by phone and show its record", async ({ page, request }) => {
