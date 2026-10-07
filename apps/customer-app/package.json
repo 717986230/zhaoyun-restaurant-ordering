@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@tanstack/react-query": "^5.103.2",
+    "@tanstack/react-query": "^5.104.1",
     "@zhaoyun/api-client": "*",
     "@zhaoyun/contracts": "*",
     "@zhaoyun/domain": "*",
