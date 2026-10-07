@@ -50,10 +50,10 @@ function refusal(language: BookingLanguage, error: unknown, info: ApiBookingInfo
   if (error instanceof ApiError) {
     if (error.status === 429 && error.code !== "NO_SHOW_BLOCKED" && error.code !== "CODE_TOO_SOON" && error.code !== "TOO_MANY_CODES") return bookingError(language, "RATE");
     const known: BookingErrorKey[] = ["SLOT_FULL", "SLOT_UNAVAILABLE", "PARTY_TOO_LARGE", "RESERVATIONS_OFF", "INVALID", "TABLE_TAKEN", "TABLE_REQUIRED", "TABLE_TOO_SMALL", "SIGN_IN_REQUIRED", "NO_SHOW_BLOCKED", "DAY_LIMIT", "TOO_MANY_BOOKINGS",
-      "EMAIL_UNVERIFIED", "BAD_PHONE", "NOT_MOBILE", "WRONG_CODE", "CODE_EXPIRED", "CODE_TOO_SOON", "TOO_MANY_CODES", "MAIL_FAILED"];
+      "EMAIL_UNVERIFIED", "BAD_PHONE", "NOT_MOBILE", "WRONG_CODE", "CODE_EXPIRED", "CODE_TOO_SOON", "TOO_MANY_CODES", "MAIL_FAILED", "NOT_ENOUGH_POINTS"];
     const limit = error.code === "DAY_LIMIT" ? info?.maxPerDayPerGuest : info?.maxActivePerGuest;
-    const details = (error.details ?? {}) as { attemptsLeft?: number; retryAfter?: number };
-    if (error.code && (known as string[]).includes(error.code)) return bookingError(language, error.code as BookingErrorKey, { message: error.message, limit: limit ?? "", left: details.attemptsLeft ?? "", s: details.retryAfter ?? "" });
+    const details = (error.details ?? {}) as { attemptsLeft?: number; retryAfter?: number; minPoints?: number; points?: number };
+    if (error.code && (known as string[]).includes(error.code)) return bookingError(language, error.code as BookingErrorKey, { message: error.message, limit: limit ?? "", left: details.attemptsLeft ?? "", s: details.retryAfter ?? "", min: details.minPoints ?? info?.minPoints ?? "", points: details.points ?? "" });
     return bookingError(language, "INVALID", { message: error.message });
   }
   return bookingError(language, "OFFLINE");
@@ -181,7 +181,7 @@ export function BookingPage() {
       <button type="button" className="bk-secondary" onClick={startOver}>{b(language, "another")}</button>
     </section> : null}
 
-    {customer ? <p className="bk-account" id="bookingAccount">{b(language, "signedInAs", { email: customer.email })} · <button type="button" className="bk-link-button" onClick={() => void signOut()}>{b(language, "signOut")}</button></p> : null}
+    {customer ? <p className="bk-account" id="bookingAccount">{b(language, "signedInAs", { email: customer.email })}{info?.minPoints ? <> · <b id="bookingPoints">{b(language, "pointsBalance", { points: customer.points })}</b></> : null} · <button type="button" className="bk-link-button" onClick={() => void signOut()}>{b(language, "signOut")}</button></p> : null}
 
     {booking && held
       ? <BookingDetails language={language} booking={booking} held={held} info={info} onChange={(next) => { setBooking(next); void loadMine(); }} onAnother={startOver} />
@@ -191,7 +191,12 @@ export function BookingPage() {
           ? <p className="bk-muted">{b(language, "loading")}</p>
           : !info.enabled
             ? <section className="bk-card bk-message" id="bookingOff"><p>{b(language, "off")}</p></section>
-            : <BookingForm language={language} info={info} customer={customer} recent={recent} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />}
+            : <>
+              {info.minPoints ? <p className="bk-member-rule" id="bookingMemberRule">{b(language, "memberRule", { min: info.minPoints, welcome: info.welcomePoints ?? 0, noShow: info.noShowPoints ?? 0 })}</p> : null}
+              {/* Short of the points, said first: no picking a time that cannot be booked yet. */}
+              {customer && shortOfPoints(info, customer) ? <MemberCard language={language} info={info} customer={customer} onRefreshed={setCustomer} /> : null}
+              <BookingForm language={language} info={info} customer={customer} recent={recent} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />
+            </>}
 
     {/* The booking open above is not listed a second time under it. */}
     {customer && others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => void loadMine()} /> : null}
@@ -384,6 +389,8 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   const [phoneError, setPhoneError] = useState("");
   // Where mail goes out, a guest proves their email before booking (shared/email-verify.mjs).
   const mustVerify = Boolean(info.emailVerification && customer && !customer.emailVerified);
+  // Booking is for members: short of the points it takes, the page shows how to get them (MemberCard) instead.
+  const short = Boolean(customer && shortOfPoints(info, customer));
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -557,7 +564,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
     <div id="bookingFinish" className="bk-finish">
       {!customer ? <SignInCard language={language} onSignedIn={onSignedIn} /> : null}
       {customer && mustVerify ? <VerifyEmailCard language={language} customer={customer} onVerified={onVerified} /> : null}
-      {customer && !mustVerify ? <form className="bk-card bk-details" id="bookingForm" onSubmit={(event) => void submit(event)}>
+      {customer && !mustVerify && !short ? <form className="bk-card bk-details" id="bookingForm" onSubmit={(event) => void submit(event)}>
         <h2>{b(language, "details")}</h2>
         <label className="bk-field"><span>{b(language, "name")}</span><input id="bookingName" required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="bk-field"><span>{b(language, "phone")}</span>
@@ -578,6 +585,38 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   </div>;
 }
 
+/** Whether a signed-in guest (their email proved, where it must be) has fewer points than booking takes. */
+function shortOfPoints(info: ApiBookingInfo, customer: ApiCustomer): boolean {
+  const mustVerify = Boolean(info.emailVerification && !customer.emailVerified);
+  return !mustVerify && Boolean(info.minPoints) && customer.points < (info.minPoints ?? 0);
+}
+
+/**
+ * Booking for members, short of the points: what it takes, what they have,
+ * and the member code the waiter scans when they pay at the restaurant —
+ * their first visit's points (POS, apps/pos-web/src/BookingScanner.tsx).
+ */
+function MemberCard({ language, info, customer, onRefreshed }: { language: BookingLanguage; info: ApiBookingInfo; customer: ApiCustomer; onRefreshed: (customer: ApiCustomer) => void }) {
+  const qr = useQr(`ZYMEM:${customer.id}`);
+  const [busy, setBusy] = useState(false);
+  async function refresh() {
+    setBusy(true);
+    try {
+      onRefreshed((await api.customer()).customer);
+    } catch { /* Still short: the card stays. */ } finally {
+      setBusy(false);
+    }
+  }
+  const min = info.minPoints ?? 0;
+  return <section className="bk-card bk-member" id="bookingMember">
+    <h2>{b(language, "memberTitle")}</h2>
+    <p className="bk-member-short">{b(language, "pointsShort", { points: customer.points, missing: Math.max(0, min - customer.points) })}</p>
+    <p className="bk-muted">{b(language, "memberHow", { welcome: info.welcomePoints ?? 0 })}</p>
+    {qr ? <span className="bk-member-code"><img id="bookingMemberQr" src={qr} alt={b(language, "memberQrAlt")} width="220" height="220" /></span> : null}
+    <button type="button" className="bk-secondary" id="bookingRefreshPoints" disabled={busy} onClick={() => void refresh()}>{b(language, "memberRefresh")}</button>
+  </section>;
+}
+
 /**
  * The booking's QR code, for the waiter to scan at the door (the POS reads
  * "ZYRES:" and the number, apps/pos-web/src/BookingScanner.tsx). Drawn as
@@ -585,18 +624,23 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
  * a booking to show.
  */
 function useBookingQr(reference: string): string {
+  return useQr(reference ? `ZYRES:${reference}` : "");
+}
+
+/** A QR code for `text` as an SVG data URL; "" while it is drawn, or for no text. */
+function useQr(text: string): string {
   const [qr, setQr] = useState("");
   useEffect(() => {
     setQr("");
-    if (!reference) return;
+    if (!text) return;
     let current = true;
     void import("qrcode").then(({ default: QRCode }) =>
-      QRCode.toString(`ZYRES:${reference}`, { type: "svg", errorCorrectionLevel: "M", margin: 2, color: { dark: "#000000", light: "#ffffff" } })
+      QRCode.toString(text, { type: "svg", errorCorrectionLevel: "M", margin: 2, color: { dark: "#000000", light: "#ffffff" } })
     ).then((svg) => {
       if (current) setQr(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
     }).catch(() => { /* The number is on the ticket to read out. */ });
     return () => { current = false; };
-  }, [reference]);
+  }, [text]);
   return qr;
 }
 

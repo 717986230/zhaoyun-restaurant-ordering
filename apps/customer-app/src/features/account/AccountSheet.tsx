@@ -163,7 +163,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
       })}</ul>}
       <button type="button" className="link-button" onClick={() => setShowHistory(!showHistory)}>{g(language, "pointsHistory")} {showHistory ? "▴" : "▾"}</button>
       {showHistory && <ul className="points-history">{(history.data?.entries ?? []).map((entry) => <li key={entry.id}>
-        <span>{pointsReason(language, entry.reason)}{entry.note ? ` · ${entry.note}` : ""}<small>{new Date(entry.createdAt).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")}</small></span>
+        <span>{pointsReason(language, entry.reason, entry.kind)}{entry.note ? ` · ${entry.note}` : ""}<small>{new Date(entry.createdAt).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")}</small></span>
         <b className={entry.delta > 0 ? "plus" : "minus"}>{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</b>
       </li>)}</ul>}
     </section>}

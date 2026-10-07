@@ -382,6 +382,14 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
       <label><span>{t("resNoShowLimit")}</span><input type="number" min={0} max={20} value={draft.noShowLimit} onChange={(event) => set("noShowLimit", Number(event.target.value))} /></label>
     </div>
 
+    <p className="settings-label">{t("resMembership")}</p>
+    <div className="field-grid three">
+      <label><span>{t("resMinPoints")}</span><input type="number" id="resMinPoints" min={0} max={100000} value={draft.minPoints} onChange={(event) => set("minPoints", Number(event.target.value))} /></label>
+      <label><span>{t("resWelcomePoints")}</span><input type="number" id="resWelcomePoints" min={0} max={100000} value={draft.welcomePoints} onChange={(event) => set("welcomePoints", Number(event.target.value))} /></label>
+      <label><span>{t("resNoShowPoints")}</span><input type="number" id="resNoShowPoints" min={0} max={100000} value={draft.noShowPoints} onChange={(event) => set("noShowPoints", Number(event.target.value))} /></label>
+      <label><span>{t("resNoShowAfter")}</span><input type="number" id="resNoShowAfter" min={0} max={720} step={5} value={draft.noShowAfterMinutes} onChange={(event) => set("noShowAfterMinutes", Number(event.target.value))} /></label>
+    </div>
+
     <p className="settings-label">{t("resHours")}</p>
     {draft.hours.map((period, index) => <div className="res-period" key={index}>
       <div className="schedule-days" role="group">{[1, 2, 3, 4, 5, 6, 7].map((weekday) => <button key={weekday} type="button" className={period.days.includes(weekday) ? "on" : ""} aria-pressed={period.days.includes(weekday)}

@@ -39,7 +39,8 @@ test.beforeAll(async ({ request }, testInfo) => {
   for (const [name, pin, role] of [["Li", "1234", "staff"], ["Wang", "9876", "manager"]]) {
     expect((await admin(request, "post", "/api/admin/staff", { name, pin, role })).ok()).toBe(true);
   }
-  expect((await admin(request, "put", "/api/admin/settings", { takeawayDiscountPercent: 10, showOrdering: true })).ok()).toBe(true);
+  // Bookings checked in by hand here: none goes missed by itself while the tests run late in the day.
+  expect((await admin(request, "put", "/api/admin/settings", { takeawayDiscountPercent: 10, showOrdering: true, reservations: { noShowAfterMinutes: 0 } })).ok()).toBe(true);
 });
 
 test.afterAll(() => {

@@ -11,6 +11,16 @@ export function bookingReferenceFrom(text: string): string | null {
   return /^[A-Z0-9]{4,12}$/.test(value) ? value : null;
 }
 
+/** What a code read at the door is: a booking to check in, or a member's code ("ZYMEM:" and their account) for the first visit's points. */
+export type Scanned = { kind: "booking"; reference: string } | { kind: "member"; id: string };
+
+export function scannedFrom(text: string): Scanned | null {
+  const member = /^ZYMEM:([A-Za-z0-9-]{8,64})$/.exec(text.trim());
+  if (member) return { kind: "member", id: member[1]! };
+  const reference = bookingReferenceFrom(text);
+  return reference ? { kind: "booking", reference } : null;
+}
+
 type Detect = (video: HTMLVideoElement) => Promise<string | null>;
 
 /** The browser's own barcode reader where it has one (Chrome on Android); jsQR otherwise. */
@@ -38,9 +48,10 @@ async function detector(): Promise<Detect> {
 /**
  * Checking a booking in at the door: the camera reads the QR code on the
  * guest's phone, or the waiter types the booking number under it. Either way
- * the number goes to `onFound`; the floor does the rest.
+ * the number goes to `onFound`; the floor does the rest. A member's code
+ * (the booking page shows it to a guest short of points) goes there too.
  */
-export function BookingScanner({ pos, onFound, onClose }: { pos: Pos; onFound: (reference: string) => void; onClose: () => void }) {
+export function BookingScanner({ pos, onFound, onClose }: { pos: Pos; onFound: (scanned: Scanned) => void; onClose: () => void }) {
   const { t } = pos;
   const video = useRef<HTMLVideoElement>(null);
   const [cameraFailed, setCameraFailed] = useState(false);
@@ -67,11 +78,11 @@ export function BookingScanner({ pos, onFound, onClose }: { pos: Pos; onFound: (
         const tick = async () => {
           if (stopped || found.current) return;
           const text = await read(element).catch(() => null);
-          const reference = text ? bookingReferenceFrom(text) : null;
-          if (reference && !found.current) {
+          const scanned = text ? scannedFrom(text) : null;
+          if (scanned && !found.current) {
             found.current = true;
             navigator.vibrate?.(60);
-            handler.current(reference);
+            handler.current(scanned);
             return;
           }
           frame = window.setTimeout(() => void tick(), 180);
@@ -97,7 +108,7 @@ export function BookingScanner({ pos, onFound, onClose }: { pos: Pos; onFound: (
   function submit(event: FormEvent) {
     event.preventDefault();
     const reference = bookingReferenceFrom(typed);
-    if (reference) onFound(reference);
+    if (reference) onFound({ kind: "booking", reference });
   }
 
   return <div className="pos-scan" role="dialog" aria-modal="true" aria-label={t("scanBooking")} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>

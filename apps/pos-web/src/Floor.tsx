@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { ApiError } from "@zhaoyun/api-client";
 import type { TableOverview } from "@zhaoyun/api-client";
 import type { ApiDeliveryOrder, ApiPrintJob, ApiReservation, ApiServiceRequest, PosClaim, ReservationUpdateCommand } from "@zhaoyun/contracts";
 import { api, useLiveReload } from "./App";
@@ -7,6 +8,7 @@ import type { Pos, Screen } from "./App";
 import type { PosKey } from "./i18n";
 import { DeliveryOrders } from "./Delivery";
 import { BookingScanner } from "./BookingScanner";
+import type { Scanned } from "./BookingScanner";
 
 const TAKEAWAY = /^TA-/i;
 /** The poll under the live channel: quick while it is down, slow while it is up. */
@@ -119,52 +121,70 @@ function ServiceCalls({ pos, requests, onDone }: { pos: Pos; requests: ApiServic
   </section>;
 }
 
+/** A booking changed by the floor; false when it could not be (said already). */
+async function changeBooking(pos: Pos, booking: ApiReservation, command: ReservationUpdateCommand, onDone: () => void): Promise<boolean> {
+  try {
+    await api.updateReservation(booking.id, command);
+    onDone();
+    return true;
+  } catch (error) {
+    pos.failed(error);
+    return false;
+  }
+}
+
+/** A booking seated at the table the waiter gives; the table, or null when not seated. */
+async function seatBooking(pos: Pos, booking: ApiReservation, onDone: () => void): Promise<string | null> {
+  const table = window.prompt(pos.t("bookingTablePrompt", { name: booking.name, party: booking.party }), booking.table ?? "");
+  if (table === null) return null;
+  const chosen = table.trim().toUpperCase();
+  return (await changeBooking(pos, booking, { status: "seated", table: chosen }, onDone)) ? chosen : null;
+}
+
+/**
+ * A code read at the door. A booking's: today's booking with that number is
+ * seated — at the table they picked, or at the one the waiter gives them. A
+ * member's: their first visit's points, if they never had them, so they can
+ * book from then on.
+ */
+async function scanned(pos: Pos, code: Scanned, bookings: ApiReservation[], onDone: () => void) {
+  const { t } = pos;
+  if (code.kind === "member") {
+    try {
+      const visit = await api.memberVisit(code.id);
+      const name = visit.customer.name || visit.customer.email;
+      pos.notify(visit.granted
+        ? t("memberWelcome", { name, points: visit.welcomePoints, total: visit.customer.points })
+        : t("memberAlready", { name, total: visit.customer.points }));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) pos.notify(t("memberUnknown"), "error");
+      else pos.failed(error);
+    }
+    return;
+  }
+  const { reference } = code;
+  const booking = bookings.find((entry) => entry.reference.toUpperCase() === reference);
+  if (!booking) return pos.notify(t("scanNotToday", { reference }), "error");
+  if (booking.status === "seated") return pos.notify(t("scanAlready", { name: booking.name }), "error");
+  if (booking.status !== "confirmed" && booking.status !== "pending") return pos.notify(t("scanCancelled", { reference }), "error");
+  const table = booking.table
+    ? ((await changeBooking(pos, booking, { status: "seated", table: booking.table }, onDone)) ? booking.table : null)
+    : await seatBooking(pos, booking, onDone);
+  if (table === null) return;
+  pos.notify(table ? t("checkedIn", { name: booking.name, party: booking.party, table: t("table", { table }) }) : t("checkedInNoTable", { name: booking.name, party: booking.party }));
+}
+
 /**
  * Today's bookings still to come or at the table: who, how many, when, and
  * where they sit. Seating one asks for the table; the console has the rest.
  */
 function TodayBookings({ pos, bookings, onDone }: { pos: Pos; bookings: ApiReservation[]; onDone: () => void }) {
   const { t } = pos;
-  const [scanning, setScanning] = useState(false);
   if (!bookings.length) return null;
-  async function change(booking: ApiReservation, command: ReservationUpdateCommand): Promise<boolean> {
-    try {
-      await api.updateReservation(booking.id, command);
-      onDone();
-      return true;
-    } catch (error) {
-      pos.failed(error);
-      return false;
-    }
-  }
-  async function seat(booking: ApiReservation): Promise<string | null> {
-    const table = window.prompt(t("bookingTablePrompt", { name: booking.name, party: booking.party }), booking.table ?? "");
-    if (table === null) return null;
-    const chosen = table.trim().toUpperCase();
-    return (await change(booking, { status: "seated", table: chosen })) ? chosen : null;
-  }
-  /**
-   * Checked in at the door, from the QR code on the guest's phone: today's
-   * booking with that number is seated — at the table they picked, or at the
-   * one the waiter gives them.
-   */
-  async function checkIn(reference: string) {
-    setScanning(false);
-    const booking = bookings.find((entry) => entry.reference.toUpperCase() === reference);
-    if (!booking) return pos.notify(t("scanNotToday", { reference }), "error");
-    if (booking.status === "seated") return pos.notify(t("scanAlready", { name: booking.name }), "error");
-    if (booking.status !== "confirmed" && booking.status !== "pending") return pos.notify(t("scanCancelled", { reference }), "error");
-    const table = booking.table
-      ? ((await change(booking, { status: "seated", table: booking.table })) ? booking.table : null)
-      : await seat(booking);
-    if (table === null) return;
-    pos.notify(table ? t("checkedIn", { name: booking.name, party: booking.party, table: t("table", { table }) }) : t("checkedInNoTable", { name: booking.name, party: booking.party }));
-  }
+  const change = (booking: ApiReservation, command: ReservationUpdateCommand) => changeBooking(pos, booking, command, onDone);
   const guests = bookings.reduce((total, booking) => total + booking.party, 0);
-  return <><details className="pos-bookings" open>
-    <summary><h2>📅 {t("bookings", { count: bookings.length, guests })}</h2>
-      <button type="button" className="pos-scan-open" id="posScanBooking" onClick={(event) => { event.preventDefault(); setScanning(true); }}>{t("scanBooking")}</button>
-    </summary>
+  return <details className="pos-bookings" open>
+    <summary><h2>📅 {t("bookings", { count: bookings.length, guests })}</h2></summary>
     <ul>{bookings.map((booking) => <li key={booking.id} data-booking={booking.reference} data-status={booking.status}>
       <span>
         <b>{booking.time}</b> · {booking.name} · {booking.party} 👤{booking.table ? ` · ${t("table", { table: booking.table })}` : ""}
@@ -174,13 +194,11 @@ function TodayBookings({ pos, bookings, onDone }: { pos: Pos; bookings: ApiReser
       {booking.status === "seated"
         ? <button type="button" onClick={() => void change(booking, { status: "completed" })}>{t("bookingFinish")}</button>
         : <>
-          <button type="button" onClick={() => void seat(booking)}>{t("bookingSeat")}</button>
+          <button type="button" onClick={() => void seatBooking(pos, booking, onDone)}>{t("bookingSeat")}</button>
           <button type="button" className="pos-quiet" onClick={() => void change(booking, { status: "no_show" })}>{t("bookingNoShow")}</button>
         </>}
     </li>)}</ul>
-  </details>
-  {scanning && <BookingScanner pos={pos} onFound={(reference) => void checkIn(reference)} onClose={() => setScanning(false)} />}
-  </>;
+  </details>;
 }
 
 /** The room: every table and what is open on it, and the takeaways waiting. */
@@ -191,6 +209,8 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const [requests, setRequests] = useState<ApiServiceRequest[]>([]);
   const [bookings, setBookings] = useState<ApiReservation[]>([]);
   const [delivery, setDelivery] = useState<ApiDeliveryOrder[]>([]);
+  // The camera at the door: a booking's code or a member's.
+  const [scanning, setScanning] = useState(false);
   // This device: the tables it has open are its own, every other device's are locked to it.
   const [deviceId, setDeviceId] = useState("");
 
@@ -264,8 +284,10 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
         <input name="table" placeholder={t("openTable")} aria-label={t("openTable")} maxLength={8} autoCapitalize="characters" />
         <button type="submit">{t("open")}</button>
       </form>
+      <button type="button" className="pos-scan-open" id="posScanBooking" onClick={() => setScanning(true)}>{t("scanBooking")}</button>
       <button type="button" className="pos-primary" onClick={() => void newTakeaway()}>{t("newTakeaway")}</button>
     </div>
+    {scanning && <BookingScanner pos={pos} onFound={(code) => { setScanning(false); void scanned(pos, code, bookings, () => void load()); }} onClose={() => setScanning(false)} />}
     <h2>{t("tables")}</h2>
     <div className="pos-table-grid">{room.map(tile)}</div>
     {takeaways.length > 0 && <>

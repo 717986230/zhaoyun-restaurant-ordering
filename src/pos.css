@@ -722,17 +722,13 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   }
 }
 
-/* Checking a booking in at the door: the button beside today's bookings, and
-   the camera over the floor, framing the QR code on the guest's phone. */
-.pos-bookings summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.pos-bookings summary .pos-scan-open {
-  min-height: 40px;
+/* At the door: the scan button on the floor's bar, and the camera over the
+   floor, framing the QR code on the guest's phone — a booking's, or a
+   member's for their first visit's points. */
+.pos-floor-bar .pos-scan-open {
+  border-color: var(--p-accent);
+  color: var(--p-accent);
+  font-weight: 700;
 }
 
 .pos-scan {
