@@ -45,7 +45,7 @@ import {
   DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
   normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
 } from "./account.mjs";
-import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements } from "./customer.mjs";
+import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements, welcomePointsStatements } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
 import { createDeliveryStore } from "./delivery-store.mjs";
 import {
@@ -477,6 +477,8 @@ export function createStore(driver) {
         ] : []),
         // Points for the signed-in guests whose orders this paid (shared/customer.mjs).
         ...(earnPointsStatements(plan.receipt.id, settings.loyalty, at)),
+        // A member's first paid visit: the bonus that lets them book (shared/reservations.mjs).
+        ...(welcomePointsStatements(plan.receipt.id, settings.reservations?.enabled ? settings.reservations.welcomePoints : 0, at)),
         printStatement(receiptPrintPayload(view, settings), at),
         await journalStatement(last, "receipt.issued", plan.receipt.id, view, at)
       ];

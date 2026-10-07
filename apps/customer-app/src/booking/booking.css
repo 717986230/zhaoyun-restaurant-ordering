@@ -1023,6 +1023,42 @@ html.bk-root body {
   text-align: center;
 }
 
+/* Booking for members: the rule in one line above the form, and for a
+   guest short of points, the member code the waiter scans when they pay —
+   white around it, like the booking's own code. */
+.bk-member-rule {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.bk-member {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.bk-member-short {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.bk-member-code {
+  display: grid;
+  justify-items: center;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--light-panel);
+}
+.bk-member-code img {
+  width: min(220px, 70%);
+  height: auto;
+  aspect-ratio: 1;
+}
+
 /* One tap per choice (2026-10): the party and the time are buttons, not
    lists — a list was a tap to open, a scroll and a tap to pick. */
 .bk-choices {

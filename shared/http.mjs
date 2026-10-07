@@ -100,7 +100,9 @@ function reservationRefusal(error) {
     code: error.code,
     ...(error.reason ? { reason: error.reason } : {}),
     ...(error.maxParty ? { maxParty: error.maxParty } : {}),
-    ...(error.limit ? { limit: error.limit } : {})
+    ...(error.limit ? { limit: error.limit } : {}),
+    // Booking for members: the points it needs and the guest's.
+    ...(error.minPoints !== undefined ? { minPoints: error.minPoints, points: error.points } : {})
   }, error.status ?? 400);
 }
 
@@ -1068,6 +1070,15 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const { value: payload } = await body(request);
           return json({ ok: await store.failPrintJob(path[3], payload.workerId, payload.error) });
         }
+      }
+
+      // A member at the counter: the POS scanned the code on their phone
+      // (ZYMEM:<id>, the booking page). Their first visit's bonus, once ever.
+      if (path[2] === "members" && path.length === 5 && path[4] === "visit" && method === "POST") {
+        const { denied } = await gate("staff");
+        if (denied) return denied;
+        const visit = await store.reservations.memberVisit(path[3]);
+        return visit ? json(visit) : fail("No such member", 404);
       }
 
       // Table bookings are the floor's: the waiters take them by phone, seat

@@ -17,7 +17,11 @@
  *  - reverse: that receipt cancelled (storno), as much as is left to take;
  *  - redeem:  a reward in an order, the moment it is ordered;
  *  - refund:  that order cancelled before anything of it was paid;
- *  - adjust:  the manager, by hand, with a note.
+ *  - adjust:  the manager, by hand, with a note; and the booking membership's
+ *             own lines (shared/reservations.mjs), told apart by their id:
+ *             `welcome-<guest>` the first visit's bonus, once per account
+ *             ever; `noshow-<booking>` a booking not kept; `noshowback-<booking>`
+ *             that given back when the floor marks it kept after all.
  *
  * Both backends run these statements and these rules; only the way they
  * reach the database differs (shared/store.mjs, over each backend's driver).
@@ -62,7 +66,17 @@ export function storedCustomerPassword(row) {
 }
 
 export function pointsEntryView(row) {
-  return { id: row.id, delta: row.delta, reason: row.reason, ref: row.ref, note: row.note, createdAt: row.created_at };
+  const kind = pointsKind(row.id);
+  return { id: row.id, delta: row.delta, reason: row.reason, ref: row.ref, note: row.note, createdAt: row.created_at, ...(kind ? { kind } : {}) };
+}
+
+/** Which of the booking membership's own lines a ledger line is, by its id; or null. */
+export function pointsKind(id) {
+  const value = String(id ?? "");
+  if (value.startsWith("welcome-")) return "welcome";
+  if (value.startsWith("noshowback-")) return "no_show_back";
+  if (value.startsWith("noshow-")) return "no_show";
+  return null;
 }
 
 /**
@@ -197,6 +211,48 @@ export const REFUND_POINTS_SQL = `INSERT OR IGNORE INTO points_ledger (id, custo
   SELECT 'refund-' || ref, customer_id, -delta, 'refund', ref, '', ?
   FROM points_ledger WHERE ref = ? AND reason = 'redeem'`;
 
+/**
+ * The ledger lines written just now (`at`) under `ref` whose id is like
+ * `pattern`, added to each guest's balance. A line already there (INSERT OR
+ * IGNORE kept the old one) is not counted again: its time is not `at`.
+ * Parameters: applyNewParams.
+ */
+export const APPLY_NEW_POINTS_SQL = `UPDATE customers SET
+  points = points + (SELECT SUM(delta) FROM points_ledger WHERE points_ledger.customer_id = customers.id AND points_ledger.id LIKE ? AND points_ledger.ref = ? AND points_ledger.created_at = ?),
+  updated_at = ?
+  WHERE id IN (SELECT customer_id FROM points_ledger WHERE id LIKE ? AND ref = ? AND created_at = ?)`;
+export function applyNewParams(pattern, ref, at) {
+  return [pattern, ref, at, at, pattern, ref, at];
+}
+/**
+ * The first visit's bonus, for the signed-in guests whose orders a paid
+ * receipt holds: once per account ever (the id is the guest's).
+ * Parameters: points, receipt id, at, receipt id.
+ */
+export const WELCOME_POINTS_SQL = `INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at)
+  SELECT DISTINCT 'welcome-' || guest_orders.customer_id, guest_orders.customer_id, ?, 'adjust', ?, '', ?
+  FROM receipt_items
+  JOIN order_items ON order_items.id = receipt_items.order_item_id
+  JOIN guest_orders ON guest_orders.order_id = order_items.order_id
+  WHERE receipt_items.receipt_id = ? AND guest_orders.customer_id IS NOT NULL`;
+/** The same bonus given at the counter (the POS scanned the guest's member code). Parameters: id, customer id, points, at. */
+export const WELCOME_AT_COUNTER_SQL = "INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at) VALUES (?, ?, ?, 'adjust', 'pos', '', ?)";
+/**
+ * A booking not kept: its guest loses the points, as many as they have —
+ * never below zero — and once per booking, and only while it stands marked
+ * so (the status is written first, in the same batch, and may have lost to
+ * the floor). Parameters: points, at, booking id, points.
+ */
+export const NO_SHOW_POINTS_SQL = `INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at)
+  SELECT 'noshow-' || reservations.id, reservations.customer_id, -MIN(?, customers.points), 'adjust', reservations.id, '', ?
+  FROM reservations JOIN customers ON customers.id = reservations.customer_id
+  WHERE reservations.id = ? AND reservations.status = 'no_show' AND MIN(?, customers.points) > 0`;
+/** The floor marks it kept after all: what it took comes back, once. Parameters: at, booking id. */
+export const NO_SHOW_BACK_SQL = `INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at)
+  SELECT 'noshowback-' || ref, customer_id, -delta, 'adjust', ref, '', ?
+  FROM points_ledger WHERE id = 'noshow-' || ?
+    AND EXISTS (SELECT 1 FROM reservations WHERE reservations.id = points_ledger.ref AND reservations.status != 'no_show')`;
+
 /** `APPLY_POINTS_SQL`'s parameters, in its order. */
 export function applyPointsParams(ref, reason, at) {
   return [ref, reason, at, ref, reason];
@@ -220,6 +276,40 @@ export function earnPointsStatements(receiptId, loyalty, at) {
   return [
     [EARN_POINTS_SQL, [loyalty.pointsPerEuro, at, receiptId, loyalty.pointsPerEuro]],
     [APPLY_POINTS_SQL, applyPointsParams(receiptId, "earn", at)]
+  ];
+}
+
+/** A receipt issued: the first-visit bonus for its guests who never had one. */
+export function welcomePointsStatements(receiptId, points, at) {
+  if (!points) return [];
+  return [
+    [WELCOME_POINTS_SQL, [points, receiptId, at, receiptId]],
+    [APPLY_NEW_POINTS_SQL, applyNewParams("welcome-%", receiptId, at)]
+  ];
+}
+
+/** The first-visit bonus at the counter, if the guest never had one. */
+export function welcomeAtCounterStatements(customerId, points, at) {
+  return [
+    [WELCOME_AT_COUNTER_SQL, [`welcome-${customerId}`, customerId, points, at]],
+    [APPLY_NEW_POINTS_SQL, applyNewParams(`welcome-${customerId}`, "pos", at)]
+  ];
+}
+
+/** A booking marked not kept (by the floor, or gone past its time): its points taken. */
+export function noShowPointsStatements(reservationId, points, at) {
+  if (!points) return [];
+  return [
+    [NO_SHOW_POINTS_SQL, [points, at, reservationId, points]],
+    [APPLY_NEW_POINTS_SQL, applyNewParams(`noshow-${reservationId}`, reservationId, at)]
+  ];
+}
+
+/** A booking taken back from not kept: its points given back. */
+export function noShowBackStatements(reservationId, at) {
+  return [
+    [NO_SHOW_BACK_SQL, [at, reservationId]],
+    [APPLY_NEW_POINTS_SQL, applyNewParams(`noshowback-${reservationId}`, reservationId, at)]
   ];
 }
 

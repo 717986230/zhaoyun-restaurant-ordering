@@ -41,11 +41,25 @@ test.beforeAll(async ({ request }, testInfo) => {
       intervalMinutes: 30, durationMinutes: 120, capacity: 40, maxParty: 8, leadMinutes: 60, daysAhead: 30,
       autoConfirm: true, closedDates: [], note: "8 人以上请致电",
       tables: [{ table: "2", seats: 2 }, { table: "4", seats: 4 }, { table: "6", seats: 6 }],
-      maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2
+      maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2,
+      minPoints: 10, welcomePoints: 10, noShowPoints: 5, noShowAfterMinutes: 30
     }
   });
   expect(saved.ok()).toBe(true);
 });
+
+/** What a QR code on the page says, read as a camera would. */
+async function decodeQr(image) {
+  await expect(image).toBeVisible();
+  const pixels = await image.evaluate(async (element) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 240;
+    const context = canvas.getContext("2d");
+    context.drawImage(element, 0, 0, 240, 240);
+    return Array.from(context.getImageData(0, 0, 240, 240).data);
+  });
+  return jsQR(Uint8ClampedArray.from(pixels), 240, 240)?.data ?? null;
+}
 
 test.afterAll(() => {
   server?.kill();
@@ -84,6 +98,22 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingEmailCode").fill(code);
   await page.locator("#bookingVerifySubmit").click();
   await expect(page.locator("#bookingVerify")).toHaveCount(0);
+
+  // Booking is for members: 10 points to book, and a new account has none.
+  // The page says the rule, what is missing, and shows the member code.
+  await expect(page.locator("#bookingMemberRule")).toHaveText("预约需要 10 积分。首次到店消费后赠送 10 积分；预约未按时到店会扣 5 积分。");
+  await expect(page.locator("#bookingPoints")).toHaveText("0 积分");
+  await expect(page.locator("#bookingMember")).toContainText("还差 10 积分");
+  await expect(page.locator("#bookingForm")).toHaveCount(0);
+  const memberCode = await decodeQr(page.locator("#bookingMemberQr"));
+  expect(memberCode).toMatch(/^ZYMEM:[0-9a-f-]{36}$/);
+  // The first visit: the waiter scans it when Mia pays (as the POS does), and she may book.
+  const visit = await admin(request, "post", `/api/admin/members/${memberCode.slice("ZYMEM:".length)}/visit`, {});
+  expect((await visit.json()).granted).toBe(true);
+  await page.locator("#bookingRefreshPoints").click();
+  await expect(page.locator("#bookingPoints")).toHaveText("10 积分");
+  await expect(page.locator("#bookingMember")).toHaveCount(0);
+
   // Asked once, in the details: not again at sign-up, and no second email.
   await expect(page.locator("#bookingEmail")).toHaveCount(0);
   await page.locator("#bookingName").fill("Mia");
@@ -121,13 +151,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   const qr = page.locator("#bookingQr");
   await expect(qr).toBeVisible();
   await expect(qr).toHaveAttribute("alt", `预约二维码 ${reference}`);
-  expect(await qr.evaluate(async (image) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 240;
-    const context = canvas.getContext("2d");
-    context.drawImage(image, 0, 0, 240, 240);
-    return Array.from(context.getImageData(0, 0, 240, 240).data);
-  }).then((pixels) => jsQR(Uint8ClampedArray.from(pixels), 240, 240)?.data)).toBe(`ZYRES:${reference}`);
+  expect(await decodeQr(qr)).toBe(`ZYRES:${reference}`);
   await page.locator("#bookingPass").click();
   await expect(page.locator("#bookingPass")).toHaveAttribute("aria-pressed", "false");
 

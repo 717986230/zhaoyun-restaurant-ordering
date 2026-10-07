@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi, CustomerDetail } from "@zhaoyun/api-client";
-import type { ApiCustomer, ApiGuestOrdering, ApiLoyalty, ApiSchedule, ApiSettings, PointsReason } from "@zhaoyun/contracts";
+import type { ApiCustomer, ApiGuestOrdering, ApiLoyalty, ApiSchedule, ApiSettings, PointsKind, PointsReason } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
@@ -136,6 +136,8 @@ function LoyaltyForm({ loyalty, products, onSave }: { loyalty: ApiLoyalty; produ
 }
 
 const REASONS: Record<PointsReason, CopyKey> = { earn: "pointsEarn", reverse: "pointsReverse", redeem: "pointsRedeem", refund: "pointsRefund", adjust: "pointsAdjust" };
+/** The booking membership's own lines among the adjustments (shared/customer.mjs). */
+const KINDS: Record<PointsKind, CopyKey> = { welcome: "pointsWelcome", no_show: "pointsNoShow", no_show_back: "pointsNoShowBack" };
 
 function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message: string) => void; failed: (error: unknown) => void }) {
   const { t, language } = useI18n();
@@ -206,7 +208,7 @@ function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message
       {open?.customer.id === customer.id && <div className="customer-history">
         <small>{t("customerSince", { date: new Date(customer.createdAt).toLocaleDateString(language) })} · {t("customerHistory")}</small>
         <ul>{open.points.map((entry) => <li key={entry.id}>
-          <span>{formatTime(entry.createdAt, language)}</span><span>{t(REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</b>
+          <span>{formatTime(entry.createdAt, language)}</span><span>{t(entry.kind ? KINDS[entry.kind] : REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</b>
         </li>)}</ul>
       </div>}
     </li>)}</ul>}
