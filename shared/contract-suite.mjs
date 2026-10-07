@@ -1817,7 +1817,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const { booking } = (await call("GET", "/api/reservations/availability")).json;
       assert.equal(booking.enabled, true);
       assert.equal(booking.signInRequired, true);
-      assert.equal(booking.maxParty, 50, "any party books online; the page offers up to fifty");
+      assert.equal(booking.maxParty, 500, "any party books online: the guest types the number");
       const signedOut = await book({ date: addDaysTo(booking.today, 7), time: "18:00", party: 2, ...guest });
       assert.equal(signedOut.status, 401, "no account, no booking");
       assert.equal(signedOut.json.code, "SIGN_IN_REQUIRED");

@@ -134,7 +134,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
 
   // Three at the table: a date, a time, then a table big enough.
   // Three dropdowns: how many, which day, what time.
-  await page.locator("#bookingParty").selectOption("3");
+  await page.locator("#bookingParty").fill("3");
   const day = await page.locator("#bookingDate option").nth(2).getAttribute("value");
   await page.locator("#bookingDate").selectOption(day);
   await page.locator("#bookingTime").selectOption("19:00");
@@ -142,8 +142,8 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator('[data-table="2"]')).toContainText("座位不够");
   await page.locator('[data-table="4"]').click();
   // A number that could be no one's, then a landline: said at once, nothing sent.
-  // Any party size: no "call us above eight" any more.
-  await expect(page.locator("#bookingParty option")).toHaveCount(50);
+  // Any party size, typed by the guest: no "call us above eight" any more.
+  await expect(page.locator("#bookingParty")).toHaveAttribute("max", "500");
   // A mobile number or an email: the account's email is there to start with.
   await expect(page.locator("#bookingContact")).toHaveValue("mia@example.com");
   await page.locator("#bookingContact").fill("mia@");
@@ -186,7 +186,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingDockBookings").click();
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.locator("#bookingParty").selectOption("2");
+  await page.locator("#bookingParty").fill("2");
   await page.locator("#bookingDate").selectOption(day);
   await page.locator("#bookingTime").selectOption("13:00");
   await page.locator('[data-table="2"]').click();

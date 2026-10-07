@@ -448,7 +448,9 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   onVerified: (customer: ApiCustomer) => void;
   onBooked: (reservation: ApiGuestReservation, token: string) => void;
 }) {
-  const [party, setParty] = useState(Math.min(2, info.maxParty));
+  const [party, setParty] = useState(2);
+  // What the guest typed for the party, kept as typed while they change it; `party` is the last whole number in range.
+  const [partyText, setPartyText] = useState("2");
   const bookable = (date: string) => date >= info.today && date <= info.lastDate && info.days.includes(weekdayOf(date)) && !info.closedDates.includes(date);
   const [date, setDate] = useState(() => {
     for (let offset = 0; offset <= 60; offset += 1) {
@@ -582,9 +584,13 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
     <section className="bk-card bk-pick" id="bookingTimes">
       <div className="bk-selects">
         <label className="bk-field bk-select"><span>{b(language, "party")}</span>
-          <select id="bookingParty" value={party} onChange={(event) => setParty(Number(event.target.value))}>
-            {Array.from({ length: info.maxParty }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{b(language, "guests", { n: count })}</option>)}
-          </select>
+          <input id="bookingParty" type="number" inputMode="numeric" min={1} max={info.maxParty} step={1} value={partyText}
+            onChange={(event) => {
+              setPartyText(event.target.value);
+              const count = Number(event.target.value);
+              if (Number.isInteger(count) && count >= 1 && count <= info.maxParty) setParty(count);
+            }}
+            onBlur={() => setPartyText(String(party))} />
         </label>
         <label className="bk-field bk-select"><span>{b(language, "date")}</span>
           <select id="bookingDate" value={date} onChange={(event) => setDate(event.target.value)}>

@@ -1362,3 +1362,12 @@ html.bk-root body {
 .bk-dock button {
   box-shadow: 0 6px 18px var(--glass-scrim);
 }
+/* The party, typed by the guest: as tall and as bold as the two dropdowns beside it. */
+.bk-selects .bk-field input#bookingParty {
+  min-height: 48px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}

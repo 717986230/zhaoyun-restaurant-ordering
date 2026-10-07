@@ -213,8 +213,8 @@ export function seatSelection(rules) {
   return rules.tables.length > 0;
 }
 
-/** The largest party the booking page offers: online, a party of any size books (2026-10). */
-export const ONLINE_MAX_PARTY = 50;
+/** The largest party a guest may type in: online, a party of any size books (2026-10), up to what a booking holds. */
+export const ONLINE_MAX_PARTY = 500;
 
 /**
  * Whether this party picks a table: where the owner lists tables and one is
@@ -246,7 +246,7 @@ export function bookingView(rules, { timeZone, restaurantName }, at = new Date()
     enabled: rules.enabled,
     restaurantName,
     timeZone,
-    // Any party books online; the page offers up to this many.
+    // Any party books online: the guest types the number, up to this.
     maxParty: ONLINE_MAX_PARTY,
     today,
     lastDate: addDays(today, rules.daysAhead),
