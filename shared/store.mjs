@@ -54,6 +54,7 @@ import {
 } from "./drawer.mjs";
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
+import { appIconsView } from "./app-icons.mjs";
 import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
 import {
   CLOSE_TABLE_SESSION_SQL, closePaidTableStatements, guestOrderError, LAST_CUSTOMER_PICKUP_SQL, LAST_TABLE_GUEST_ORDER_SQL, LIVE_TABLE_SESSIONS_SQL,
@@ -288,6 +289,58 @@ export function createStore(driver) {
       fileId, contentType, bytes, now()
     );
     return addMedia(productId, { type: "image", url: `/media/${fileId}` });
+  }
+
+  /**
+   * The owner's own icons for the installed apps (shared/app-icons.mjs), kept
+   * with the other pictures; app_settings says which files are whose.
+   */
+  async function storedAppIcons() {
+    const row = await first("SELECT value FROM app_settings WHERE key = 'app_icons'");
+    const stored = parseJson(row?.value, {});
+    return stored && typeof stored === "object" ? stored : {};
+  }
+
+  /** One of an app's icon files, or null while it wears the built one. */
+  async function appIconFile(app, file) {
+    const id = (await storedAppIcons())[app]?.files?.[file];
+    return id ? getMediaFile(id) : null;
+  }
+
+  /** `files` maps each size's file name ("192", "maskable-512", …) to its PNG bytes; the old ones go. */
+  async function saveAppIcon(app, files) {
+    const icons = await storedAppIcons();
+    const replaced = Object.values(icons[app]?.files ?? {});
+    const timestamp = now();
+    const ids = {};
+    const statements = [];
+    for (const [file, bytes] of Object.entries(files)) {
+      ids[file] = `icon-${app}-${uuid()}.png`;
+      statements.push(sql("INSERT INTO media_files (id, content_type, bytes, credit, source_url, created_at) VALUES (?, 'image/png', ?, NULL, NULL, ?)", ids[file], bytes, timestamp));
+    }
+    icons[app] = { version: uuid().slice(0, 8), updatedAt: timestamp, files: ids };
+    statements.push(appIconsStatement(icons, timestamp));
+    for (const id of replaced) statements.push(sql("DELETE FROM media_files WHERE id = ?", id));
+    await batch(statements);
+    return appIconsView(icons);
+  }
+
+  /** Back to the built icon. */
+  async function resetAppIcon(app) {
+    const icons = await storedAppIcons();
+    const replaced = Object.values(icons[app]?.files ?? {});
+    delete icons[app];
+    const timestamp = now();
+    await batch([appIconsStatement(icons, timestamp), ...replaced.map((id) => sql("DELETE FROM media_files WHERE id = ?", id))]);
+    return appIconsView(icons);
+  }
+
+  function appIconsStatement(icons, timestamp) {
+    return sql(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ('app_icons', ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      JSON.stringify(icons), timestamp
+    );
   }
 
   async function viewOrder(row) {
@@ -979,6 +1032,11 @@ export function createStore(driver) {
     setCategoryVat,
     getMediaFile,
     storeMedia,
+    appIcons: async () => appIconsView(await storedAppIcons()),
+    storedAppIcons,
+    appIconFile,
+    saveAppIcon,
+    resetAppIcon,
     listOrders: async (limit = 100) => {
       const rows = await all(RECENT_ORDERS_SQL, boundedLimit(limit));
       return Promise.all(rows.map(viewOrder));

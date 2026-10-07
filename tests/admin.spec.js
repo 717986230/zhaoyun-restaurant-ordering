@@ -64,6 +64,7 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/admin/staff", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff: [] }) }));
   await page.route("**/api/admin/pos-devices", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ devices: [] }) }));
   await page.route("**/api/admin/staff/activity", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff: [] }) }));
+  await page.route("**/api/admin/app-icons", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ icons: { menu: null, pos: null, admin: null } }) }));
   await page.goto("/admin.html");
 });
 
@@ -864,6 +865,41 @@ test("the console and the POS each install as their own app, opening straight to
   await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByRole("heading", { name: "桌面版", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /安装/ })).toHaveCount(0);
+});
+
+test("the owner gives the installed menu the restaurant's own icon, every size made from one picture, and takes it off again", async ({ page }) => {
+  await openSettingsCards(page);
+  const sent = [];
+  await page.route("**/api/admin/app-icons/menu", async (route) => {
+    const request = route.request();
+    sent.push({ method: request.method(), body: request.postDataBuffer() });
+    const menu = request.method() === "PUT" ? { version: "abc123", updatedAt: new Date().toISOString() } : null;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ icons: { menu, pos: null, admin: null } }) });
+  });
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const menu = page.locator('#appIcons li[data-app="menu"]');
+  await expect(menu).toContainText("菜单（客人）");
+  await expect(menu).toContainText("默认图标");
+  await expect(menu.getByRole("button", { name: "恢复默认" })).toHaveCount(0);
+
+  // One picture, made into each size an installed app asks for.
+  await menu.locator('input[type="file"]').setInputFiles("public/icons/menu-512.png");
+  await expect(menu).toContainText("自定义图标");
+  await expect(page.getByText("图标已更换")).toBeVisible();
+  const body = sent[0].body;
+  expect(sent[0].method).toBe("PUT");
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  const widths = [];
+  for (let at = body.indexOf(signature); at !== -1; at = body.indexOf(signature, at + 1)) widths.push(body.readUInt32BE(at + 16));
+  expect(widths).toEqual([180, 192, 512, 512]);
+  for (const field of ["icon180", "icon192", "icon512", "maskable512"]) expect(body.includes(`name="${field}"`)).toBe(true);
+  // The picture beside it is the one the app installs with now.
+  await expect(menu.locator("img")).toHaveAttribute("src", /\/icons\/menu-192\.png\?v=abc123$/);
+
+  await menu.getByRole("button", { name: "恢复默认" }).click();
+  await expect(menu).toContainText("默认图标");
+  expect(sent.map((entry) => entry.method)).toEqual(["PUT", "DELETE"]);
 });
 
 test("the restaurant's time zone is chosen in settings", async ({ page }) => {

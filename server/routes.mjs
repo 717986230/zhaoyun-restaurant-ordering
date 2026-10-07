@@ -7,6 +7,7 @@ import { pipeline } from "node:stream/promises";
 import { existsSync } from "node:fs";
 import { createApi, createApiState } from "../shared/http.mjs";
 import { liveRole } from "../shared/live.mjs";
+import { iconRequest } from "../shared/app-icons.mjs";
 
 /**
  * The Node server's routes: every /api route is shared/http.mjs's — the same
@@ -23,6 +24,8 @@ const MEDIA_TYPES = new Map([
 ]);
 const API_BODY_LIMIT = 2 * 1024 * 1024;
 const UPLOAD_BODY_LIMIT = 51 * 1024 * 1024;
+// An app's icon: four PNGs of at most 1 MB each.
+const ICON_BODY_LIMIT = 5 * 1024 * 1024;
 const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 const API_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -91,6 +94,15 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.route({ method: API_METHODS, url: "/api/*", bodyLimit: API_BODY_LIMIT, handler: forward });
   // A dish's photo or video, larger than any other body.
   app.route({ method: ["POST"], url: "/api/admin/products/:id/media", bodyLimit: UPLOAD_BODY_LIMIT, handler: forward });
+  app.route({ method: ["PUT"], url: "/api/admin/app-icons/:app", bodyLimit: ICON_BODY_LIMIT, handler: forward });
+
+  // The installed apps' icons and manifests: the owner's own when there is one
+  // (shared/app-icons.mjs), before the built files in the web folder answer.
+  app.addHook("onRequest", async (request, reply) => {
+    if (!["GET", "HEAD"].includes(request.method) || !iconRequest(request.url.split("?")[0])) return;
+    const response = await api(toRequest(request), { ip: request.ip, requestId: request.id });
+    if (response) return send(reply, response);
+  });
 
   app.get("/ws", { websocket: true }, (socket, request) => {
     realtime.connect(socket, liveRole(new URLSearchParams(request.query ?? {})));

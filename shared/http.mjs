@@ -27,6 +27,7 @@ import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboun
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
 import { liveEvent } from "./live.mjs";
+import { ICON_APPS, ICON_SIZES, iconRequest, isPng, manifestWithIcon, MAX_ICON_BYTES, svgHoldingPng } from "./app-icons.mjs";
 import { createRateLimiter } from "./rate-limit.mjs";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
@@ -1487,6 +1488,31 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         return json({ printer: await store.printerForRole(path[3]) });
       }
 
+      // /api/admin/app-icons[/:app]: the installed apps' icons (shared/app-icons.mjs).
+      if (path[2] === "app-icons") {
+        if (path.length === 3 && method === "GET") return json({ icons: await store.appIcons() });
+        if (path.length === 4 && !ICON_APPS.includes(path[3])) return fail("No such app", 404);
+        if (path.length === 4 && method === "DELETE") return json({ icons: await store.resetAppIcon(path[3]) });
+        if (path.length === 4 && method === "PUT") {
+          let form;
+          try {
+            form = await request.formData();
+          } catch {
+            return fail("The icon's pictures are required");
+          }
+          const files = {};
+          for (const size of ICON_SIZES) {
+            const file = form.get(size.field);
+            if (!file || typeof file === "string") return json({ error: `The ${size.pixels} × ${size.pixels} picture is missing`, code: "ICON_MISSING", field: size.field }, 400);
+            if (file.size > MAX_ICON_BYTES) return json({ error: "An icon picture exceeds 1 MB", code: "ICON_TOO_BIG" }, 413);
+            const bytes = new Uint8Array(await file.arrayBuffer());
+            if (!isPng(bytes)) return json({ error: "An icon picture has to be a PNG", code: "ICON_NOT_PNG" }, 400);
+            files[size.file] = bytes;
+          }
+          return json({ icons: await store.saveAppIcon(path[3], files) });
+        }
+      }
+
       // /api/admin/settings
       if (path.length === 3 && path[2] === "settings" && method === "GET") {
         return json(await store.getSettings());
@@ -1518,6 +1544,22 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           "content-security-policy": "default-src 'none'; sandbox"
         }
       });
+    }
+
+    // The installed apps' icons and manifests: the owner's own when there is
+    // one, otherwise the built files (null: the host's to serve).
+    const icon = (method === "GET" || method === "HEAD") ? iconRequest(url.pathname) : null;
+    if (icon) {
+      const iconHeaders = { ...SECURITY_HEADERS, "cache-control": "no-cache", "content-security-policy": "default-src 'none'; img-src data:; sandbox" };
+      if (icon.kind === "manifest") {
+        const version = (await store.storedAppIcons())[icon.app]?.version;
+        if (!version) return null;
+        return new Response(method === "HEAD" ? null : JSON.stringify(manifestWithIcon(icon.app, version)), { headers: { ...iconHeaders, "content-type": "application/manifest+json; charset=utf-8" } });
+      }
+      const picture = await store.appIconFile(icon.app, icon.kind === "svg" ? "192" : icon.file);
+      if (!picture) return null;
+      const svg = icon.kind === "svg";
+      return new Response(method === "HEAD" ? null : (svg ? svgHoldingPng(picture.bytes) : picture.bytes), { headers: { ...iconHeaders, "content-type": svg ? "image/svg+xml" : "image/png" } });
     }
 
     // Anything else is the web app, the host's to serve.

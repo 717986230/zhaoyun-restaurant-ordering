@@ -1,4 +1,4 @@
-import type { ApiMailStatus, ApiMemberVisit,
+import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, AppIconFiles, IconApp,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
@@ -437,6 +437,15 @@ export class AdminApi {
   live(onEvent: (event: RealtimeEnvelope) => void, onStatus?: (open: boolean) => void): () => void {
     return openLive(this.storage.baseUrl, { role: "staff" }, onEvent, onStatus);
   }
+
+  /** The installed apps' icons: the owner's own, or null for the built one. */
+  appIcons(): Promise<{ icons: ApiAppIcons }> { return this.#request("/api/admin/app-icons"); }
+  saveAppIcon(app: IconApp, files: AppIconFiles): Promise<{ icons: ApiAppIcons }> {
+    const form = new FormData();
+    for (const [field, blob] of Object.entries(files)) form.append(field, blob, `${field}.png`);
+    return this.#request(`/api/admin/app-icons/${app}`, { method: "PUT", body: form });
+  }
+  resetAppIcon(app: IconApp): Promise<{ icons: ApiAppIcons }> { return this.#request(`/api/admin/app-icons/${app}`, { method: "DELETE" }); }
 
   async uploadMedia(id: string, file: File): Promise<{ product: ApiCatalogProduct }> {
     const form = new FormData();
