@@ -1817,7 +1817,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const { booking } = (await call("GET", "/api/reservations/availability")).json;
       assert.equal(booking.enabled, true);
       assert.equal(booking.signInRequired, true);
-      assert.equal(booking.maxParty, 6);
+      assert.equal(booking.maxParty, 50, "any party books online; the page offers up to fifty");
       const signedOut = await book({ date: addDaysTo(booking.today, 7), time: "18:00", party: 2, ...guest });
       assert.equal(signedOut.status, 401, "no account, no booking");
       assert.equal(signedOut.json.code, "SIGN_IN_REQUIRED");
@@ -1883,7 +1883,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
         if (code) assert.equal(response.json.code, code, JSON.stringify(body));
         return response.json;
       };
-      assert.equal((await refused({ party: 7 }, 400, "PARTY_TOO_LARGE")).maxParty, 6, "a larger party calls");
+      await refused({ party: 11 }, 409, "SLOT_FULL");
       await refused({ time: "12:15" }, 409, "SLOT_UNAVAILABLE");
       await refused({ time: "21:00" }, 409, "SLOT_UNAVAILABLE");
       assert.equal((await refused({ date: addDays(booking.today, -1) }, 409, "SLOT_UNAVAILABLE")).reason, "PAST");
@@ -1893,8 +1893,11 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await refused({ phone: "0660 12" }, 400, "BAD_PHONE");
       await refused({ email: "not-an-email" }, 400);
       await refused({ date: "2030-02-30" }, 400);
-      assert.equal((await book({ date: day, time: "13:00", party: 2, name: "X" })).status, 400, "a guest leaves a number to call");
-      assert.equal((await call("GET", `/api/reservations/availability?date=${day}&party=9`)).json.code, "PARTY_TOO_LARGE");
+      // No number: the account's email reaches them — a mobile number or an email, either will do.
+      const byEmail = await book({ date: addDays(day, 1), time: "13:00", party: 2, name: "X" });
+      assert.equal(byEmail.status, 201, JSON.stringify(byEmail.json));
+      assert.match(byEmail.json.reservation.email, /^anna-/);
+      assert.equal((await call("GET", `/api/reservations/availability?date=${day}&party=9`)).status, 200, "a larger party is not turned away");
 
       // The guest's own link.
       const mine = (id, token, method = "GET", suffix = "") => call(method, `/api/reservations/${id}${suffix}`, { headers: token ? { "x-reservation-token": token } : {} });
@@ -1987,6 +1990,12 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(forThree["19:30"], false, "no table for three left then");
       assert.equal(forThree["17:00"], true);
       assert.equal((await book({ table: "S2", time: "17:00", party: 2 })).status, 201, "a stay that ends as the next begins");
+
+      // Larger than every table: seats, no table to pick — the floor puts tables together. An email reaches them.
+      assert.equal((await at("19:00", 6)).tables, undefined, "no table to pick for six");
+      const six = await book({ party: 6, time: "13:00", phone: undefined, email: "dora-party@example.com" });
+      assert.equal(six.status, 201, JSON.stringify(six.json));
+      assert.deepEqual([six.json.reservation.table, six.json.reservation.phone, six.json.reservation.email], [null, "", "dora-party@example.com"]);
 
       const cancelled = await call("POST", `/api/reservations/${taken.json.reservation.id}/cancel`, { headers: { "x-reservation-token": taken.json.token } });
       assert.equal(cancelled.json.reservation.status, "cancelled");

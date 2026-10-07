@@ -403,7 +403,7 @@ const ReservationFields = {
 /** From the booking page. */
 export const ReservationBody = Type.Object({
   ...ReservationFields,
-  phone: Type.String({ minLength: 1, maxLength: 30 }),
+  // A mobile number or an email (ReservationFields), either will do: shared/reservations.mjs checks one is there.
   language: Type.Optional(Type.Union([Type.Literal("zh"), Type.Literal("en"), Type.Literal("de")])),
   // The guest's own table, where the restaurant lets guests pick one.
   table: Type.Optional(Type.String({ maxLength: 8 }))
