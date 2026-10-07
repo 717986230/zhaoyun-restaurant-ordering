@@ -4,6 +4,8 @@ import type { ApiBookingInfo, ApiCustomer, ApiGuestReservation, ApiReservationSl
 import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
 import { apiBaseUrl, customerToken, setCustomerToken } from "../app/api";
 import { useColorScheme } from "../app/useColorScheme";
+import { MoonIcon, SunIcon } from "../components/SchemeIcons";
+import { LANGUAGE_INFO } from "@zhaoyun/domain";
 import { b, bookingError, formatDay, initialLanguage, rememberLanguage } from "./booking-i18n";
 import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
 import { checkMobile } from "../../../../shared/phone.mjs";
@@ -15,7 +17,8 @@ const api = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-custom
 interface Held { id: string; token: string }
 
 const HELD_KEY = "zy_booking";
-const LANGUAGES: Array<[BookingLanguage, string]> = [["de", "Deutsch"], ["en", "English"], ["zh", "中文"]];
+/** The booking page speaks what the menu speaks: its flags, in its order (Settings → menu languages). */
+const BOOKING_LANGUAGES: readonly BookingLanguage[] = ["zh", "en", "de"];
 
 function addDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -164,6 +167,12 @@ export function BookingPage() {
     history.replaceState(null, "", location.pathname);
   };
 
+  // The languages the menu offers (an older server: all three), and the one in use among them.
+  const languages = (info?.languages ?? BOOKING_LANGUAGES).filter((code): code is BookingLanguage => (BOOKING_LANGUAGES as readonly string[]).includes(code));
+  useEffect(() => {
+    if (languages.length && !languages.includes(language)) setLanguage(languages[0]!);
+  }, [languages.join(","), language]);
+
   const others = mine.filter((entry) => !(booking && held && entry.id === booking.id));
   // The name and number of the guest's latest booking, to start the next one from.
   const latest = mine.find((entry) => entry.phone);
@@ -175,12 +184,13 @@ export function BookingPage() {
         <p className="bk-eyebrow">{info?.restaurantName ?? ""}</p>
         <h1>{booking ? b(language, "myBooking") : b(language, "title")}</h1>
       </div>
-      <div className="bk-tools">
-        <select className="bk-language" id="bookingLanguage" aria-label="Language" value={language} onChange={(event) => chooseLanguage(event.target.value as BookingLanguage)}>
-          {LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-        </select>
-        <button type="button" className="bk-theme" id="bookingTheme" aria-label={b(language, scheme === "dark" ? "themeLight" : "themeDark")} title={b(language, scheme === "dark" ? "themeLight" : "themeDark")} onClick={toggleScheme}>
-          <span aria-hidden="true">{scheme === "dark" ? "☀" : "☾"}</span>
+      {/* The menu's own capsule: a flag per language the menu offers, then the sun or the moon. */}
+      <div className="topbar-end bk-topbar">
+        {languages.length > 1 && <div className="flags" role="group" aria-label="Language" id="bookingLanguages">{languages.map((code) => <button key={code} type="button"
+          className={`flag ${code === language ? "on" : ""}`} data-lang={code} aria-label={LANGUAGE_INFO[code].name} aria-pressed={code === language}
+          onClick={() => chooseLanguage(code)}><img src={LANGUAGE_INFO[code].flag} alt="" /></button>)}</div>}
+        <button type="button" className="icon-btn scheme-toggle" id="bookingTheme" aria-label={b(language, scheme === "dark" ? "themeLight" : "themeDark")} onClick={toggleScheme}>
+          {scheme === "dark" ? <SunIcon /> : <MoonIcon />}
         </button>
       </div>
     </header>
@@ -471,7 +481,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   const [phoneError, setPhoneError] = useState("");
   // Where mail goes out, a guest proves their email before booking (shared/email-verify.mjs).
   const mustVerify = Boolean(info.emailVerification && customer && !customer.emailVerified);
-  // Booking is for members: short of the points it takes, the page shows how to get them (MemberCard) instead.
+  // Booking is for members: short of the points it takes, the page shows how to get them (MemberCard) and the button waits.
   const short = Boolean(customer && shortOfPoints(info, customer));
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -630,7 +640,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
     <div id="bookingFinish" className="bk-finish">
       {!customer ? <SignInCard language={language} onSignedIn={onSignedIn} /> : null}
       {customer && mustVerify ? <VerifyEmailCard language={language} customer={customer} onVerified={onVerified} /> : null}
-      {customer && !mustVerify && !short ? <form className="bk-card bk-details" id="bookingForm" onSubmit={(event) => void submit(event)}>
+      {customer && !mustVerify ? <form className="bk-card bk-details" id="bookingForm" onSubmit={(event) => void submit(event)}>
         <h2>{b(language, "details")}</h2>
         <label className="bk-field"><span>{b(language, "name")}</span><input id="bookingName" required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="bk-field"><span>{b(language, "contact")}</span>
@@ -643,8 +653,9 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
         {info.note ? <p className="bk-note">{info.note}</p> : null}
         <p className="bk-privacy">{b(language, "privacy", { restaurant: info.restaurantName })}</p>
         {error ? <p className="bk-error" role="alert" id="bookingError">{error}</p> : null}
-        <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy}>
-          {busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}` : b(language, "submit")}
+        {/* Short of the points it takes, the button stays, greyed, and says how many are missing (the card above says how to get them). */}
+        <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy || short}>
+          {short ? b(language, "needPoints", { missing: Math.max(0, (info.minPoints ?? 0) - (customer?.points ?? 0)) }) : busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}` : b(language, "submit")}
         </button>
       </form> : null}
     </div>

@@ -240,12 +240,14 @@ export function tablesAt(rules, bookings, minute, party) {
 }
 
 /** What the booking page reads: the rules a guest meets, never the capacity. */
-export function bookingView(rules, { timeZone, restaurantName }, at = new Date()) {
+export function bookingView(rules, { timeZone, restaurantName, languages }, at = new Date()) {
   const today = localNow(timeZone, at).date;
   return {
     enabled: rules.enabled,
     restaurantName,
     timeZone,
+    // The menu's languages, in its flag order: the booking page offers the same.
+    ...(Array.isArray(languages) && languages.length ? { languages } : {}),
     // Any party books online: the guest types the number, up to this.
     maxParty: ONLINE_MAX_PARTY,
     today,
@@ -313,9 +315,11 @@ export function peakGuests(bookings, start, duration) {
  * picks a table, room among the seats otherwise.
  */
 export function availability(rules, date, party, bookings, now) {
-  return slotMinutes(rules, date).map((minute) => ({
+  // A time already past, or too soon to book online, is not offered at all:
+  // "full" is for a time that has no room, not for one that has gone.
+  return slotMinutes(rules, date).filter((minute) => !outsideWindow(rules, date, minute, now)).map((minute) => ({
     time: toClock(minute),
-    available: !outsideWindow(rules, date, minute, now) && (picksTable(rules, party)
+    available: (picksTable(rules, party)
       ? tablesAt(rules, bookings, minute, party).some((table) => table.available)
       : peakGuests(bookings, minute, rules.durationMinutes) + party <= rules.capacity)
   }));

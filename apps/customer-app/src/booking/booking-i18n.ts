@@ -14,7 +14,7 @@ const copy = {
     myBookings: "我的预约", noBookings: "还没有预约", registerConsent: "注册即表示同意餐厅按下方说明使用你的邮箱和预约信息。",
     seat: "选座", pickTable: "请选择餐桌", tableSeats: "{seats} 座", tableName: "{table} 号桌", tablesLoading: "正在查看空桌…", noTables: "这个时间没有适合 {n} 位的空桌，请换个时间。", tableBooked: "已订", tableSmall: "座位不够", yourTable: "餐桌",
     details: "联系方式", name: "姓名", phone: "手机号", contact: "手机号或邮箱", contactHint: "0660 1234567 或 name@example.com", contactMissing: "请留下手机号或邮箱。", emailInvalid: "请填写有效的邮箱。", phoneHint: "有变动时餐厅会打给你", phoneInvalid: "请填写有效的手机号，例如 0660 1234567 或 +43 660 1234567。", phoneNotMobile: "请填写手机号，不是座机号码。", verifyTitle: "验证邮箱", verifyLead: "验证码会发到 {email}。", sendCode: "发送验证码", resend: "重新发送", resendIn: "{s} 秒后可重新发送", codeSent: "验证码已发到 {email}，10 分钟内有效。", codeLabel: "6 位验证码", verify: "验证", verified: "邮箱已验证，可以预约了。", notes: "备注（可不填）", notesHint: "例如：儿童椅、过敏、庆生",
-    submit: "确认预约", submitting: "正在预约…", staysFor: "餐桌为你保留约 {minutes} 分钟。",
+    submit: "确认预约", needPoints: "还差 {missing} 积分才能预约", submitting: "正在预约…", staysFor: "餐桌为你保留约 {minutes} 分钟。",
     privacy: "{restaurant}只用你的姓名、电话和邮箱处理这次预约，不做广告、不交给第三方；用餐日期过后 30 天自动删除。",
     booked: "预约成功", pending: "已收到预约，餐厅确认后生效", confirmed: "已确认", cancelled: "已取消", seated: "已入座", completed: "已完成", declined: "餐厅无法接受这次预约", no_show: "未到店",
     reference: "预约号", showPass: "点按出示预约二维码", qrHint: "到店出示，服务员扫码签到", qrAlt: "预约二维码 {reference}", backToTime: "点按看时间", when: "{date} {time}", partyOf: "{n} 位", keepLink: "请保存这个链接，可以随时查看或取消预约：", copy: "复制链接", copied: "已复制",
@@ -35,7 +35,7 @@ const copy = {
     myBookings: "Meine Reservierungen", noBookings: "Noch keine Reservierungen", registerConsent: "Mit der Registrierung stimmst du zu, dass das Restaurant E-Mail und Reservierungen wie unten beschrieben verwendet.",
     seat: "Tisch wählen", pickTable: "Bitte einen Tisch wählen", tableSeats: "{seats} Plätze", tableName: "Tisch {table}", tablesLoading: "Freie Tische werden gesucht …", noTables: "Zu dieser Zeit ist kein Tisch für {n} Personen frei – bitte eine andere Uhrzeit wählen.", tableBooked: "Reserviert", tableSmall: "Zu klein", yourTable: "Tisch",
     details: "Kontakt", name: "Name", phone: "Handynummer", contact: "Handynummer oder E-Mail", contactHint: "0660 1234567 oder name@example.com", contactMissing: "Bitte Handynummer oder E-Mail angeben.", emailInvalid: "Bitte eine gültige E-Mail angeben.", phoneHint: "Für Rückfragen des Restaurants", phoneInvalid: "Bitte eine gültige Handynummer angeben, z. B. 0660 1234567 oder +43 660 1234567.", phoneNotMobile: "Bitte eine Handynummer angeben, keine Festnetznummer.", verifyTitle: "E-Mail bestätigen", verifyLead: "Wir senden einen Code an {email}.", sendCode: "Code senden", resend: "Erneut senden", resendIn: "Erneut senden in {s} s", codeSent: "Code an {email} gesendet, 10 Minuten gültig.", codeLabel: "6-stelliger Code", verify: "Bestätigen", verified: "E-Mail bestätigt – Sie können jetzt reservieren.", notes: "Anmerkung (optional)", notesHint: "z. B. Kinderstuhl, Allergien, Geburtstag",
-    submit: "Verbindlich reservieren", submitting: "Wird reserviert …", staysFor: "Der Tisch ist für etwa {minutes} Minuten für Sie reserviert.",
+    submit: "Verbindlich reservieren", needPoints: "Noch {missing} Punkte bis zur Reservierung", submitting: "Wird reserviert …", staysFor: "Der Tisch ist für etwa {minutes} Minuten für Sie reserviert.",
     privacy: "{restaurant} verwendet Name, Telefon und E-Mail nur für diese Reservierung – keine Werbung, keine Weitergabe. 30 Tage nach dem Besuch werden sie automatisch gelöscht.",
     booked: "Reserviert", pending: "Anfrage erhalten – gilt, sobald das Restaurant bestätigt", confirmed: "Bestätigt", cancelled: "Storniert", seated: "Am Tisch", completed: "Abgeschlossen", declined: "Das Restaurant kann diese Reservierung leider nicht annehmen", no_show: "Nicht erschienen",
     reference: "Reservierungsnummer", showPass: "Antippen: QR-Code zeigen", qrHint: "Beim Eintreffen zeigen – wir scannen ihn ein", qrAlt: "QR-Code der Reservierung {reference}", backToTime: "Antippen: Uhrzeit zeigen", when: "{date}, {time} Uhr", partyOf: "{n} Personen", keepLink: "Bitte diesen Link aufheben – damit können Sie die Reservierung jederzeit ansehen oder stornieren:", copy: "Link kopieren", copied: "Kopiert",
@@ -56,7 +56,7 @@ const copy = {
     myBookings: "My bookings", noBookings: "No bookings yet", registerConsent: "By registering you agree to the restaurant using your email and bookings as described below.",
     seat: "Pick your table", pickTable: "Please pick a table", tableSeats: "{seats} seats", tableName: "Table {table}", tablesLoading: "Checking free tables…", noTables: "No table for {n} is free at this time – please pick another time.", tableBooked: "Booked", tableSmall: "Too small", yourTable: "Table",
     details: "Your details", name: "Name", phone: "Mobile number", contact: "Mobile number or email", contactHint: "0660 1234567 or name@example.com", contactMissing: "Please leave a mobile number or an email.", emailInvalid: "Please enter a valid email.", phoneHint: "In case the restaurant needs to reach you", phoneInvalid: "Please enter a valid mobile number, e.g. 0660 1234567 or +43 660 1234567.", phoneNotMobile: "Please enter a mobile number, not a landline.", verifyTitle: "Confirm your email", verifyLead: "We will send a code to {email}.", sendCode: "Send code", resend: "Send again", resendIn: "Send again in {s}s", codeSent: "Code sent to {email}, valid for 10 minutes.", codeLabel: "6-digit code", verify: "Confirm", verified: "Email confirmed – you can book now.", notes: "Note (optional)", notesHint: "e.g. high chair, allergies, birthday",
-    submit: "Book now", submitting: "Booking…", staysFor: "Your table is held for about {minutes} minutes.",
+    submit: "Book now", needPoints: "{missing} more points to book", submitting: "Booking…", staysFor: "Your table is held for about {minutes} minutes.",
     privacy: "{restaurant} uses your name, phone and email for this booking only – no advertising, never passed on. They are deleted automatically 30 days after your visit.",
     booked: "Booked", pending: "Request received – it stands once the restaurant confirms", confirmed: "Confirmed", cancelled: "Cancelled", seated: "Seated", completed: "Completed", declined: "The restaurant cannot take this booking", no_show: "No-show",
     reference: "Booking number", showPass: "Tap to show your QR code", qrHint: "Show it when you arrive – we scan it to check you in", qrAlt: "Booking QR code {reference}", backToTime: "Tap for the time", when: "{date} at {time}", partyOf: "{n} guests", keepLink: "Keep this link to see or cancel your booking at any time:", copy: "Copy link", copied: "Copied",
@@ -94,8 +94,23 @@ export function formatDay(language: BookingLanguage, date: string, options: Intl
 }
 
 const LANGUAGE_KEY = "zy_booking_language";
+/** The menu's own saved state (app/model.ts): the language a guest picked there. */
+const MENU_STATE_KEY = "zy_customer_state_v5";
 
-/** The guest's own pick, else `?lang=`, else the phone's language, else German. */
+function menuLanguage(): string | null {
+  try {
+    const state = JSON.parse(localStorage.getItem(MENU_STATE_KEY) ?? "null") as { language?: unknown; languageChosen?: unknown } | null;
+    return state?.languageChosen && typeof state.language === "string" ? state.language : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One language for the menu and the booking page: `?lang=` (the menu's link
+ * here), else what the guest picked on the menu or here, else the phone's
+ * language, else German.
+ */
 export function initialLanguage(): BookingLanguage {
   const pick = (value: string | null | undefined): BookingLanguage | null => {
     const code = String(value ?? "").slice(0, 2).toLowerCase();
@@ -103,9 +118,14 @@ export function initialLanguage(): BookingLanguage {
   };
   let stored: string | null = null;
   try { stored = localStorage.getItem(LANGUAGE_KEY); } catch { /* Private tab. */ }
-  return pick(stored) ?? pick(new URLSearchParams(location.search).get("lang")) ?? pick(navigator.language) ?? "de";
+  return pick(new URLSearchParams(location.search).get("lang")) ?? pick(menuLanguage()) ?? pick(stored) ?? pick(navigator.language) ?? "de";
 }
 
+/** Kept here and on the menu, so the menu opens in the language picked here. */
 export function rememberLanguage(language: BookingLanguage): void {
-  try { localStorage.setItem(LANGUAGE_KEY, language); } catch { /* Private tab: this visit only. */ }
+  try {
+    localStorage.setItem(LANGUAGE_KEY, language);
+    const state = JSON.parse(localStorage.getItem(MENU_STATE_KEY) ?? "null") as Record<string, unknown> | null;
+    if (state && typeof state === "object") localStorage.setItem(MENU_STATE_KEY, JSON.stringify({ ...state, language, languageChosen: true }));
+  } catch { /* Private tab: this visit only. */ }
 }

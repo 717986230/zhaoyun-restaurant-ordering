@@ -38,7 +38,7 @@ const LISTED_SQL = `SELECT reservations.*, customers.email AS account_email,
 export function createReservationStore(driver, { settings }) {
   async function context() {
     const current = await settings();
-    return { rules: current.reservations, timeZone: current.timeZone, restaurantName: current.restaurantName, now: localNow(current.timeZone) };
+    return { rules: current.reservations, timeZone: current.timeZone, restaurantName: current.restaurantName, languages: current.menuLanguages, now: localNow(current.timeZone) };
   }
 
   /** The bookings on `date` that hold seats, as { minute, party, table }. */
@@ -120,8 +120,8 @@ export function createReservationStore(driver, { settings }) {
   return {
     /** The rules a guest meets on the booking page. */
     async booking() {
-      const { rules, timeZone, restaurantName } = await context();
-      return bookingView(rules, { timeZone, restaurantName });
+      const { rules, timeZone, restaurantName, languages } = await context();
+      return bookingView(rules, { timeZone, restaurantName, languages });
     },
 
     /**
@@ -129,8 +129,8 @@ export function createReservationStore(driver, { settings }) {
      * `time`, and the guest picking a table, the tables at that time too.
      */
     async availability(date, partyInput, timeInput = null) {
-      const { rules, timeZone, restaurantName, now: clock } = await context();
-      const booking = bookingView(rules, { timeZone, restaurantName });
+      const { rules, timeZone, restaurantName, languages, now: clock } = await context();
+      const booking = bookingView(rules, { timeZone, restaurantName, languages });
       if (!rules.enabled) return { booking, date, party: null, slots: [] };
       if (!isDate(date)) throw reservationError("The date is YYYY-MM-DD", "INVALID");
       const party = Number(partyInput ?? 2);
