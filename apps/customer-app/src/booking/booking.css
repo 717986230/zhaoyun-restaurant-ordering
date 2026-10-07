@@ -860,3 +860,88 @@ html.bk-root body {
     grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
   }
 }
+
+/* ② Flip to reveal (docs/motion-prompts.md): the ticket turns 180° about
+   its upright, perspective 1200px, 0.8 s on cubic-bezier(.3,.7,.2,1); each
+   face hides its back, so the faces swap at 90°. The back is the booking
+   number, large, to show at the door. A tap mid-turn turns it back from where
+   it is. */
+.bk-pass {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  perspective: 1200px;
+  -webkit-tap-highlight-color: transparent;
+}
+.bk-pass-inner {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+.bk-pass.flipped .bk-pass-inner {
+  transform: rotateY(180deg);
+}
+.bk-pass-face {
+  grid-area: 1 / 1;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.bk-pass-back {
+  transform: rotateY(180deg);
+}
+.bk-pass-front strong,
+.bk-pass-back strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: clamp(48px, 16vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.bk-pass-back strong {
+  font-size: clamp(36px, 12vw, 52px);
+  letter-spacing: 0.04em;
+}
+.bk-pass-face > span,
+.bk-pass-face > small:not(.bk-pass-hint) {
+  font-family: var(--bk-serif);
+  font-size: 18px;
+  color: var(--ink-2);
+}
+.bk-pass-face > small:not(.bk-pass-hint) {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.bk-pass-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.bk-pass:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-pass-inner {
+    transition: none;
+  }
+}
+/* The ticket's own wrappers are spans (a button holds phrasing content): the
+   older ".bk-when span" rule for the date must not reach them. */
+.bk-pass .bk-pass-inner,
+.bk-pass .bk-pass-face {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--ink);
+}

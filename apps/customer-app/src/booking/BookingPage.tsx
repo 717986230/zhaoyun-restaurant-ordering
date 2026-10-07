@@ -561,13 +561,28 @@ function BookingDetails({ language, booking, held, info, onChange, onAnother }: 
   }
 
   const active = booking.status === "pending" || booking.status === "confirmed";
+  const [flipped, setFlipped] = useState(false);
   return <section className="bk-card bk-booking" id="bookingDetails" data-status={booking.status}>
     <p className={`bk-status bk-status-${booking.status}`} id="bookingStatus">{booking.status === "cancelled" ? b(language, "cancelDone") : b(language, booking.status)}</p>
-    {/* The time and the day first and large, as a ticket reads; the rest under it. */}
-    <div className="bk-when">
-      <strong>{booking.time}</strong>
-      <span>{formatDay(language, booking.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
-    </div>
+    {/* The time and the day first and large, as a ticket reads; the rest under
+        it. ② Flip to reveal: a tap turns the ticket over to the booking number,
+        large, to show at the door; another tap turns it back. */}
+    <button type="button" className={`bk-when bk-pass ${flipped ? "flipped" : ""}`} id="bookingPass" aria-pressed={flipped}
+      aria-label={flipped ? b(language, "backToTime") : b(language, "showPass")} onClick={() => setFlipped((value) => !value)}>
+      <span className="bk-pass-inner">
+        <span className="bk-pass-face bk-pass-front" aria-hidden={flipped}>
+          <strong>{booking.time}</strong>
+          <span>{formatDay(language, booking.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+          <small className="bk-pass-hint">{b(language, "showPass")} ↻</small>
+        </span>
+        <span className="bk-pass-face bk-pass-back" aria-hidden={!flipped}>
+          <small>{b(language, "reference")}</small>
+          <strong>{booking.reference}</strong>
+          <span>{[b(language, "partyOf", { n: booking.party }), booking.table ? b(language, "tableName", { table: booking.table }) : "", booking.name].filter(Boolean).join(" · ")}</span>
+          <small className="bk-pass-hint">{b(language, "backToTime")} ↻</small>
+        </span>
+      </span>
+    </button>
     <dl className="bk-summary">
       <div><dt>{b(language, "reference")}</dt><dd id="bookingReference">{booking.reference}</dd></div>
       <div><dt>{b(language, "party")}</dt><dd>{b(language, "partyOf", { n: booking.party })}</dd></div>

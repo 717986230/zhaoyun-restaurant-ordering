@@ -92,6 +92,8 @@
   --pull: 0;
   /* A row's place on a freshly turned page, for its cascade; set inline. */
   --row: 0;
+  /* Set per digit by RollingNumber: how long a changed digit waits to roll. */
+  --roll-delay: 0ms;
   /* How tall a dish card may grow; set per screen on the card itself. */
   --detail-max: 70vh;
 
@@ -4387,5 +4389,95 @@ button:focus-visible,
 
   .sheet-body > * {
     animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion, to the prompts in docs/motion-prompts.md (2026-10).
+   ------------------------------------------------------------------------ */
+
+/* ② Flip to reveal: perspective 1200px (the turn itself is in CatalogScreen). */
+.dish-detail-card {
+  perspective: 1200px;
+}
+
+/* ④ Fly to cart: the round copy of the dish that arcs into the cart bar. */
+.fly-ghost {
+  position: fixed;
+  z-index: 120;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  background: var(--accent) center / cover no-repeat;
+  box-shadow: var(--shadow-1);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* ⑦ Number roll: a changed digit rolls in from below (up) or above (down),
+   360 ms, the ones first, each place further left 40 ms later. */
+.rolling {
+  display: inline-flex;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  vertical-align: bottom;
+}
+
+.roll {
+  display: inline-block;
+  animation: 0.36s cubic-bezier(0.2, 0.7, 0.2, 1) var(--roll-delay) backwards;
+}
+
+.roll-up {
+  animation-name: roll-up;
+}
+
+.roll-down {
+  animation-name: roll-down;
+}
+
+@keyframes roll-up {
+  from {
+    opacity: 0;
+    transform: translateY(80%);
+  }
+}
+
+@keyframes roll-down {
+  from {
+    opacity: 0;
+    transform: translateY(-80%);
+  }
+}
+
+/* ⑥ Toast: in on the landing curve (280 ms), out faster on ease-in (180 ms).
+   It stays at the top, under the header — never over the button just tapped. */
+.toast {
+  transform: translate(-50%, -16px);
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
+}
+
+.toast.show {
+  transition: opacity 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* ⑤ Press feedback: the round "+" gives under the finger and springs back. */
+.quick-add {
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.quick-add:active {
+  transform: scale(0.9);
+  transition-duration: 0.09s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roll {
+    animation: none;
+  }
+
+  .toast,
+  .toast.show {
+    transition: none;
   }
 }

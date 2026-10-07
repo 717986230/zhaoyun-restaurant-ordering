@@ -111,6 +111,12 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   expect(reference).toMatch(/^[A-Z2-9]{6}$/);
   // Shown above, it is not listed a second time under it.
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveCount(0);
+  // A tap turns the ticket over to the number, to show at the door; another turns it back.
+  await page.locator("#bookingPass").click();
+  await expect(page.locator("#bookingPass")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".bk-pass-back strong")).toHaveText(reference);
+  await page.locator("#bookingPass").click();
+  await expect(page.locator("#bookingPass")).toHaveAttribute("aria-pressed", "false");
 
   // The link opens it again, even on another visit.
   await page.reload();

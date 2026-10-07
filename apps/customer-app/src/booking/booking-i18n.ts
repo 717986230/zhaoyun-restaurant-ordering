@@ -17,7 +17,7 @@ const copy = {
     submit: "确认预约", submitting: "正在预约…", staysFor: "餐桌为你保留约 {minutes} 分钟。",
     privacy: "{restaurant}只用你的姓名、电话和邮箱处理这次预约，不做广告、不交给第三方；用餐日期过后 30 天自动删除。",
     booked: "预约成功", pending: "已收到预约，餐厅确认后生效", confirmed: "已确认", cancelled: "已取消", seated: "已入座", completed: "已完成", declined: "餐厅无法接受这次预约", no_show: "未到店",
-    reference: "预约号", when: "{date} {time}", partyOf: "{n} 位", keepLink: "请保存这个链接，可以随时查看或取消预约：", copy: "复制链接", copied: "已复制",
+    reference: "预约号", showPass: "点按出示预约号", backToTime: "点按看时间", when: "{date} {time}", partyOf: "{n} 位", keepLink: "请保存这个链接，可以随时查看或取消预约：", copy: "复制链接", copied: "已复制",
     cancel: "取消预约", cancelConfirm: "确定要取消这次预约吗？", cancelDone: "预约已取消", cannotCancel: "现在不能在线取消了，请直接致电餐厅。",
     another: "再订一桌", myBooking: "我的预约", notFound: "找不到这个预约，链接可能不完整。",
     errors: {
@@ -38,7 +38,7 @@ const copy = {
     submit: "Verbindlich reservieren", submitting: "Wird reserviert …", staysFor: "Der Tisch ist für etwa {minutes} Minuten für Sie reserviert.",
     privacy: "{restaurant} verwendet Name, Telefon und E-Mail nur für diese Reservierung – keine Werbung, keine Weitergabe. 30 Tage nach dem Besuch werden sie automatisch gelöscht.",
     booked: "Reserviert", pending: "Anfrage erhalten – gilt, sobald das Restaurant bestätigt", confirmed: "Bestätigt", cancelled: "Storniert", seated: "Am Tisch", completed: "Abgeschlossen", declined: "Das Restaurant kann diese Reservierung leider nicht annehmen", no_show: "Nicht erschienen",
-    reference: "Reservierungsnummer", when: "{date}, {time} Uhr", partyOf: "{n} Personen", keepLink: "Bitte diesen Link aufheben – damit können Sie die Reservierung jederzeit ansehen oder stornieren:", copy: "Link kopieren", copied: "Kopiert",
+    reference: "Reservierungsnummer", showPass: "Antippen: Nummer zeigen", backToTime: "Antippen: Uhrzeit zeigen", when: "{date}, {time} Uhr", partyOf: "{n} Personen", keepLink: "Bitte diesen Link aufheben – damit können Sie die Reservierung jederzeit ansehen oder stornieren:", copy: "Link kopieren", copied: "Kopiert",
     cancel: "Reservierung stornieren", cancelConfirm: "Diese Reservierung wirklich stornieren?", cancelDone: "Die Reservierung ist storniert", cannotCancel: "Online nicht mehr stornierbar – bitte rufen Sie uns an.",
     another: "Noch einen Tisch reservieren", myBooking: "Meine Reservierung", notFound: "Reservierung nicht gefunden – ist der Link vollständig?",
     errors: {
@@ -59,7 +59,7 @@ const copy = {
     submit: "Book now", submitting: "Booking…", staysFor: "Your table is held for about {minutes} minutes.",
     privacy: "{restaurant} uses your name, phone and email for this booking only – no advertising, never passed on. They are deleted automatically 30 days after your visit.",
     booked: "Booked", pending: "Request received – it stands once the restaurant confirms", confirmed: "Confirmed", cancelled: "Cancelled", seated: "Seated", completed: "Completed", declined: "The restaurant cannot take this booking", no_show: "No-show",
-    reference: "Booking number", when: "{date} at {time}", partyOf: "{n} guests", keepLink: "Keep this link to see or cancel your booking at any time:", copy: "Copy link", copied: "Copied",
+    reference: "Booking number", showPass: "Tap to show your number", backToTime: "Tap for the time", when: "{date} at {time}", partyOf: "{n} guests", keepLink: "Keep this link to see or cancel your booking at any time:", copy: "Copy link", copied: "Copied",
     cancel: "Cancel booking", cancelConfirm: "Cancel this booking?", cancelDone: "Your booking is cancelled", cannotCancel: "It can no longer be cancelled online – please call us.",
     another: "Book another table", myBooking: "My booking", notFound: "Booking not found – is the link complete?",
     errors: {

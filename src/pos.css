@@ -654,3 +654,70 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   font-style: normal;
   font-weight: 700;
 }
+
+/* ---------------------------------------------------------------------------
+   Motion, to the prompts in docs/motion-prompts.md (2026-10).
+   ------------------------------------------------------------------------ */
+
+/* ⑫ Live pulse: a guest calling from a table — a dot by the heading with a
+   ring growing from 1× to 1.8× and fading, every 2 s, two rings 1 s apart. */
+.pos-floor .pos-calls h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pos-floor .pos-calls h2::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--p-accent);
+  box-shadow: 0 0 0 0 var(--p-accent);
+  animation: pos-pulse 2s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+}
+
+@keyframes pos-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--p-accent) 55%, transparent), 0 0 0 0 color-mix(in srgb, var(--p-accent) 55%, transparent); }
+  50% { box-shadow: 0 0 0 8px transparent, 0 0 0 0 color-mix(in srgb, var(--p-accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent, 0 0 0 8px transparent; }
+}
+
+/* ⑥ Toast: rises 16px into place on the landing curve (280 ms); leaves
+   faster on ease-in (180 ms). */
+.pos-toast {
+  transform: translate(-50%, 16px);
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
+}
+
+.pos-toast.show {
+  transition: opacity 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* ⑤ Press feedback: on a touchscreen a tap has to be felt — every button
+   gives a little under the finger (90 ms) and comes back (220 ms). */
+.pos-shell :where(button:not(:disabled)) {
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pos-shell :where(button:not(:disabled)):active {
+  transform: scale(0.96);
+  transition-duration: 0.09s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-floor .pos-calls h2::before {
+    animation: none;
+  }
+
+  .pos-toast,
+  .pos-toast.show,
+  .pos-shell :where(button) {
+    transition: none;
+  }
+
+  .pos-shell :where(button):active {
+    transform: none;
+  }
+}
