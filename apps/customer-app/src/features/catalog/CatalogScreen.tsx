@@ -506,6 +506,12 @@ function FeaturedPage({ title, eyebrow, template, products, byId, language, onOp
 }
 
 export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {}, ordering, account, cart, reservations = false }: Props) {
+  // How many of each dish are in the cart already, on its "+" in the list: the row says what the tap did.
+  const inCart = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of Object.values(state.cart)) counts.set(entry.productId, (counts.get(entry.productId) ?? 0) + entry.quantity);
+    return counts;
+  }, [state.cart]);
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
@@ -733,7 +739,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
                   flyToCart(event.currentTarget);
                   dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [] });
                   dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
-                }}>+</button>}
+                }}>+{inCart.get(product.id) ? <b className="quick-add-count" aria-hidden="true">{inCart.get(product.id)}</b> : null}</button>}
             </div>
           </article>) : query && products.length
             // A search that found nothing says what was looked for and offers the way back.

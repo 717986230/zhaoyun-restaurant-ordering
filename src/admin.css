@@ -41,6 +41,7 @@
   --a-accent-2: #4e6659;
   --a-accent-line: #66806f;
   --a-accent-wash: #dfe7e2;
+  --a-accent-hover: #1f4e3a;
   --a-on-accent: #ffffff;
   --a-focus-ring: rgba(39, 95, 70, 0.14);
 
@@ -4364,5 +4365,141 @@ em.voided {
 
   .admin-shell :where(button):active {
     transform: none;
+  }
+}
+
+/* Buttons, one system (2026-10). Three kinds, the same corners and heights:
+   - an action: solid (the main one on a card) or outlined (the rest), 8px
+     corners, 40px tall; danger outlined in red, filled pink under the pointer;
+   - a choice that only shows what is chosen — a view, a filter, a weekday,
+     today — is not an action: the chosen one takes the accent wash and a
+     green edge, never the solid action green;
+   - an icon: a 40px square with the same corners.
+   Each answers the pointer and the keyboard the same way. */
+.admin-shell :where(.primary-action, .ghost-action, .danger-action, .icon-action, .test-printer) {
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.admin-shell .primary-action:not(:disabled):hover {
+  background: var(--a-accent-hover);
+}
+
+.admin-shell :where(.ghost-action, .icon-action, .test-printer):not(:disabled):hover {
+  border-color: var(--a-accent-line);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.admin-shell .ghost-action.danger,
+.admin-shell .danger-action {
+  border-color: var(--a-danger-line);
+  background: var(--a-card);
+  color: var(--a-danger);
+}
+
+.admin-shell .ghost-action.danger:not(:disabled):hover,
+.admin-shell .danger-action:not(:disabled):hover {
+  border-color: var(--a-danger);
+  background: var(--a-danger-wash);
+  color: var(--a-danger);
+}
+
+.admin-shell :where(.primary-action, .ghost-action, .danger-action, .icon-action, .test-printer, .filter-tabs button, .res-views button, .settings-jump button, .schedule-days button):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
+}
+
+.admin-shell .icon-action {
+  width: 40px;
+  height: 40px;
+}
+
+/* Chosen, not pressed: the wash and a green edge. */
+.admin-shell .ghost-action.on {
+  border-color: var(--a-accent);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+/* Day view or the records: one control of two segments. */
+.res-views {
+  display: inline-flex;
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--a-rail);
+}
+
+.res-views button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a-muted);
+  font-weight: 600;
+}
+
+.res-views button.on {
+  background: var(--a-card);
+  color: var(--a-head);
+  box-shadow: 0 1px 4px var(--a-shadow-1);
+}
+
+/* Filters: pills, the chosen one washed. */
+.filter-tabs button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.filter-tabs button.active {
+  border-color: var(--a-accent);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+/* Weekdays: on in the wash with a green edge and a tick, off outlined and quiet. */
+.schedule-presets button.on,
+.schedule-days button.on {
+  border-color: var(--a-accent);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  font-weight: 700;
+}
+
+.schedule-days button:not(.on) {
+  color: var(--a-faint);
+}
+
+/* The settings page's jump bar: places on the page, pills like the filters. */
+.settings-jump button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  font-weight: 600;
+}
+
+.settings-jump button:hover {
+  border-color: var(--a-accent-line);
+  color: var(--a-accent-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell :where(.primary-action, .ghost-action, .danger-action, .icon-action, .test-printer) {
+    transition: none;
   }
 }
