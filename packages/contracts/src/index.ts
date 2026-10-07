@@ -47,7 +47,8 @@ export type GuestOrderRefusal =
 
 /** A guest's own account (shared/customer.mjs). */
 /** `emailVerified`: the address, as it is now, was proved by a code (shared/email-verify.mjs). */
-export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean }
+/** A guest's account. Signed up by mobile number: `phone` is set, and `email` holds the same number (how they sign in). */
+export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string }
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer }
 export interface CustomerRegisterCommand { email: string; name?: string; password: string }
 /** Every change is made against the password in force. */

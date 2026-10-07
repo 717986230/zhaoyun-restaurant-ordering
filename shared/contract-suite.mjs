@@ -1941,12 +1941,12 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(phoned.json.reservation.table, "12");
       assert.equal(phoned.json.token, undefined);
 
-      // A month after the day, the guest's details are gone; the count stays.
+      // Long after the day, the guest's details are still there: the restaurant keeps its records.
       const old = addDays(booking.today, -40);
       await call("POST", "/api/admin/reservations", { role: "staff", body: { date: old, time: "19:00", party: 3, name: "Alt", phone: "0660 3333333", email: "alt@example.com" } });
-      const forgotten = (await call("GET", `/api/admin/reservations?from=${old}&to=${old}`, { role: "staff" })).json.reservations[0];
-      assert.equal(forgotten.party, 3);
-      assert.deepEqual([forgotten.name, forgotten.phone, forgotten.email], ["", "", ""]);
+      const kept = (await call("GET", `/api/admin/reservations?from=${old}&to=${old}`, { role: "staff" })).json.reservations[0];
+      assert.equal(kept.party, 3);
+      assert.deepEqual([kept.name, kept.phone, kept.email], ["Alt", "+43 660 3333333", "alt@example.com"]);
 
       // Erased for good on request: the manager's.
       assert.equal((await call("DELETE", `/api/admin/reservations/${phoned.json.reservation.id}`, { role: "staff" })).status, 403);
@@ -2134,6 +2134,25 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(yesterday.find((entry) => entry.id === late.id).status, "no_show");
 
       await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
+    }],
+
+    ["a guest signs up with a mobile number instead of an email: checked to be a mobile, no code, the same account however written", async () => {
+      const stamp = Date.now().toString().slice(-7);
+      const number = `0660 ${stamp}`;
+      const signedUp = await call("POST", "/api/customer/register", { body: { email: number, password: "secret123" } });
+      assert.equal(signedUp.status, 201, JSON.stringify(signedUp.json));
+      assert.equal(signedUp.json.customer.phone, `+43660${stamp}`, "kept as one form, +43…");
+      assert.equal(signedUp.json.customer.email, `+43660${stamp}`, "the lists show the number");
+      for (const [login, code] of [["01 5877777", "NOT_MOBILE"], ["call me", "BAD_LOGIN"]]) {
+        const refused = await call("POST", "/api/customer/register", { body: { email: login, password: "secret123" } });
+        assert.deepEqual([refused.status, refused.json.code], [400, code], login);
+      }
+      const twice = await call("POST", "/api/customer/register", { body: { email: `+43 660 ${stamp}`, password: "secret123" } });
+      assert.deepEqual([twice.status, twice.json.code], [409, "EMAIL_TAKEN"], "the same number, written another way");
+      const signedIn = await call("POST", "/api/customer/sign-in", { body: { email: `0043660${stamp}`, password: "secret123" } });
+      assert.equal(signedIn.status, 200, "signs in however the number is written");
+      // No email to send a code to: none is asked for, and none can be.
+      assert.equal((await call("POST", "/api/customer/email-code", { customerToken: signedIn.json.token, body: {} })).json.code, "NO_EMAIL");
     }],
 
     ["每日限量: a dish counts down with every order, leaves the guests' menu at zero, gets a void back, and takes more when the floor says so", async () => {

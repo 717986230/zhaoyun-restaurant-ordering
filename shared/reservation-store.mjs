@@ -50,18 +50,6 @@ export function createReservationStore(driver, { settings }) {
   const byId = (id) => driver.first("SELECT * FROM reservations WHERE id = ?", String(id));
 
   /**
-   * A guest's name, phone, email and note are kept for a month after the
-   * day, then blanked: the count of guests and what became of the booking
-   * stay, for the owner's own numbers (GDPR Art. 5(1)(e)).
-   */
-  async function forgetOld(today) {
-    await driver.run(
-      "UPDATE reservations SET name = '', phone = '', email = '', notes = '', token_hash = NULL WHERE date < ? AND (name != '' OR phone != '' OR email != '' OR notes != '' OR token_hash IS NOT NULL)",
-      addDays(today, -RESERVATION_RETENTION_DAYS)
-    );
-  }
-
-  /**
    * The guest's bookings still to come and their recent no-shows: by their
    * account, and by the phone number they gave, so a second account with the
    * same number does not start afresh.
@@ -160,7 +148,9 @@ export function createReservationStore(driver, { settings }) {
       const booking = normalizeReservationInput(staff ? input : {
         ...input,
         name: String(input.name ?? "").trim() || customer.name || customer.email.split("@")[0],
-        email: String(input.email ?? "").trim() || customer.email
+        // Nothing typed: how the account reaches them — its email, or its mobile number.
+        email: String(input.email ?? "").trim() || (customer.phone ? "" : customer.email),
+        phone: String(input.phone ?? "").trim() || customer.phone || ""
       }, rules, { staff });
       if (staff) booking.table = reservationTable(input.table);
       else {
@@ -245,7 +235,6 @@ export function createReservationStore(driver, { settings }) {
      */
     async list(fromInput, toInput, { q = "", status = "" } = {}) {
       const { now: clock, rules } = await context();
-      await forgetOld(clock.date);
       await expireMissed(rules, clock);
       const from = fromInput || clock.date;
       const to = toInput || from;
