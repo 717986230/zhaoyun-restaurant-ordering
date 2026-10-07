@@ -1123,3 +1123,242 @@ html.bk-root body {
     transition: none;
   }
 }
+
+/* Compact (2026-10): language and light/dark in the top-right corner; the
+   party, day and time as three dropdowns on one card; the guest's other
+   bookings and account in a dock at the bottom-right, each opening a panel. */
+.bk-head {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.bk-head h1 {
+  font-size: clamp(26px, 7vw, 34px);
+}
+.bk-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.bk-language,
+.bk-theme {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.bk-language {
+  padding: 0 12px;
+  appearance: none;
+  text-align: center;
+  cursor: pointer;
+}
+.bk-theme {
+  width: 38px;
+  padding: 0;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.bk-pick {
+  padding: 14px;
+}
+.bk-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.bk-selects .bk-field span {
+  font-size: 12px;
+}
+.bk-selects .bk-field select {
+  min-height: 48px;
+  padding: 8px 26px 8px 10px;
+  background-position: right 8px center;
+  background-size: 14px;
+  font-size: 15px;
+}
+.bk-selects .bk-field select:disabled {
+  opacity: 0.55;
+}
+
+/* The member code, short of points: one line and two buttons. */
+.bk-member {
+  padding: 14px;
+}
+.bk-member .bk-member-short {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.bk-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bk-member-actions .bk-member-code {
+  flex-basis: 100%;
+  order: 3;
+}
+
+/* The dock: two buttons stacked at the bottom-right, over the page. */
+.bk-page {
+  padding-bottom: max(140px, env(safe-area-inset-bottom));
+}
+.bk-dock {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+}
+.bk-dock button {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 72px;
+  padding: 10px 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--glass-lift);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.22s var(--bk-ease);
+}
+.bk-dock button span {
+  font-size: 20px;
+  line-height: 1;
+}
+.bk-dock button:active {
+  transform: scale(0.95);
+}
+.bk-dock-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
+}
+
+/* The panel the dock opens: from the bottom, over a dimmed page. */
+.bk-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  background: var(--glass-scrim);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: bk-fade 0.25s var(--bk-ease);
+}
+.bk-sheet-panel {
+  display: grid;
+  gap: 12px;
+  width: min(640px, 100%);
+  max-height: 82dvh;
+  overflow: auto;
+  padding: 16px 16px max(20px, env(safe-area-inset-bottom));
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--panel);
+  color: var(--ink);
+  animation: bk-sheet-up 0.4s var(--bk-ease);
+}
+.bk-sheet-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bk-sheet-panel > header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.bk-sheet-close {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  font-size: 22px;
+  cursor: pointer;
+}
+.bk-sheet-panel #myBookings {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.bk-sheet-panel #myBookings > h2 {
+  display: none;
+}
+.bk-account-panel {
+  display: grid;
+  gap: 10px;
+}
+.bk-account-panel p {
+  margin: 0;
+}
+.bk-account-email {
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+}
+.bk-account-points b {
+  font-size: 22px;
+}
+@keyframes bk-fade {
+  from { opacity: 0; }
+}
+@keyframes bk-sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-sheet,
+  .bk-sheet-panel,
+  .bk-dock button {
+    animation: none;
+    transition: none;
+  }
+}
+/* No step numbers: the page is short enough to read without them. */
+.bk-form > .bk-card > h2::before {
+  content: none;
+}
+/* The three dropdowns read alike: one face, one weight. */
+.bk-selects .bk-field select,
+.bk-selects .bk-field select#bookingParty,
+.bk-selects .bk-field select#bookingTime {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+/* The dock as small as a thumb needs. */
+.bk-dock button {
+  width: 60px;
+  padding: 8px 2px 6px;
+  font-size: 11px;
+}
+.bk-dock button span {
+  font-size: 18px;
+}
+.bk-dock button {
+  box-shadow: 0 6px 18px var(--glass-scrim);
+}

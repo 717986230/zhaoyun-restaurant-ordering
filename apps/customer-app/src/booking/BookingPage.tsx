@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import type { ApiBookingInfo, ApiCustomer, ApiGuestReservation, ApiReservationSlot, ApiTableChoice } from "@zhaoyun/contracts";
 import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
 import { apiBaseUrl, customerToken, setCustomerToken } from "../app/api";
+import { useColorScheme } from "../app/useColorScheme";
 import { b, bookingError, formatDay, initialLanguage, rememberLanguage } from "./booking-i18n";
 import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
 import { checkMobile } from "../../../../shared/phone.mjs";
@@ -15,7 +16,6 @@ interface Held { id: string; token: string }
 
 const HELD_KEY = "zy_booking";
 const LANGUAGES: Array<[BookingLanguage, string]> = [["de", "Deutsch"], ["en", "English"], ["zh", "中文"]];
-const DAY_CHIPS = 14;
 
 function addDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -73,6 +73,10 @@ export function BookingPage() {
   // The signed-in guest: booking needs one (against fake bookings), and their bookings are listed.
   const [customer, setCustomer] = useState<ApiCustomer | null>(null);
   const [mine, setMine] = useState<ApiGuestReservation[]>([]);
+  // Light or dark, as on the menu (the same choice, kept on this phone).
+  const [scheme, toggleScheme] = useColorScheme(undefined);
+  // The guest's other bookings and their account open over the page from the dock.
+  const [sheet, setSheet] = useState<"bookings" | "account" | null>(null);
 
   const loadMine = useCallback(async () => {
     if (!customerToken()) return;
@@ -171,17 +175,20 @@ export function BookingPage() {
         <p className="bk-eyebrow">{info?.restaurantName ?? ""}</p>
         <h1>{booking ? b(language, "myBooking") : b(language, "title")}</h1>
       </div>
-      <nav className="bk-languages" aria-label="Language">
-        {LANGUAGES.map(([code, label]) => <button key={code} type="button" className={code === language ? "active" : ""} aria-pressed={code === language} onClick={() => chooseLanguage(code)}>{label}</button>)}
-      </nav>
+      <div className="bk-tools">
+        <select className="bk-language" id="bookingLanguage" aria-label="Language" value={language} onChange={(event) => chooseLanguage(event.target.value as BookingLanguage)}>
+          {LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+        </select>
+        <button type="button" className="bk-theme" id="bookingTheme" aria-label={b(language, scheme === "dark" ? "themeLight" : "themeDark")} title={b(language, scheme === "dark" ? "themeLight" : "themeDark")} onClick={toggleScheme}>
+          <span aria-hidden="true">{scheme === "dark" ? "☀" : "☾"}</span>
+        </button>
+      </div>
     </header>
 
     {notFound && !booking ? <section className="bk-card bk-message" id="bookingNotFound">
       <p>{b(language, "notFound")}</p>
       <button type="button" className="bk-secondary" onClick={startOver}>{b(language, "another")}</button>
     </section> : null}
-
-    {customer ? <p className="bk-account" id="bookingAccount">{b(language, "signedInAs", { email: customer.email })}{info?.minPoints ? <> · <b id="bookingPoints">{b(language, "pointsBalance", { points: customer.points })}</b></> : null} · <button type="button" className="bk-link-button" onClick={() => void signOut()}>{b(language, "signOut")}</button></p> : null}
 
     {booking && held
       ? <BookingDetails language={language} booking={booking} held={held} info={info} onChange={(next) => { setBooking(next); void loadMine(); }} onAnother={startOver} />
@@ -192,15 +199,73 @@ export function BookingPage() {
           : !info.enabled
             ? <section className="bk-card bk-message" id="bookingOff"><p>{b(language, "off")}</p></section>
             : <>
-              {info.minPoints ? <p className="bk-member-rule" id="bookingMemberRule">{b(language, "memberRule", { min: info.minPoints, welcome: info.welcomePoints ?? 0, noShow: info.noShowPoints ?? 0 })}</p> : null}
               {/* Short of the points, said first: no picking a time that cannot be booked yet. */}
               {customer && shortOfPoints(info, customer) ? <MemberCard language={language} info={info} customer={customer} onRefreshed={setCustomer} /> : null}
               <BookingForm language={language} info={info} customer={customer} recent={recent} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />
             </>}
 
-    {/* The booking open above is not listed a second time under it. */}
-    {customer && others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => void loadMine()} /> : null}
+    {/* The guest's other bookings and their account: one tap each, from the corner. */}
+    <nav className="bk-dock" aria-label={b(language, "account")}>
+      <button type="button" id="bookingDockBookings" aria-haspopup="dialog" onClick={() => setSheet("bookings")}>
+        <span aria-hidden="true">📅</span>{b(language, "myBookings")}{customer && others.length ? <b className="bk-dock-count">{others.length}</b> : null}
+      </button>
+      <button type="button" id="bookingDockAccount" aria-haspopup="dialog" onClick={() => setSheet("account")}>
+        <span aria-hidden="true">👤</span>{b(language, "account")}
+      </button>
+    </nav>
+    {sheet ? <BookingSheet language={language} title={b(language, sheet === "bookings" ? "myBookings" : "account")} onClose={() => setSheet(null)}>
+      {!customer
+        ? <p className="bk-muted" id="bookingSignInToSee">{b(language, "signInToSee")}</p>
+        : sheet === "bookings"
+          // The booking open on the page is not listed a second time.
+          ? others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => void loadMine()} /> : <p className="bk-muted">{b(language, "noBookings")}</p>
+          : <AccountPanel language={language} info={info} customer={customer} onRefreshed={setCustomer} onSignOut={() => { setSheet(null); void signOut(); }} />}
+    </BookingSheet> : null}
   </main>;
+}
+
+/** A panel over the page, from the bottom: the guest's bookings or account. Escape or the scrim closes it. */
+function BookingSheet({ language, title, onClose, children }: { language: BookingLanguage; title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return <div className="bk-sheet" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="bk-sheet-panel" role="dialog" aria-modal="true" aria-label={title} id="bookingSheet">
+      <header><h2>{title}</h2><button type="button" className="bk-sheet-close" aria-label={b(language, "close")} onClick={onClose}>×</button></header>
+      {children}
+    </section>
+  </div>;
+}
+
+/** The guest's account: who, how many points, the rule, the member code behind a tap, and signing out. */
+function AccountPanel({ language, info, customer, onRefreshed, onSignOut }: {
+  language: BookingLanguage; info: ApiBookingInfo | null; customer: ApiCustomer; onRefreshed: (customer: ApiCustomer) => void; onSignOut: () => void;
+}) {
+  useEffect(() => {
+    // Opened to see the points: the latest, after a visit at the counter.
+    api.customer().then(({ customer: fresh }) => onRefreshed(fresh)).catch(() => { /* What is on screen stays. */ });
+  }, []);
+  return <div className="bk-account-panel" id="bookingAccount">
+    <p className="bk-account-email">{customer.email}</p>
+    <p className="bk-account-points"><b id="bookingPoints">{b(language, "pointsBalance", { points: customer.points })}</b></p>
+    {info?.minPoints ? <p className="bk-muted" id="bookingMemberRule">{b(language, "memberRule", { min: info.minPoints, welcome: info.welcomePoints ?? 0, noShow: info.noShowPoints ?? 0 })}</p> : null}
+    <MemberCode language={language} customer={customer} id="accountMemberQr" />
+    <button type="button" className="bk-secondary" id="bookingSignOut" onClick={onSignOut}>{b(language, "signOut")}</button>
+  </div>;
+}
+
+/** The guest's member code (ZYMEM: and their account), shown on a tap, for the waiter to scan when they pay. */
+function MemberCode({ language, customer, id }: { language: BookingLanguage; customer: ApiCustomer; id: string }) {
+  const [shown, setShown] = useState(false);
+  const qr = useQr(shown ? `ZYMEM:${customer.id}` : "");
+  return <>
+    <button type="button" className="bk-secondary" id={`${id}Toggle`} aria-expanded={shown} onClick={() => setShown((value) => !value)}>
+      {b(language, shown ? "hideMemberCode" : "showMemberCode")}
+    </button>
+    {shown && qr ? <span className="bk-member-code"><img id={id} src={qr} alt={b(language, "memberQrAlt")} width="220" height="220" /></span> : null}
+  </>;
 }
 
 /** The signed-in guest's own bookings, each cancellable while it still may be. */
@@ -448,7 +513,12 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   }, [seatSelection, date, party, time, language]);
   useEffect(() => { void loadTables(); }, [loadTables]);
 
-  const chips = Array.from({ length: DAY_CHIPS }, (_, offset) => addDays(info.today, offset)).filter((day) => day <= info.lastDate);
+  // Every day that takes bookings, up to the last one open.
+  const days = useMemo(() => {
+    const open: string[] = [];
+    for (let day = info.today; day <= info.lastDate && open.length < 120; day = addDays(day, 1)) if (bookable(day)) open.push(day);
+    return open.length ? open : [info.today];
+  }, [info]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -487,59 +557,30 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   }
 
   const anyFree = slots?.some((slot) => slot.available);
-  const partyChips = Array.from({ length: Math.min(PARTY_CHIPS, info.maxParty) }, (_, index) => index + 1);
 
   return <div className="bk-form">
-    <section className="bk-card" id="bookingPartyCard">
-      <h2>{b(language, "party")}</h2>
-      <div className="bk-choices bk-party" role="radiogroup" aria-label={b(language, "party")}>
-        {partyChips.map((count) => <button key={count} type="button" role="radio" aria-checked={count === party} data-party={count}
-          className={count === party ? "active" : ""} onClick={() => setParty(count)}>{count}</button>)}
+    {/* How many, which day, what time: three dropdowns on one card. */}
+    <section className="bk-card bk-pick" id="bookingTimes">
+      <div className="bk-selects">
+        <label className="bk-field bk-select"><span>{b(language, "party")}</span>
+          <select id="bookingParty" value={party} onChange={(event) => setParty(Number(event.target.value))}>
+            {Array.from({ length: info.maxParty }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{b(language, "guests", { n: count })}</option>)}
+          </select>
+        </label>
+        <label className="bk-field bk-select"><span>{b(language, "date")}</span>
+          <select id="bookingDate" value={date} onChange={(event) => setDate(event.target.value)}>
+            {days.map((day) => <option key={day} value={day}>{formatDay(language, day)}</option>)}
+          </select>
+        </label>
+        <label className="bk-field bk-select"><span>{b(language, "time")}</span>
+          <select id="bookingTime" value={time} disabled={!slots?.length} onChange={(event) => { setTime(event.target.value); setError(""); if (event.target.value) setBringUp(seatSelection ? "bookingSeats" : "bookingFinish"); }}>
+            <option value="">{slots === null ? b(language, "timesLoading") : b(language, "chooseTime")}</option>
+            {(slots ?? []).map((slot) => <option key={slot.time} value={slot.time} disabled={!slot.available}>{slot.available ? slot.time : `${slot.time} · ${b(language, "full")}`}</option>)}
+          </select>
+        </label>
       </div>
-      {info.maxParty > PARTY_CHIPS ? <label className="bk-field bk-select bk-more">
-        <span>{b(language, "moreGuests")}</span>
-        <select id="bookingParty" value={party > PARTY_CHIPS ? party : ""} onChange={(event) => { if (event.target.value) setParty(Number(event.target.value)); }}>
-          <option value="">—</option>
-          {Array.from({ length: info.maxParty - PARTY_CHIPS }, (_, index) => PARTY_CHIPS + index + 1).map((count) => <option key={count} value={count}>{b(language, "guests", { n: count })}</option>)}
-        </select>
-      </label> : null}
-      <p className="bk-muted">{b(language, "largeParty", { n: info.maxParty })}</p>
-    </section>
-
-    <section className="bk-card">
-      <h2>{b(language, "date")}</h2>
-      <div className="bk-days">
-        {chips.map((day) => {
-          const open = bookable(day);
-          return <button key={day} type="button" data-date={day} disabled={!open} className={day === date ? "active" : ""} aria-pressed={day === date} onClick={() => { setDate(day); setBringUp("bookingTimes"); }}>
-            <span>{formatDay(language, day, { weekday: "short" })}</span>
-            <strong>{formatDay(language, day, { day: "numeric" })}</strong>
-            <small>{open ? formatDay(language, day, { month: "short" }) : b(language, "closed")}</small>
-          </button>;
-        })}
-      </div>
-      <label className="bk-field bk-other-date">
-        <span>{b(language, "otherDate")}</span>
-        <input type="date" id="bookingDate" min={info.today} max={info.lastDate} value={date} onChange={(event) => { if (event.target.value) { setDate(event.target.value); setBringUp("bookingTimes"); } }} />
-      </label>
-    </section>
-
-    <section className="bk-card" id="bookingTimes">
-      <h2>{b(language, "time")} <span className="bk-muted">· {formatDay(language, date, { weekday: "long", day: "numeric", month: "long" })}</span></h2>
-      {slots === null
-        ? <p className="bk-muted">{b(language, "timesLoading")}</p>
-        : !slots.length
-          ? <p className="bk-muted" id="bookingNoTimes">{b(language, "noTimes")}</p>
-          : <>
-            {!anyFree ? <p className="bk-muted" id="bookingFullDay">{b(language, "fullDay")}</p> : null}
-            <div className="bk-choices bk-times" role="radiogroup" aria-label={b(language, "time")}>
-              {slots.map((slot) => <button key={slot.time} type="button" role="radio" aria-checked={slot.time === time} data-time={slot.time} disabled={!slot.available}
-                className={slot.time === time ? "active" : ""} onClick={() => { setTime(slot.time); setError(""); setBringUp(seatSelection ? "bookingSeats" : "bookingFinish"); }}>
-                {slot.time}{slot.available ? null : <small>{b(language, "full")}</small>}
-              </button>)}
-            </div>
-          </>}
-      <p className="bk-muted">{b(language, "staysFor", { minutes: info.durationMinutes })}</p>
+      {slots && !slots.length ? <p className="bk-muted" id="bookingNoTimes">{b(language, "noTimes")}</p> : null}
+      {slots?.length && !anyFree ? <p className="bk-muted" id="bookingFullDay">{b(language, "fullDay")}</p> : null}
     </section>
 
     {/* Only once there is a time: an empty card before it said nothing. */}
@@ -571,7 +612,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
           <input id="bookingPhone" required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" placeholder="0660 1234567" aria-invalid={phoneError ? true : undefined} value={phone}
             onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }}
             onBlur={() => { const mobile = checkMobile(phone); setPhoneError(!phone.trim() || mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid")); }} />
-          {phoneError ? <small className="bk-field-error" id="bookingPhoneError" role="alert">{phoneError}</small> : <small>{b(language, "phoneHint")}</small>}
+          {phoneError ? <small className="bk-field-error" id="bookingPhoneError" role="alert">{phoneError}</small> : null}
         </label>
         <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
         {info.note ? <p className="bk-note">{info.note}</p> : null}
@@ -597,7 +638,6 @@ function shortOfPoints(info: ApiBookingInfo, customer: ApiCustomer): boolean {
  * their first visit's points (POS, apps/pos-web/src/BookingScanner.tsx).
  */
 function MemberCard({ language, info, customer, onRefreshed }: { language: BookingLanguage; info: ApiBookingInfo; customer: ApiCustomer; onRefreshed: (customer: ApiCustomer) => void }) {
-  const qr = useQr(`ZYMEM:${customer.id}`);
   const [busy, setBusy] = useState(false);
   async function refresh() {
     setBusy(true);
@@ -607,13 +647,12 @@ function MemberCard({ language, info, customer, onRefreshed }: { language: Booki
       setBusy(false);
     }
   }
-  const min = info.minPoints ?? 0;
   return <section className="bk-card bk-member" id="bookingMember">
-    <h2>{b(language, "memberTitle")}</h2>
-    <p className="bk-member-short">{b(language, "pointsShort", { points: customer.points, missing: Math.max(0, min - customer.points) })}</p>
-    <p className="bk-muted">{b(language, "memberHow", { welcome: info.welcomePoints ?? 0 })}</p>
-    {qr ? <span className="bk-member-code"><img id="bookingMemberQr" src={qr} alt={b(language, "memberQrAlt")} width="220" height="220" /></span> : null}
-    <button type="button" className="bk-secondary" id="bookingRefreshPoints" disabled={busy} onClick={() => void refresh()}>{b(language, "memberRefresh")}</button>
+    <p className="bk-member-short">{b(language, "pointsShortLine", { min: info.minPoints ?? 0, points: customer.points, welcome: info.welcomePoints ?? 0 })}</p>
+    <div className="bk-member-actions">
+      <MemberCode language={language} customer={customer} id="bookingMemberQr" />
+      <button type="button" className="bk-secondary" id="bookingRefreshPoints" disabled={busy} onClick={() => void refresh()}>{b(language, "memberRefresh")}</button>
+    </div>
   </section>;
 }
 
