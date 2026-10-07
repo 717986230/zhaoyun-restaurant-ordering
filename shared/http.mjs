@@ -635,7 +635,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           if (invalid) return invalid;
           // From the guest's own account: signed in, or no booking.
           const customer = await store.customers.session(request.headers.get("x-customer-token"));
-          if (mail && customer && !customer.emailVerified) return json({ error: "Please verify your email address first", code: "EMAIL_UNVERIFIED" }, 403);
+          // An account by mobile number has no email to prove; one by email proves it, where mail goes out.
+          if (mail && customer && !customer.emailVerified && !customer.phone) return json({ error: "Please verify your email address first", code: "EMAIL_UNVERIFIED" }, 403);
           return json(await reservations.create(value, { customer }), 201);
         }
         const token = request.headers.get("x-reservation-token");

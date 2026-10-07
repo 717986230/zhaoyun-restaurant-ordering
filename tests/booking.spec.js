@@ -210,6 +210,23 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveAttribute("data-status", "cancelled");
 });
 
+test("a guest signs up with a mobile number: no code asked for, the number is how they are reached", async ({ page }) => {
+  await page.goto("/book.html?lang=zh");
+  await page.getByRole("tab", { name: "注册" }).click();
+  // A landline is refused before anything is sent; a mobile goes through.
+  await page.locator("#bookingEmailLogin").fill("01 5877777");
+  await page.locator("#bookingPassword").fill("secret123");
+  await page.locator("#bookingSignInSubmit").click();
+  await expect(page.locator("#bookingSignIn .bk-error")).toHaveText("请填写手机号，不是座机号码。");
+  await page.locator("#bookingEmailLogin").fill("0699 123 45 67");
+  await page.locator("#bookingSignInSubmit").click();
+  // Mail goes out here, yet no code: a number has no email to prove.
+  await expect(page.locator("#bookingVerify")).toHaveCount(0);
+  await expect(page.locator("#bookingContact")).toHaveValue("+436991234567");
+  // And nothing said about deleting details after the day.
+  await expect(page.locator(".bk-privacy")).toHaveCount(0);
+});
+
 test("the menu opens the booking over itself, in glass, and closing it goes back to the menu", async ({ page }) => {
   await page.goto("/");
   await page.locator("#bookBtn").click();

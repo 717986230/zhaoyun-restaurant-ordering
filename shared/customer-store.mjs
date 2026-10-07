@@ -22,7 +22,7 @@ import {
   ADD_FAVORITE_SQL, CHANGE_POINTS_SQL, CUSTOMER_BY_EMAIL_SQL, CUSTOMER_BY_ID_SQL, CUSTOMER_SESSION_SQL,
   CUSTOMER_SESSION_TTL_MS, customerView, DELETE_CUSTOMER_SESSION_SQL, DELETE_CUSTOMER_SESSIONS_SQL, DELETE_CUSTOMER_STATEMENTS,
   DELETE_EXPIRED_CUSTOMER_SESSIONS_SQL, FAVORITES_SQL, INSERT_CUSTOMER_SESSION_SQL, INSERT_CUSTOMER_SQL, INSERT_POINTS_SQL, isOverdrawn,
-  MAX_FAVORITES, normalizeCustomerName, normalizeCustomerRegistration, normalizePointsAdjustment, pointsEntryView, POINTS_HISTORY_SQL,
+  isPhoneLogin, MAX_FAVORITES, normalizeCustomerName, normalizeLogin, normalizeCustomerRegistration, normalizePointsAdjustment, pointsEntryView, POINTS_HISTORY_SQL,
   REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
@@ -69,7 +69,7 @@ export function createCustomerStore(driver, { ordersFor }) {
 
   async function register(input) {
     const { email, name, password } = normalizeCustomerRegistration(input);
-    if (await driver.first(CUSTOMER_BY_EMAIL_SQL, email)) throw coded("This email already has an account: sign in", "EMAIL_TAKEN", 409);
+    if (await driver.first(CUSTOMER_BY_EMAIL_SQL, email)) throw coded("This email or number already has an account: sign in", "EMAIL_TAKEN", 409);
     const stored = await hashPassword(password);
     const id = uuid();
     const at = now();
@@ -77,14 +77,17 @@ export function createCustomerStore(driver, { ordersFor }) {
       await driver.run(INSERT_CUSTOMER_SQL, id, email, name, stored.hash, stored.salt, stored.iterations, at, at);
     } catch (error) {
       // Two registrations of one email at once: the UNIQUE index decides.
-      if (/UNIQUE/i.test(String(error?.message))) throw coded("This email already has an account: sign in", "EMAIL_TAKEN", 409);
+      if (/UNIQUE/i.test(String(error?.message))) throw coded("This email or number already has an account: sign in", "EMAIL_TAKEN", 409);
       throw error;
     }
     return openSession(await byId(id));
   }
 
   async function signIn(emailInput, password) {
-    const row = await driver.first(CUSTOMER_BY_EMAIL_SQL, String(emailInput ?? "").trim().toLowerCase());
+    // An email or a mobile number, written any way: the same key the account was made with.
+    let login = String(emailInput ?? "").trim().toLowerCase();
+    try { login = normalizeLogin(emailInput); } catch { /* Not one or the other: no such account, the same answer. */ }
+    const row = await driver.first(CUSTOMER_BY_EMAIL_SQL, login);
     const stored = row ? storedCustomerPassword(row) : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
     const correct = await verifyPassword(String(password ?? ""), stored);
     return row && correct ? openSession(row) : null;
@@ -176,6 +179,7 @@ export function createCustomerStore(driver, { ordersFor }) {
     const row = await byId(customerId);
     if (!row) throw coded("Please sign in", "SIGN_IN_REQUIRED", 401);
     if (row.email_verified) throw coded("This email is verified already", "ALREADY_VERIFIED", 409);
+    if (isPhoneLogin(row.email)) throw coded("This account signs in by mobile number: there is no email to verify", "NO_EMAIL", 400);
     const nowMs = Date.now();
     await driver.run(DELETE_OLD_EMAIL_CODES_SQL, new Date(nowMs - 86_400_000).toISOString());
     const recent = await driver.all(EMAIL_CODES_SINCE_SQL, row.id, new Date(nowMs - 3_600_000).toISOString());

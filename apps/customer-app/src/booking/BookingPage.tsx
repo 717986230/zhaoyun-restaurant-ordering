@@ -54,7 +54,7 @@ function refusal(language: BookingLanguage, error: unknown, info: ApiBookingInfo
   if (error instanceof ApiError) {
     if (error.status === 429 && error.code !== "NO_SHOW_BLOCKED" && error.code !== "CODE_TOO_SOON" && error.code !== "TOO_MANY_CODES") return bookingError(language, "RATE");
     const known: BookingErrorKey[] = ["SLOT_FULL", "SLOT_UNAVAILABLE", "PARTY_TOO_LARGE", "RESERVATIONS_OFF", "INVALID", "TABLE_TAKEN", "TABLE_REQUIRED", "TABLE_TOO_SMALL", "SIGN_IN_REQUIRED", "NO_SHOW_BLOCKED", "DAY_LIMIT", "TOO_MANY_BOOKINGS",
-      "EMAIL_UNVERIFIED", "BAD_PHONE", "NOT_MOBILE", "WRONG_CODE", "CODE_EXPIRED", "CODE_TOO_SOON", "TOO_MANY_CODES", "MAIL_FAILED", "NOT_ENOUGH_POINTS", "CONTACT_REQUIRED"];
+      "EMAIL_UNVERIFIED", "BAD_PHONE", "NOT_MOBILE", "WRONG_CODE", "CODE_EXPIRED", "CODE_TOO_SOON", "TOO_MANY_CODES", "MAIL_FAILED", "NOT_ENOUGH_POINTS", "CONTACT_REQUIRED", "BAD_LOGIN"];
     const limit = error.code === "DAY_LIMIT" ? info?.maxPerDayPerGuest : info?.maxActivePerGuest;
     const details = (error.details ?? {}) as { attemptsLeft?: number; retryAfter?: number; minPoints?: number; points?: number };
     if (error.code && (known as string[]).includes(error.code)) return bookingError(language, error.code as BookingErrorKey, { message: error.message, limit: limit ?? "", left: details.attemptsLeft ?? "", s: details.retryAfter ?? "", min: details.minPoints ?? info?.minPoints ?? "", points: details.points ?? "" });
@@ -358,6 +358,12 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
   async function submit(event: FormEvent) {
     event.preventDefault();
     event.stopPropagation();
+    // Registering: an email or a mobile number that could be real, said before the guest waits for the server.
+    const problem = mode === "register" ? loginProblem(language, email) : "";
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -381,9 +387,9 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
       {(["signIn", "register"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => { setMode(key); setError(""); }}>{b(language, key)}</button>)}
     </div>
     <form className="bk-signin" onSubmit={(event) => void submit(event)}>
-      <label className="bk-field"><span>{b(language, "loginEmail")}</span><input id="bookingEmailLogin" type="email" required maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+      <label className="bk-field"><span>{b(language, "loginEmail")}</span><input id="bookingEmailLogin" type="text" required maxLength={254} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={b(language, "contactHint")} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
       <label className="bk-field"><span>{b(language, "password")}</span><input id="bookingPassword" type="password" required minLength={mode === "register" ? 6 : 1} maxLength={200} autoComplete={mode === "register" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} />{mode === "register" ? <small>{b(language, "passwordHint")}</small> : null}</label>
-      {mode === "register" ? <p className="bk-privacy">{b(language, "registerConsent")}</p> : <p className="bk-privacy">{b(language, "forgot")}</p>}
+      {mode === "signIn" ? <p className="bk-privacy">{b(language, "forgot")}</p> : null}
       {error ? <p className="bk-error" role="alert">{error}</p> : null}
       <button type="submit" className="bk-secondary" id="bookingSignInSubmit" disabled={busy}>{b(language, mode)}</button>
     </form>
@@ -393,6 +399,14 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
 /** Party sizes offered as one tap each; a list holds the rest, where there are more. */
 const PARTY_CHIPS = 8;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** What is wrong with the email or mobile number a guest signs up with, or "": no code is sent, the number is checked to be one that could be real. */
+function loginProblem(language: BookingLanguage, value: string): string {
+  const clean = value.trim();
+  if (clean.includes("@")) return EMAIL_SHAPE.test(clean) ? "" : b(language, "emailInvalid");
+  const mobile = checkMobile(clean);
+  return mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "loginInvalid");
+}
 
 /**
  * What is wrong with how the guest left to be reached, or "": an email (it
@@ -456,7 +470,8 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   // Where mail goes out, a guest proves their email before booking (shared/email-verify.mjs).
-  const mustVerify = Boolean(info.emailVerification && customer && !customer.emailVerified);
+  // An account by mobile number has no email to prove (and no code to wait for).
+  const mustVerify = Boolean(info.emailVerification && customer && !customer.emailVerified && !customer.phone);
   // Booking is for members: short of the points it takes, the page shows how to get them (MemberCard) and the button waits.
   const short = Boolean(customer && shortOfPoints(info, customer));
   const [notes, setNotes] = useState("");
@@ -549,7 +564,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
     try {
       // The account's email goes with it, for the floor: the guest is not asked for it again.
       // A mobile number or an email: either reaches the guest. With a number, the account's email goes along for the floor.
-      const email = byEmail ? contact : customer?.email;
+      const email = byEmail ? contact : customer?.phone ? undefined : customer?.email;
       const { reservation, token } = await api.book({ date, time, party, name, ...(byEmail ? {} : { phone: contact }), ...(email ? { email } : {}), ...(notes ? { notes } : {}), ...(seatSelection ? { table } : {}), language });
       rememberContact(name.trim(), contact);
       onBooked(reservation, token);
@@ -627,7 +642,6 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
         </label>
         <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
         {info.note ? <p className="bk-note">{info.note}</p> : null}
-        <p className="bk-privacy">{b(language, "privacy", { restaurant: info.restaurantName })}</p>
         {error ? <p className="bk-error" role="alert" id="bookingError">{error}</p> : null}
         {/* Short of the points it takes, the button stays, greyed, and says how many are missing (the card above says how to get them). */}
         <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy || short}>
@@ -640,7 +654,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
 
 /** Whether a signed-in guest (their email proved, where it must be) has fewer points than booking takes. */
 function shortOfPoints(info: ApiBookingInfo, customer: ApiCustomer): boolean {
-  const mustVerify = Boolean(info.emailVerification && !customer.emailVerified);
+  const mustVerify = Boolean(info.emailVerification && !customer.emailVerified && !customer.phone);
   return !mustVerify && Boolean(info.minPoints) && customer.points < (info.minPoints ?? 0);
 }
 

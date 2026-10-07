@@ -27,6 +27,7 @@
  * reach the database differs (shared/store.mjs, over each backend's driver).
  */
 import { assertPassword } from "./auth.mjs";
+import { checkMobile } from "./phone.mjs";
 
 /** A guest stays signed in on their phone for a month. */
 export const CUSTOMER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -49,14 +50,37 @@ export function normalizeCustomerName(value) {
 }
 
 /** Everything a registration needs, checked before anything is written. */
+/**
+ * How a guest signs in: an email, or a mobile number — checked to be one that
+ * could be real (shared/phone.mjs), no code sent to it — kept as +E.164, so
+ * "0660 1234567" and "+43 660 1234567" are the same account. The column is
+ * still called email: an account by phone keeps its number there.
+ */
+export function normalizeLogin(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.includes("@")) return normalizeEmail(raw);
+  const mobile = checkMobile(raw);
+  if (mobile.ok) return mobile.e164;
+  const error = new Error(mobile.reason === "NOT_MOBILE" ? "Please give a mobile number, not a landline" : "Please enter an email address or a mobile number");
+  error.code = mobile.reason === "NOT_MOBILE" ? "NOT_MOBILE" : "BAD_LOGIN";
+  throw error;
+}
+
+/** Whether an account signs in by its mobile number (no email to send a code to). */
+export function isPhoneLogin(login) {
+  return Boolean(login) && !String(login).includes("@");
+}
+
 export function normalizeCustomerRegistration(input) {
-  return { email: normalizeEmail(input?.email), name: normalizeCustomerName(input?.name), password: assertPassword(input?.password) };
+  return { email: normalizeLogin(input?.email), name: normalizeCustomerName(input?.name), password: assertPassword(input?.password) };
 }
 
 /** A guest as they see themselves, and as the console lists them: never the hash. */
 export function customerView(row) {
   return row ? {
     id: row.id, email: row.email, name: row.name, points: row.points, createdAt: row.created_at,
+    // Signed up with a mobile number: `email` is that number too, for the lists that show who it is.
+    ...(isPhoneLogin(row.email) ? { phone: row.email } : {}),
     ...(row.email_verified !== undefined ? { emailVerified: Boolean(row.email_verified) } : {})
   } : null;
 }

@@ -22,7 +22,11 @@ export const RESERVATION_INTERVALS = [15, 30, 60];
 export const RESERVATION_STATUSES = ["pending", "confirmed", "seated", "completed", "cancelled", "declined", "no_show"];
 /** The bookings that hold seats. */
 export const ACTIVE_RESERVATION_STATUSES = ["pending", "confirmed", "seated"];
-/** Days after its date that a booking keeps the guest's name, phone, email and note. */
+/**
+ * How far back a guest's own list of bookings reaches. The details of a
+ * booking (name, phone, email, note) are kept: the restaurant keeps its guests'
+ * records (2026-10); an account removed on request takes its own with it.
+ */
 export const RESERVATION_RETENTION_DAYS = 30;
 export const MAX_RESERVATION_HOURS = 14;
 export const MAX_CLOSED_DATES = 200;
