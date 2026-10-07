@@ -35,6 +35,8 @@ test.beforeAll(async ({ request }, testInfo) => {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   const saved = await admin(request, "put", "/api/admin/settings", {
+    // The booking page speaks the menu's languages: Chinese among them here.
+    menuLanguages: ["zh", "en", "de"],
     reservations: {
       enabled: true,
       hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "12:00", to: "21:00" }],
@@ -75,7 +77,8 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.goto("/book.html?lang=zh");
   await expect(page.getByRole("heading", { name: "预约餐桌" })).toBeVisible();
   // Top-right: the language, and light or dark, as on the menu.
-  await expect(page.locator("#bookingLanguage")).toHaveValue("zh");
+  // The menu's own capsule: its flags, the one in use on the accent.
+  await expect(page.locator('#bookingLanguages .flag[aria-pressed="true"]')).toHaveAttribute("data-lang", "zh");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.locator("#bookingTheme").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -113,7 +116,9 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   // Booking is for members: 10 points to book, and a new account has none.
   // One line says so; the member code shows on a tap.
   await expect(page.locator("#bookingMember")).toContainText("预约需要 10 积分，你现在有 0 积分。");
-  await expect(page.locator("#bookingForm")).toHaveCount(0);
+  // The form is there to fill in; its button waits, saying what is missing.
+  await expect(page.locator("#bookingSubmit")).toBeDisabled();
+  await expect(page.locator("#bookingSubmit")).toHaveText("还差 10 积分才能预约");
   await expect(page.locator("#bookingMemberQr")).toHaveCount(0);
   await page.locator("#bookingMemberQrToggle").click();
   const memberCode = await decodeQr(page.locator("#bookingMemberQr"));

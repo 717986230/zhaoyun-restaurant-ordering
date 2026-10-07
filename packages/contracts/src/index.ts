@@ -561,6 +561,8 @@ export type ApiGuestReservation = Omit<ApiReservation, "source" | "customerId" |
 /** What the booking page reads before a guest picks anything. */
 export interface ApiBookingInfo {
   enabled: boolean;
+  /** The menu's languages, in its flag order: the booking page offers the same (absent from an older server). */
+  languages?: MenuLanguage[];
   /** Whether a guest proves their email by a code before booking: only where mail goes out. */
   emailVerification?: boolean;
   restaurantName: string;
