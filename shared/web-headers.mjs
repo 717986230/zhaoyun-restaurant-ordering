@@ -45,7 +45,22 @@ export const WEB_HEADERS = {
   "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()"
 };
 
-/** Cloudflare's `_headers` file: the same headers on every page and asset. */
+/** The POS reads a guest's booking QR code with the camera at the door; no other page may use one. */
+export const POS_PERMISSIONS = "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()";
+const POS_PAGES = ["/pos", "/pos.html"];
+
+/** The headers for one path: the POS page's let it use the camera. */
+export function headersFor(url = "/") {
+  const path = url.split(/[?#]/)[0];
+  return POS_PAGES.includes(path) ? { ...WEB_HEADERS, "permissions-policy": POS_PERMISSIONS } : WEB_HEADERS;
+}
+
+/**
+ * Cloudflare's `_headers` file: the same headers on every page and asset,
+ * and on the POS page (served as /pos, or /pos.html) the camera let through:
+ * `! name` drops the value the `/*` rule set before it is set again.
+ */
 export function headersFile() {
-  return ["/*", ...Object.entries(WEB_HEADERS).map(([name, value]) => `  ${name}: ${value}`), ""].join("\n");
+  const pos = POS_PAGES.flatMap((page) => [page, "  ! permissions-policy", `  permissions-policy: ${POS_PERMISSIONS}`]);
+  return ["/*", ...Object.entries(WEB_HEADERS).map(([name, value]) => `  ${name}: ${value}`), ...pos, ""].join("\n");
 }

@@ -7,7 +7,7 @@ import { assertRoleTokens, config } from "./config.mjs";
 import { createDatabase } from "./database.mjs";
 import { createRealtimeHub } from "./realtime.mjs";
 import { registerRoutes } from "./routes.mjs";
-import { WEB_HEADERS } from "../shared/web-headers.mjs";
+import { headersFor } from "../shared/web-headers.mjs";
 
 export async function buildServer(overrides = {}) {
   const settings = { ...config, ...overrides };
@@ -46,7 +46,7 @@ export async function buildServer(overrides = {}) {
   // The web app's headers (shared/web-headers.mjs) on everything, and the request's id to quote in a report.
   // Uploaded media is user-controlled: never let a browser sniff it into an active document.
   app.addHook("onSend", async (request, reply, payload) => {
-    for (const [name, value] of Object.entries(WEB_HEADERS)) reply.header(name, value);
+    for (const [name, value] of Object.entries(headersFor(request.url))) reply.header(name, value);
     reply.header("x-request-id", request.id);
     if (request.url.startsWith("/media/")) {
       reply.header("content-security-policy", "default-src 'none'; img-src 'self'; media-src 'self'; sandbox");

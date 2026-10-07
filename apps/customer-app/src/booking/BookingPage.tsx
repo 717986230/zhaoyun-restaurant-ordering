@@ -578,6 +578,28 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   </div>;
 }
 
+/**
+ * The booking's QR code, for the waiter to scan at the door (the POS reads
+ * "ZYRES:" and the number, apps/pos-web/src/BookingScanner.tsx). Drawn as
+ * SVG, black on white for any camera, by a library fetched only once there is
+ * a booking to show.
+ */
+function useBookingQr(reference: string): string {
+  const [qr, setQr] = useState("");
+  useEffect(() => {
+    setQr("");
+    if (!reference) return;
+    let current = true;
+    void import("qrcode").then(({ default: QRCode }) =>
+      QRCode.toString(`ZYRES:${reference}`, { type: "svg", errorCorrectionLevel: "M", margin: 2, color: { dark: "#000000", light: "#ffffff" } })
+    ).then((svg) => {
+      if (current) setQr(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+    }).catch(() => { /* The number is on the ticket to read out. */ });
+    return () => { current = false; };
+  }, [reference]);
+  return qr;
+}
+
 function BookingDetails({ language, booking, held, info, onChange, onAnother }: {
   language: BookingLanguage; booking: ApiGuestReservation; held: Held; info: ApiBookingInfo | null;
   onChange: (booking: ApiGuestReservation) => void; onAnother: () => void;
@@ -609,6 +631,7 @@ function BookingDetails({ language, booking, held, info, onChange, onAnother }: 
 
   const active = booking.status === "pending" || booking.status === "confirmed";
   const [flipped, setFlipped] = useState(false);
+  const qr = useBookingQr(active ? booking.reference : "");
   return <section className="bk-card bk-booking" id="bookingDetails" data-status={booking.status}>
     <p className={`bk-status bk-status-${booking.status}`} id="bookingStatus">{booking.status === "cancelled" ? b(language, "cancelDone") : b(language, booking.status)}</p>
     {/* The time and the day first and large, as a ticket reads; the rest under
@@ -623,9 +646,11 @@ function BookingDetails({ language, booking, held, info, onChange, onAnother }: 
           <small className="bk-pass-hint">{b(language, "showPass")} ↻</small>
         </span>
         <span className="bk-pass-face bk-pass-back" aria-hidden={!flipped}>
+          {qr && <img className="bk-pass-qr" id="bookingQr" src={qr} alt={b(language, "qrAlt", { reference: booking.reference })} width="160" height="160" />}
           <small>{b(language, "reference")}</small>
           <strong>{booking.reference}</strong>
           <span>{[b(language, "partyOf", { n: booking.party }), booking.table ? b(language, "tableName", { table: booking.table }) : "", booking.name].filter(Boolean).join(" · ")}</span>
+          {qr && <span className="bk-pass-scan">{b(language, "qrHint")}</span>}
           <small className="bk-pass-hint">{b(language, "backToTime")} ↻</small>
         </span>
       </span>

@@ -946,6 +946,31 @@ html.bk-root body {
   color: var(--ink);
 }
 
+/* The back of the ticket: the QR code the waiter scans at the door, beside
+   the number to read out if the camera will not. The code brings its own white
+   margin, whatever the page's colours, so any camera finds its edges. */
+.bk-pass-back {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
+}
+.bk-pass-back > :not(.bk-pass-qr) {
+  grid-column: 1;
+}
+.bk-pass-qr {
+  grid-column: 2;
+  grid-row: 1 / span 5;
+  align-self: start;
+  width: clamp(116px, 34vw, 160px);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+.bk-pass .bk-pass-scan {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
 /* One tap per choice (2026-10): the party and the time are buttons, not
    lists — a list was a tap to open, a scroll and a tap to pick. */
 .bk-choices {

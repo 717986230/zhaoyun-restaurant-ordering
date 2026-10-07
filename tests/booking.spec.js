@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import jsQR from "jsqr";
 import { expect, test } from "./support/test.js";
 
 /**
@@ -116,6 +117,17 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingPass").click();
   await expect(page.locator("#bookingPass")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".bk-pass-back strong")).toHaveText(reference);
+  // With the QR code the waiter scans at the door: it reads "ZYRES:" and the number.
+  const qr = page.locator("#bookingQr");
+  await expect(qr).toBeVisible();
+  await expect(qr).toHaveAttribute("alt", `预约二维码 ${reference}`);
+  expect(await qr.evaluate(async (image) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 240;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, 240, 240);
+    return Array.from(context.getImageData(0, 0, 240, 240).data);
+  }).then((pixels) => jsQR(Uint8ClampedArray.from(pixels), 240, 240)?.data)).toBe(`ZYRES:${reference}`);
   await page.locator("#bookingPass").click();
   await expect(page.locator("#bookingPass")).toHaveAttribute("aria-pressed", "false");
 
