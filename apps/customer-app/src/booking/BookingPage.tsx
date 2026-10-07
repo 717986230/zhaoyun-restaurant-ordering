@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type { ApiBookingInfo, ApiCustomer, ApiGuestReservation, ApiReservationSlot, ApiTableChoice } from "@zhaoyun/contracts";
 import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
@@ -161,6 +161,9 @@ export function BookingPage() {
   };
 
   const others = mine.filter((entry) => !(booking && held && entry.id === booking.id));
+  // The name and number of the guest's latest booking, to start the next one from.
+  const latest = mine.find((entry) => entry.phone);
+  const recent = useMemo(() => (latest ? { name: latest.name, phone: latest.phone } : null), [latest?.name, latest?.phone]);
 
   return <main className="bk-page">
     <header className="bk-head">
@@ -188,7 +191,7 @@ export function BookingPage() {
           ? <p className="bk-muted">{b(language, "loading")}</p>
           : !info.enabled
             ? <section className="bk-card bk-message" id="bookingOff"><p>{b(language, "off")}</p></section>
-            : <BookingForm language={language} info={info} customer={customer} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />}
+            : <BookingForm language={language} info={info} customer={customer} recent={recent} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />}
 
     {/* The booking open above is not listed a second time under it. */}
     {customer && others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => void loadMine()} /> : null}
@@ -293,7 +296,6 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
   const [mode, setMode] = useState<"signIn" | "register">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -305,7 +307,7 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
     try {
       onSignedIn(mode === "signIn"
         ? await api.signInCustomer(email, password)
-        : await api.registerCustomer({ email, password, ...(name.trim() ? { name: name.trim() } : {}) }));
+        : await api.registerCustomer({ email, password }));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) setError(b(language, "wrongLogin"));
       else if (failure instanceof ApiError && failure.code === "EMAIL_TAKEN") setError(b(language, "emailTaken"));
@@ -325,7 +327,6 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
     <form className="bk-signin" onSubmit={(event) => void submit(event)}>
       <label className="bk-field"><span>{b(language, "loginEmail")}</span><input id="bookingEmailLogin" type="email" required maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
       <label className="bk-field"><span>{b(language, "password")}</span><input id="bookingPassword" type="password" required minLength={mode === "register" ? 6 : 1} maxLength={200} autoComplete={mode === "register" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} />{mode === "register" ? <small>{b(language, "passwordHint")}</small> : null}</label>
-      {mode === "register" ? <label className="bk-field"><span>{b(language, "accountName")}</span><input maxLength={40} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label> : null}
       {mode === "register" ? <p className="bk-privacy">{b(language, "registerConsent")}</p> : <p className="bk-privacy">{b(language, "forgot")}</p>}
       {error ? <p className="bk-error" role="alert">{error}</p> : null}
       <button type="submit" className="bk-secondary" id="bookingSignInSubmit" disabled={busy}>{b(language, mode)}</button>
@@ -333,8 +334,32 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
   </section>;
 }
 
-function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooked }: {
+/** Party sizes offered as one tap each; a list holds the rest, where there are more. */
+const PARTY_CHIPS = 8;
+/** The name and mobile number a guest booked with last, kept on this phone only. */
+const CONTACT_KEY = "zy_book_contact";
+
+function rememberedContact(): { name: string; phone: string } {
+  try {
+    const value = JSON.parse(localStorage.getItem(CONTACT_KEY) ?? "null") as { name?: unknown; phone?: unknown } | null;
+    if (value && typeof value.name === "string" && typeof value.phone === "string") return { name: value.name, phone: value.phone };
+  } catch { /* A private tab, or nothing kept yet. */ }
+  return { name: "", phone: "" };
+}
+
+function rememberContact(name: string, phone: string): void {
+  try { localStorage.setItem(CONTACT_KEY, JSON.stringify({ name, phone })); } catch { /* Kept for this visit only. */ }
+}
+
+/**
+ * The booking, quickest first: every choice is one tap — the party, the day,
+ * the time, the table — and each one brings the next step up the screen. Then
+ * the one card that is left: signing in, proving the email, or the name and
+ * mobile number, filled in from the last booking on this phone.
+ */
+function BookingForm({ language, info, customer, recent, onSignedIn, onVerified, onBooked }: {
   language: BookingLanguage; info: ApiBookingInfo; customer: ApiCustomer | null;
+  recent: { name: string; phone: string } | null;
   onSignedIn: (session: { token: string; customer: ApiCustomer }) => void;
   onVerified: (customer: ApiCustomer) => void;
   onBooked: (reservation: ApiGuestReservation, token: string) => void;
@@ -359,14 +384,27 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
   const [phoneError, setPhoneError] = useState("");
   // Where mail goes out, a guest proves their email before booking (shared/email-verify.mjs).
   const mustVerify = Boolean(info.emailVerification && customer && !customer.emailVerified);
-  const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Signed in: the account's name to start from.
+  // The step to bring up the screen once it is there.
+  const [bringUp, setBringUp] = useState<string | null>(null);
+
+  // Name and number from the last booking — on this phone, or on the account — then the account's name.
   useEffect(() => {
-    if (customer?.name) setName((current) => current || customer.name);
-  }, [customer]);
+    const kept = rememberedContact();
+    setName((current) => current || recent?.name || kept.name || customer?.name || "");
+    setPhone((current) => current || recent?.phone || kept.phone || "");
+  }, [customer, recent]);
+
+  useEffect(() => {
+    if (!bringUp) return;
+    const element = document.getElementById(bringUp);
+    if (!element) return;
+    const smooth = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    element.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    setBringUp(null);
+  }, [bringUp, slots, tables]);
 
   const loadSlots = useCallback(async () => {
     setSlots(null);
@@ -409,10 +447,12 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
     event.preventDefault();
     if (!time) {
       setError(b(language, "pickTime"));
+      setBringUp("bookingTimes");
       return;
     }
     if (seatSelection && !table) {
       setError(b(language, "pickTable"));
+      setBringUp("bookingSeats");
       return;
     }
     // The same check the server makes (shared/phone.mjs), before the guest waits for it.
@@ -425,7 +465,9 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
     setBusy(true);
     setError("");
     try {
-      const { reservation, token } = await api.book({ date, time, party, name, phone, ...(email ? { email } : {}), ...(notes ? { notes } : {}), ...(seatSelection ? { table } : {}), language });
+      // The account's email goes with it, for the floor: the guest is not asked for it again.
+      const { reservation, token } = await api.book({ date, time, party, name, phone, ...(customer?.email ? { email: customer.email } : {}), ...(notes ? { notes } : {}), ...(seatSelection ? { table } : {}), language });
+      rememberContact(name.trim(), phone.trim());
       onBooked(reservation, token);
     } catch (failure) {
       setError(refusal(language, failure, info));
@@ -438,16 +480,22 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
   }
 
   const anyFree = slots?.some((slot) => slot.available);
+  const partyChips = Array.from({ length: Math.min(PARTY_CHIPS, info.maxParty) }, (_, index) => index + 1);
 
-  return <><form className="bk-form" id="bookingForm" onSubmit={(event) => void submit(event)}>
-    <section className="bk-card">
+  return <div className="bk-form">
+    <section className="bk-card" id="bookingPartyCard">
       <h2>{b(language, "party")}</h2>
-      {/* A list to pick from: twenty buttons were a screenful for one number. */}
-      <label className="bk-field bk-select">
-        <select id="bookingParty" aria-label={b(language, "party")} value={party} onChange={(event) => setParty(Number(event.target.value))}>
-          {Array.from({ length: info.maxParty }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{b(language, "guests", { n: count })}</option>)}
+      <div className="bk-choices bk-party" role="radiogroup" aria-label={b(language, "party")}>
+        {partyChips.map((count) => <button key={count} type="button" role="radio" aria-checked={count === party} data-party={count}
+          className={count === party ? "active" : ""} onClick={() => setParty(count)}>{count}</button>)}
+      </div>
+      {info.maxParty > PARTY_CHIPS ? <label className="bk-field bk-select bk-more">
+        <span>{b(language, "moreGuests")}</span>
+        <select id="bookingParty" value={party > PARTY_CHIPS ? party : ""} onChange={(event) => { if (event.target.value) setParty(Number(event.target.value)); }}>
+          <option value="">—</option>
+          {Array.from({ length: info.maxParty - PARTY_CHIPS }, (_, index) => PARTY_CHIPS + index + 1).map((count) => <option key={count} value={count}>{b(language, "guests", { n: count })}</option>)}
         </select>
-      </label>
+      </label> : null}
       <p className="bk-muted">{b(language, "largeParty", { n: info.maxParty })}</p>
     </section>
 
@@ -456,7 +504,7 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
       <div className="bk-days">
         {chips.map((day) => {
           const open = bookable(day);
-          return <button key={day} type="button" data-date={day} disabled={!open} className={day === date ? "active" : ""} aria-pressed={day === date} onClick={() => setDate(day)}>
+          return <button key={day} type="button" data-date={day} disabled={!open} className={day === date ? "active" : ""} aria-pressed={day === date} onClick={() => { setDate(day); setBringUp("bookingTimes"); }}>
             <span>{formatDay(language, day, { weekday: "short" })}</span>
             <strong>{formatDay(language, day, { day: "numeric" })}</strong>
             <small>{open ? formatDay(language, day, { month: "short" }) : b(language, "closed")}</small>
@@ -465,11 +513,11 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
       </div>
       <label className="bk-field bk-other-date">
         <span>{b(language, "otherDate")}</span>
-        <input type="date" id="bookingDate" min={info.today} max={info.lastDate} value={date} onChange={(event) => { if (event.target.value) setDate(event.target.value); }} />
+        <input type="date" id="bookingDate" min={info.today} max={info.lastDate} value={date} onChange={(event) => { if (event.target.value) { setDate(event.target.value); setBringUp("bookingTimes"); } }} />
       </label>
     </section>
 
-    <section className="bk-card">
+    <section className="bk-card" id="bookingTimes">
       <h2>{b(language, "time")} <span className="bk-muted">· {formatDay(language, date, { weekday: "long", day: "numeric", month: "long" })}</span></h2>
       {slots === null
         ? <p className="bk-muted">{b(language, "timesLoading")}</p>
@@ -477,12 +525,12 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
           ? <p className="bk-muted" id="bookingNoTimes">{b(language, "noTimes")}</p>
           : <>
             {!anyFree ? <p className="bk-muted" id="bookingFullDay">{b(language, "fullDay")}</p> : null}
-            <label className="bk-field bk-select">
-              <select id="bookingTime" aria-label={b(language, "time")} value={time} onChange={(event) => setTime(event.target.value)}>
-                <option value="" disabled>{b(language, "pickTime")}</option>
-                {slots.map((slot) => <option key={slot.time} value={slot.time} disabled={!slot.available}>{slot.available ? slot.time : `${slot.time} · ${b(language, "full")}`}</option>)}
-              </select>
-            </label>
+            <div className="bk-choices bk-times" role="radiogroup" aria-label={b(language, "time")}>
+              {slots.map((slot) => <button key={slot.time} type="button" role="radio" aria-checked={slot.time === time} data-time={slot.time} disabled={!slot.available}
+                className={slot.time === time ? "active" : ""} onClick={() => { setTime(slot.time); setError(""); setBringUp(seatSelection ? "bookingSeats" : "bookingFinish"); }}>
+                {slot.time}{slot.available ? null : <small>{b(language, "full")}</small>}
+              </button>)}
+            </div>
           </>}
       <p className="bk-muted">{b(language, "staysFor", { minutes: info.durationMinutes })}</p>
     </section>
@@ -497,7 +545,7 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
             : null}
       {tables?.length ? <div className="bk-tables" role="radiogroup" aria-label={b(language, "seat")}>
         {tables.map((choice) => <button key={choice.table} type="button" role="radio" aria-checked={choice.table === table} data-table={choice.table}
-          disabled={!choice.available} className={`bk-table ${choice.table === table ? "active" : ""}`} onClick={() => setTable(choice.table)}>
+          disabled={!choice.available} className={`bk-table ${choice.table === table ? "active" : ""}`} onClick={() => { setTable(choice.table); setError(""); setBringUp("bookingFinish"); }}>
           <strong>{b(language, "tableName", { table: choice.table })}</strong>
           <span className="bk-seats" aria-hidden="true">{"●".repeat(Math.min(choice.seats, 12))}</span>
           <small>{choice.available ? b(language, "tableSeats", { seats: choice.seats }) : choice.seats < party ? b(language, "tableSmall") : b(language, "tableBooked")}</small>
@@ -505,30 +553,29 @@ function BookingForm({ language, info, customer, onSignedIn, onVerified, onBooke
       </div> : null}
     </section> : null}
 
-    {customer && !mustVerify ? <section className="bk-card">
-      <h2>{b(language, "details")}</h2>
-      <label className="bk-field"><span>{b(language, "name")}</span><input id="bookingName" required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label className="bk-field"><span>{b(language, "phone")}</span>
-        <input id="bookingPhone" required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" placeholder="0660 1234567" aria-invalid={phoneError ? true : undefined} value={phone}
-          onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }}
-          onBlur={() => { const mobile = checkMobile(phone); setPhoneError(!phone.trim() || mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid")); }} />
-        {phoneError ? <small className="bk-field-error" id="bookingPhoneError" role="alert">{phoneError}</small> : <small>{b(language, "phoneHint")}</small>}
-      </label>
-      <label className="bk-field"><span>{b(language, "email")}</span><input id="bookingEmail" type="email" maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-      <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
-      {info.note ? <p className="bk-note">{info.note}</p> : null}
-      <p className="bk-privacy">{b(language, "privacy", { restaurant: info.restaurantName })}</p>
-    </section> : null}
-
-    {error ? <p className="bk-error" role="alert" id="bookingError">{error}</p> : null}
-    {customer && !mustVerify ? <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy}>
-      {busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}` : b(language, "submit")}
-    </button> : null}
-  </form>
-  {/* Their own forms, after the booking's: forms do not nest. */}
-  {!customer ? <SignInCard language={language} onSignedIn={onSignedIn} /> : null}
-  {customer && mustVerify ? <VerifyEmailCard language={language} customer={customer} onVerified={onVerified} /> : null}
-  </>;
+    {/* The one card left: who is booking. */}
+    <div id="bookingFinish" className="bk-finish">
+      {!customer ? <SignInCard language={language} onSignedIn={onSignedIn} /> : null}
+      {customer && mustVerify ? <VerifyEmailCard language={language} customer={customer} onVerified={onVerified} /> : null}
+      {customer && !mustVerify ? <form className="bk-card bk-details" id="bookingForm" onSubmit={(event) => void submit(event)}>
+        <h2>{b(language, "details")}</h2>
+        <label className="bk-field"><span>{b(language, "name")}</span><input id="bookingName" required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
+        <label className="bk-field"><span>{b(language, "phone")}</span>
+          <input id="bookingPhone" required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" placeholder="0660 1234567" aria-invalid={phoneError ? true : undefined} value={phone}
+            onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }}
+            onBlur={() => { const mobile = checkMobile(phone); setPhoneError(!phone.trim() || mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid")); }} />
+          {phoneError ? <small className="bk-field-error" id="bookingPhoneError" role="alert">{phoneError}</small> : <small>{b(language, "phoneHint")}</small>}
+        </label>
+        <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
+        {info.note ? <p className="bk-note">{info.note}</p> : null}
+        <p className="bk-privacy">{b(language, "privacy", { restaurant: info.restaurantName })}</p>
+        {error ? <p className="bk-error" role="alert" id="bookingError">{error}</p> : null}
+        <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy}>
+          {busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}` : b(language, "submit")}
+        </button>
+      </form> : null}
+    </div>
+  </div>;
 }
 
 function BookingDetails({ language, booking, held, info, onChange, onAnother }: {

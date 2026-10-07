@@ -945,3 +945,68 @@ html.bk-root body {
   font-size: inherit;
   color: var(--ink);
 }
+
+/* One tap per choice (2026-10): the party and the time are buttons, not
+   lists — a list was a tap to open, a scroll and a tap to pick. */
+.bk-choices {
+  display: grid;
+  gap: 8px;
+}
+.bk-party {
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+}
+.bk-times {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+.bk-choices button {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.bk-choices button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.bk-choices button:active:not(:disabled) {
+  transform: scale(0.96);
+  transition-duration: 0.09s;
+}
+.bk-choices button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.bk-choices button small {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
+}
+.bk-more {
+  margin-top: 10px;
+}
+/* The step brought up the screen lands a little below the top edge. */
+.bk-card,
+.bk-finish {
+  scroll-margin-top: 12px;
+}
+.bk-finish {
+  display: grid;
+  gap: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-choices button {
+    transition: none;
+  }
+}
