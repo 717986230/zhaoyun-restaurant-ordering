@@ -371,6 +371,13 @@ export type MenuLanguage = "zh" | "en" | "de";
 
 export type ColorScheme = "dark" | "light";
 
+/** The apps that install with an icon of their own (shared/app-icons.mjs). */
+export type IconApp = "menu" | "pos" | "admin";
+/** Per app: the owner's icon (its version, for the address), or null while it wears the built one. */
+export type ApiAppIcons = Record<IconApp, { version: string; updatedAt: string } | null>;
+/** The sizes the console makes from one picture, by the form field the server reads. */
+export type AppIconFiles = Record<"icon180" | "icon192" | "icon512" | "maskable512", Blob>;
+
 export interface ApiSettings {
   menuTheme: MenuThemeId;
   /** Which of the three the menu offers; at least one. */

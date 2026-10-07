@@ -8,6 +8,7 @@ import { translate, useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
 import { StaffCard } from "./StaffCard";
+import { AppIcons } from "./AppIcons";
 import { downloadQrCard } from "../qr/qrCard";
 import { describeSchedule, ScheduleEditor } from "./ScheduleEditor";
 
@@ -453,6 +454,9 @@ export function SettingsPanel(props: Props) {
           onClick={() => void props.onSaveSettings({ menuDefaultScheme: scheme }, "appearanceSaved")}
         >{scheme === "dark" ? "☾" : "☀"} {t(scheme === "dark" ? "schemeDark" : "schemeLight")}</button>)}</div>
         <Toggle checked={settings.showTableNumber} label={t("showTableNumber")} onChange={(showTableNumber) => void props.onSaveSettings({ showTableNumber }, "appearanceSaved")} />
+      </Section>
+      <Section id="app-icons" title={t("sectionAppIcons")}>
+        <AppIcons api={props.api} storage={props.storage} notify={props.notify} failed={props.failed} />
       </Section>
       <Section id="languages" title={t("sectionLanguages")} summary={offered.map((option) => LANGUAGE_INFO[option].name).join(" · ")}>
         <div className="language-picker" role="group" aria-label={t("sectionLanguages")}>{MENU_LANGUAGES.map((option) => {

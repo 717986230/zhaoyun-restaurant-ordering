@@ -1824,6 +1824,50 @@ em.voided {
   line-height: 1.5;
 }
 
+/* The installed apps' icons: each with its picture, what it wears, and the two actions. */
+.app-icon-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.app-icon-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.app-icon-list img {
+  width: 56px;
+  height: 56px;
+  border-radius: 13px;
+  border: 1px solid var(--a-line-2);
+  object-fit: cover;
+  flex: none;
+}
+.app-icon-name {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.app-icon-name small {
+  color: var(--a-muted);
+}
+.app-icon-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.app-icon-actions label.ghost-action {
+  cursor: pointer;
+}
+.app-icon-actions label.ghost-action.busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .settings-card .editor-form small {
   color: var(--a-faint);
   font-size: 12px;

@@ -156,6 +156,53 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.ok(Buffer.from(served.bytes).equals(png), "the upload comes back byte for byte");
     }],
 
+    ["the installed apps' icons: the owner's own in place of the built ones, and back again", async () => {
+      assert.equal((await call("GET", "/api/admin/app-icons")).status, 401);
+      assert.deepEqual((await call("GET", "/api/admin/app-icons", { admin: true })).json.icons, { menu: null, pos: null, admin: null });
+      // Every size, made by the console from one picture; a 1×1 PNG stands in for each here.
+      const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+      const boundary = "contract-icon-boundary";
+      const multipart = (parts) => ({
+        contentType: `multipart/form-data; boundary=${boundary}`,
+        body: Buffer.concat([...parts.flatMap(([field, bytes]) => [
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="${field}.png"\r\nContent-Type: image/png\r\n\r\n`), bytes, Buffer.from("\r\n")
+        ]), Buffer.from(`--${boundary}--\r\n`)])
+      });
+      const fields = ["icon180", "icon192", "icon512", "maskable512"];
+      const upload = (app, parts, auth = { admin: true }) => call("PUT", `/api/admin/app-icons/${app}`, { ...auth, raw: multipart(parts) });
+      assert.equal((await upload("menu", fields.map((field) => [field, png]), { role: "staff" })).status, 403, "the owner's, in the console");
+      assert.equal((await upload("kitchen", fields.map((field) => [field, png]))).status, 404);
+      assert.deepEqual([(await upload("menu", fields.slice(1).map((field) => [field, png]))).json.code], ["ICON_MISSING"]);
+      assert.deepEqual([(await upload("menu", fields.map((field) => [field, Buffer.from("<svg/>")]))).json.code], ["ICON_NOT_PNG"]);
+
+      const saved = await upload("menu", fields.map((field) => [field, png]));
+      assert.equal(saved.status, 200, JSON.stringify(saved.json));
+      const { version } = saved.json.icons.menu;
+      assert.ok(version);
+      assert.equal(saved.json.icons.pos, null, "each app its own");
+
+      // At the addresses the pages and the manifest already name.
+      const manifest = await call("GET", "/menu.webmanifest");
+      assert.equal(manifest.status, 200);
+      const read = JSON.parse(Buffer.from(manifest.bytes).toString());
+      assert.equal(read.short_name, "Menu");
+      assert.deepEqual(read.icons.map((entry) => entry.src), [`icons/menu-192.png?v=${version}`, `icons/menu-512.png?v=${version}`, `icons/menu-maskable-512.png?v=${version}`]);
+      for (const file of ["180", "192", "512", "maskable-512"]) {
+        const served = await call("GET", `/icons/menu-${file}.png`);
+        assert.equal(served.status, 200, file);
+        assert.ok(Buffer.from(served.bytes).equals(png), `${file}: the owner's picture`);
+      }
+      const tab = await call("GET", "/icons/menu.svg");
+      assert.match(Buffer.from(tab.bytes).toString(), new RegExp(`data:image/png;base64,${png.toString("base64").replace(/[+/]/g, "\\$&")}`), "the tab's icon holds it too");
+      const pos = await call("GET", "/icons/pos-192.png");
+      assert.ok(!Buffer.from(pos.bytes ?? []).equals(png), "the POS keeps its own");
+
+      // Taken off: the built one again.
+      const reset = await call("DELETE", "/api/admin/app-icons/menu", { admin: true });
+      assert.equal(reset.json.icons.menu, null);
+      assert.ok(!Buffer.from((await call("GET", "/icons/menu-192.png")).bytes ?? []).equals(png));
+    }],
+
     ["a dish is copied whole, off the menu until someone has looked at it", async () => {
       assert.equal((await call("POST", "/api/admin/products/photo-r1/duplicate")).status, 401);
       assert.equal((await call("POST", "/api/admin/products/no-such-dish/duplicate", { admin: true })).status, 404);
