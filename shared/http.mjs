@@ -365,6 +365,19 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     return null;
   }
 
+  /**
+   * Whether a request comes from a table's printed code: a table on the
+   * floor and the token on its card. A restaurant with no tables set up has no
+   * tokens to check: there the table number is taken at its word.
+   */
+  async function scannedAtTable(request, tableInput) {
+    const table = String(tableInput ?? "").trim().toUpperCase();
+    if (!TABLE_PATTERN.test(table)) return false;
+    if (!await store.hasTables()) return true;
+    const registered = await store.getTable(table);
+    return Boolean(registered?.enabled && tokenMatches(request.headers.get("x-table-token"), registered.token));
+  }
+
   /** Responses that changed nothing anyone watches (a POS keeping its table): no live event, no audit. */
   const QUIET = new WeakSet();
   const quiet = (response) => {
@@ -492,7 +505,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const { value, invalid } = await body(request, CustomerRegisterBody);
           if (invalid) return invalid;
           try {
-            return json(await customers.register(value), 201);
+            const { table, ...account } = value;
+            const session = await customers.register(account);
+            // Signed up at the restaurant, from a table's code (its number and the token printed on its card): the bonus.
+            if (table && await scannedAtTable(request, table) && await store.reservations.signupBonus(session.customer.id)) {
+              return json({ ...session, customer: await customers.byIdView(session.customer.id), signupBonus: true }, 201);
+            }
+            return json(session, 201);
           } catch (error) {
             return coded(error);
           }

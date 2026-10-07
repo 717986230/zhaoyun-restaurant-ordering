@@ -50,7 +50,8 @@ export type GuestOrderRefusal =
 /** A guest's account. Signed up by mobile number: `phone` is set, and `email` holds the same number (how they sign in). */
 export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string }
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer }
-export interface CustomerRegisterCommand { email: string; name?: string; password: string }
+/** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */
+export interface CustomerRegisterCommand { email: string; name?: string; password: string; table?: string }
 /** Every change is made against the password in force. */
 export interface CustomerUpdateCommand { currentPassword: string; name?: string; password?: string }
 export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
@@ -58,7 +59,7 @@ export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
  * The booking membership's own lines among the adjustments: the first visit's
  * bonus, a missed booking's cost, and that given back.
  */
-export type PointsKind = "welcome" | "no_show" | "no_show_back";
+export type PointsKind = "welcome" | "no_show" | "no_show_back" | "signup" | "booking" | "booking_back";
 export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string; kind?: PointsKind }
 /** A member's code scanned at the counter: the guest, and whether this visit gave the first visit's bonus. */
 export interface ApiMemberVisit { customer: ApiCustomer; granted: boolean; welcomePoints: number; minPoints: number }
@@ -522,6 +523,10 @@ export interface ApiReservationSettings {
   minPoints: number;
   /** Points for a guest's first paid visit, once per account. */
   welcomePoints: number;
+  /** Points for signing up after scanning a table's code, once per account. */
+  signupPoints: number;
+  /** Points each booking costs (back when it is cancelled or declined). */
+  bookingPoints: number;
   /** Points a missed booking costs. */
   noShowPoints: number;
   /** Minutes past its time before a booking not checked in counts as missed; 0: only the floor marks it. */
@@ -587,6 +592,8 @@ export interface ApiBookingInfo {
   /** Booking for members: the points it needs, what the first visit brings, what a missed booking costs. */
   minPoints?: number;
   welcomePoints?: number;
+  signupPoints?: number;
+  bookingPoints?: number;
   noShowPoints?: number;
 }
 

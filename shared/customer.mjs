@@ -21,7 +21,10 @@
  *             own lines (shared/reservations.mjs), told apart by their id:
  *             `welcome-<guest>` the first visit's bonus, once per account
  *             ever; `noshow-<booking>` a booking not kept; `noshowback-<booking>`
- *             that given back when the floor marks it kept after all.
+ *             that given back when the floor marks it kept after all;
+ *             `signup-<guest>` signing up after scanning a table's code, once;
+ *             `booking-<booking>` what a booking costs; `bookingback-<booking>`
+ *             that given back when it is cancelled or declined.
  *
  * Both backends run these statements and these rules; only the way they
  * reach the database differs (shared/store.mjs, over each backend's driver).
@@ -97,6 +100,9 @@ export function pointsEntryView(row) {
 /** Which of the booking membership's own lines a ledger line is, by its id; or null. */
 export function pointsKind(id) {
   const value = String(id ?? "");
+  if (value.startsWith("signup-")) return "signup";
+  if (value.startsWith("bookingback-")) return "booking_back";
+  if (value.startsWith("booking-")) return "booking";
   if (value.startsWith("welcome-")) return "welcome";
   if (value.startsWith("noshowback-")) return "no_show_back";
   if (value.startsWith("noshow-")) return "no_show";
@@ -326,6 +332,32 @@ export function noShowPointsStatements(reservationId, points, at) {
   return [
     [NO_SHOW_POINTS_SQL, [points, at, reservationId, points]],
     [APPLY_NEW_POINTS_SQL, applyNewParams(`noshow-${reservationId}`, reservationId, at)]
+  ];
+}
+
+/** Signed up after scanning a table's code: the bonus, once per account. */
+export function signupPointsStatements(customerId, points, at) {
+  if (!points) return [];
+  return [
+    ["INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at) VALUES (?, ?, ?, 'adjust', 'signup', '', ?)", [`signup-${customerId}`, customerId, points, at]],
+    [APPLY_NEW_POINTS_SQL, applyNewParams(`signup-${customerId}`, "signup", at)]
+  ];
+}
+
+/** A booking made: what it costs, taken — or the whole batch refused (CHECK points >= 0). */
+export function bookingPointsStatements(reservationId, customerId, points, at) {
+  if (!points) return [];
+  return [
+    [INSERT_POINTS_SQL, [`booking-${reservationId}`, customerId, -points, "adjust", reservationId, "", at]],
+    [CHANGE_POINTS_SQL, [-points, at, customerId]]
+  ];
+}
+
+/** A booking cancelled or declined before it was kept: what it cost, given back, once. */
+export function bookingBackStatements(reservationId, at) {
+  return [
+    ["INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at) SELECT 'bookingback-' || ref, customer_id, -delta, 'adjust', ref, '', ? FROM points_ledger WHERE id = 'booking-' || ? AND EXISTS (SELECT 1 FROM reservations WHERE reservations.id = points_ledger.ref AND reservations.status IN ('cancelled', 'declined'))", [at, reservationId]],
+    [APPLY_NEW_POINTS_SQL, applyNewParams(`bookingback-${reservationId}`, reservationId, at)]
   ];
 }
 

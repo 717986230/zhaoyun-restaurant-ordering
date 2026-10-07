@@ -15,7 +15,10 @@
  */
 import { hashSessionToken, newSessionToken } from "./auth.mjs";
 import { now, uuid } from "./core.mjs";
-import { CUSTOMER_BY_ID_SQL, customerView, noShowBackStatements, noShowPointsStatements, welcomeAtCounterStatements } from "./customer.mjs";
+import {
+  bookingBackStatements, bookingPointsStatements, CUSTOMER_BY_ID_SQL, customerView, isOverdrawn, noShowBackStatements, noShowPointsStatements, signupPointsStatements,
+  welcomeAtCounterStatements
+} from "./customer.mjs";
 import {
   ACTIVE_RESERVATION_STATUSES, addDays, availability, bookingView, guestLimit, guestMayCancel, guestReservationView, isDate, localNow,
   newReference, NO_SHOW_WINDOW_DAYS, picksTable, normalizeReservationInput, normalizeReservationUpdate, outsideWindow, peakGuests, phoneKey, RESERVATION_RETENTION_DAYS,
@@ -69,9 +72,12 @@ export function createReservationStore(driver, { settings }) {
    */
   async function writeStatus(row, status, rules, extra = []) {
     const at = now();
-    const points = row.customer_id && status !== row.status
-      ? (status === "no_show" ? noShowPointsStatements(row.id, rules.noShowPoints, at) : row.status === "no_show" ? noShowBackStatements(row.id, at) : [])
-      : [];
+    const changed = row.customer_id && status !== row.status;
+    const points = !changed ? [] : [
+      ...(status === "no_show" ? noShowPointsStatements(row.id, rules.noShowPoints, at) : row.status === "no_show" ? noShowBackStatements(row.id, at) : []),
+      // Cancelled or declined before it was kept: what the booking cost comes back, once.
+      ...(["cancelled", "declined"].includes(status) && ACTIVE_RESERVATION_STATUSES.includes(row.status) ? bookingBackStatements(row.id, at) : [])
+    ];
     await driver.batch([...extra.length ? extra : [["UPDATE reservations SET status = ?, updated_at = ? WHERE id = ? AND status = ?", [status, at, row.id, row.status]]], ...points]);
   }
 
@@ -194,6 +200,14 @@ export function createReservationStore(driver, { settings }) {
           await driver.run("DELETE FROM reservations WHERE id = ?", id);
           throw picksTable(rules, booking.party) ? reservationError("That table has just been booked", "TABLE_TAKEN", 409) : reservationError("That time is fully booked", "SLOT_FULL", 409);
         }
+        // What the booking costs, taken now; two bookings spending the last points at once cannot both have them.
+        try {
+          if (rules.bookingPoints) await driver.batch(bookingPointsStatements(id, customer.id, rules.bookingPoints, now()));
+        } catch (error) {
+          await driver.run("DELETE FROM reservations WHERE id = ?", id);
+          if (isOverdrawn(error)) throw reservationError(`Booking needs ${rules.bookingPoints} points`, "NOT_ENOUGH_POINTS", 403, { minPoints: rules.bookingPoints, points: 0 });
+          throw error;
+        }
       }
       const row = await byId(id);
       return staff ? { reservation: reservationView(row) } : { reservation: guestReservationView(row), token };
@@ -223,7 +237,8 @@ export function createReservationStore(driver, { settings }) {
       if (row.status === "cancelled") return { ...guestReservationView(row), cancellable: false };
       const { now: clock } = await context();
       if (!guestMayCancel(row, clock)) throw reservationError("This booking can no longer be cancelled online; please call us", "TOO_LATE", 409);
-      await driver.run("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?", now(), row.id);
+      // Cancelled in time: what it cost comes back with it.
+      await writeStatus(row, "cancelled", (await context()).rules);
       return { ...guestReservationView(await byId(row.id)), cancellable: false };
     },
 
@@ -286,6 +301,20 @@ export function createReservationStore(driver, { settings }) {
       if (rules.welcomePoints) await driver.batch(welcomeAtCounterStatements(before.id, rules.welcomePoints, now()));
       const after = await driver.first(CUSTOMER_BY_ID_SQL, before.id);
       return { customer: customerView(after), granted: after.points > before.points, welcomePoints: rules.welcomePoints, minPoints: rules.minPoints };
+    },
+
+    /**
+     * A guest who signed up after scanning a table's code: the bonus, once
+     * per account. Returns whether this gave it.
+     */
+    async signupBonus(customerId) {
+      const { rules } = await context();
+      if (!rules.signupPoints) return false;
+      const before = await driver.first("SELECT points FROM customers WHERE id = ?", String(customerId));
+      if (!before) return false;
+      await driver.batch(signupPointsStatements(String(customerId), rules.signupPoints, now()));
+      const after = await driver.first("SELECT points FROM customers WHERE id = ?", String(customerId));
+      return after.points > before.points;
     },
 
     /** Gone for good: a guest who asks for their data to be erased (GDPR Art. 17). */

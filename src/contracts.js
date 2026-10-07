@@ -450,7 +450,8 @@ export const TableBody = Type.Object({
 // Guests' own accounts (shared/customer.mjs). An email and a password; the
 // email's form and the password floor are the shared rules'.
 const Email = Type.String({ minLength: 3, maxLength: 254 });
-export const CustomerRegisterBody = Type.Object({ email: Email, name: Type.Optional(Type.String({ maxLength: 40 })), password: Password }, { additionalProperties: false });
+// `table`: the table whose code the guest scanned before signing up (with its token in x-table-token): the sign-up bonus.
+export const CustomerRegisterBody = Type.Object({ email: Email, name: Type.Optional(Type.String({ maxLength: 40 })), password: Password, table: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
 export const CustomerSignInBody = Type.Object({ email: Type.String({ maxLength: 254 }), password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
 // A code to the guest's email, and the code back (shared/email-verify.mjs).
 export const EmailCodeBody = Type.Object({ language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });

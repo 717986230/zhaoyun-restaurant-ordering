@@ -92,7 +92,7 @@ export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "11:30", to: "14:00" }, { days: [1, 2, 3, 4, 5, 6, 7], from: "17:30", to: "21:00" }],
   intervalMinutes: 30, durationMinutes: 120, capacity: 40, maxParty: 8, leadMinutes: 60, daysAhead: 60, autoConfirm: true, closedDates: [], note: "", tables: [],
   maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2,
-  minPoints: 10, welcomePoints: 10, noShowPoints: 5, noShowAfterMinutes: 30
+  minPoints: 0, welcomePoints: 0, signupPoints: 20, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 30
 };
 
 /** shared/delivery.mjs, DELIVERY_SETTING_DEFAULTS (the same for each platform). */
