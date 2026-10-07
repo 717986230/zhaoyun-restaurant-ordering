@@ -423,7 +423,7 @@ export function SettingsPanel(props: Props) {
 
     {/* Three groups, in the order a restaurant sets itself up: what the guests
         see, how it runs, and the account behind it. The chips jump to each. */}
-    <nav className="settings-jump" aria-label={t("settingsGroups")}>{SETTINGS_GROUPS.map(([id, label]) => <button key={id} type="button" className="ghost-action" onClick={() => document.getElementById(`group-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>{t(label)}</button>)}</nav>
+    <nav className="settings-jump" aria-label={t("settingsGroups")}>{SETTINGS_GROUPS.map(([id, label]) => <button key={id} type="button" onClick={() => document.getElementById(`group-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>{t(label)}</button>)}</nav>
 
     <h2 className="settings-group" id="group-menu">{t("groupMenu")}</h2>
     {settings && <div className="settings-grid">

@@ -4481,3 +4481,51 @@ button:focus-visible,
     transition: none;
   }
 }
+
+/* Buttons, one family (2026-10):
+   - an action that moves the guest on (add to cart, place the order): a
+     full-width bar, 14px corners, the same height everywhere;
+   - a choice (a category, how many, eat in or pick up): a pill; the chosen
+     one in the accent wash;
+   - an icon (close, favourite, call, "+"): a circle.
+   The "+" in the list carries how many of that dish are in the cart, so a
+   tap is answered on the row itself, not only by the toast. */
+.primary {
+  min-height: 52px;
+  border-radius: 14px;
+}
+
+.cart-channel label,
+.segmented button {
+  border-radius: 999px;
+}
+
+.quick-add {
+  position: relative;
+}
+
+.quick-add-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: 0 0 0 2px var(--bg);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The quieter action beside the main one (show all, my orders, sign out):
+   the same corners and height as the main one, outlined. */
+.secondary {
+  min-height: 46px;
+  border-radius: 14px;
+}

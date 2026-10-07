@@ -122,14 +122,14 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
     {rules && !rules.enabled && <p className="admin-banner res-off" role="note">{t("resOff")}</p>}
 
     <div className="res-views" role="tablist">
-      {(["day", "records"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "primary-action" : "ghost-action"} onClick={() => setView(key)}>{t(key === "day" ? "resViewDay" : "resViewRecords")}</button>)}
+      {(["day", "records"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "on" : ""} onClick={() => setView(key)}>{t(key === "day" ? "resViewDay" : "resViewRecords")}</button>)}
     </div>
 
     {view === "records" ? <ReservationRecords api={api} timeZone={timeZone} failed={failed} liveTick={liveTick} /> : <>
     <div className="res-day">
       <div className="res-day-nav">
         <button type="button" className="ghost-action" aria-label={t("resPrev")} onClick={() => setDay(shift(day, -1))}>‹</button>
-        <button type="button" className={day === todayIn(timeZone) ? "primary-action" : "ghost-action"} onClick={() => setDay(todayIn(timeZone))}>{t("resToday")}</button>
+        <button type="button" className={`ghost-action ${day === todayIn(timeZone) ? "on" : ""}`} aria-pressed={day === todayIn(timeZone)} onClick={() => setDay(todayIn(timeZone))}>{t("resToday")}</button>
         <button type="button" className="ghost-action" aria-label={t("resNext")} onClick={() => setDay(shift(day, 1))}>›</button>
         <input type="date" aria-label={t("reportDate")} value={day} onChange={(event) => { if (event.target.value) setDay(event.target.value); }} />
       </div>
