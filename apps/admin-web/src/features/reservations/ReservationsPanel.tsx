@@ -366,7 +366,6 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
 
     <div className="field-grid three">
       <label><span>{t("resCapacity")}</span><input type="number" id="resCapacity" min={1} max={2000} value={draft.capacity} onChange={(event) => set("capacity", Number(event.target.value))} /></label>
-      <label><span>{t("resMaxParty")}</span><input type="number" min={1} max={100} value={draft.maxParty} onChange={(event) => set("maxParty", Number(event.target.value))} /></label>
       <label><span>{t("resDuration")}</span><input type="number" min={30} max={360} step={15} value={draft.durationMinutes} onChange={(event) => set("durationMinutes", Number(event.target.value))} /></label>
       <label><span>{t("resInterval")}</span><select value={draft.intervalMinutes} onChange={(event) => set("intervalMinutes", Number(event.target.value) as 15 | 30 | 60)}>
         {[15, 30, 60].map((minutes) => <option key={minutes} value={minutes}>{t("resMinutes", { n: minutes })}</option>)}

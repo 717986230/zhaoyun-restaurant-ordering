@@ -162,6 +162,7 @@ export function normalizeReservationSettings(value) {
     intervalMinutes,
     durationMinutes: integer("A table is held for", input.durationMinutes, 30, 360),
     capacity: integer("Seats for reservations", input.capacity, 1, 2000),
+    // Kept for settings stored before 2026-10; online, any party books now (ONLINE_MAX_PARTY).
     maxParty: integer("The largest party booked online", input.maxParty, 1, 100),
     leadMinutes: integer("The notice a booking needs, in minutes,", input.leadMinutes, 0, 7 * 24 * 60),
     daysAhead: integer("Bookings open this many days ahead:", input.daysAhead, 1, 365),
@@ -212,6 +213,18 @@ export function seatSelection(rules) {
   return rules.tables.length > 0;
 }
 
+/** The largest party a guest may type in: online, a party of any size books (2026-10), up to what a booking holds. */
+export const ONLINE_MAX_PARTY = 500;
+
+/**
+ * Whether this party picks a table: where the owner lists tables and one is
+ * big enough. A party larger than every table books seats instead, and the
+ * floor puts tables together on the day.
+ */
+export function picksTable(rules, party) {
+  return seatSelection(rules) && rules.tables.some((table) => table.seats >= party);
+}
+
 /** Whether `table` is free for a whole stay from `minute`: no booking on it overlaps. */
 export function tableFree(bookings, table, minute, duration) {
   return !bookings.some((booking) => booking.table === table && booking.minute < minute + duration && minute < booking.minute + duration);
@@ -233,7 +246,8 @@ export function bookingView(rules, { timeZone, restaurantName }, at = new Date()
     enabled: rules.enabled,
     restaurantName,
     timeZone,
-    maxParty: rules.maxParty,
+    // Any party books online: the guest types the number, up to this.
+    maxParty: ONLINE_MAX_PARTY,
     today,
     lastDate: addDays(today, rules.daysAhead),
     // Weekdays with any period, so the date picker can grey out the rest.
@@ -301,7 +315,7 @@ export function peakGuests(bookings, start, duration) {
 export function availability(rules, date, party, bookings, now) {
   return slotMinutes(rules, date).map((minute) => ({
     time: toClock(minute),
-    available: !outsideWindow(rules, date, minute, now) && (seatSelection(rules)
+    available: !outsideWindow(rules, date, minute, now) && (picksTable(rules, party)
       ? tablesAt(rules, bookings, minute, party).some((table) => table.available)
       : peakGuests(bookings, minute, rules.durationMinutes) + party <= rules.capacity)
   }));
@@ -315,9 +329,9 @@ function text(label, value, max, { required = false } = {}) {
 }
 
 /**
- * A booking as a guest or the staff send it. The staff may book any party
- * size and leave the phone out (a walk-in who booked at the counter); a
- * guest leaves a phone number the restaurant can call.
+ * A booking as a guest or the staff send it. Any party size; the staff may
+ * leave the phone out (a walk-in who booked at the counter); a guest leaves a
+ * mobile number or an email the restaurant can reach them at.
  */
 export function normalizeReservationInput(input, rules, { staff = false } = {}) {
   const date = String(input.date ?? "").trim();
@@ -326,19 +340,18 @@ export function normalizeReservationInput(input, rules, { staff = false } = {}) 
   if (!TIME.test(time)) throw reservationError("The time is HH:MM", "INVALID");
   const party = Number(input.party);
   if (!Number.isInteger(party) || party < 1 || party > 500) throw reservationError("The party is 1 or more guests", "INVALID");
-  if (!staff && party > rules.maxParty) {
-    throw reservationError(`Online bookings are for up to ${rules.maxParty} guests; please call us for a larger party`, "PARTY_TOO_LARGE", 400, { maxParty: rules.maxParty });
-  }
   const name = text("The name", input.name, 80, { required: true });
-  let phone = text("The phone number", input.phone, 30, { required: !staff });
+  let phone = text("The phone number", input.phone, 30);
   // A guest leaves a mobile number that could be real, written one way
   // (shared/phone.mjs). The staff may write down a landline at the counter.
   const mobile = phone ? checkMobile(phone) : null;
   if (mobile?.ok) phone = mobile.display;
-  else if (!staff) throw reservationError(mobile?.reason === "NOT_MOBILE" ? "Please give a mobile number" : "That is not a mobile number", mobile?.reason === "NOT_MOBILE" ? "NOT_MOBILE" : "BAD_PHONE", 400);
+  else if (phone && !staff) throw reservationError(mobile?.reason === "NOT_MOBILE" ? "Please give a mobile number" : "That is not a mobile number", mobile?.reason === "NOT_MOBILE" ? "NOT_MOBILE" : "BAD_PHONE", 400);
   else if (phone && !PHONE.test(phone)) throw reservationError("That is not a phone number", "INVALID");
   const email = text("The email", input.email, 254).toLowerCase();
   if (email && !EMAIL.test(email)) throw reservationError("That is not an email address", "INVALID");
+  // A guest leaves a way to be reached: a mobile number or an email, either will do.
+  if (!staff && !phone && !email) throw reservationError("Please leave a mobile number or an email", "CONTACT_REQUIRED", 400);
   const notes = text("The note", input.notes, 500);
   const language = LANGUAGES.includes(input.language) ? input.language : "";
   return { date, time, minute: toMinutes(time), party, name, phone, email, notes, language };

@@ -38,8 +38,8 @@ test.beforeAll(async ({ request }, testInfo) => {
     reservations: {
       enabled: true,
       hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "12:00", to: "21:00" }],
-      intervalMinutes: 30, durationMinutes: 120, capacity: 40, maxParty: 8, leadMinutes: 60, daysAhead: 30,
-      autoConfirm: true, closedDates: [], note: "8 人以上请致电",
+      intervalMinutes: 30, durationMinutes: 120, capacity: 40, leadMinutes: 60, daysAhead: 30,
+      autoConfirm: true, closedDates: [], note: "",
       tables: [{ table: "2", seats: 2 }, { table: "4", seats: 4 }, { table: "6", seats: 6 }],
       maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2,
       minPoints: 10, welcomePoints: 10, noShowPoints: 5, noShowAfterMinutes: 30
@@ -134,7 +134,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
 
   // Three at the table: a date, a time, then a table big enough.
   // Three dropdowns: how many, which day, what time.
-  await page.locator("#bookingParty").selectOption("3");
+  await page.locator("#bookingParty").fill("3");
   const day = await page.locator("#bookingDate option").nth(2).getAttribute("value");
   await page.locator("#bookingDate").selectOption(day);
   await page.locator("#bookingTime").selectOption("19:00");
@@ -142,14 +142,21 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator('[data-table="2"]')).toContainText("座位不够");
   await page.locator('[data-table="4"]').click();
   // A number that could be no one's, then a landline: said at once, nothing sent.
-  await page.locator("#bookingPhone").fill("12345");
-  await page.locator("#bookingPhone").blur();
-  await expect(page.locator("#bookingPhoneError")).toHaveText("请填写有效的手机号，例如 0660 1234567 或 +43 660 1234567。");
-  await page.locator("#bookingPhone").fill("01 5877777");
+  // Any party size, typed by the guest: no "call us above eight" any more.
+  await expect(page.locator("#bookingParty")).toHaveAttribute("max", "500");
+  // A mobile number or an email: the account's email is there to start with.
+  await expect(page.locator("#bookingContact")).toHaveValue("mia@example.com");
+  await page.locator("#bookingContact").fill("mia@");
+  await page.locator("#bookingContact").blur();
+  await expect(page.locator("#bookingContactError")).toHaveText("请填写有效的邮箱。");
+  await page.locator("#bookingContact").fill("12345");
+  await page.locator("#bookingContact").blur();
+  await expect(page.locator("#bookingContactError")).toHaveText("请填写有效的手机号，例如 0660 1234567 或 +43 660 1234567。");
+  await page.locator("#bookingContact").fill("01 5877777");
   await page.locator("#bookingSubmit").click();
-  await expect(page.locator("#bookingPhoneError")).toHaveText("请填写手机号，不是座机号码。");
-  await page.locator("#bookingPhone").fill("0660 111 22 33");
-  await expect(page.locator(".bk-note")).toHaveText("8 人以上请致电");
+  await expect(page.locator("#bookingContactError")).toHaveText("请填写手机号，不是座机号码。");
+  await page.locator("#bookingContact").fill("0660 111 22 33");
+  await expect(page.locator(".bk-note")).toHaveCount(0);
   await page.locator("#bookingSubmit").click();
 
   await expect(page.locator("#bookingStatus")).toHaveText("已确认");
@@ -179,11 +186,11 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingDockBookings").click();
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.locator("#bookingParty").selectOption("2");
+  await page.locator("#bookingParty").fill("2");
   await page.locator("#bookingDate").selectOption(day);
   await page.locator("#bookingTime").selectOption("13:00");
   await page.locator('[data-table="2"]').click();
-  await page.locator("#bookingPhone").fill("+43 660 1112233");
+  await page.locator("#bookingContact").fill("mia@example.com");
   await page.locator("#bookingSubmit").click();
   await expect(page.locator("#bookingError")).toHaveText("同一天最多预约 1 次。");
 

@@ -596,7 +596,8 @@ export interface ReservationCommand {
   time: string;
   party: number;
   name: string;
-  phone: string;
+  /** A mobile number or an email: either will do. */
+  phone?: string;
   email?: string;
   notes?: string;
   language?: MenuLanguage;

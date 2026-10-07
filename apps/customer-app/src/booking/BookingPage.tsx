@@ -50,7 +50,7 @@ function refusal(language: BookingLanguage, error: unknown, info: ApiBookingInfo
   if (error instanceof ApiError) {
     if (error.status === 429 && error.code !== "NO_SHOW_BLOCKED" && error.code !== "CODE_TOO_SOON" && error.code !== "TOO_MANY_CODES") return bookingError(language, "RATE");
     const known: BookingErrorKey[] = ["SLOT_FULL", "SLOT_UNAVAILABLE", "PARTY_TOO_LARGE", "RESERVATIONS_OFF", "INVALID", "TABLE_TAKEN", "TABLE_REQUIRED", "TABLE_TOO_SMALL", "SIGN_IN_REQUIRED", "NO_SHOW_BLOCKED", "DAY_LIMIT", "TOO_MANY_BOOKINGS",
-      "EMAIL_UNVERIFIED", "BAD_PHONE", "NOT_MOBILE", "WRONG_CODE", "CODE_EXPIRED", "CODE_TOO_SOON", "TOO_MANY_CODES", "MAIL_FAILED", "NOT_ENOUGH_POINTS"];
+      "EMAIL_UNVERIFIED", "BAD_PHONE", "NOT_MOBILE", "WRONG_CODE", "CODE_EXPIRED", "CODE_TOO_SOON", "TOO_MANY_CODES", "MAIL_FAILED", "NOT_ENOUGH_POINTS", "CONTACT_REQUIRED"];
     const limit = error.code === "DAY_LIMIT" ? info?.maxPerDayPerGuest : info?.maxActivePerGuest;
     const details = (error.details ?? {}) as { attemptsLeft?: number; retryAfter?: number; minPoints?: number; points?: number };
     if (error.code && (known as string[]).includes(error.code)) return bookingError(language, error.code as BookingErrorKey, { message: error.message, limit: limit ?? "", left: details.attemptsLeft ?? "", s: details.retryAfter ?? "", min: details.minPoints ?? info?.minPoints ?? "", points: details.points ?? "" });
@@ -406,7 +406,21 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
 
 /** Party sizes offered as one tap each; a list holds the rest, where there are more. */
 const PARTY_CHIPS = 8;
-/** The name and mobile number a guest booked with last, kept on this phone only. */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * What is wrong with how the guest left to be reached, or "": an email (it
+ * has an @) or a mobile number (the server's own check, shared/phone.mjs).
+ */
+function contactProblem(language: BookingLanguage, value: string): string {
+  const clean = value.trim();
+  if (!clean) return b(language, "contactMissing");
+  if (clean.includes("@")) return EMAIL_SHAPE.test(clean) ? "" : b(language, "emailInvalid");
+  const mobile = checkMobile(clean);
+  return mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid");
+}
+
+/** The name and mobile number (or email) a guest booked with last, kept on this phone only. */
 const CONTACT_KEY = "zy_book_contact";
 
 function rememberedContact(): { name: string; phone: string } {
@@ -434,7 +448,9 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   onVerified: (customer: ApiCustomer) => void;
   onBooked: (reservation: ApiGuestReservation, token: string) => void;
 }) {
-  const [party, setParty] = useState(Math.min(2, info.maxParty));
+  const [party, setParty] = useState(2);
+  // What the guest typed for the party, kept as typed while they change it; `party` is the last whole number in range.
+  const [partyText, setPartyText] = useState("2");
   const bookable = (date: string) => date >= info.today && date <= info.lastDate && info.days.includes(weekdayOf(date)) && !info.closedDates.includes(date);
   const [date, setDate] = useState(() => {
     for (let offset = 0; offset <= 60; offset += 1) {
@@ -446,7 +462,8 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   const [slots, setSlots] = useState<ApiReservationSlot[] | null>(null);
   const [time, setTime] = useState("");
   // The guest's own table, where the restaurant lets them pick one.
-  const seatSelection = Boolean(info.seatSelection);
+  // A party larger than every table books seats; the floor puts tables together (shared/reservations.mjs, picksTable).
+  const seatSelection = Boolean(info.seatSelection) && (info.tables ?? []).some((choice) => choice.seats >= party);
   const [tables, setTables] = useState<ApiTableChoice[] | null>(null);
   const [table, setTable] = useState("");
   const [name, setName] = useState("");
@@ -466,7 +483,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   useEffect(() => {
     const kept = rememberedContact();
     setName((current) => current || recent?.name || kept.name || customer?.name || "");
-    setPhone((current) => current || recent?.phone || kept.phone || "");
+    setPhone((current) => current || recent?.phone || kept.phone || customer?.email || "");
   }, [customer, recent]);
 
   useEffect(() => {
@@ -532,19 +549,23 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
       setBringUp("bookingSeats");
       return;
     }
-    // The same check the server makes (shared/phone.mjs), before the guest waits for it.
-    const mobile = checkMobile(phone);
-    if (!mobile.ok) {
-      setPhoneError(b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid"));
-      document.getElementById("bookingPhone")?.focus();
+    // The same check the server makes, before the guest waits for it.
+    const problem = contactProblem(language, phone);
+    if (problem) {
+      setPhoneError(problem);
+      document.getElementById("bookingContact")?.focus();
       return;
     }
+    const contact = phone.trim();
+    const byEmail = contact.includes("@");
     setBusy(true);
     setError("");
     try {
       // The account's email goes with it, for the floor: the guest is not asked for it again.
-      const { reservation, token } = await api.book({ date, time, party, name, phone, ...(customer?.email ? { email: customer.email } : {}), ...(notes ? { notes } : {}), ...(seatSelection ? { table } : {}), language });
-      rememberContact(name.trim(), phone.trim());
+      // A mobile number or an email: either reaches the guest. With a number, the account's email goes along for the floor.
+      const email = byEmail ? contact : customer?.email;
+      const { reservation, token } = await api.book({ date, time, party, name, ...(byEmail ? {} : { phone: contact }), ...(email ? { email } : {}), ...(notes ? { notes } : {}), ...(seatSelection ? { table } : {}), language });
+      rememberContact(name.trim(), contact);
       onBooked(reservation, token);
     } catch (failure) {
       setError(refusal(language, failure, info));
@@ -563,9 +584,13 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
     <section className="bk-card bk-pick" id="bookingTimes">
       <div className="bk-selects">
         <label className="bk-field bk-select"><span>{b(language, "party")}</span>
-          <select id="bookingParty" value={party} onChange={(event) => setParty(Number(event.target.value))}>
-            {Array.from({ length: info.maxParty }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{b(language, "guests", { n: count })}</option>)}
-          </select>
+          <input id="bookingParty" type="number" inputMode="numeric" min={1} max={info.maxParty} step={1} value={partyText}
+            onChange={(event) => {
+              setPartyText(event.target.value);
+              const count = Number(event.target.value);
+              if (Number.isInteger(count) && count >= 1 && count <= info.maxParty) setParty(count);
+            }}
+            onBlur={() => setPartyText(String(party))} />
         </label>
         <label className="bk-field bk-select"><span>{b(language, "date")}</span>
           <select id="bookingDate" value={date} onChange={(event) => setDate(event.target.value)}>
@@ -608,11 +633,11 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
       {customer && !mustVerify && !short ? <form className="bk-card bk-details" id="bookingForm" onSubmit={(event) => void submit(event)}>
         <h2>{b(language, "details")}</h2>
         <label className="bk-field"><span>{b(language, "name")}</span><input id="bookingName" required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
-        <label className="bk-field"><span>{b(language, "phone")}</span>
-          <input id="bookingPhone" required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" placeholder="0660 1234567" aria-invalid={phoneError ? true : undefined} value={phone}
+        <label className="bk-field"><span>{b(language, "contact")}</span>
+          <input id="bookingContact" required maxLength={254} autoComplete="tel email" placeholder={b(language, "contactHint")} aria-invalid={phoneError ? true : undefined} value={phone}
             onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }}
-            onBlur={() => { const mobile = checkMobile(phone); setPhoneError(!phone.trim() || mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid")); }} />
-          {phoneError ? <small className="bk-field-error" id="bookingPhoneError" role="alert">{phoneError}</small> : null}
+            onBlur={() => setPhoneError(phone.trim() ? contactProblem(language, phone) : "")} />
+          {phoneError ? <small className="bk-field-error" id="bookingContactError" role="alert">{phoneError}</small> : null}
         </label>
         <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
         {info.note ? <p className="bk-note">{info.note}</p> : null}

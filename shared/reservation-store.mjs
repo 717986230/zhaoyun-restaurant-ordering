@@ -18,8 +18,8 @@ import { now, uuid } from "./core.mjs";
 import { CUSTOMER_BY_ID_SQL, customerView, noShowBackStatements, noShowPointsStatements, welcomeAtCounterStatements } from "./customer.mjs";
 import {
   ACTIVE_RESERVATION_STATUSES, addDays, availability, bookingView, guestLimit, guestMayCancel, guestReservationView, isDate, localNow,
-  newReference, NO_SHOW_WINDOW_DAYS, normalizeReservationInput, normalizeReservationUpdate, outsideWindow, peakGuests, phoneKey, RESERVATION_RETENTION_DAYS,
-  RESERVATION_STATUSES, reservationError, reservationTable, reservationView, seatSelection, slotMinutes, tableFree, tablesAt, toMinutes
+  newReference, NO_SHOW_WINDOW_DAYS, picksTable, normalizeReservationInput, normalizeReservationUpdate, outsideWindow, peakGuests, phoneKey, RESERVATION_RETENTION_DAYS,
+  RESERVATION_STATUSES, reservationError, reservationTable, reservationView, slotMinutes, tableFree, tablesAt, toMinutes
 } from "./reservations.mjs";
 
 const ACTIVE_SQL = ACTIVE_RESERVATION_STATUSES.map((status) => `'${status}'`).join(", ");
@@ -135,13 +135,13 @@ export function createReservationStore(driver, { settings }) {
       if (!isDate(date)) throw reservationError("The date is YYYY-MM-DD", "INVALID");
       const party = Number(partyInput ?? 2);
       if (!Number.isInteger(party) || party < 1) throw reservationError("The party is 1 or more guests", "INVALID");
-      if (party > rules.maxParty) throw reservationError(`Online bookings are for up to ${rules.maxParty} guests; please call us for a larger party`, "PARTY_TOO_LARGE", 400, { maxParty: rules.maxParty });
+      if (party > 500) throw reservationError("The party is 1 to 500 guests", "INVALID");
       const bookings = await seatedOn(date);
       const slots = availability(rules, date, party, bookings, clock);
       const time = timeInput && slots.some((slot) => slot.time === timeInput) ? timeInput : null;
       return {
         booking, date, party, slots,
-        ...(time && seatSelection(rules) ? { time, tables: tablesAt(rules, bookings, toMinutes(time), party).map((table) => ({ ...table, available: table.available && slots.find((slot) => slot.time === time).available })) } : {})
+        ...(time && picksTable(rules, party) ? { time, tables: tablesAt(rules, bookings, toMinutes(time), party).map((table) => ({ ...table, available: table.available && slots.find((slot) => slot.time === time).available })) } : {})
       };
     },
 
@@ -175,7 +175,7 @@ export function createReservationStore(driver, { settings }) {
         const reason = outsideWindow(rules, booking.date, booking.minute, clock);
         if (reason) throw reservationError(reason === "TOO_SOON" ? "That time is too soon to book online; please call us" : "That day cannot be booked", "SLOT_UNAVAILABLE", 409, { reason });
         const bookings = await seatedOn(booking.date);
-        if (seatSelection(rules)) {
+        if (picksTable(rules, booking.party)) {
           // The guest's own pick: one of the bookable tables, big enough, and free for the whole stay.
           booking.table = reservationTable(input.table);
           const chosen = rules.tables.find((entry) => entry.table === booking.table);
@@ -196,13 +196,13 @@ export function createReservationStore(driver, { settings }) {
       // Checked again once written: two guests taking the last seats, or the same table, at once cannot both have them.
       if (!staff) {
         const others = await seatedOn(booking.date, id);
-        const lost = seatSelection(rules)
+        const lost = picksTable(rules, booking.party)
           // Both written at once: the one with the lower id keeps the table, whichever checks first.
           ? !tableFree(others.filter((other) => other.id < id), booking.table, booking.minute, rules.durationMinutes)
           : peakGuests(await seatedOn(booking.date), booking.minute, rules.durationMinutes) > rules.capacity;
         if (lost) {
           await driver.run("DELETE FROM reservations WHERE id = ?", id);
-          throw seatSelection(rules) ? reservationError("That table has just been booked", "TABLE_TAKEN", 409) : reservationError("That time is fully booked", "SLOT_FULL", 409);
+          throw picksTable(rules, booking.party) ? reservationError("That table has just been booked", "TABLE_TAKEN", 409) : reservationError("That time is fully booked", "SLOT_FULL", 409);
         }
       }
       const row = await byId(id);
