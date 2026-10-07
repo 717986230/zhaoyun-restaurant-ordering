@@ -641,15 +641,21 @@ function BookingDetails({ language, booking, held, info, onChange, onAnother }: 
       aria-label={flipped ? b(language, "backToTime") : b(language, "showPass")} onClick={() => setFlipped((value) => !value)}>
       <span className="bk-pass-inner">
         <span className="bk-pass-face bk-pass-front" aria-hidden={flipped}>
-          <strong>{booking.time}</strong>
-          <span>{formatDay(language, booking.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+          <span className="bk-pass-stub">
+            <strong>{booking.time}</strong>
+            <span>{formatDay(language, booking.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+          </span>
           <small className="bk-pass-hint">{b(language, "showPass")} ↻</small>
         </span>
         <span className="bk-pass-face bk-pass-back" aria-hidden={!flipped}>
-          {qr && <img className="bk-pass-qr" id="bookingQr" src={qr} alt={b(language, "qrAlt", { reference: booking.reference })} width="160" height="160" />}
-          <small>{b(language, "reference")}</small>
-          <strong>{booking.reference}</strong>
-          <span>{[b(language, "partyOf", { n: booking.party }), booking.table ? b(language, "tableName", { table: booking.table }) : "", booking.name].filter(Boolean).join(" · ")}</span>
+          {/* One white rectangle, like a boarding pass: the code large in the
+              middle, the number and who under it, for the door to read or type. */}
+          <span className="bk-pass-code">
+            {qr && <img className="bk-pass-qr" id="bookingQr" src={qr} alt={b(language, "qrAlt", { reference: booking.reference })} width="240" height="240" />}
+            <small>{b(language, "reference")}</small>
+            <strong>{booking.reference}</strong>
+            <span>{[b(language, "partyOf", { n: booking.party }), booking.table ? b(language, "tableName", { table: booking.table }) : "", booking.name].filter(Boolean).join(" · ")}</span>
+          </span>
           {qr && <span className="bk-pass-scan">{b(language, "qrHint")}</span>}
           <small className="bk-pass-hint">{b(language, "backToTime")} ↻</small>
         </span>

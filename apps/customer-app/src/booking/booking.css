@@ -946,29 +946,81 @@ html.bk-root body {
   color: var(--ink);
 }
 
-/* The back of the ticket: the QR code the waiter scans at the door, beside
-   the number to read out if the camera will not. The code brings its own white
-   margin, whatever the page's colours, so any camera finds its edges. */
-.bk-pass-back {
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 16px;
-}
-.bk-pass-back > :not(.bk-pass-qr) {
-  grid-column: 1;
+/* The back of the ticket: one white rectangle, like a boarding pass — the
+   QR code large in the middle for the waiter to scan at the door, the number
+   and who under it to read out if the camera will not. White and dark ink
+   whatever the page's colours, so any camera finds the code's edges. */
+.bk-pass .bk-pass-code {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 18px 16px 16px;
+  border-radius: 14px;
+  background: var(--light-panel);
+  color: var(--light-ink);
+  text-align: center;
 }
 .bk-pass-qr {
-  grid-column: 2;
-  grid-row: 1 / span 5;
-  align-self: start;
-  width: clamp(116px, 34vw, 160px);
+  width: min(240px, 72%);
   height: auto;
   aspect-ratio: 1;
-  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.bk-pass .bk-pass-code small {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--light-ink);
+  opacity: 0.6;
+}
+.bk-pass .bk-pass-code strong {
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: clamp(32px, 10vw, 44px);
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+  color: var(--light-ink);
+}
+.bk-pass .bk-pass-code span {
+  font-family: var(--bk-serif);
+  font-size: 16px;
+  color: var(--light-ink);
 }
 .bk-pass .bk-pass-scan {
+  margin-top: 6px;
   font-family: inherit;
   font-size: 14px;
   color: var(--ink-2);
+  text-align: center;
+}
+.bk-pass-back .bk-pass-hint {
+  text-align: center;
+}
+/* Both faces are the same rectangle, so the flip turns one into the other:
+   the front's time and day in the middle of a frame as tall as the code. */
+.bk-pass-face {
+  grid-template-rows: 1fr auto;
+}
+.bk-pass-back {
+  grid-template-rows: 1fr auto auto;
+}
+.bk-pass .bk-pass-stub {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+.bk-pass .bk-pass-stub span {
+  font-family: var(--bk-serif);
+  font-size: 18px;
+  color: var(--ink-2);
+}
+.bk-pass-front .bk-pass-hint {
+  text-align: center;
 }
 
 /* One tap per choice (2026-10): the party and the time are buttons, not
