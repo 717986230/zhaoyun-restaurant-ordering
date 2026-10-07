@@ -44,7 +44,7 @@ test.beforeAll(async ({ request }, testInfo) => {
       autoConfirm: true, closedDates: [], note: "",
       tables: [{ table: "2", seats: 2 }, { table: "4", seats: 4 }, { table: "6", seats: 6 }],
       maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2,
-      minPoints: 10, welcomePoints: 10, noShowPoints: 5, noShowAfterMinutes: 30
+      minPoints: 0, welcomePoints: 10, signupPoints: 20, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 30
     }
   });
   expect(saved.ok()).toBe(true);
@@ -83,6 +83,8 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   // Nothing is booked without an account.
   await expect(page.locator("#bookingSignIn")).toBeVisible();
   await expect(page.locator("#bookingSubmit")).toHaveCount(0);
+  // Signing up at a table brings points; from home, as Mia does here, none.
+  await expect(page.locator("#bookingSignupBonus")).toHaveText("在店里扫桌上的二维码注册，赠送 20 积分。");
   await page.getByRole("tab", { name: "注册" }).click();
   await page.locator("#bookingEmailLogin").fill("mia@example.com");
   await page.locator("#bookingPassword").fill("secret123");
@@ -110,12 +112,12 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingVerifySubmit").click();
   await expect(page.locator("#bookingVerify")).toHaveCount(0);
 
-  // Booking is for members: 10 points to book, and a new account has none.
+  // Booking is for members: each one costs 5 points, and a new account from home has none.
   // One line says so; the member code shows on a tap.
-  await expect(page.locator("#bookingMember")).toContainText("预约需要 10 积分，你现在有 0 积分。");
+  await expect(page.locator("#bookingMember")).toContainText("预约一次需要 5 积分，你现在有 0 积分。");
   // The form is there to fill in; its button waits, saying what is missing.
   await expect(page.locator("#bookingSubmit")).toBeDisabled();
-  await expect(page.locator("#bookingSubmit")).toHaveText("还差 10 积分才能预约");
+  await expect(page.locator("#bookingSubmit")).toHaveText("还差 5 积分才能预约");
   await expect(page.locator("#bookingMemberQr")).toHaveCount(0);
   await page.locator("#bookingMemberQrToggle").click();
   const memberCode = await decodeQr(page.locator("#bookingMemberQr"));
@@ -127,7 +129,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator("#bookingMember")).toHaveCount(0);
   await page.locator("#bookingDockAccount").click();
   await expect(page.locator("#bookingPoints")).toHaveText("10 积分");
-  await expect(page.locator("#bookingMemberRule")).toHaveText("预约需要 10 积分。首次到店消费后赠送 10 积分；预约未按时到店会扣 5 积分。");
+  await expect(page.locator("#bookingMemberRule")).toHaveText("扫码注册送 20 积分 · 每次预约扣 5 积分（取消退回） · 首次到店消费送 10 积分 · 预约未到另扣 5 积分");
   await page.locator("#bookingPanel .sheet-close").click();
   await expect(page.locator("#bookingPanel")).toHaveCount(0);
 
@@ -208,6 +210,10 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   page.once("dialog", (dialog) => dialog.accept());
   await page.locator(`#myBookings [data-reference="${reference}"] .bk-danger`).click();
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveAttribute("data-status", "cancelled");
+  // The 5 points it cost come back with the cancel.
+  await page.keyboard.press("Escape");
+  await page.locator("#bookingDockAccount").click();
+  await expect(page.locator("#bookingPoints")).toHaveText("10 积分");
 });
 
 test("a guest signs up with a mobile number: no code asked for, the number is how they are reached", async ({ page }) => {

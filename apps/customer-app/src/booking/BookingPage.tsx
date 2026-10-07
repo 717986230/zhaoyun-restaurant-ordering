@@ -5,14 +5,15 @@ import { AnimatePresence } from "motion/react";
 import type { ApiBookingInfo, ApiCustomer, ApiGuestReservation, ApiReservationSlot, ApiTableChoice } from "@zhaoyun/contracts";
 import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
 import { apiBaseUrl, customerToken, setCustomerToken } from "../app/api";
+import { assignedTableNo, tableToken } from "../app/table";
 import { Sheet } from "../components/Sheet";
 import { CalendarIcon, PersonIcon, QrIcon, RefreshIcon } from "../components/LineIcons";
 import { b, bookingError, formatDay, initialLanguage } from "./booking-i18n";
 import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
 import { checkMobile } from "../../../../shared/phone.mjs";
 
-// The guest's session is the menu's own (the same account, the same phone).
-const api = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-customer-token": customerToken() }) });
+// The guest's session is the menu's own (the same account, the same phone); the table this phone scanned, if any, for the sign-up bonus.
+const api = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-customer-token": customerToken(), "x-table-token": tableToken() }) });
 
 /** A booking this phone holds: its id and the token that opens it. */
 interface Held { id: string; token: string }
@@ -104,6 +105,12 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
     });
   }, [loadMine]);
 
+  // A booking costs points and a cancel brings them back: the balance shown follows.
+  const refreshCustomer = () => {
+    if (!customerToken()) return;
+    api.customer().then(({ customer: fresh }) => setCustomer(fresh)).catch(() => { /* What is on screen stays. */ });
+  };
+
   const signedIn = (session: { token: string; customer: ApiCustomer }) => {
     setCustomerToken(session.token);
     setCustomer(session.customer);
@@ -161,6 +168,7 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
     if (standalone) history.replaceState(null, "", linkFor(next));
     document.querySelector("#bookingModal .sheet-body")?.scrollTo({ top: 0 });
     void loadMine();
+    refreshCustomer();
   };
 
   const startOver = () => {
@@ -188,7 +196,7 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
     </section> : null}
 
     {booking && held
-      ? <BookingDetails language={language} booking={booking} held={held} info={info} onChange={(next) => { setBooking(next); void loadMine(); }} onAnother={startOver} />
+      ? <BookingDetails language={language} booking={booking} held={held} info={info} onChange={(next) => { setBooking(next); void loadMine(); refreshCustomer(); }} onAnother={startOver} />
       : loadFailed
         ? <section className="bk-card bk-message"><p>{b(language, "failedLoad")}</p><button type="button" className="bk-secondary" onClick={() => void load()}>{b(language, "retry")}</button></section>
         : !info
@@ -218,7 +226,7 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
         ? <p className="bk-muted" id="bookingSignInToSee">{b(language, "signInToSee")}</p>
         : sheet === "bookings"
           // The booking open on the page is not listed a second time.
-          ? others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => void loadMine()} /> : <p className="bk-muted">{b(language, "noBookings")}</p>
+          ? others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => { void loadMine(); refreshCustomer(); }} /> : <p className="bk-muted">{b(language, "noBookings")}</p>
           : <AccountPanel language={language} info={info} customer={customer} onRefreshed={setCustomer} onSignOut={() => { setSheet(null); void signOut(); }} />}
     </Sheet> : null}
   </AnimatePresence>, document.body)}
@@ -236,7 +244,7 @@ function AccountPanel({ language, info, customer, onRefreshed, onSignOut }: {
   return <div className="bk-account-panel" id="bookingAccount">
     <p className="bk-account-email">{customer.email}</p>
     <p className="bk-account-points"><b id="bookingPoints">{b(language, "pointsBalance", { points: customer.points })}</b></p>
-    {info?.minPoints ? <p className="bk-muted" id="bookingMemberRule">{b(language, "memberRule", { min: info.minPoints, welcome: info.welcomePoints ?? 0, noShow: info.noShowPoints ?? 0 })}</p> : null}
+    {info && pointsRules(language, info) ? <p className="bk-muted" id="bookingMemberRule">{pointsRules(language, info)}</p> : null}
     <MemberCode language={language} customer={customer} id="accountMemberQr" />
     <button type="button" className="bk-text-button bk-sign-out" id="bookingSignOut" onClick={onSignOut}>{b(language, "signOut")}</button>
   </div>;
@@ -348,7 +356,17 @@ function VerifyEmailCard({ language, customer, onVerified }: { language: Booking
 }
 
 /** Signing in, or registering, before a booking: a booking someone has to stand behind. */
-function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSignedIn: (session: { token: string; customer: ApiCustomer }) => void }) {
+/** The points rules in one line, only those the restaurant has switched on: sign-up, each booking, a missed one. */
+function pointsRules(language: BookingLanguage, info: ApiBookingInfo): string {
+  return [
+    info.signupPoints ? b(language, "ruleSignup", { n: info.signupPoints }) : "",
+    info.bookingPoints ? b(language, "ruleBooking", { n: info.bookingPoints }) : "",
+    info.welcomePoints ? b(language, "ruleWelcome", { n: info.welcomePoints }) : "",
+    info.noShowPoints && (info.minPoints || info.bookingPoints) ? b(language, "ruleNoShow", { n: info.noShowPoints }) : ""
+  ].filter(Boolean).join(" · ");
+}
+
+function SignInCard({ language, info, onSignedIn }: { language: BookingLanguage; info: ApiBookingInfo; onSignedIn: (session: { token: string; customer: ApiCustomer }) => void }) {
   const [mode, setMode] = useState<"signIn" | "register">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -369,7 +387,7 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
     try {
       onSignedIn(mode === "signIn"
         ? await api.signInCustomer(email, password)
-        : await api.registerCustomer({ email, password }));
+        : await api.registerCustomer({ email, password, ...(assignedTableNo() ? { table: assignedTableNo()! } : {}) }));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) setError(b(language, "wrongLogin"));
       else if (failure instanceof ApiError && failure.code === "EMAIL_TAKEN") setError(b(language, "emailTaken"));
@@ -383,6 +401,7 @@ function SignInCard({ language, onSignedIn }: { language: BookingLanguage; onSig
   return <section className="bk-card" id="bookingSignIn">
     <h2>{b(language, "signInTitle")}</h2>
     <p className="bk-muted">{b(language, "signInLead")}</p>
+    {info.signupPoints ? <p className="bk-signup-bonus" id="bookingSignupBonus">{b(language, "signupBonus", { n: info.signupPoints })}</p> : null}
     <div className="bk-tabs" role="tablist">
       {(["signIn", "register"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => { setMode(key); setError(""); }}>{b(language, key)}</button>)}
     </div>
@@ -629,7 +648,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
 
     {/* The one card left: who is booking. */}
     <div id="bookingFinish" className="bk-finish">
-      {!customer ? <SignInCard language={language} onSignedIn={onSignedIn} /> : null}
+      {!customer ? <SignInCard language={language} info={info} onSignedIn={onSignedIn} /> : null}
       {customer && mustVerify ? <VerifyEmailCard language={language} customer={customer} onVerified={onVerified} /> : null}
       {customer && !mustVerify ? <form className="bk-card bk-details" id="bookingForm" onSubmit={(event) => void submit(event)}>
         <h2>{b(language, "details")}</h2>
@@ -645,7 +664,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
         {error ? <p className="bk-error" role="alert" id="bookingError">{error}</p> : null}
         {/* Short of the points it takes, the button stays, greyed, and says how many are missing (the card above says how to get them). */}
         <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy || short}>
-          {short ? b(language, "needPoints", { missing: Math.max(0, (info.minPoints ?? 0) - (customer?.points ?? 0)) }) : busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}` : b(language, "submit")}
+          {short ? b(language, "needPoints", { missing: Math.max(0, (info.minPoints ?? 0) - (customer?.points ?? 0)) }) : busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}${info.bookingPoints ? ` · ${b(language, "bookingCost", { n: info.bookingPoints })}` : ""}` : b(language, "submit")}
         </button>
       </form> : null}
     </div>
@@ -674,7 +693,7 @@ function MemberCard({ language, info, customer, onRefreshed }: { language: Booki
     }
   }
   return <section className="bk-card bk-member" id="bookingMember">
-    <p className="bk-member-short">{b(language, "pointsShortLine", { min: info.minPoints ?? 0, points: customer.points, welcome: info.welcomePoints ?? 0 })}</p>
+    <p className="bk-member-short">{b(language, "pointsShortLine", { min: info.minPoints ?? 0, points: customer.points })}{info.welcomePoints ? ` ${b(language, "pointsHowWelcome", { welcome: info.welcomePoints })}` : ""}</p>
     <div className="bk-member-actions">
       <MemberCode language={language} customer={customer} id="bookingMemberQr" />
       <button type="button" className="bk-text-button" id="bookingRefreshPoints" disabled={busy} onClick={() => void refresh()}><RefreshIcon />{b(language, "memberRefresh")}</button>

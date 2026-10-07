@@ -1804,7 +1804,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(off.status, 403);
       assert.equal(off.json.code, "RESERVATIONS_OFF");
 
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 10, maxParty: 6, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0, minPoints: 0 };
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 10, maxParty: 6, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0, minPoints: 0, bookingPoints: 0 };
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, hours: [{ days: EVERY_DAY, from: "20:00", to: "12:00" }] } } })).status, 400, "a period ends after it starts");
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, intervalMinutes: 7 } } })).status, 400);
       assert.equal((await call("PUT", "/api/admin/settings", { role: "staff", body: { reservations: rules } })).status, 403, "the owner's rules");
@@ -1958,7 +1958,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     }],
 
     ["a guest picks their own table online: only a free one big enough, never one already booked for that stay", async () => {
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [{ table: "s1", seats: 2 }, { table: "S2", seats: 4 }], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0, minPoints: 0 };
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [{ table: "s1", seats: 2 }, { table: "S2", seats: 4 }], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0, minPoints: 0, bookingPoints: 0 };
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, tables: [{ table: "S1", seats: 2 }, { table: "s1", seats: 4 }] } } })).status, 400, "a table listed twice");
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, tables: [{ table: "S1", seats: 0 }] } } })).status, 400);
       const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } });
@@ -2004,7 +2004,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     }],
 
     ["online bookings are held to limits per guest and per phone, no-shows stop them, and the floor finds every booking in its records", async () => {
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 1, minPoints: 0 };
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 1, minPoints: 0, bookingPoints: 0 };
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, maxActivePerGuest: 0 } } })).status, 400);
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } })).status, 200);
       const { booking } = (await call("GET", "/api/reservations/availability")).json;
@@ -2073,7 +2073,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     }],
 
     ["booking is for members: 10 points to book, 10 for the first paid visit or at the counter, 5 off for a booking not kept and given back if it was", async () => {
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 5, maxPerDayPerGuest: 1, noShowLimit: 0, minPoints: 10, welcomePoints: 10, noShowPoints: 5, noShowAfterMinutes: 30 };
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 5, maxPerDayPerGuest: 1, noShowLimit: 0, minPoints: 10, welcomePoints: 10, signupPoints: 0, bookingPoints: 0, noShowPoints: 5, noShowAfterMinutes: 30 };
       for (const bad of [{ minPoints: -1 }, { welcomePoints: 1.5 }, { noShowAfterMinutes: 721 }]) {
         assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, ...bad } } })).status, 400, JSON.stringify(bad));
       }
@@ -2153,6 +2153,50 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(signedIn.status, 200, "signs in however the number is written");
       // No email to send a code to: none is asked for, and none can be.
       assert.equal((await call("POST", "/api/customer/email-code", { customerToken: signedIn.json.token, body: {} })).json.code, "NO_EMAIL");
+    }],
+
+    ["signing up at a table brings 20 points; each booking costs 5, back when it is cancelled or declined", async () => {
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 5, maxPerDayPerGuest: 3, noShowLimit: 0, minPoints: 0, welcomePoints: 0, signupPoints: 20, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 0 };
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } })).status, 200);
+      const { booking } = (await call("GET", "/api/reservations/availability")).json;
+      assert.deepEqual([booking.signupPoints, booking.bookingPoints, booking.minPoints], [20, 5, 5], "a booking needs what it costs");
+      const card = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "Q7" } })).json.table;
+      // Phone accounts: nothing to verify before booking.
+      const stamp = Date.now().toString().slice(-6);
+      const signUp = (prefix, extra = {}) => call("POST", "/api/customer/register", { ...extra, body: { email: `${prefix} ${stamp}`, password: "secret123", ...(extra.body ?? {}) } });
+
+      // At the table, from its code: 20 points. The number alone, or from home: none.
+      const atTable = await signUp("0699 1", { headers: { "x-table-token": card.token }, body: { table: "Q7" } });
+      assert.deepEqual([atTable.status, atTable.json.customer.points, atTable.json.signupBonus], [201, 20, true]);
+      assert.equal((await signUp("0699 2", { headers: { "x-table-token": "not-the-token" }, body: { table: "Q7" } })).json.customer.points, 0, "a made-up token brings nothing");
+      const fromHome = (await signUp("0699 3")).json;
+      assert.equal(fromHome.customer.points, 0);
+
+      const day = (offset) => addDaysTo(booking.today, offset);
+      const book = (customerToken, date, time = "18:00") => call("POST", "/api/reservations", { customerToken, body: { date, time, party: 2, name: "Nina", phone: "+43 660 7778899" } });
+      const points = async (token) => (await call("GET", "/api/customer", { customerToken: token })).json.customer.points;
+      const nina = atTable.json.token;
+
+      // Each booking costs 5.
+      const first = await book(nina, day(4));
+      assert.equal(first.status, 201, JSON.stringify(first.json));
+      assert.equal(await points(nina), 15);
+      // Cancelled by the guest: back.
+      assert.equal((await call("POST", `/api/reservations/${first.json.reservation.id}/cancel`, { headers: { "x-reservation-token": first.json.token } })).json.reservation.status, "cancelled");
+      assert.equal(await points(nina), 20);
+      // Declined by the floor: back too.
+      const second = (await book(nina, day(5))).json.reservation;
+      assert.equal(await points(nina), 15);
+      await call("PATCH", `/api/admin/reservations/${second.id}`, { role: "staff", body: { status: "declined" } });
+      assert.equal(await points(nina), 20);
+      const kinds = (await call("GET", "/api/customer/points", { customerToken: nina })).json.entries.map((entry) => [entry.kind, entry.delta]);
+      assert.deepEqual(kinds, [["booking_back", 5], ["booking", -5], ["booking_back", 5], ["booking", -5], ["signup", 20]]);
+
+      // Without points: no booking, said with what it takes.
+      const refused = await book(fromHome.token, day(4));
+      assert.deepEqual([refused.status, refused.json.code, refused.json.minPoints], [403, "NOT_ENOUGH_POINTS", 5]);
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
     }],
 
     ["每日限量: a dish counts down with every order, leaves the guests' menu at zero, gets a void back, and takes more when the floor says so", async () => {

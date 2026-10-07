@@ -1374,3 +1374,15 @@ html.bk-root body {
 .bk-modal #bookingVerify > h2::before {
   content: none;
 }
+
+/* Signing up at a table brings points: said on the sign-in card, in the accent. */
+.bk-signup-bonus {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-wash);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}

@@ -137,7 +137,7 @@ function LoyaltyForm({ loyalty, products, onSave }: { loyalty: ApiLoyalty; produ
 
 const REASONS: Record<PointsReason, CopyKey> = { earn: "pointsEarn", reverse: "pointsReverse", redeem: "pointsRedeem", refund: "pointsRefund", adjust: "pointsAdjust" };
 /** The booking membership's own lines among the adjustments (shared/customer.mjs). */
-const KINDS: Record<PointsKind, CopyKey> = { welcome: "pointsWelcome", no_show: "pointsNoShow", no_show_back: "pointsNoShowBack" };
+const KINDS: Record<PointsKind, CopyKey> = { welcome: "pointsWelcome", no_show: "pointsNoShow", no_show_back: "pointsNoShowBack", signup: "pointsSignup", booking: "pointsBooking", booking_back: "pointsBookingBack" };
 
 function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message: string) => void; failed: (error: unknown) => void }) {
   const { t, language } = useI18n();

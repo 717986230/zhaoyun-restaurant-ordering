@@ -288,6 +288,8 @@ export function createCustomerStore(driver, { ordersFor }) {
       await driver.run(DELETE_CUSTOMER_SESSIONS_SQL, row.id);
       return customerView(await byId(row.id));
     },
+    /** A guest as they see themselves, or null. */
+    byIdView: async (customerId) => customerView(await byId(customerId)),
     async remove(customerId) {
       if (!(await byId(customerId))) return false;
       await removeAccount(customerId);

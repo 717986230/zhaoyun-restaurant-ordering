@@ -383,6 +383,8 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
 
     <p className="settings-label">{t("resMembership")}</p>
     <div className="field-grid three">
+      <label><span>{t("resSignupPoints")}</span><input type="number" id="resSignupPoints" min={0} max={100000} value={draft.signupPoints} onChange={(event) => set("signupPoints", Number(event.target.value))} /></label>
+      <label><span>{t("resBookingPoints")}</span><input type="number" id="resBookingPoints" min={0} max={100000} value={draft.bookingPoints} onChange={(event) => set("bookingPoints", Number(event.target.value))} /></label>
       <label><span>{t("resMinPoints")}</span><input type="number" id="resMinPoints" min={0} max={100000} value={draft.minPoints} onChange={(event) => set("minPoints", Number(event.target.value))} /></label>
       <label><span>{t("resWelcomePoints")}</span><input type="number" id="resWelcomePoints" min={0} max={100000} value={draft.welcomePoints} onChange={(event) => set("welcomePoints", Number(event.target.value))} /></label>
       <label><span>{t("resNoShowPoints")}</span><input type="number" id="resNoShowPoints" min={0} max={100000} value={draft.noShowPoints} onChange={(event) => set("noShowPoints", Number(event.target.value))} /></label>
