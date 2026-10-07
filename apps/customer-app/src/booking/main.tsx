@@ -22,4 +22,7 @@ applyMenuTheme(cachedMenuTheme(), scheme);
 const root = document.getElementById("booking");
 if (!root) throw new Error("Booking page root was not found");
 
-createRoot(root).render(<StrictMode><ErrorBoundary onError={reportError}><BookingPage /></ErrorBoundary></StrictMode>);
+// On its own (a link from a website or Google Maps), closing the booking goes to the menu.
+const toMenu = () => location.assign(new URL("./", location.href).href);
+
+createRoot(root).render(<StrictMode><ErrorBoundary onError={reportError}><BookingPage onClose={toMenu} /></ErrorBoundary></StrictMode>);

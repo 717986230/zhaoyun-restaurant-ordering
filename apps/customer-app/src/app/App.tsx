@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeEnvelope } from "@zhaoyun/contracts";
@@ -18,6 +18,9 @@ import { assignedTableNo } from "./table";
 import { useCustomer } from "../features/account/useCustomer";
 import { AccountSheet } from "../features/account/AccountSheet";
 import { CartSheet } from "../features/cart/CartSheet";
+
+// Booking a table opens over the menu; its code and styles load on the first tap.
+const BookingSheet = lazy(() => import("../booking/BookingSheet"));
 import { OrdersSheet } from "../features/orders/OrdersSheet";
 import { ServiceSheet } from "../features/service/ServiceSheet";
 
@@ -121,6 +124,7 @@ export function App() {
       {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} />}
       {sheet === "service" && serviceTable && <ServiceSheet key="service" state={{ ...state, language }} dispatch={dispatch} table={serviceTable} />}
       {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}
+      {sheet === "booking" && <Suspense key="booking" fallback={null}><BookingSheet language={language} onClose={() => dispatch({ type: "sheet", sheet: null })} /></Suspense>}
     </AnimatePresence>
     <div className={`toast ${state.toast ? "show" : ""}`} role="status" aria-live="polite">{state.toast}</div>
   </main>;

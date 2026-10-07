@@ -1124,46 +1124,8 @@ html.bk-root body {
   }
 }
 
-/* Compact (2026-10): language and light/dark in the top-right corner; the
-   party, day and time as three dropdowns on one card; the guest's other
-   bookings and account in a dock at the bottom-right, each opening a panel. */
-.bk-head {
-  flex-wrap: nowrap;
-  align-items: center;
-}
-.bk-head h1 {
-  font-size: clamp(26px, 7vw, 34px);
-}
-.bk-tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.bk-language,
-.bk-theme {
-  min-height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--bg-2);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-}
-.bk-language {
-  padding: 0 12px;
-  appearance: none;
-  text-align: center;
-  cursor: pointer;
-}
-.bk-theme {
-  width: 38px;
-  padding: 0;
-  cursor: pointer;
-  font-size: 17px;
-  line-height: 1;
-}
-
+/* Compact (2026-10): the party, day and time as three controls on one card;
+   the guest's other bookings and account behind two round buttons. */
 .bk-pick {
   padding: 14px;
 }
@@ -1204,139 +1166,6 @@ html.bk-root body {
   order: 3;
 }
 
-/* The dock: two buttons stacked at the bottom-right, over the page. */
-.bk-page {
-  padding-bottom: max(140px, env(safe-area-inset-bottom));
-}
-.bk-dock {
-  position: fixed;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 20;
-  display: grid;
-  gap: 8px;
-}
-.bk-dock button {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  width: 72px;
-  padding: 10px 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--panel-glass);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  box-shadow: var(--glass-lift);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.22s var(--bk-ease);
-}
-.bk-dock button span {
-  font-size: 20px;
-  line-height: 1;
-}
-.bk-dock button:active {
-  transform: scale(0.95);
-}
-.bk-dock-count {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 20px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--bg);
-  font-size: 11px;
-}
-
-/* The panel the dock opens: from the bottom, over a dimmed page. */
-.bk-sheet {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: grid;
-  align-items: end;
-  justify-items: center;
-  background: var(--glass-scrim);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  animation: bk-fade 0.25s var(--bk-ease);
-}
-.bk-sheet-panel {
-  display: grid;
-  gap: 12px;
-  width: min(640px, 100%);
-  max-height: 82dvh;
-  overflow: auto;
-  padding: 16px 16px max(20px, env(safe-area-inset-bottom));
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: 20px 20px 0 0;
-  background: var(--panel);
-  color: var(--ink);
-  animation: bk-sheet-up 0.4s var(--bk-ease);
-}
-.bk-sheet-panel > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.bk-sheet-panel > header h2 {
-  margin: 0;
-  font-size: 18px;
-}
-.bk-sheet-close {
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: none;
-  color: var(--ink);
-  font-size: 22px;
-  cursor: pointer;
-}
-.bk-sheet-panel #myBookings {
-  padding: 0;
-  border: 0;
-  background: none;
-}
-.bk-sheet-panel #myBookings > h2 {
-  display: none;
-}
-.bk-account-panel {
-  display: grid;
-  gap: 10px;
-}
-.bk-account-panel p {
-  margin: 0;
-}
-.bk-account-email {
-  overflow-wrap: anywhere;
-  color: var(--ink-2);
-}
-.bk-account-points b {
-  font-size: 22px;
-}
-@keyframes bk-fade {
-  from { opacity: 0; }
-}
-@keyframes bk-sheet-up {
-  from { transform: translateY(24px); opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .bk-sheet,
-  .bk-sheet-panel,
-  .bk-dock button {
-    animation: none;
-    transition: none;
-  }
-}
 /* No step numbers: the page is short enough to read without them. */
 .bk-form > .bk-card > h2::before {
   content: none;
@@ -1350,18 +1179,6 @@ html.bk-root body {
   font-weight: 600;
   letter-spacing: 0;
 }
-/* The dock as small as a thumb needs. */
-.bk-dock button {
-  width: 60px;
-  padding: 8px 2px 6px;
-  font-size: 11px;
-}
-.bk-dock button span {
-  font-size: 18px;
-}
-.bk-dock button {
-  box-shadow: 0 6px 18px var(--glass-scrim);
-}
 /* The party, typed by the guest: as tall and as bold as the two dropdowns beside it. */
 .bk-selects .bk-field input#bookingParty {
   min-height: 48px;
@@ -1370,4 +1187,190 @@ html.bk-root body {
   font-size: 15px;
   font-weight: 600;
   text-align: center;
+}
+
+/* In glass (2026-10): the booking is a pane of frosted glass like the cart
+   (components/Sheet.tsx, ① in docs/motion-prompts.md), taller, over the menu
+   or over its own page; the cards inside are frosted tiles on it. */
+.sheet.bk-modal {
+  max-height: min(94dvh, 960px);
+}
+
+.bk-modal .bk-page {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  gap: 12px;
+}
+
+.bk-modal .bk-card {
+  border-color: color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--panel) 62%, transparent);
+}
+
+/* The guest's bookings and account: two round buttons, raised a thumb's
+   width off the bottom corner, riding over the form as it scrolls. They take
+   no room of their own (the negative margin), so the page does not grow. */
+.bk-dock {
+  position: sticky;
+  bottom: 28px;
+  z-index: 2;
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  width: max-content;
+  margin: -132px 0 0 auto;
+  pointer-events: none;
+}
+
+.bk-dock button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 22px var(--glass-scrim), inset 0 1px 0 color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), border-color 0.15s ease;
+}
+
+.bk-dock button .scheme-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.bk-dock button:hover {
+  border-color: var(--accent);
+}
+
+.bk-dock button:active {
+  transform: scale(0.92);
+}
+
+.bk-dock-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 2px var(--panel);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* Buttons on the booking, one family: a pill for a thing to show, a text
+   button for a thing to redo, both with a line icon before their words. */
+.bk-pill,
+.bk-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bk-pill {
+  padding: 0 18px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--ink);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.bk-pill:active {
+  transform: scale(0.96);
+}
+
+.bk-text-button {
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+}
+
+.bk-text-button:disabled {
+  opacity: 0.5;
+}
+
+.bk-pill .scheme-icon,
+.bk-text-button .scheme-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.bk-member-actions {
+  align-items: center;
+}
+
+/* The account panel: who, the points large, the rule, the code, signing out. */
+.bk-account-panel {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.bk-account-panel p {
+  margin: 0;
+}
+
+.bk-account-email {
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+}
+
+.bk-account-points b {
+  font-size: 26px;
+}
+
+.bk-account-panel .bk-member-code {
+  justify-self: stretch;
+}
+
+.bk-sign-out {
+  color: var(--ink-2);
+}
+
+#bookingPanel #myBookings {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+#bookingPanel #myBookings > h2 {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-dock button,
+  .bk-pill {
+    transition: none;
+  }
+}
+
+/* No step numbers anywhere in the booking, the sign-in card included. */
+.bk-modal .bk-card h2::before,
+.bk-modal #bookingSignIn > h2::before,
+.bk-modal #bookingVerify > h2::before {
+  content: none;
 }

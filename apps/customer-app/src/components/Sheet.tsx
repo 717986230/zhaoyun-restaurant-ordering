@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion, useDragControls, useReducedMotion } from "motion/react";
 
 /** The curve the whole sheet moves on: fast off the mark, long soft landing. */
@@ -12,11 +12,16 @@ const EASE = [0.2, 0.7, 0.2, 1] as const;
  * stays where it was underneath; a tap on the blurred room, the ×, Escape or
  * pulling the sheet down by its handle closes it.
  */
-export function Sheet({ id, title, closeLabel, onClose, children }: { id: string; title: string; closeLabel: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({ id, title, closeLabel, onClose, children, className = "" }: { id: string; title: string; closeLabel: string; onClose: () => void; children: React.ReactNode; className?: string }) {
   const reduceMotion = useReducedMotion();
   const drag = useDragControls();
+  const pane = useRef<HTMLElement>(null);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    // Escape closes the sheet on top only: a panel opened from inside another (the booking's account) first.
+    const onKey = (event: KeyboardEvent) => {
+      const sheets = document.querySelectorAll(".sheet");
+      if (event.key === "Escape" && sheets[sheets.length - 1] === pane.current) onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -26,7 +31,7 @@ export function Sheet({ id, title, closeLabel, onClose, children }: { id: string
     animate={{ opacity: 1, ...blur(26), transition: { duration: reduceMotion ? 0 : 0.6, ease: EASE } }}
     exit={{ opacity: 0, ...blur(reduceMotion ? 26 : 0), transition: { duration: reduceMotion ? 0 : 0.24, ease: "easeIn" } }}
     onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <motion.section id={id} className="sheet" role="dialog" aria-modal="true" aria-label={title}
+    <motion.section ref={pane} id={id} className={`sheet ${className}`} role="dialog" aria-modal="true" aria-label={title}
       initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 28 }}
       animate={{ opacity: 1, scale: 1, y: 0, transition: { duration: reduceMotion ? 0 : 0.6, ease: EASE } }}
       exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.97, y: 18, transition: { duration: 0.22, ease: "easeIn" } }}
