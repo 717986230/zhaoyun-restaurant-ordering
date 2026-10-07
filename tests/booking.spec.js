@@ -74,6 +74,13 @@ test.beforeEach(async ({ page }, testInfo) => {
 test("a guest signs up, picks day, time and table, sees the booking and cancels it; the limits say no in words", async ({ page, request }) => {
   await page.goto("/book.html?lang=zh");
   await expect(page.getByRole("heading", { name: "预约餐桌" })).toBeVisible();
+  // Top-right: the language, and light or dark, as on the menu.
+  await expect(page.locator("#bookingLanguage")).toHaveValue("zh");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.locator("#bookingTheme").click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.locator("#bookingTheme").click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
   // Nothing is booked without an account.
   await expect(page.locator("#bookingSignIn")).toBeVisible();
@@ -82,7 +89,11 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.locator("#bookingEmailLogin").fill("mia@example.com");
   await page.locator("#bookingPassword").fill("secret123");
   await page.locator("#bookingSignInSubmit").click();
+  // The account is one tap away, in the dock at the bottom-right.
+  await page.locator("#bookingDockAccount").click();
   await expect(page.locator("#bookingAccount")).toContainText("mia@example.com");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#bookingSheet")).toHaveCount(0);
 
   // The email proved first: a code to it, typed back (read here from the test server's outbox).
   await expect(page.locator("#bookingVerify")).toContainText("mia@example.com");
@@ -100,29 +111,33 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator("#bookingVerify")).toHaveCount(0);
 
   // Booking is for members: 10 points to book, and a new account has none.
-  // The page says the rule, what is missing, and shows the member code.
-  await expect(page.locator("#bookingMemberRule")).toHaveText("预约需要 10 积分。首次到店消费后赠送 10 积分；预约未按时到店会扣 5 积分。");
-  await expect(page.locator("#bookingPoints")).toHaveText("0 积分");
-  await expect(page.locator("#bookingMember")).toContainText("还差 10 积分");
+  // One line says so; the member code shows on a tap.
+  await expect(page.locator("#bookingMember")).toContainText("预约需要 10 积分，你现在有 0 积分。");
   await expect(page.locator("#bookingForm")).toHaveCount(0);
+  await expect(page.locator("#bookingMemberQr")).toHaveCount(0);
+  await page.locator("#bookingMemberQrToggle").click();
   const memberCode = await decodeQr(page.locator("#bookingMemberQr"));
   expect(memberCode).toMatch(/^ZYMEM:[0-9a-f-]{36}$/);
   // The first visit: the waiter scans it when Mia pays (as the POS does), and she may book.
   const visit = await admin(request, "post", `/api/admin/members/${memberCode.slice("ZYMEM:".length)}/visit`, {});
   expect((await visit.json()).granted).toBe(true);
   await page.locator("#bookingRefreshPoints").click();
-  await expect(page.locator("#bookingPoints")).toHaveText("10 积分");
   await expect(page.locator("#bookingMember")).toHaveCount(0);
+  await page.locator("#bookingDockAccount").click();
+  await expect(page.locator("#bookingPoints")).toHaveText("10 积分");
+  await expect(page.locator("#bookingMemberRule")).toHaveText("预约需要 10 积分。首次到店消费后赠送 10 积分；预约未按时到店会扣 5 积分。");
+  await page.locator("#bookingSheet .bk-sheet-close").click();
 
   // Asked once, in the details: not again at sign-up, and no second email.
   await expect(page.locator("#bookingEmail")).toHaveCount(0);
   await page.locator("#bookingName").fill("Mia");
 
   // Three at the table: a date, a time, then a table big enough.
-  await page.locator('[data-party="3"]').click();
-  const day = page.locator(".bk-days button:not([disabled])").nth(2);
-  await day.click();
-  await page.locator('[data-time="19:00"]').click();
+  // Three dropdowns: how many, which day, what time.
+  await page.locator("#bookingParty").selectOption("3");
+  const day = await page.locator("#bookingDate option").nth(2).getAttribute("value");
+  await page.locator("#bookingDate").selectOption(day);
+  await page.locator("#bookingTime").selectOption("19:00");
   await expect(page.locator('[data-table="2"]')).toBeDisabled();
   await expect(page.locator('[data-table="2"]')).toContainText("座位不够");
   await page.locator('[data-table="4"]').click();
@@ -161,21 +176,24 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
 
   // The same day again: one a day, said in words.
   await page.locator("#bookingAnother").click();
+  await page.locator("#bookingDockBookings").click();
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toBeVisible();
-  await page.locator('[data-party="2"]').click();
-  await day.click();
-  await page.locator('[data-time="13:00"]').click();
+  await page.keyboard.press("Escape");
+  await page.locator("#bookingParty").selectOption("2");
+  await page.locator("#bookingDate").selectOption(day);
+  await page.locator("#bookingTime").selectOption("13:00");
   await page.locator('[data-table="2"]').click();
   await page.locator("#bookingPhone").fill("+43 660 1112233");
   await page.locator("#bookingSubmit").click();
   await expect(page.locator("#bookingError")).toHaveText("同一天最多预约 1 次。");
 
   // The table taken at 19:00 is taken for the whole stay.
-  await page.locator('[data-time="20:00"]').click();
+  await page.locator("#bookingTime").selectOption("20:00");
   await expect(page.locator('[data-table="4"]')).toBeDisabled();
   await expect(page.locator('[data-table="4"]')).toContainText("已订");
 
-  // Cancelled from the guest's own list.
+  // Cancelled from the guest's own list, in the dock.
+  await page.locator("#bookingDockBookings").click();
   page.once("dialog", (dialog) => dialog.accept());
   await page.locator(`#myBookings [data-reference="${reference}"] .bk-danger`).click();
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveAttribute("data-status", "cancelled");
