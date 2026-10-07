@@ -53,7 +53,14 @@ export interface CustomerRegisterCommand { email: string; name?: string; passwor
 /** Every change is made against the password in force. */
 export interface CustomerUpdateCommand { currentPassword: string; name?: string; password?: string }
 export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
-export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string }
+/**
+ * The booking membership's own lines among the adjustments: the first visit's
+ * bonus, a missed booking's cost, and that given back.
+ */
+export type PointsKind = "welcome" | "no_show" | "no_show_back";
+export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string; kind?: PointsKind }
+/** A member's code scanned at the counter: the guest, and whether this visit gave the first visit's bonus. */
+export interface ApiMemberVisit { customer: ApiCustomer; granted: boolean; welcomePoints: number; minPoints: number }
 /**
  * Everything the restaurant keeps about one guest's account, as they may ask
  * for it (GDPR Art. 15 and 20): machine-readable, in one file.
@@ -510,6 +517,14 @@ export interface ApiReservationSettings {
   maxPerDayPerGuest: number;
   /** No-shows in 180 days before a guest must call instead; 0: never. */
   noShowLimit: number;
+  /** Booking for members: the points a guest needs to book online (0: anyone signed in). */
+  minPoints: number;
+  /** Points for a guest's first paid visit, once per account. */
+  welcomePoints: number;
+  /** Points a missed booking costs. */
+  noShowPoints: number;
+  /** Minutes past its time before a booking not checked in counts as missed; 0: only the floor marks it. */
+  noShowAfterMinutes: number;
 }
 
 export interface ApiBookableTable { table: string; seats: number }
@@ -566,6 +581,10 @@ export interface ApiBookingInfo {
   signInRequired?: boolean;
   maxActivePerGuest?: number;
   maxPerDayPerGuest?: number;
+  /** Booking for members: the points it needs, what the first visit brings, what a missed booking costs. */
+  minPoints?: number;
+  welcomePoints?: number;
+  noShowPoints?: number;
 }
 
 export interface ApiReservationSlot { time: string; available: boolean }

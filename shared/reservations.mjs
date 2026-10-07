@@ -51,7 +51,16 @@ export const RESERVATION_DEFAULTS = {
   // (in NO_SHOW_WINDOW_DAYS) before the guest has to call instead. 0: no limit.
   maxActivePerGuest: 2,
   maxPerDayPerGuest: 1,
-  noShowLimit: 2
+  noShowLimit: 2,
+  // Booking is for members: a guest books online with at least `minPoints`
+  // points (shared/customer.mjs). Their first paid visit brings
+  // `welcomePoints`, once; a booking not kept costs `noShowPoints` — marked
+  // by the floor, or by itself once `noShowAfterMinutes` past its time
+  // without the guest checked in (0: only the floor marks it). 0 points: off.
+  minPoints: 10,
+  welcomePoints: 10,
+  noShowPoints: 5,
+  noShowAfterMinutes: 30
 };
 export const NO_SHOW_WINDOW_DAYS = 180;
 export const MAX_BOOKABLE_TABLES = 200;
@@ -162,16 +171,24 @@ export function normalizeReservationSettings(value) {
     tables,
     maxActivePerGuest: integer("Bookings still to come per guest", input.maxActivePerGuest, 1, 20),
     maxPerDayPerGuest: integer("Bookings per guest on one day", input.maxPerDayPerGuest, 1, 10),
-    noShowLimit: integer("No-shows before a guest must call", input.noShowLimit, 0, 20)
+    noShowLimit: integer("No-shows before a guest must call", input.noShowLimit, 0, 20),
+    minPoints: integer("Points a guest needs to book", input.minPoints, 0, 100_000),
+    welcomePoints: integer("Points for a guest's first visit", input.welcomePoints, 0, 100_000),
+    noShowPoints: integer("Points a missed booking costs", input.noShowPoints, 0, 100_000),
+    noShowAfterMinutes: integer("Minutes before a booking not checked in counts as missed", input.noShowAfterMinutes, 0, 720)
   };
 }
 
 /**
  * Why a guest may not book again, or null. `mine` are the guest's bookings
  * (by account, or by the phone number given) that hold seats from today on,
- * as { date }; `noShows` how many times they did not come lately.
+ * as { date }; `noShows` how many times they did not come lately; `points`
+ * their balance, against the points a booking needs.
  */
-export function guestLimit(rules, date, mine, noShows) {
+export function guestLimit(rules, date, mine, noShows, points = Infinity) {
+  if (rules.minPoints && points < rules.minPoints) {
+    return reservationError(`Booking needs ${rules.minPoints} points; you have ${points}`, "NOT_ENOUGH_POINTS", 403, { minPoints: rules.minPoints, points });
+  }
   if (rules.noShowLimit && noShows >= rules.noShowLimit) {
     return reservationError("After missed bookings, please call us to book", "NO_SHOW_BLOCKED", 403);
   }
@@ -230,7 +247,11 @@ export function bookingView(rules, { timeZone, restaurantName }, at = new Date()
     // A guest books signed in, within these.
     signInRequired: true,
     maxActivePerGuest: rules.maxActivePerGuest,
-    maxPerDayPerGuest: rules.maxPerDayPerGuest
+    maxPerDayPerGuest: rules.maxPerDayPerGuest,
+    // Booking for members: the points it needs, what the first visit brings, what a missed booking costs.
+    minPoints: rules.minPoints,
+    welcomePoints: rules.welcomePoints,
+    noShowPoints: rules.noShowPoints
   };
 }
 

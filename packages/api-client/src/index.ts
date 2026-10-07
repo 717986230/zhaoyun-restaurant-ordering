@@ -1,4 +1,4 @@
-import type { ApiMailStatus,
+import type { ApiMailStatus, ApiMemberVisit,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
@@ -91,7 +91,8 @@ export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   enabled: false,
   hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "11:30", to: "14:00" }, { days: [1, 2, 3, 4, 5, 6, 7], from: "17:30", to: "21:00" }],
   intervalMinutes: 30, durationMinutes: 120, capacity: 40, maxParty: 8, leadMinutes: 60, daysAhead: 60, autoConfirm: true, closedDates: [], note: "", tables: [],
-  maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2
+  maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2,
+  minPoints: 10, welcomePoints: 10, noShowPoints: 5, noShowAfterMinutes: 30
 };
 
 /** shared/delivery.mjs, DELIVERY_SETTING_DEFAULTS (the same for each platform). */
@@ -529,6 +530,10 @@ export class PosApi {
   /** A booking seated, finished or marked as never come, or given its table. */
   updateReservation(id: string, command: ReservationUpdateCommand): Promise<{ reservation: ApiReservation }> {
     return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
+  }
+  /** A member's code scanned at the counter: their first visit's bonus, if they never had it. */
+  memberVisit(customerId: string): Promise<ApiMemberVisit> {
+    return this.#request(`/api/admin/members/${encodeURIComponent(customerId)}/visit`, { method: "POST", body: "{}" });
   }
   /** The tickets the print bridge gave up on, for the waiter to see and send again. */
   /** A guest's call dealt with: off every waiter's floor. */

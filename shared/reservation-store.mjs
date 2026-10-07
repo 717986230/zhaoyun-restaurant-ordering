@@ -15,6 +15,7 @@
  */
 import { hashSessionToken, newSessionToken } from "./auth.mjs";
 import { now, uuid } from "./core.mjs";
+import { CUSTOMER_BY_ID_SQL, customerView, noShowBackStatements, noShowPointsStatements, welcomeAtCounterStatements } from "./customer.mjs";
 import {
   ACTIVE_RESERVATION_STATUSES, addDays, availability, bookingView, guestLimit, guestMayCancel, guestReservationView, isDate, localNow,
   newReference, NO_SHOW_WINDOW_DAYS, normalizeReservationInput, normalizeReservationUpdate, outsideWindow, peakGuests, phoneKey, RESERVATION_RETENTION_DAYS,
@@ -71,6 +72,34 @@ export function createReservationStore(driver, { settings }) {
     const upcoming = (await driver.all(`SELECT id, date, phone, customer_id FROM reservations WHERE date >= ? AND status IN (${ACTIVE_SQL})`, today)).filter(theirs);
     const missed = (await driver.all("SELECT phone, customer_id FROM reservations WHERE status = 'no_show' AND date >= ?", addDays(today, -NO_SHOW_WINDOW_DAYS))).filter(theirs);
     return { upcoming, noShows: missed.length };
+  }
+
+  /**
+   * A booking's new status written, with what it does to the guest's points:
+   * marked not kept, the points a missed booking costs; taken back from not
+   * kept, those given back. One batch, so the two never part.
+   */
+  async function writeStatus(row, status, rules, extra = []) {
+    const at = now();
+    const points = row.customer_id && status !== row.status
+      ? (status === "no_show" ? noShowPointsStatements(row.id, rules.noShowPoints, at) : row.status === "no_show" ? noShowBackStatements(row.id, at) : [])
+      : [];
+    await driver.batch([...extra.length ? extra : [["UPDATE reservations SET status = ?, updated_at = ? WHERE id = ? AND status = ?", [status, at, row.id, row.status]]], ...points]);
+  }
+
+  /**
+   * Bookings gone past their time by `noShowAfterMinutes` without the guest
+   * checked in are marked not kept, and cost their points. Only yesterday's
+   * and today's: what happened before is the records', not a new penalty.
+   * Run whenever the floor or a guest looks, so no timer is needed.
+   */
+  async function expireMissed(rules, clock) {
+    if (!rules.noShowAfterMinutes) return;
+    const rows = await driver.all("SELECT * FROM reservations WHERE status IN ('pending', 'confirmed') AND date >= ? AND date <= ?", addDays(clock.date, -1), clock.date);
+    for (const row of rows) {
+      if (row.date === clock.date && toMinutes(row.time) + rules.noShowAfterMinutes > clock.minute) continue;
+      await writeStatus(row, "no_show", rules);
+    }
   }
 
   async function insert(booking, { status, source, tokenHash, customerId = null }) {
@@ -136,8 +165,11 @@ export function createReservationStore(driver, { settings }) {
       if (staff) booking.table = reservationTable(input.table);
       else {
         // The limits against bookings made to be broken (shared/reservations.mjs, guestLimit).
+        await expireMissed(rules, clock);
         const record = await guestRecord(customer.id, booking.phone, clock.date);
-        const limited = guestLimit(rules, booking.date, record.upcoming, record.noShows);
+        // Booking is for members with points enough: read now, not from the session.
+        const balance = Number((await driver.first("SELECT points FROM customers WHERE id = ?", customer.id))?.points ?? 0);
+        const limited = guestLimit(rules, booking.date, record.upcoming, record.noShows, balance);
         if (limited) throw limited;
         if (!slotMinutes(rules, booking.date).includes(booking.minute)) throw reservationError("We do not take bookings at that time", "SLOT_UNAVAILABLE", 409);
         const reason = outsideWindow(rules, booking.date, booking.minute, clock);
@@ -187,7 +219,8 @@ export function createReservationStore(driver, { settings }) {
 
     /** The guest's own bookings, from a month back on, newest day first. */
     async forCustomer(customerId) {
-      const { now: clock } = await context();
+      const { now: clock, rules } = await context();
+      await expireMissed(rules, clock);
       const rows = await driver.all("SELECT * FROM reservations WHERE customer_id = ? AND date >= ? ORDER BY date DESC, time DESC LIMIT 50", String(customerId), addDays(clock.date, -RESERVATION_RETENTION_DAYS));
       return rows.map((row) => ({ ...guestReservationView(row), cancellable: guestMayCancel(row, clock) }));
     },
@@ -213,6 +246,7 @@ export function createReservationStore(driver, { settings }) {
     async list(fromInput, toInput, { q = "", status = "" } = {}) {
       const { now: clock, rules } = await context();
       await forgetOld(clock.date);
+      await expireMissed(rules, clock);
       const from = fromInput || clock.date;
       const to = toInput || from;
       if (!isDate(from) || !isDate(to)) throw reservationError("from and to are dates: YYYY-MM-DD", "INVALID");
@@ -233,7 +267,8 @@ export function createReservationStore(driver, { settings }) {
 
     /** Today's bookings still to come or at the table, for the POS floor. */
     async today() {
-      const { now: clock } = await context();
+      const { now: clock, rules } = await context();
+      await expireMissed(rules, clock);
       const rows = await driver.all(`${LISTED_SQL} WHERE reservations.date = ? AND reservations.status IN (${ACTIVE_SQL}) ORDER BY reservations.time, reservations.created_at LIMIT 500`, addDays(clock.date, -NO_SHOW_WINDOW_DAYS), clock.date);
       return rows.map(reservationView);
     },
@@ -242,12 +277,26 @@ export function createReservationStore(driver, { settings }) {
       const current = await byId(id);
       if (!current) return null;
       const next = normalizeReservationUpdate(input, current);
-      await driver.run(
+      const { now: clock, rules } = await context();
+      await writeStatus(current, next.status, rules, [[
         "UPDATE reservations SET date = ?, time = ?, party = ?, name = ?, phone = ?, email = ?, notes = ?, status = ?, table_no = ?, updated_at = ? WHERE id = ?",
-        next.date, next.time, next.party, next.name, next.phone, next.email, next.notes, next.status, next.table || null, now(), current.id
-      );
-      const { now: clock } = await context();
+        [next.date, next.time, next.party, next.name, next.phone, next.email, next.notes, next.status, next.table || null, now(), current.id]
+      ]]);
       return reservationView(await driver.first(`${LISTED_SQL} WHERE reservations.id = ?`, addDays(clock.date, -NO_SHOW_WINDOW_DAYS), current.id));
+    },
+
+    /**
+     * A member at the counter (the POS scanned the code on their phone):
+     * their first visit's bonus, if they never had it. Returns the guest
+     * and whether this gave it, or null for no such guest.
+     */
+    async memberVisit(customerId) {
+      const { rules } = await context();
+      const before = await driver.first(CUSTOMER_BY_ID_SQL, String(customerId));
+      if (!before) return null;
+      if (rules.welcomePoints) await driver.batch(welcomeAtCounterStatements(before.id, rules.welcomePoints, now()));
+      const after = await driver.first(CUSTOMER_BY_ID_SQL, before.id);
+      return { customer: customerView(after), granted: after.points > before.points, welcomePoints: rules.welcomePoints, minPoints: rules.minPoints };
     },
 
     /** Gone for good: a guest who asks for their data to be erased (GDPR Art. 17). */

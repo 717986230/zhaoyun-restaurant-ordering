@@ -1804,7 +1804,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(off.status, 403);
       assert.equal(off.json.code, "RESERVATIONS_OFF");
 
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 10, maxParty: 6, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0 };
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 10, maxParty: 6, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0, minPoints: 0 };
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, hours: [{ days: EVERY_DAY, from: "20:00", to: "12:00" }] } } })).status, 400, "a period ends after it starts");
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, intervalMinutes: 7 } } })).status, 400);
       assert.equal((await call("PUT", "/api/admin/settings", { role: "staff", body: { reservations: rules } })).status, 403, "the owner's rules");
@@ -1955,7 +1955,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     }],
 
     ["a guest picks their own table online: only a free one big enough, never one already booked for that stay", async () => {
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [{ table: "s1", seats: 2 }, { table: "S2", seats: 4 }], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0 };
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [{ table: "s1", seats: 2 }, { table: "S2", seats: 4 }], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0, minPoints: 0 };
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, tables: [{ table: "S1", seats: 2 }, { table: "s1", seats: 4 }] } } })).status, 400, "a table listed twice");
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, tables: [{ table: "S1", seats: 0 }] } } })).status, 400);
       const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } });
@@ -1995,7 +1995,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     }],
 
     ["online bookings are held to limits per guest and per phone, no-shows stop them, and the floor finds every booking in its records", async () => {
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 1 };
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 1, minPoints: 0 };
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, maxActivePerGuest: 0 } } })).status, 400);
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } })).status, 200);
       const { booking } = (await call("GET", "/api/reservations/availability")).json;
@@ -2059,6 +2059,70 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("POST", "/api/customer/delete", { customerToken: gone, body: { password: "secret123" } })).status, 204);
       const after = (await records(`q=${kept.json.reservation.reference}`))[0];
       assert.deepEqual([after.status, after.name, after.phone, after.customerId], ["cancelled", "", "", null]);
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
+    }],
+
+    ["booking is for members: 10 points to book, 10 for the first paid visit or at the counter, 5 off for a booking not kept and given back if it was", async () => {
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 5, maxPerDayPerGuest: 1, noShowLimit: 0, minPoints: 10, welcomePoints: 10, noShowPoints: 5, noShowAfterMinutes: 30 };
+      for (const bad of [{ minPoints: -1 }, { welcomePoints: 1.5 }, { noShowAfterMinutes: 721 }]) {
+        assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, ...bad } } })).status, 400, JSON.stringify(bad));
+      }
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules, loyalty: { enabled: false }, guestOrdering: { ...OPEN_ORDERING, pickup: true, hours: [], maxOpenPickups: 5 } } })).status, 200);
+      const { booking } = (await call("GET", "/api/reservations/availability")).json;
+      assert.deepEqual([booking.minPoints, booking.welcomePoints, booking.noShowPoints], [10, 10, 5], "the page says so before anything is picked");
+      const stamp = Date.now().toString(36);
+      const signUp = async (name) => {
+        const session = (await call("POST", "/api/customer/register", { body: { email: `${name}-${stamp}@example.com`, password: "secret123", name } })).json;
+        await verifyEmail(call, assert, session.token);
+        return session;
+      };
+      const day = (offset) => addDaysTo(booking.today, offset);
+      const book = (customerToken, date) => call("POST", "/api/reservations", { customerToken, body: { date, time: "18:00", party: 2, name: "Lena", phone: "+43 660 4445566" } });
+      const points = async (token) => (await call("GET", "/api/customer", { customerToken: token })).json.customer.points;
+      const kinds = async (token) => (await call("GET", "/api/customer/points", { customerToken: token })).json.entries.map((entry) => [entry.kind ?? entry.reason, entry.delta]);
+
+      // New: no points, no booking — said with what it takes.
+      const lena = await signUp("lena");
+      const refused = await book(lena.token, day(3));
+      assert.deepEqual([refused.status, refused.json.code, refused.json.minPoints, refused.json.points], [403, "NOT_ENOUGH_POINTS", 10, 0]);
+
+      // The first visit at the counter: the waiter scans the member code. Once, ever.
+      assert.equal((await call("POST", `/api/admin/members/${lena.customer.id}/visit`, {})).status, 401, "the floor's, not anyone's");
+      const visit = await call("POST", `/api/admin/members/${lena.customer.id}/visit`, { role: "staff" });
+      assert.deepEqual([visit.status, visit.json.granted, visit.json.customer.points], [200, true, 10]);
+      const again = await call("POST", `/api/admin/members/${lena.customer.id}/visit`, { role: "staff" });
+      assert.deepEqual([again.json.granted, again.json.customer.points], [false, 10], "a second visit brings no second bonus");
+      assert.equal((await call("POST", "/api/admin/members/nobody/visit", { role: "staff" })).status, 404);
+      const kept = await book(lena.token, day(3));
+      assert.equal(kept.status, 201, JSON.stringify(kept.json));
+
+      // Not kept: 5 off, once; marked kept after all, they come back.
+      const id = kept.json.reservation.id;
+      const mark = (status) => call("PATCH", `/api/admin/reservations/${id}`, { role: "staff", body: { status } });
+      assert.equal((await mark("no_show")).status, 200);
+      assert.equal(await points(lena.token), 5);
+      assert.equal((await book(lena.token, day(4))).json.code, "NOT_ENOUGH_POINTS", "5 is not enough");
+      await mark("no_show");
+      assert.equal(await points(lena.token), 5, "marked twice, taken once");
+      await mark("seated");
+      assert.equal(await points(lena.token), 10);
+      assert.deepEqual(await kinds(lena.token), [["no_show_back", 5], ["no_show", -5], ["welcome", 10]]);
+
+      // The first paid visit gives the bonus by itself: an order from the account, paid.
+      const max = await signUp("max");
+      const order = (await call("POST", "/api/guest/orders", { customerToken: max.token, body: { clientRequestId: `contract-member-${stamp}`, channel: "pickup", note: "", items: [{ id: "photo-r1", qty: 1 }] } })).json.order;
+      const bill = (await call("GET", `/api/admin/tables/${order.table}/bill`, { role: "staff" })).json.bill;
+      const paid = await call("POST", "/api/admin/checkout", { role: "staff", body: { table: order.table, items: bill.items.map((line) => ({ orderItemId: line.orderItemId, quantity: line.qty })), payments: [{ type: "cash", amount: bill.total }] } });
+      assert.equal(paid.status, 201, JSON.stringify(paid.json));
+      assert.equal(await points(max.token), 10);
+      assert.equal((await call("POST", `/api/admin/members/${max.customer.id}/visit`, { role: "staff" })).json.granted, false, "had it already");
+      assert.equal((await book(max.token, day(5))).status, 201);
+
+      // Gone past its time without a check-in: not kept, by itself.
+      const late = (await call("POST", "/api/admin/reservations", { role: "staff", body: { date: day(-1), time: "19:00", party: 2, name: "Spät", phone: "01 5550100" } })).json.reservation;
+      const yesterday = (await call("GET", `/api/admin/reservations?from=${day(-1)}&to=${day(-1)}`, { role: "staff" })).json.reservations;
+      assert.equal(yesterday.find((entry) => entry.id === late.id).status, "no_show");
 
       await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
     }],
