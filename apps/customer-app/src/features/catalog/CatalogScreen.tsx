@@ -414,7 +414,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
         <section className="detail-face detail-back" aria-label={t(state.language, "detailRegion")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <button className="flip-back" onClick={(event) => { event.stopPropagation(); dispatch({ type: "toggle-product-flip" }); }}>{t(state.language, "back")}</button>
           <div><small>{product.sku} · {t(state.language, "breakdown")}</small><h3>{productName(product, state.language)}</h3><p>{product.description}</p></div>
-          <div className="detail-back-scroll" onClick={(event) => event.stopPropagation()}>
+          <div className="detail-back-scroll" tabIndex={0} onClick={(event) => event.stopPropagation()}>
             {/* A set is taken apart into its dishes; a dish into its ingredients. */}
             {isSet(product)
               ? <SetList product={product} byId={byId} language={state.language} />
@@ -692,7 +692,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     </div>
     <nav id="chips" ref={chipsRef} className="chips">{categories.map((category) => <button key={category} className={`chip ${category === FEATURED_PAGE ? "chip-featured" : ""} ${category === SETS_PAGE ? "chip-sets" : ""} ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}</nav>
     <div className="festive-garland" aria-hidden="true" />
-    <div id="stack" ref={stackRef} className="stack">
+    {/* Behind an open dish the list only shows through, dimmed: out of reach of taps, the keyboard and screen readers. */}
+    <div id="stack" ref={stackRef} className="stack" inert={Boolean(activeProduct)}>
       <div ref={sheetRef} className="page-sheet">
         {prevPage && <p className="page-hint page-hint-prev" aria-hidden="true"><i /><span className="page-hint-idle">↑ {t(state.language, "prevPage")} · {pageName(prevPage)}</span><span className="page-hint-armed">{t(state.language, "releaseToTurn")} · {pageName(prevPage)}</span></p>}
         <motion.div key={`${state.category}|${query}`} className={`stack-page ${turn.current.direction ? "turned" : ""}`}

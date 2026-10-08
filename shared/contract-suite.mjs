@@ -1422,6 +1422,10 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const atTable = (items, extra = {}) => call("POST", "/api/guest/orders", { tableToken, ...extra, body: { clientRequestId: `contract-guest-${++n}`, channel: "dine-in", table: "G1", note: "", items } });
       const ramen = [{ id: "photo-r1", qty: 1 }];
 
+      // The menu asks before the cart is filled: not open yet, and only with the card's token.
+      const tableState = (token = tableToken) => call("GET", "/api/guest/tables/g1", { tableToken: token });
+      assert.deepEqual((await tableState()).json, { table: "G1", open: false });
+      assert.equal((await tableState("wrong-token-000")).status, 403);
       const notOpen = await atTable(ramen);
       assert.equal(notOpen.status, 409, "a table nobody opened takes no orders");
       assert.equal(notOpen.json.code, "TABLE_NOT_OPEN");
@@ -1431,6 +1435,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(opened.json.session.table, "G1");
       const overview = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.find((table) => table.table === "G1");
       assert.ok(overview.orderingUntil > new Date().toISOString(), "the floor sees the table is open for ordering, and until when");
+      assert.equal((await tableState()).json.open, true, "and the menu sees it too");
 
       assert.equal((await atTable([{ id: "photo-r1", qty: 6 }])).json.code, "ORDER_TOO_LARGE", "more items than an order may have");
       const tooDear = await atTable([{ id: "photo-r1", qty: 5 }]);
@@ -2302,6 +2307,40 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(await left(), undefined);
       assert.ok((await call("GET", "/api/catalog")).json.products.some((product) => product.id === dish.id), "back on the guests' menu");
       await call("DELETE", `/api/pos/tables/S1/claim`, asMei);
+    }],
+
+    ["rush hour: tables order at once, a resent order is one order, the last portions go once, and a table is paid once", async () => {
+      const stamp = Date.now().toString(36);
+      const catalog = (await call("GET", "/api/catalog")).json.products;
+      const dish = catalog.filter((product) => product.kind === "food" && !product.bundleItems?.length).at(-2);
+      const device = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Rush" } })).json.token;
+      const waiter = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Rush", pin: "8642" } })).json.staff;
+      const asWaiter = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: device, body: { staffId: waiter.id, pin: "8642" } })).json.token };
+      const tables = ["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8"];
+      for (const table of tables) assert.equal((await call("POST", `/api/pos/tables/${table}/claim`, asWaiter)).status, 200);
+      const order = (table, id, qty = 1) => call("POST", "/api/pos/orders", { ...asWaiter, body: { clientRequestId: `rush-${stamp}-${id}`, table, note: "", items: [{ id: dish.id, qty }] } });
+
+      // Eight tables at the same moment: eight orders, eight numbers.
+      const placed = await Promise.all(tables.map((table, index) => order(table, `t${index}`)));
+      assert.deepEqual(placed.map((response) => response.status), tables.map(() => 201), JSON.stringify(placed.map((response) => response.json)));
+      assert.equal(new Set(placed.map((response) => response.json.order.no)).size, tables.length, "no number given twice");
+
+      // The same order sent twice at once (a tap that retried): one order.
+      const twice = await Promise.all([order("H1", "same"), order("H1", "same")]);
+      assert.ok(twice.every((response) => response.status < 300), JSON.stringify(twice.map((response) => response.json)));
+      assert.equal(twice[0].json.order.id, twice[1].json.order.id, "the same order, not a second one");
+
+      // Three portions left, five tables at once: three get one.
+      assert.equal((await call("PUT", `/api/admin/products/${dish.id}/stock`, { admin: true, body: { dailyLimit: 3 } })).status, 200);
+      const last = await Promise.all(tables.slice(0, 5).map((table, index) => order(table, `l${index}`)));
+      assert.deepEqual(last.map((response) => response.status).sort(), [201, 201, 201, 409, 409]);
+      await call("PUT", `/api/admin/products/${dish.id}/stock`, { admin: true, body: { dailyLimit: null, leftToday: null } });
+
+      // Two waiters settle the same table at the same moment: it is paid once.
+      const bill = (await call("GET", "/api/admin/tables/H2/bill", asWaiter)).json.bill;
+      const settle = () => call("POST", "/api/admin/checkout", { ...asWaiter, body: { table: "H2", items: bill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: bill.total }] } });
+      const paid = await Promise.all([settle(), settle()]);
+      assert.equal(paid.filter((response) => response.status === 201).length, 1, JSON.stringify(paid.map((response) => [response.status, response.json.error])));
     }],
 
     ["delivery platforms: their orders come in by webhook once each, the floor accepts and the kitchen prints, a cancel voids, the report counts them", async () => {

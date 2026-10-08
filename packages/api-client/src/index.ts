@@ -616,6 +616,11 @@ export class RestaurantApi {
     return this.#request("/api/guest/orders", { method: "POST", body: JSON.stringify(command) });
   }
 
+  /** Whether this table may order yet (a waiter opened it), with its card's token. */
+  tableOrdering(table: string): Promise<{ table: string; open: boolean }> {
+    return this.#request(`/api/guest/tables/${encodeURIComponent(table)}`);
+  }
+
   /** The orders this phone placed, by the ids it made up for them; no account needed. */
   trackOrders(clientRequestIds: string[]): Promise<{ orders: ApiOrder[] }> {
     return this.#request(`/api/guest/orders?ids=${clientRequestIds.map(encodeURIComponent).join(",")}`);

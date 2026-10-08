@@ -581,6 +581,16 @@ html.plt-android .screen.active {
   background: var(--line);
 }
 
+/* The capsule's segments look 28px tall; a finger gets 44 (WCAG 2.5.8 and
+   Apple's guide): the touch area reaches past the capsule, not the drawing. */
+.flag::after,
+.icon-btn.scheme-toggle::after,
+.icon-btn.guest-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
+}
+
 .flag.on::before,
 .flag.on + .flag::before,
 .flags:has(.flag.on:last-child) + .scheme-toggle::before {
@@ -3697,6 +3707,16 @@ button:focus-visible,
   place-items: center;
   color: var(--muted);
   text-align: center;
+}
+
+/* At the table, before it is opened: said at the top of the cart. */
+.cart-hint.table-not-open {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--ink);
 }
 
 /* What signing up at the table brings, and that it came. */

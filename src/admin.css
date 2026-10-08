@@ -220,6 +220,16 @@ button {
   background: transparent;
 }
 
+/* Drawn 30px tall, touched 46: the touch area reaches past the capsule. */
+.admin-languages button {
+  position: relative;
+}
+.admin-languages button::after {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
+}
+
 .admin-languages button.on {
   background: var(--a-head-2);
 }
