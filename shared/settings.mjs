@@ -350,7 +350,7 @@ export function menuSettingsView(settings) {
     ordering: orderingMenuView(settings.guestOrdering),
     // Whether the menu links to the booking page.
     reservations: Boolean(settings.reservations?.enabled),
-    // Signing up from a table's code brings these points (shared/http.mjs, register); said only when it does.
+    // A new account brings these points, once (shared/http.mjs, register); said only when it does.
     ...(customerAccountsOn(settings) && settings.reservations?.signupPoints ? { signupPoints: settings.reservations.signupPoints } : {}),
     loyalty: settings.loyalty?.enabled
       ? { pointsPerEuro: settings.loyalty.pointsPerEuro, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }

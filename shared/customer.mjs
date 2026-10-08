@@ -336,17 +336,10 @@ export function noShowPointsStatements(reservationId, points, at) {
 }
 
 /** Signed up after scanning a table's code: the bonus, once per account. */
-/**
- * Sign-up bonuses one table gives in a day: a table seats a party, not a
- * stack of made-up phone numbers each bringing points to spend on dishes.
- */
-export const SIGNUP_BONUSES_PER_TABLE_PER_DAY = 6;
-
-export function signupPointsStatements(customerId, points, at, table = "") {
+export function signupPointsStatements(customerId, points, at) {
   if (!points) return [];
   return [
-    // The table it was given at, in the note: how many a table has had today is counted from it.
-    ["INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at) VALUES (?, ?, ?, 'adjust', 'signup', ?, ?)", [`signup-${customerId}`, customerId, points, table, at]],
+    ["INSERT OR IGNORE INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at) VALUES (?, ?, ?, 'adjust', 'signup', '', ?)", [`signup-${customerId}`, customerId, points, at]],
     [APPLY_NEW_POINTS_SQL, applyNewParams(`signup-${customerId}`, "signup", at)]
   ];
 }

@@ -173,8 +173,7 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     // Email codes from one address: each account has its own limits too (shared/email-verify.mjs).
     mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
     // Guest sign-ups from one address in ten minutes: a full dining room on
-    // the restaurant's Wi-Fi, not a script. The points each new account could
-    // bring are capped per table too (SIGNUP_BONUSES_PER_TABLE_PER_DAY).
+    // the restaurant's Wi-Fi, not a script making accounts for their points.
     registerLimiter: createRateLimiter({ windowMs: 10 * 60_000, max: 40 })
   };
 }
@@ -370,19 +369,6 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     return null;
   }
 
-  /**
-   * Whether a request comes from a table's printed code: a table on the
-   * floor and the token on its card. A restaurant with no tables set up has no
-   * tokens to check: there the table number is taken at its word.
-   */
-  async function scannedAtTable(request, tableInput) {
-    const table = String(tableInput ?? "").trim().toUpperCase();
-    if (!TABLE_PATTERN.test(table)) return false;
-    if (!await store.hasTables()) return true;
-    const registered = await store.getTable(table);
-    return Boolean(registered?.enabled && tokenMatches(request.headers.get("x-table-token"), registered.token));
-  }
-
   /** Responses that changed nothing anyone watches (a POS keeping its table): no live event, no audit. */
   const QUIET = new WeakSet();
   const quiet = (response) => {
@@ -513,10 +499,11 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const { value, invalid } = await body(request, CustomerRegisterBody);
           if (invalid) return invalid;
           try {
-            const { table, ...account } = value;
+            // `table` is what older menus still send; the bonus no longer depends on it.
+            const { table: _table, ...account } = value;
             const session = await customers.register(account);
-            // Signed up at the restaurant, from a table's code (its number and the token printed on its card): the bonus.
-            if (table && await scannedAtTable(request, table) && await store.reservations.signupBonus(session.customer.id, table.trim().toUpperCase())) {
+            // A new account: the sign-up bonus, once.
+            if (await store.reservations.signupBonus(session.customer.id)) {
               return json({ ...session, customer: await customers.byIdView(session.customer.id), signupBonus: true }, 201);
             }
             return json(session, 201);

@@ -1360,6 +1360,8 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     }],
 
     ["guests register with an email, keep favourites, and sign in and out", async () => {
+      // Counted from zero: no sign-up bonus here (it has its own check further down).
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { signupPoints: 0 } } })).status, 200);
       const guest = { email: "Mei.Lin@Example.com", name: "Mei", password: "noodles-4-life" };
       const closed = await call("POST", "/api/customer/register", { body: guest });
       assert.equal(closed.status, 403, "no guest accounts until the owner wants them");
@@ -1491,6 +1493,8 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     }],
 
     ["guests earn points on what they pay and spend them on rewards; a storno and a cancellation undo them", async () => {
+      // Counted from zero: no sign-up bonus here (it has its own check further down).
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { signupPoints: 0 } } })).status, 200);
       await call("PUT", "/api/admin/settings", { admin: true, body: { guestOrdering: { ...OPEN_ORDERING, pickup: true, hours: [], maxOpenPickups: 5 } } });
       for (const loyalty of [{ pointsPerEuro: -1 }, { rewards: [{ productId: "photo-n1-6", points: 0 }] }, { rewards: [{ productId: "a", points: 1 }, { productId: "a", points: 2 }] }, { maxRewardsPerOrder: 0 }]) {
         assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty } })).status, 400, `${JSON.stringify(loyalty)} must be refused`);
@@ -2202,35 +2206,35 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("POST", "/api/customer/email-code", { customerToken: signedIn.json.token, body: {} })).json.code, "NO_EMAIL");
     }],
 
-    ["signing up at a table brings 20 points; each booking costs 5, back when it is cancelled or declined", async () => {
-      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 5, maxPerDayPerGuest: 3, noShowLimit: 0, minPoints: 0, welcomePoints: 0, signupPoints: 20, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 0 };
-      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } })).status, 200);
-      const { booking } = (await call("GET", "/api/reservations/availability")).json;
-      assert.deepEqual([booking.signupPoints, booking.bookingPoints, booking.minPoints], [20, 5, 5], "a booking needs what it costs");
-      assert.equal((await call("GET", "/api/catalog")).json.menu.signupPoints, 20, "the menu says it at the table, where guests sign up");
-      const card = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "Q7" } })).json.table;
+    ["a new account brings 20 points, once; each booking costs 5, back when it is cancelled or declined", async () => {
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 5, maxPerDayPerGuest: 3, noShowLimit: 0, minPoints: 0, welcomePoints: 0, signupPoints: 0, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 0 };
+      const setRules = async (change) => assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, ...change } } })).status, 200);
       // Phone accounts: nothing to verify before booking.
       const stamp = Date.now().toString().slice(-6);
-      const signUp = (prefix, extra = {}) => call("POST", "/api/customer/register", { ...extra, body: { email: `${prefix} ${stamp}`, password: "secret123", ...(extra.body ?? {}) } });
+      const signUp = (prefix) => call("POST", "/api/customer/register", { body: { email: `${prefix} ${stamp}`, password: "secret123" } });
 
-      // At the table, from its code: 20 points. The number alone, or from home: none.
-      const atTable = await signUp("0699 1", { headers: { "x-table-token": card.token }, body: { table: "Q7" } });
-      assert.deepEqual([atTable.status, atTable.json.customer.points, atTable.json.signupBonus], [201, 20, true]);
-      assert.equal((await signUp("0699 2", { headers: { "x-table-token": "not-the-token" }, body: { table: "Q7" } })).json.customer.points, 0, "a made-up token brings nothing");
-      const fromHome = (await signUp("0699 3")).json;
-      assert.equal(fromHome.customer.points, 0);
-      // One table, one day: six sign-up bonuses at most; the seventh account is made, without points.
-      const more = [];
-      for (const prefix of ["0699 41", "0699 42", "0699 43", "0699 44", "0699 45", "0699 46"]) {
-        more.push((await signUp(prefix, { headers: { "x-table-token": card.token }, body: { table: "Q7" } })).json);
-      }
-      assert.deepEqual(more.map((session) => session.customer.points), [20, 20, 20, 20, 20, 0]);
-      assert.equal(more.at(-1).signupBonus, undefined);
+      // While the owner gives nothing for signing up: no points, and nothing said.
+      await setRules({ signupPoints: 0 });
+      const without = (await signUp("0699 3")).json;
+      assert.deepEqual([without.customer.points, without.signupBonus], [0, undefined]);
+
+      await setRules({ signupPoints: 20 });
+      const { booking } = (await call("GET", "/api/reservations/availability")).json;
+      assert.deepEqual([booking.signupPoints, booking.bookingPoints, booking.minPoints], [20, 5, 5], "a booking needs what it costs");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.signupPoints, 20, "the menu says it where guests sign up");
+
+      // Signing up: 20 points, wherever it is done — the menu, the booking page, at home.
+      const signedUp = await signUp("0699 1");
+      assert.deepEqual([signedUp.status, signedUp.json.customer.points, signedUp.json.signupBonus], [201, 20, true]);
+      // Once per account: signing in again gives nothing more.
+      const again = await call("POST", "/api/customer/sign-in", { body: { email: `0699 1 ${stamp}`, password: "secret123" } });
+      assert.deepEqual([again.status, again.json.customer.points], [200, 20]);
+      const fromHome = without;
 
       const day = (offset) => addDaysTo(booking.today, offset);
       const book = (customerToken, date, time = "18:00") => call("POST", "/api/reservations", { customerToken, body: { date, time, party: 2, name: "Nina", phone: "+43 660 7778899" } });
       const points = async (token) => (await call("GET", "/api/customer", { customerToken: token })).json.customer.points;
-      const nina = atTable.json.token;
+      const nina = signedUp.json.token;
 
       // Each booking costs 5.
       const first = await book(nina, day(4));
