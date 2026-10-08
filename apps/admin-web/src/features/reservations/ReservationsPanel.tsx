@@ -390,6 +390,8 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
       <label><span>{t("resNoShowPoints")}</span><input type="number" id="resNoShowPoints" min={0} max={100000} value={draft.noShowPoints} onChange={(event) => set("noShowPoints", Number(event.target.value))} /></label>
       <label><span>{t("resNoShowAfter")}</span><input type="number" id="resNoShowAfter" min={0} max={720} step={5} value={draft.noShowAfterMinutes} onChange={(event) => set("noShowAfterMinutes", Number(event.target.value))} /></label>
     </div>
+    {/* What a guest sees, in one line, and the guard against made-up numbers. */}
+    <p className="settings-hint" id="resPointsSummary">{t("resPointsSummary", { signup: draft.signupPoints, booking: draft.bookingPoints, bookings: draft.bookingPoints ? Math.floor(draft.signupPoints / draft.bookingPoints) : 0 })}</p>
 
     <p className="settings-label">{t("resHours")}</p>
     {draft.hours.map((period, index) => <div className="res-period" key={index}>
