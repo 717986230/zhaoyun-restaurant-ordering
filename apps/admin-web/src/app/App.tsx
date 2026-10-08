@@ -15,6 +15,7 @@ import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { GuestsPanel } from "../features/guests/GuestsPanel";
+import { LinksPanel } from "../features/links/LinksPanel";
 import { ReportsPanel } from "../features/reports/ReportsPanel";
 import { ReservationsPanel } from "../features/reservations/ReservationsPanel";
 import { DeliveryPanel } from "../features/delivery/DeliveryPanel";
@@ -57,8 +58,8 @@ const LIVE_SETTLE_MS = 250;
  */
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
-  if (role === "staff") return ["board", "tables", "reservations", "delivery"];
-  return showOrdering ? ["catalog", "board", "tables", "reservations", "delivery", "reports", "printers", "guests", "system"] : ["catalog", "reservations", "delivery", "guests", "system"];
+  if (role === "staff") return ["board", "tables", "reservations", "delivery", "links"];
+  return showOrdering ? ["catalog", "board", "tables", "reservations", "delivery", "reports", "printers", "guests", "system", "links"] : ["catalog", "reservations", "delivery", "guests", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
@@ -70,7 +71,8 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
   reports: "tabReports",
   printers: "tabPrinters",
   guests: "tabGuests",
-  system: "tabSettings"
+  system: "tabSettings",
+  links: "tabLinks"
 };
 
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
@@ -613,7 +615,7 @@ export function App() {
       <div className="admin-brand">
         <strong>{restaurantName || t("admin")}</strong>
         {state.role && <span className={`admin-role ${state.role}`}>{state.account ? state.account.name : t(ROLE_KEYS[state.role])}</span>}
-        <i className={`admin-status ${state.connected ? "online" : ""} ${live ? "live" : ""}`} title={t(state.connected ? (live ? "onlineLive" : "online") : "offline")} aria-label={t(state.connected ? (live ? "onlineLive" : "online") : "offline")} />
+        <i role="img" className={`admin-status ${state.connected ? "online" : ""} ${live ? "live" : ""}`} title={t(state.connected ? (live ? "onlineLive" : "online") : "offline")} aria-label={t(state.connected ? (live ? "onlineLive" : "online") : "offline")} />
       </div>
       <div className="admin-head-actions">
         {languagePicker}
@@ -621,7 +623,9 @@ export function App() {
         {state.role && <button className="head-action" onClick={() => void signOut()} aria-label={t("signOut")} title={t("signOut")}><SignOutIcon /><em>{t("signOut")}</em></button>}
       </div>
     </header>
-    <nav className="admin-tabs" aria-label={t("modules")}>{tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}</nav>
+    <nav className="admin-tabs" aria-label={t("modules")}>
+      {tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}
+    </nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     </div>
     <main>
@@ -662,6 +666,7 @@ export function App() {
       {state.tab === "delivery" && <DeliveryPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
       {state.tab === "reservations" && <ReservationsPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
       {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
+      {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel
         api={adminApi}

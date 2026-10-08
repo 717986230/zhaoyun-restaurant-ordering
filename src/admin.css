@@ -4547,3 +4547,42 @@ em.voided {
     transition: none;
   }
 }
+
+/* 跳转: the other apps, one row each, opening in a tab of their own. */
+.link-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 640px;
+}
+.link-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 8px;
+  background: var(--a-card);
+  color: var(--a-head);
+  text-decoration: none;
+}
+.link-list a:hover,
+.link-list a:focus-visible {
+  border-color: var(--a-accent);
+}
+.link-list a span:first-child {
+  display: grid;
+  gap: 3px;
+}
+.link-list small {
+  color: var(--a-muted);
+  font-size: 13px;
+}
+.link-list a > span:last-child {
+  color: var(--a-accent);
+  font-size: 18px;
+}
