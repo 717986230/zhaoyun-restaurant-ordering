@@ -73,9 +73,35 @@ jobs:
       - name: Web build
         run: npm run build
 
-      # WebKit for the iPhone projects: every browser on iOS is WebKit.
+      # The browsers are kept between runs, by Playwright's own version: a
+      # download that stalls once cost a whole twenty-minute run.
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # WebKit for the iPhone projects: every browser on iOS is WebKit. A
+      # stalled download is cut off after five minutes and tried again, once.
       - name: Install Playwright Chromium and WebKit
-        run: npx playwright install --with-deps chromium webkit
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2; do
+            timeout 300 npx playwright install --with-deps chromium webkit && exit 0
+            echo "Browser download stalled (attempt $attempt)"
+          done
+          exit 1
+
+      # From the cache the browsers are there, the system libraries they need are not.
+      - name: Install the browsers' system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        timeout-minutes: 5
+        run: npx playwright install-deps chromium webkit
 
       - name: Responsive end-to-end tests
         run: npx playwright test --shard=${{ matrix.shard }}/3

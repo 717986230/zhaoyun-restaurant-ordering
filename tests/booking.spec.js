@@ -166,6 +166,8 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
 
   await expect(page.locator("#bookingStatus")).toHaveText("已确认");
   await expect(page.locator("#bookingTable")).toHaveText("4 号桌");
+  // What it cost, on the ticket, and what is left of the 10.
+  await expect(page.locator("#bookingPointsLeft")).toHaveText("已扣 5 积分，还剩 5 积分");
   const reference = (await page.locator("#bookingReference").textContent()).trim();
   expect(reference).toMatch(/^[A-Z2-9]{6}$/);
   // Shown above, it is not listed a second time under it.
