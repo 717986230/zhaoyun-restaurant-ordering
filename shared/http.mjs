@@ -27,7 +27,7 @@ import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboun
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
 import { liveEvent } from "./live.mjs";
-import { ICON_APPS, ICON_SIZES, iconRequest, isPng, manifestWithIcon, MAX_ICON_BYTES, svgHoldingPng } from "./app-icons.mjs";
+import { ICON_APPS, ICON_SIZES, iconRequest, isPng, servedManifest, MAX_ICON_BYTES, svgHoldingPng } from "./app-icons.mjs";
 import { createRateLimiter } from "./rate-limit.mjs";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
@@ -1552,9 +1552,10 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     if (icon) {
       const iconHeaders = { ...SECURITY_HEADERS, "cache-control": "no-cache", "content-security-policy": "default-src 'none'; img-src data:; sandbox" };
       if (icon.kind === "manifest") {
-        const version = (await store.storedAppIcons())[icon.app]?.version;
-        if (!version) return null;
-        return new Response(method === "HEAD" ? null : JSON.stringify(manifestWithIcon(icon.app, version)), { headers: { ...iconHeaders, "content-type": "application/manifest+json; charset=utf-8" } });
+        const [stored, settings] = await Promise.all([store.storedAppIcons(), icon.app === "menu" ? store.getSettings() : null]);
+        const manifest = servedManifest(icon.app, { version: stored[icon.app]?.version, name: settings?.restaurantName });
+        if (!manifest) return null;
+        return new Response(method === "HEAD" ? null : JSON.stringify(manifest), { headers: { ...iconHeaders, "content-type": "application/manifest+json; charset=utf-8" } });
       }
       const picture = await store.appIconFile(icon.app, icon.kind === "svg" ? "192" : icon.file);
       if (!picture) return null;

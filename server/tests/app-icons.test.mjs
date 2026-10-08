@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { APP_MANIFESTS, builtIcons, ICON_APPS, iconRequest, isPng, manifestWithIcon } from "../../shared/app-icons.mjs";
+import { APP_MANIFESTS, builtIcons, ICON_APPS, iconRequest, isPng, servedManifest } from "../../shared/app-icons.mjs";
 
 test("the manifests the server fills in are the ones public/ ships, icons aside", () => {
   for (const app of ICON_APPS) {
     const shipped = JSON.parse(readFileSync(new URL(`../../public/${app}.webmanifest`, import.meta.url), "utf8"));
     assert.deepEqual({ ...APP_MANIFESTS[app], icons: builtIcons(app) }, shipped, app);
-    assert.deepEqual(Object.keys(manifestWithIcon(app, "v1")).sort(), Object.keys(shipped).sort(), `${app}: nothing left out`);
+    assert.deepEqual(Object.keys(servedManifest(app, { version: "v1" })).sort(), Object.keys(shipped).sort(), `${app}: nothing left out`);
+    assert.equal(servedManifest(app), null, `${app}: nothing changed, the built file answers`);
   }
 });
 
@@ -23,4 +24,12 @@ test("only the icons' own addresses are the server's to answer", () => {
 test("a PNG is told by its signature", () => {
   assert.equal(isPng(readFileSync(new URL("../../public/icons/menu-192.png", import.meta.url))), true);
   assert.equal(isPng(new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'/>")), false);
+});
+
+test("the installed menu goes by the restaurant's name, once it has one of its own", () => {
+  const named = servedManifest("menu", { name: "Chiri Kitchen" });
+  assert.deepEqual([named.name, named.short_name], ["Chiri Kitchen", "Chiri Kitchen"]);
+  assert.deepEqual(named.icons, builtIcons("menu"), "the built icons, while there is no other");
+  assert.equal(servedManifest("menu", { name: "赵云" }), null, "the name it ships with: the built file");
+  assert.equal(servedManifest("pos", { name: "Chiri Kitchen" }), null, "the POS and the console keep theirs");
 });

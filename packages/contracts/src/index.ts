@@ -49,7 +49,8 @@ export type GuestOrderRefusal =
 /** `emailVerified`: the address, as it is now, was proved by a code (shared/email-verify.mjs). */
 /** A guest's account. Signed up by mobile number: `phone` is set, and `email` holds the same number (how they sign in). */
 export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string }
-export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer }
+/** `signupBonus`: signed up from a table's code, and the points for it given. */
+export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer; signupBonus?: boolean }
 /** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */
 export interface CustomerRegisterCommand { email: string; name?: string; password: string; table?: string }
 /** Every change is made against the password in force. */
@@ -657,6 +658,8 @@ export interface ApiMenuSettings {
   loyalty?: Omit<ApiLoyalty, "enabled"> | null;
   /** Guests can book a table online; absent from an older server. */
   reservations?: boolean;
+  /** The points a guest gets for signing up from a table's code; 0 or absent: none. */
+  signupPoints?: number;
 }
 
 export type PrintJobStatus = "queued" | "claimed" | "printing" | "printed" | "retry-wait" | "failed";

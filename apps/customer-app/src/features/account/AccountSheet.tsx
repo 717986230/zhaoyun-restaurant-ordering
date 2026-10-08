@@ -4,6 +4,7 @@ import type { ApiMenuSettings } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import type { Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
+import { assignedTableNo } from "../../app/table";
 import { g, pointsReason } from "../../app/guest-i18n";
 import { productName, t } from "../../app/i18n";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
@@ -20,6 +21,8 @@ interface Props {
   ordering: OrderingState;
   /** Who keeps the data, for the privacy notice. */
   restaurantName: string;
+  /** The points for signing up from a table's code (0: none). */
+  signupPoints: number;
 }
 
 const PASSWORD_MIN = 6;
@@ -57,13 +60,13 @@ async function downloadMyData(language: Language, dispatch: CustomerDispatch) {
  * and once in, their points and the rewards they buy with them, their
  * orders, and their settings — deleting the account included.
  */
-export function AccountSheet({ state, dispatch, products, account, loyalty, ordering, restaurantName }: Props) {
+export function AccountSheet({ state, dispatch, products, account, loyalty, ordering, restaurantName, signupPoints }: Props) {
   const language = state.language;
   const close = () => dispatch({ type: "sheet", sheet: null });
   return <Sheet id="accountSheet" title={g(language, "account")} closeLabel={t(language, "close")} onClose={close}>
     {account.signedIn && account.customer
-      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={restaurantName} />
-      : <SignInForm language={language} account={account} restaurantName={restaurantName} />}
+      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={restaurantName} signupPoints={signupPoints} />
+      : <SignInForm language={language} account={account} restaurantName={restaurantName} signupPoints={signupPoints} />}
   </Sheet>;
 }
 
@@ -71,11 +74,13 @@ function message(language: CustomerState["language"], error: unknown): string {
   if (!(error instanceof ApiError)) return g(language, "offline");
   if (error.code === "EMAIL_TAKEN") return g(language, "emailTaken");
   if (error.code === "ACCOUNTS_OFF") return g(language, "accountsOff");
+  if (error.code === "BAD_LOGIN") return g(language, "loginInvalid");
+  if (error.code === "NOT_MOBILE") return g(language, "phoneNotMobile");
   if (error.status === 401) return g(language, "wrongLogin");
   return error.message;
 }
 
-function SignInForm({ language, account, restaurantName }: { language: Language; account: CustomerAccount; restaurantName: string }) {
+function SignInForm({ language, account, restaurantName, signupPoints }: { language: Language; account: CustomerAccount; restaurantName: string; signupPoints: number }) {
   const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -85,7 +90,8 @@ function SignInForm({ language, account, restaurantName }: { language: Language;
   const [error, setError] = useState("");
   const registering = mode === "register";
   const mismatch = registering && repeat.length > 0 && password !== repeat;
-  const ready = email.includes("@") && (registering ? password.length >= PASSWORD_MIN && password === repeat : password.length > 0);
+  // An email or a mobile number: the server says which, and what is wrong with it.
+  const ready = email.trim().length >= 3 && (registering ? password.length >= PASSWORD_MIN && password === repeat : password.length > 0);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -104,6 +110,8 @@ function SignInForm({ language, account, restaurantName }: { language: Language;
 
   return <form className="guest-form" onSubmit={submit}>
     <p className="sheet-lead">{g(language, "signInLead")}</p>
+    {/* At a table, from its code: what signing up brings. */}
+    {signupPoints > 0 && assignedTableNo() ? <p className="signup-bonus" id="signupBonusHint">{g(language, "signupBonusHint", { n: signupPoints })}</p> : null}
     <div className="segmented" role="tablist">
       <button type="button" role="tab" aria-selected={!registering} className={!registering ? "on" : ""} onClick={() => setMode("sign-in")}>{g(language, "signIn")}</button>
       <button type="button" role="tab" aria-selected={registering} className={registering ? "on" : ""} onClick={() => setMode("register")}>{g(language, "register")}</button>
@@ -141,6 +149,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
   }
 
   return <div className="guest-account">
+    {account.signupBonus > 0 && <p className="signup-bonus" id="signupBonusGot" role="status">{g(language, "signupBonusGot", { n: account.signupBonus })}</p>}
     <div className="guest-card">
       <div>
         <strong>{g(language, "welcome", { name: customer.name || customer.email.split("@")[0] || customer.email })}</strong>
