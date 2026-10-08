@@ -1249,6 +1249,8 @@ export function createStore(driver) {
     /** The database answers: what /api/health asks. */
     ping: async () => Boolean(await first("SELECT 1 AS ok")),
     hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables LIMIT 1")),
+    /** Whether a waiter has opened the table for its guests to order (开台), and it has not run out. */
+    tableOpenForGuests: async (table) => Boolean(await first("SELECT table_no FROM table_sessions WHERE table_no = ? AND expires_at > ?", String(table), now())),
     // 2 before 10: numbers in the order a waiter counts them.
     listTables: async () => (await all("SELECT * FROM restaurant_tables ORDER BY length(table_no), table_no")).map(tableView),
     getTable: async (table) => tableView(await first("SELECT * FROM restaurant_tables WHERE table_no = ?", normalizeTableNo(table))),

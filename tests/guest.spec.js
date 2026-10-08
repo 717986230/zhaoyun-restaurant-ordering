@@ -64,14 +64,20 @@ test("a guest orders at the table a waiter opened, and it goes straight to the k
   await page.goto(`/?table=G5&k=${tableToken}`);
   await expect(page.locator(".dish-card").first()).toBeVisible();
 
-  // Before the waiter opens the table the menu takes the order, and the server refuses it with a reason.
+  // Before the waiter opens the table the cart says so at the top, while dishes are still being chosen;
+  // sent anyway, the server refuses it with the same reason.
   await row(page, "R1").locator(".quick-add").click();
   await expect(page.locator("#cartBar")).toContainText("1");
   await page.locator("#cartBar").click();
+  await expect(page.locator("#tableNotOpen")).toHaveText("这桌还没开台：可以先选好菜，请服务员开台后再下单");
   await page.locator("#placeOrder").click();
   await expect(page.locator("#cartSheet .cart-error")).toContainText("还没开台");
 
   expect((await admin(request, "post", "/api/admin/tables/G5/ordering", { open: true })).ok()).toBe(true);
+  await page.locator("#cartSheet .sheet-close").click();
+  // Opened: the cart no longer says it.
+  await page.locator("#cartBar").click();
+  await expect(page.locator("#tableNotOpen")).toHaveCount(0);
   await page.locator("#cartSheet .sheet-close").click();
 
   // A dish with its options and two of it, from its card.

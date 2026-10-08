@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { ApiMenuSettings, GuestChannel, GuestOrderCommand } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import type { Product } from "@zhaoyun/domain";
@@ -33,6 +34,14 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
   const channels: GuestChannel[] = [...(ordering.table ? ["dine-in" as const] : []), ...(ordering.pickup ? ["pickup" as const] : [])];
   const [chosen, setChosen] = useState<GuestChannel | null>(null);
   const channel = chosen && channels.includes(chosen) ? chosen : channels[0] ?? null;
+  // At the table: whether a waiter has opened it yet (开台), said before the cart is sent, not after.
+  const tableOrdering = useQuery({
+    queryKey: ["table-ordering", ordering.table],
+    enabled: channel === "dine-in" && ordering.open && Boolean(ordering.table),
+    queryFn: () => restaurantApi.tableOrdering(ordering.table!),
+    refetchInterval: 15_000,
+    retry: false
+  });
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -76,6 +85,7 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
         setError(g(language, "offline"));
       } else {
         if (failure.code === "SIGN_IN_REQUIRED") dispatch({ type: "sheet", sheet: "account" });
+        if (failure.code === "TABLE_NOT_OPEN") void tableOrdering.refetch();
         // A dish counted out for today (每日限量) is named, with how many there still are.
         const soldOut = failure.code === "SOLD_OUT" ? products.find((product) => product.sku === failure.details.sku) : undefined;
         const dish = soldOut ? productName(soldOut, language) : String(failure.details.sku ?? "");
@@ -89,6 +99,7 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
   }
 
   return <Sheet id="cartSheet" title={g(language, "cart")} closeLabel={t(language, "close")} onClose={() => dispatch({ type: "sheet", sheet: null })}>
+    {tableOrdering.data?.open === false && <p className="cart-hint table-not-open" id="tableNotOpen" role="status">{g(language, "tableNotOpenYet")}</p>}
     {!summary.lines.length ? <p className="sheet-empty">{g(language, "cartEmpty")}</p> : <>
       <ul className="cart-lines">{summary.lines.map(({ key, entry, product, unitCents }) => <li key={key} className={`cart-line ${entry.reward ? "reward" : ""}`} data-key={key}>
         <div className="cart-line-text">

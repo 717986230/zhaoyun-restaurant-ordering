@@ -1422,6 +1422,10 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const atTable = (items, extra = {}) => call("POST", "/api/guest/orders", { tableToken, ...extra, body: { clientRequestId: `contract-guest-${++n}`, channel: "dine-in", table: "G1", note: "", items } });
       const ramen = [{ id: "photo-r1", qty: 1 }];
 
+      // The menu asks before the cart is filled: not open yet, and only with the card's token.
+      const tableState = (token = tableToken) => call("GET", "/api/guest/tables/g1", { tableToken: token });
+      assert.deepEqual((await tableState()).json, { table: "G1", open: false });
+      assert.equal((await tableState("wrong-token-000")).status, 403);
       const notOpen = await atTable(ramen);
       assert.equal(notOpen.status, 409, "a table nobody opened takes no orders");
       assert.equal(notOpen.json.code, "TABLE_NOT_OPEN");
@@ -1431,6 +1435,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(opened.json.session.table, "G1");
       const overview = (await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.find((table) => table.table === "G1");
       assert.ok(overview.orderingUntil > new Date().toISOString(), "the floor sees the table is open for ordering, and until when");
+      assert.equal((await tableState()).json.open, true, "and the menu sees it too");
 
       assert.equal((await atTable([{ id: "photo-r1", qty: 6 }])).json.code, "ORDER_TOO_LARGE", "more items than an order may have");
       const tooDear = await atTable([{ id: "photo-r1", qty: 5 }]);

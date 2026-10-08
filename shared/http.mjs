@@ -460,6 +460,17 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       }
     }
 
+    // Whether this table may order yet: the menu says so before the cart is
+    // filled, not when it is sent (the table's card token, as for an order).
+    if (path[0] === "api" && path[1] === "guest" && path[2] === "tables" && path.length === 4 && method === "GET") {
+      const command = { table: decodeURIComponent(path[3]) };
+      const refused = await refuseUnknownTable(request, command);
+      if (refused) return refused;
+      const ordering = (await store.getSettings()).guestOrdering;
+      const open = !ordering?.requireOpenTable || await store.tableOpenForGuests(command.table);
+      return json({ table: command.table, open });
+    }
+
     if (path[0] === "api" && path[1] === "guest" && path[2] === "orders" && path.length === 3) {
       if (method === "POST") {
         const limited = throttlePublic(state.orderLimiter, ctx, "Too many orders from this device");
