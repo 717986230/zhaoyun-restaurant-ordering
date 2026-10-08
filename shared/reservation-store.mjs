@@ -16,7 +16,7 @@
 import { hashSessionToken, newSessionToken } from "./auth.mjs";
 import { now, uuid } from "./core.mjs";
 import {
-  bookingBackStatements, bookingPointsStatements, CUSTOMER_BY_ID_SQL, customerView, isOverdrawn, noShowBackStatements, noShowPointsStatements, signupPointsStatements,
+  bookingBackStatements, bookingPointsStatements, CUSTOMER_BY_ID_SQL, customerView, isOverdrawn, noShowBackStatements, noShowPointsStatements, signupPointsStatements, SIGNUP_BONUSES_PER_TABLE_PER_DAY,
   welcomeAtCounterStatements
 } from "./customer.mjs";
 import {
@@ -307,12 +307,16 @@ export function createReservationStore(driver, { settings }) {
      * A guest who signed up after scanning a table's code: the bonus, once
      * per account. Returns whether this gave it.
      */
-    async signupBonus(customerId) {
+    async signupBonus(customerId, table = "") {
       const { rules } = await context();
       if (!rules.signupPoints) return false;
+      // A table's share for the day given out already: the account is made, the points are not.
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const given = await driver.first("SELECT COUNT(*) AS n FROM points_ledger WHERE id LIKE 'signup-%' AND note = ? AND created_at >= ?", String(table), since);
+      if (table && Number(given?.n ?? 0) >= SIGNUP_BONUSES_PER_TABLE_PER_DAY) return false;
       const before = await driver.first("SELECT points FROM customers WHERE id = ?", String(customerId));
       if (!before) return false;
-      await driver.batch(signupPointsStatements(String(customerId), rules.signupPoints, now()));
+      await driver.batch(signupPointsStatements(String(customerId), rules.signupPoints, now(), String(table)));
       const after = await driver.first("SELECT points FROM customers WHERE id = ?", String(customerId));
       return after.points > before.points;
     },

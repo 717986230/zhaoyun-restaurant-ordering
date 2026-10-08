@@ -77,7 +77,9 @@ function message(language: CustomerState["language"], error: unknown): string {
   if (error.code === "BAD_LOGIN") return g(language, "loginInvalid");
   if (error.code === "NOT_MOBILE") return g(language, "phoneNotMobile");
   if (error.status === 401) return g(language, "wrongLogin");
-  return error.message;
+  if (error.status === 429) return g(language, "tooManyTries");
+  // Never the server's own words (English, technical) to a guest.
+  return g(language, "accountFailed");
 }
 
 function SignInForm({ language, account, restaurantName, signupPoints }: { language: Language; account: CustomerAccount; restaurantName: string; signupPoints: number }) {

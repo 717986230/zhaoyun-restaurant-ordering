@@ -171,7 +171,11 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     // and its limits (shared/reservations.mjs, guestLimit) do the rest.
     reservationLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 60 }),
     // Email codes from one address: each account has its own limits too (shared/email-verify.mjs).
-    mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 })
+    mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
+    // Guest sign-ups from one address in ten minutes: a full dining room on
+    // the restaurant's Wi-Fi, not a script. The points each new account could
+    // bring are capped per table too (SIGNUP_BONUSES_PER_TABLE_PER_DAY).
+    registerLimiter: createRateLimiter({ windowMs: 10 * 60_000, max: 40 })
   };
 }
 
@@ -503,13 +507,16 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         const throttle = authThrottle(ctx, state.customerFailures);
         if (throttle.denied) return throttle.denied;
         if (rest === "register") {
+          // New accounts from one address: a busy table's worth, not a script making them by the hundred.
+          const limited = throttlePublic(state.registerLimiter, ctx, "Too many new accounts from this device");
+          if (limited) return limited;
           const { value, invalid } = await body(request, CustomerRegisterBody);
           if (invalid) return invalid;
           try {
             const { table, ...account } = value;
             const session = await customers.register(account);
             // Signed up at the restaurant, from a table's code (its number and the token printed on its card): the bonus.
-            if (table && await scannedAtTable(request, table) && await store.reservations.signupBonus(session.customer.id)) {
+            if (table && await scannedAtTable(request, table) && await store.reservations.signupBonus(session.customer.id, table.trim().toUpperCase())) {
               return json({ ...session, customer: await customers.byIdView(session.customer.id), signupBonus: true }, 201);
             }
             return json(session, 201);

@@ -263,6 +263,9 @@ test("the console's records find a booking by phone and show its record", async 
   await page.goto("/admin.html");
   await page.getByRole("button", { name: "预约" }).first().click();
   await expect(page.locator("#reservationsPanel")).toBeVisible();
+  // The points rules said in one line, as a guest meets them, with the guard against made-up numbers.
+  await page.locator(".res-rules summary").click();
+  await expect(page.locator("#resPointsSummary")).toContainText("新客人在桌上扫码注册得 20 积分，每次预约扣 5 积分（取消退回），够预约 4 次。同一张桌每天最多 6 位");
   await page.getByRole("tab", { name: "预约单据" }).click();
   await page.locator("#resSearch").fill("5550199");
   await page.locator("#resRecords").getByRole("button", { name: "查询" }).click();

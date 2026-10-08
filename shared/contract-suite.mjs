@@ -2219,6 +2219,13 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await signUp("0699 2", { headers: { "x-table-token": "not-the-token" }, body: { table: "Q7" } })).json.customer.points, 0, "a made-up token brings nothing");
       const fromHome = (await signUp("0699 3")).json;
       assert.equal(fromHome.customer.points, 0);
+      // One table, one day: six sign-up bonuses at most; the seventh account is made, without points.
+      const more = [];
+      for (const prefix of ["0699 41", "0699 42", "0699 43", "0699 44", "0699 45", "0699 46"]) {
+        more.push((await signUp(prefix, { headers: { "x-table-token": card.token }, body: { table: "Q7" } })).json);
+      }
+      assert.deepEqual(more.map((session) => session.customer.points), [20, 20, 20, 20, 20, 0]);
+      assert.equal(more.at(-1).signupBonus, undefined);
 
       const day = (offset) => addDaysTo(booking.today, offset);
       const book = (customerToken, date, time = "18:00") => call("POST", "/api/reservations", { customerToken, body: { date, time, party: 2, name: "Nina", phone: "+43 660 7778899" } });
