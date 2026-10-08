@@ -167,6 +167,8 @@ PIN。密码存在你自己的后端（D1 或本机 SQLite）里，存的是 PBK
 - [变更记录](CHANGELOG.md)
 - [部署单元与备份](deploy/README.md)
 - [ADR-0001：TypeScript 模块化单体](docs/adr/0001-modular-monolith-typescript.md)
+- [优化提示词库](docs/optimize-prompts.md)：让 AI 审查和优化界面、速度、安全、积分规则时用
+- [动效提示词库](docs/motion-prompts.md)
 
 ## 已知边界
 
