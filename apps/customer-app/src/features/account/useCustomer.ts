@@ -17,6 +17,8 @@ export interface CustomerAccount {
   remove: (password: string) => Promise<void>;
   /** After an order or a payment: the points may have changed. */
   refresh: () => void;
+  /** The points just given for signing up from a table's code (0: none), to say so once. */
+  signupBonus: number;
 }
 
 const KEY = ["customer"] as const;
@@ -30,6 +32,7 @@ const KEY = ["customer"] as const;
 export function useCustomer(enabled: boolean): CustomerAccount {
   const queryClient = useQueryClient();
   const [token, setToken] = useState(customerToken);
+  const [signupBonus, setSignupBonus] = useState(0);
   const remember = useCallback((next: string | null) => {
     setCustomerToken(next);
     setToken(next ?? "");
@@ -56,6 +59,7 @@ export function useCustomer(enabled: boolean): CustomerAccount {
     signedIn: Boolean(token && profile.data),
     customer: profile.data?.customer ?? null,
     favorites: profile.data?.favorites ?? [],
+    signupBonus,
     async signIn(email, password) {
       const session = await restaurantApi.signInCustomer(email, password);
       remember(session.token);
@@ -64,10 +68,12 @@ export function useCustomer(enabled: boolean): CustomerAccount {
       // From a table's code (its token rides along in x-table-token): the sign-up bonus.
       const table = assignedTableNo();
       const session = await restaurantApi.registerCustomer({ ...command, ...(table ? { table } : {}) });
+      setSignupBonus(session.signupBonus ? session.customer.points : 0);
       remember(session.token);
     },
     async signOut() {
       await restaurantApi.signOutCustomer().catch(() => undefined);
+      setSignupBonus(0);
       remember(null);
     },
     async toggleFavorite(productId) {

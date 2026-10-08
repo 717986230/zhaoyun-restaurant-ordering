@@ -2207,6 +2207,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } })).status, 200);
       const { booking } = (await call("GET", "/api/reservations/availability")).json;
       assert.deepEqual([booking.signupPoints, booking.bookingPoints, booking.minPoints], [20, 5, 5], "a booking needs what it costs");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.signupPoints, 20, "the menu says it at the table, where guests sign up");
       const card = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "Q7" } })).json.table;
       // Phone accounts: nothing to verify before booking.
       const stamp = Date.now().toString().slice(-6);

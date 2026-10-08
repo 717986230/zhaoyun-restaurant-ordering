@@ -13,6 +13,9 @@
 
 export const ICON_APPS = ["menu", "pos", "admin"];
 
+/** The name a restaurant has before it sets its own (shared/settings.mjs): the menu then keeps "Menu". */
+const DEFAULT_RESTAURANT_NAME = "赵云";
+
 /** The sizes a manifest and the iPhone's home screen ask for: the form field, the file name, its pixels. */
 export const ICON_SIZES = [
   { field: "icon180", file: "180", pixels: 180 },
@@ -74,18 +77,24 @@ export function builtIcons(app) {
 }
 
 /**
- * The manifest with the owner's icon. Each address carries the icon's version,
- * so a phone that installed the app sees a new picture as a change and takes it.
+ * The manifest as served: the owner's icon when there is one (`version`; each
+ * address carries it, so a phone that installed the app sees a new picture as
+ * a change and takes it), and the guests' menu under the restaurant's own
+ * name (`name`) rather than "Menu". Null when neither changes anything: the
+ * built file then answers.
  */
-export function manifestWithIcon(app, version) {
+export function servedManifest(app, { version = "", name = "" } = {}) {
+  const ownName = app === "menu" && name && name !== DEFAULT_RESTAURANT_NAME ? name : "";
+  if (!version && !ownName) return null;
   const v = encodeURIComponent(version);
   return {
     ...APP_MANIFESTS[app],
-    icons: [
+    ...(ownName ? { name: ownName, short_name: ownName } : {}),
+    icons: version ? [
       { src: `icons/${app}-192.png?v=${v}`, sizes: "192x192", type: "image/png" },
       { src: `icons/${app}-512.png?v=${v}`, sizes: "512x512", type: "image/png" },
       { src: `icons/${app}-maskable-512.png?v=${v}`, sizes: "512x512", type: "image/png", purpose: "maskable" }
-    ]
+    ] : builtIcons(app)
   };
 }
 

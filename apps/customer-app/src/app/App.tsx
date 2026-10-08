@@ -46,6 +46,8 @@ export function App() {
   useEffect(() => {
     const name = catalog.menu?.restaurantName;
     document.title = name ? `${name} · ${menuTitle}` : menuTitle;
+    // What an iPhone writes under the icon when the menu is added to the home screen.
+    if (name) document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", name);
   }, [catalog.menu?.restaurantName, menuTitle]);
   useMenuTheme(catalog.theme, scheme);
 
@@ -121,7 +123,7 @@ export function App() {
     />
     <AnimatePresence>
       {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} />}
-      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} />}
+      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} signupPoints={catalog.menu?.signupPoints ?? 0} />}
       {sheet === "service" && serviceTable && <ServiceSheet key="service" state={{ ...state, language }} dispatch={dispatch} table={serviceTable} />}
       {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}
       {sheet === "booking" && <Suspense key="booking" fallback={null}><BookingSheet language={language} onClose={() => dispatch({ type: "sheet", sheet: null })} /></Suspense>}

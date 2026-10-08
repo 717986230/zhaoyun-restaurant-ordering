@@ -3699,6 +3699,19 @@ button:focus-visible,
   text-align: center;
 }
 
+/* What signing up at the table brings, and that it came. */
+.signup-bonus {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .sheet-lead,
 .cart-hint {
   color: var(--muted);

@@ -117,6 +117,25 @@ test("a phone that scanned no table card has no one to call", async ({ page }) =
   await expect(page.locator("#callBtn")).toHaveCount(0);
 });
 
+test("at the table, signing up with a mobile number brings 20 points, said before and after", async ({ page }) => {
+  await page.goto(`/?table=G5&k=${tableToken}`);
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  await page.locator("#accountBtn").click();
+  const sheet = page.locator("#accountSheet");
+  await expect(sheet.locator("#signupBonusHint")).toHaveText("新用户在店里扫码注册，赠送 20 积分");
+  await sheet.getByRole("tab", { name: "注册" }).click();
+  // A landline is said in words; a mobile number goes through, no "@" needed.
+  await sheet.locator("input[name=email]").fill("01 5877777");
+  await sheet.locator("input[name=password]").fill("dumplings");
+  await sheet.locator("input[name=password-repeat]").fill("dumplings");
+  await sheet.locator("button[type=submit]").click();
+  await expect(sheet.locator(".cart-error")).toHaveText("请填写手机号，不是座机号码");
+  await sheet.locator("input[name=email]").fill("0699 222 33 44");
+  await sheet.locator("button[type=submit]").click();
+  await expect(sheet.locator("#signupBonusGot")).toHaveText("注册成功，已赠送 20 积分");
+  await expect(sheet.locator(".points-balance b")).toHaveText("20");
+});
+
 test("a guest registers, keeps a favourite, orders for pickup, earns points and spends them on a reward", async ({ page, request }) => {
   await page.goto("/");
   await expect(page.locator(".dish-card").first()).toBeVisible();
