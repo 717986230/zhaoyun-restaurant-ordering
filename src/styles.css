@@ -581,6 +581,16 @@ html.plt-android .screen.active {
   background: var(--line);
 }
 
+/* The capsule's segments look 28px tall; a finger gets 44 (WCAG 2.5.8 and
+   Apple's guide): the touch area reaches past the capsule, not the drawing. */
+.flag::after,
+.icon-btn.scheme-toggle::after,
+.icon-btn.guest-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
+}
+
 .flag.on::before,
 .flag.on + .flag::before,
 .flags:has(.flag.on:last-child) + .scheme-toggle::before {
