@@ -111,13 +111,19 @@ export function createStore(driver) {
 
   const TAKEN = /UNIQUE constraint failed: (journal\.seq|receipts\.receipt_no|day_closings\.(closing_no|last_receipt_no))/;
 
-  /** Runs `attempt` again while a concurrent write took its journal entry or number first. */
-  async function retrying(attempt, tries = 6) {
+  /**
+   * Runs `attempt` again while a concurrent write took its journal entry or
+   * number first. Each try waits a little longer, by a random amount: at
+   * rush hour eight tablets that all lost to the same write would otherwise
+   * collide again, every one of them, on every try.
+   */
+  async function retrying(attempt, tries = 12) {
     for (let round = 1; ; round += 1) {
       try {
         return await attempt();
       } catch (error) {
         if (round >= tries || !TAKEN.test(String(error?.message ?? error))) throw error;
+        await new Promise((resolve) => setTimeout(resolve, Math.random() * 15 * round));
       }
     }
   }
@@ -137,22 +143,36 @@ export function createStore(driver) {
     return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 
+  // Same join as the Node server: pictures kept in media_files carry a credit.
+  const MEDIA_SQL = "SELECT product_media.*, media_files.credit AS credit FROM product_media LEFT JOIN media_files ON product_media.url = '/media/' || media_files.id";
+  const MEDIA_ORDER = " ORDER BY product_media.sort_order, product_media.created_at";
+
+  /** `productIds` null: every dish's, in one query (the whole menu, not 100 ids at a time). */
   async function mediaFor(productIds) {
-    if (!productIds.length) return new Map();
-    const rows = await selectByIds(
-      // Same join as the Node server: pictures kept in media_files carry a credit.
-      "SELECT product_media.*, media_files.credit AS credit FROM product_media LEFT JOIN media_files ON product_media.url = '/media/' || media_files.id WHERE product_media.product_id IN (?) ORDER BY product_media.sort_order, product_media.created_at",
-      productIds
-    );
+    if (productIds && !productIds.length) return new Map();
+    const rows = productIds
+      ? await selectByIds(`${MEDIA_SQL} WHERE product_media.product_id IN (?)${MEDIA_ORDER}`, productIds)
+      : await all(`${MEDIA_SQL}${MEDIA_ORDER}`);
+    if (!productIds) {
+      const map = new Map();
+      for (const row of rows) {
+        if (!map.has(row.product_id)) map.set(row.product_id, []);
+        map.get(row.product_id).push(row);
+      }
+      return map;
+    }
     const map = new Map(productIds.map((id) => [id, []]));
     for (const row of rows) map.get(row.product_id)?.push(row);
     return map;
   }
 
   /** The dishes' limits and today's portions (shared/stock.mjs), by product id, and the restaurant's day. */
-  async function stockFor(ids = null) {
-    const rows = ids ? await selectByIds("SELECT * FROM product_stock WHERE product_id IN (?)", ids) : await all("SELECT * FROM product_stock");
-    return { stock: new Map(rows.map((row) => [String(row.product_id), row])), today: restaurantDay((await getSettings()).timeZone) };
+  async function stockFor(ids = null, timeZone = null) {
+    const [rows, zone] = await Promise.all([
+      ids ? selectByIds("SELECT * FROM product_stock WHERE product_id IN (?)", ids) : all("SELECT * FROM product_stock"),
+      timeZone ?? getSettings().then((settings) => settings.timeZone)
+    ]);
+    return { stock: new Map(rows.map((row) => [String(row.product_id), row])), today: restaurantDay(zone) };
   }
 
   async function getProduct(id) {
@@ -168,13 +188,20 @@ export function createStore(driver) {
    * catalogue (`publishedOnly`) leaves out what is sold out, by hand or by
    * count; the staff see it all, a dish counted out with `leftToday` 0.
    */
-  async function listProducts(publishedOnly = false) {
-    const rows = publishedOnly
-      ? await all("SELECT * FROM products WHERE published = 1 AND available = 1 ORDER BY sort_order, created_at")
-      : await all("SELECT * FROM products ORDER BY sort_order, created_at");
-    const media = await mediaFor(rows.map((row) => row.id));
-    const { stock, today } = await stockFor();
-    const products = rows.map((row) => mapProduct(row, media.get(row.id), stockView(stock.get(String(row.id)), today)));
+  /**
+   * The menu, every guest's first request: the dishes, their pictures and
+   * today's stock asked for at once (each is a round trip on D1), the
+   * restaurant's time zone passed in when the caller has the settings already.
+   */
+  async function listProducts(publishedOnly = false, timeZone = null) {
+    const [rows, media, { stock, today }] = await Promise.all([
+      publishedOnly
+        ? all("SELECT * FROM products WHERE published = 1 AND available = 1 ORDER BY sort_order, created_at")
+        : all("SELECT * FROM products ORDER BY sort_order, created_at"),
+      mediaFor(null),
+      stockFor(null, timeZone)
+    ]);
+    const products = rows.map((row) => mapProduct(row, media.get(row.id) ?? [], stockView(stock.get(String(row.id)), today)));
     return publishedOnly ? products.filter((product) => product.leftToday !== 0) : products;
   }
 

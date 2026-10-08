@@ -399,7 +399,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     // /api/catalog
     if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
       const settings = await store.getSettings();
-      return json({ products: await store.listProducts(true), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) });
+      return json({ products: await store.listProducts(true, settings.timeZone), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) });
     }
 
     // /api/orders and /api/orders/:id/status
