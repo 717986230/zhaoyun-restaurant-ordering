@@ -117,12 +117,12 @@ test("a phone that scanned no table card has no one to call", async ({ page }) =
   await expect(page.locator("#callBtn")).toHaveCount(0);
 });
 
-test("at the table, signing up with a mobile number brings 20 points, said before and after", async ({ page }) => {
+test("signing up with a mobile number brings 20 points, said before and after", async ({ page }) => {
   await page.goto(`/?table=G5&k=${tableToken}`);
   await expect(page.locator(".dish-card").first()).toBeVisible();
   await page.locator("#accountBtn").click();
   const sheet = page.locator("#accountSheet");
-  await expect(sheet.locator("#signupBonusHint")).toHaveText("新用户在店里扫码注册，赠送 20 积分");
+  await expect(sheet.locator("#signupBonusHint")).toHaveText("新用户注册即送 20 积分");
   await sheet.getByRole("tab", { name: "注册" }).click();
   // A landline is said in words; a mobile number goes through, no "@" needed.
   await sheet.locator("input[name=email]").fill("01 5877777");
@@ -153,7 +153,8 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   await expect(sheet.locator(".privacy-notice p")).toContainText("下载全部数据");
   await sheet.locator("button[type=submit]").click();
   await expect(sheet.locator(".guest-card")).toContainText("你好，Mei");
-  await expect(sheet.locator(".points-balance b")).toHaveText("0");
+  // Signing up brings 20 points, wherever it is done.
+  await expect(sheet.locator(".points-balance b")).toHaveText("20");
   await sheet.locator(".sheet-close").click();
 
   // A favourite: the heart on the dish's card, and a page of their own.
@@ -171,7 +172,7 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   await expect(page.locator("#ordersSheet .pickup-no b")).toHaveText(/^\d+$/);
   const pickupNo = await page.locator("#ordersSheet .pickup-no b").textContent();
 
-  // Paid at the counter: 12.50 is 12 points.
+  // Paid at the counter: 12.50 is 12 points more.
   const table = `TA-${pickupNo}`;
   const bill = (await (await admin(request, "get", `/api/admin/tables/${table}/bill`)).json()).bill;
   const paid = await admin(request, "post", "/api/admin/checkout", { table, items: bill.items.map((line) => ({ orderItemId: line.orderItemId, quantity: line.qty })), payments: [{ type: "cash", amount: bill.total }] });
@@ -179,14 +180,14 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
 
   await page.reload();
   await page.locator("#accountBtn").click();
-  await expect(sheet.locator(".points-balance b")).toHaveText("12");
+  await expect(sheet.locator(".points-balance b")).toHaveText("32");
   await sheet.locator(".reward-list button", { hasText: "兑换" }).click();
   await expect(page.locator("#cartSheet .cart-line.reward")).toContainText("5 积分");
   await page.locator("#placeOrder").click();
   await expect(page.locator("#ordersSheet .my-order")).toHaveCount(2);
   await page.locator("#ordersSheet .sheet-close").click();
   await page.locator("#accountBtn").click();
-  await expect(sheet.locator(".points-balance b")).toHaveText("7");
+  await expect(sheet.locator(".points-balance b")).toHaveText("27");
 
   // Their own copy of everything kept about them, as one file.
   const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "⬇ 下载我的数据" }).click()]);
@@ -196,5 +197,5 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   expect(data.account.email).toBe("mei@example.com");
   expect(data.orders).toHaveLength(2);
   expect(data.favorites).toHaveLength(1);
-  expect(data.points.map((entry) => entry.reason).sort()).toEqual(["earn", "redeem"]);
+  expect(data.points.map((entry) => entry.reason).sort()).toEqual(["adjust", "earn", "redeem"]);
 });

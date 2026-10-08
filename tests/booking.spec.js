@@ -44,7 +44,7 @@ test.beforeAll(async ({ request }, testInfo) => {
       autoConfirm: true, closedDates: [], note: "",
       tables: [{ table: "2", seats: 2 }, { table: "4", seats: 4 }, { table: "6", seats: 6 }],
       maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2,
-      minPoints: 0, welcomePoints: 10, signupPoints: 20, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 30
+      minPoints: 0, welcomePoints: 10, signupPoints: 0, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 30
     }
   });
   expect(saved.ok()).toBe(true);
@@ -83,8 +83,8 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   // Nothing is booked without an account.
   await expect(page.locator("#bookingSignIn")).toBeVisible();
   await expect(page.locator("#bookingSubmit")).toHaveCount(0);
-  // Signing up at a table brings points; from home, as Mia does here, none.
-  await expect(page.locator("#bookingSignupBonus")).toHaveText("在店里扫桌上的二维码注册，赠送 20 积分。");
+  // No sign-up bonus set here (Mia starts at 0), so none is promised.
+  await expect(page.locator("#bookingSignupBonus")).toHaveCount(0);
   await page.getByRole("tab", { name: "注册" }).click();
   await page.locator("#bookingEmailLogin").fill("mia@example.com");
   await page.locator("#bookingPassword").fill("secret123");
@@ -129,7 +129,7 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator("#bookingMember")).toHaveCount(0);
   await page.locator("#bookingDockAccount").click();
   await expect(page.locator("#bookingPoints")).toHaveText("10 积分");
-  await expect(page.locator("#bookingMemberRule")).toHaveText("扫码注册送 20 积分 · 每次预约扣 5 积分（取消退回） · 首次到店消费送 10 积分 · 预约未到另扣 5 积分");
+  await expect(page.locator("#bookingMemberRule")).toHaveText("每次预约扣 5 积分（取消退回） · 首次到店消费送 10 积分 · 预约未到另扣 5 积分");
   await page.locator("#bookingPanel .sheet-close").click();
   await expect(page.locator("#bookingPanel")).toHaveCount(0);
 
@@ -265,7 +265,8 @@ test("the console's records find a booking by phone and show its record", async 
   await expect(page.locator("#reservationsPanel")).toBeVisible();
   // The points rules said in one line, as a guest meets them, with the guard against made-up numbers.
   await page.locator(".res-rules summary").click();
-  await expect(page.locator("#resPointsSummary")).toContainText("新客人在桌上扫码注册得 20 积分，每次预约扣 5 积分（取消退回），够预约 4 次。同一张桌每天最多 6 位");
+  await page.locator("#resSignupPoints").fill("20");
+  await expect(page.locator("#resPointsSummary")).toHaveText("新用户注册得 20 积分（每个账户一次），每次预约扣 5 积分（取消退回），够预约 4 次。");
   await page.getByRole("tab", { name: "预约单据" }).click();
   await page.locator("#resSearch").fill("5550199");
   await page.locator("#resRecords").getByRole("button", { name: "查询" }).click();

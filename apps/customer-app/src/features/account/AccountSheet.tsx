@@ -4,7 +4,6 @@ import type { ApiMenuSettings } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import type { Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
-import { assignedTableNo } from "../../app/table";
 import { g, pointsReason } from "../../app/guest-i18n";
 import { productName, t } from "../../app/i18n";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
@@ -112,8 +111,8 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
 
   return <form className="guest-form" onSubmit={submit}>
     <p className="sheet-lead">{g(language, "signInLead")}</p>
-    {/* At a table, from its code: what signing up brings. */}
-    {signupPoints > 0 && assignedTableNo() ? <p className="signup-bonus" id="signupBonusHint">{g(language, "signupBonusHint", { n: signupPoints })}</p> : null}
+    {/* What signing up brings. */}
+    {signupPoints > 0 ? <p className="signup-bonus" id="signupBonusHint">{g(language, "signupBonusHint", { n: signupPoints })}</p> : null}
     <div className="segmented" role="tablist">
       <button type="button" role="tab" aria-selected={!registering} className={!registering ? "on" : ""} onClick={() => setMode("sign-in")}>{g(language, "signIn")}</button>
       <button type="button" role="tab" aria-selected={registering} className={registering ? "on" : ""} onClick={() => setMode("register")}>{g(language, "register")}</button>

@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiCustomer, CustomerRegisterCommand, CustomerUpdateCommand } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import { customerToken, restaurantApi, setCustomerToken } from "../../app/api";
-import { assignedTableNo } from "../../app/table";
 
 export interface CustomerAccount {
   signedIn: boolean;
@@ -65,9 +64,7 @@ export function useCustomer(enabled: boolean): CustomerAccount {
       remember(session.token);
     },
     async register(command) {
-      // From a table's code (its token rides along in x-table-token): the sign-up bonus.
-      const table = assignedTableNo();
-      const session = await restaurantApi.registerCustomer({ ...command, ...(table ? { table } : {}) });
+      const session = await restaurantApi.registerCustomer(command);
       setSignupBonus(session.signupBonus ? session.customer.points : 0);
       remember(session.token);
     },

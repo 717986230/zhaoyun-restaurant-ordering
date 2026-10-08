@@ -5,7 +5,6 @@ import { AnimatePresence } from "motion/react";
 import type { ApiBookingInfo, ApiCustomer, ApiGuestReservation, ApiReservationSlot, ApiTableChoice } from "@zhaoyun/contracts";
 import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
 import { apiBaseUrl, customerToken, setCustomerToken } from "../app/api";
-import { assignedTableNo, tableToken } from "../app/table";
 import { Sheet } from "../components/Sheet";
 import { CalendarIcon, PersonIcon, QrIcon, RefreshIcon } from "../components/LineIcons";
 import { b, bookingError, formatDay, initialLanguage } from "./booking-i18n";
@@ -13,7 +12,7 @@ import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
 import { checkMobile } from "../../../../shared/phone.mjs";
 
 // The guest's session is the menu's own (the same account, the same phone); the table this phone scanned, if any, for the sign-up bonus.
-const api = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-customer-token": customerToken(), "x-table-token": tableToken() }) });
+const api = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-customer-token": customerToken() }) });
 
 /** A booking this phone holds: its id and the token that opens it. */
 interface Held { id: string; token: string }
@@ -387,7 +386,7 @@ function SignInCard({ language, info, onSignedIn }: { language: BookingLanguage;
     try {
       onSignedIn(mode === "signIn"
         ? await api.signInCustomer(email, password)
-        : await api.registerCustomer({ email, password, ...(assignedTableNo() ? { table: assignedTableNo()! } : {}) }));
+        : await api.registerCustomer({ email, password }));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) setError(b(language, "wrongLogin"));
       else if (failure instanceof ApiError && failure.code === "EMAIL_TAKEN") setError(b(language, "emailTaken"));
