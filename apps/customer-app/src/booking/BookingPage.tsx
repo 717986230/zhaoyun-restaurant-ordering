@@ -196,7 +196,7 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
     </section> : null}
 
     {booking && held
-      ? <BookingDetails language={language} booking={booking} held={held} info={info} onChange={(next) => { setBooking(next); void loadMine(); refreshCustomer(); }} onAnother={startOver} />
+      ? <BookingDetails language={language} booking={booking} held={held} info={info} customer={customer} onChange={(next) => { setBooking(next); void loadMine(); refreshCustomer(); }} onAnother={startOver} />
       : loadFailed
         ? <section className="bk-card bk-message"><p>{b(language, "failedLoad")}</p><button type="button" className="bk-secondary" onClick={() => void load()}>{b(language, "retry")}</button></section>
         : !info
@@ -728,8 +728,8 @@ function useQr(text: string): string {
   return qr;
 }
 
-function BookingDetails({ language, booking, held, info, onChange, onAnother }: {
-  language: BookingLanguage; booking: ApiGuestReservation; held: Held; info: ApiBookingInfo | null;
+function BookingDetails({ language, booking, held, info, customer, onChange, onAnother }: {
+  language: BookingLanguage; booking: ApiGuestReservation; held: Held; info: ApiBookingInfo | null; customer: ApiCustomer | null;
   onChange: (booking: ApiGuestReservation) => void; onAnother: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -795,6 +795,8 @@ function BookingDetails({ language, booking, held, info, onChange, onAnother }: 
       {booking.table ? <div><dt>{b(language, "yourTable")}</dt><dd id="bookingTable">{b(language, "tableName", { table: booking.table })}</dd></div> : null}
       <div><dt>{b(language, "name")}</dt><dd>{booking.name}</dd></div>
       {booking.notes ? <div><dt>{b(language, "notes")}</dt><dd>{booking.notes}</dd></div> : null}
+      {/* What the booking cost, and what is left; a cancel says the points came back. */}
+      {info?.bookingPoints && customer && (active || booking.status === "cancelled") ? <div><dt>{b(language, "pointsLabel")}</dt><dd id="bookingPointsLeft">{b(language, active ? "pointsSpent" : "pointsBack", { n: info.bookingPoints, points: customer.points })}</dd></div> : null}
     </dl>
     {active ? <div className="bk-link">
       <p>{b(language, "keepLink")}</p>
