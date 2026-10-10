@@ -912,6 +912,18 @@ test("跳转 lists the other apps, each a tap away in a tab of its own", async (
   await expect(page.locator('[data-link="pos"]')).toHaveAttribute("href", /\/pos\.html$/);
 });
 
+test("the owner chooses the drinks the cart offers, or leaves it to the best sellers, or switches it off", async ({ page }) => {
+  appSettings.cartSuggestions = { enabled: true, productIds: [] };
+  await openSettingsCards(page);
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const card = page.locator("#suggestDrinks");
+  await expect(card).toContainText("自动推荐最近 30 天卖得最好的 3 款饮品");
+  await card.getByRole("switch").uncheck();
+  await expect.poll(() => appSettings.cartSuggestions.enabled).toBe(false);
+  await expect(card.locator("#suggestAdd")).toHaveCount(0);
+});
+
 test("the restaurant's time zone is chosen in settings", async ({ page }) => {
   appSettings.timeZone = "Europe/Vienna";
   await page.reload();

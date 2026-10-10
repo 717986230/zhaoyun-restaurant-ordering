@@ -20,6 +20,8 @@ interface Props {
   ordering: OrderingState;
   loyalty: ApiMenuSettings["loyalty"];
   account: CustomerAccount;
+  /** Drinks to offer while the cart has none (the owner's picks or the best sellers). */
+  suggestions: string[];
 }
 
 /**
@@ -27,7 +29,7 @@ interface Props {
  * for pickup (signed in). Straight to the kitchen when the server takes it;
  * when it does not, the guest is told why and what to do, and the cart stays.
  */
-export function CartSheet({ state, dispatch, products, ordering, loyalty, account }: Props) {
+export function CartSheet({ state, dispatch, products, ordering, loyalty, account, suggestions }: Props) {
   const language = state.language;
   const rewardPoints = new Map((loyalty?.rewards ?? []).map((reward) => [reward.productId, reward.points]));
   const summary = summarize(state.cart, products, rewardPoints);
@@ -42,6 +44,10 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
     refetchInterval: 15_000,
     retry: false
   });
+  // A drink offered only while there is none in the cart, and only what can be ordered now.
+  const hasDrink = summary.lines.some(({ product }) => product.kind === "drink");
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const offered = ordering.open && !hasDrink ? suggestions.flatMap((id) => productById.get(id) ?? []).slice(0, 3) : [];
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -116,6 +122,16 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
         </div>
         <strong className="cart-line-price">{formatPrice(unitCents * entry.quantity, language)}</strong>
       </li>)}</ul>
+
+      {/* Nothing to drink yet: two or three, one tap each. */}
+      {offered.length > 0 && <section className="cart-suggest" id="cartSuggest" aria-labelledby="cartSuggestTitle">
+        <h3 id="cartSuggestTitle">{g(language, "suggestDrinks")}</h3>
+        <ul>{offered.map((product) => <li key={product.id}>
+          <span><b>{productName(product, language)}</b><small>{formatPrice(product.priceCents, language)}</small></span>
+          <button type="button" className="secondary" aria-label={`${g(language, "addToCart")}: ${productName(product, language)}`}
+            onClick={() => dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [] })}>＋</button>
+        </li>)}</ul>
+      </section>}
 
       {channels.length > 0 && <fieldset className={`cart-channel ${channels.length === 1 ? "single" : ""}`}>
         <legend>{g(language, "channel")}</legend>

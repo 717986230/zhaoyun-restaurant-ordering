@@ -59,6 +59,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     featuredEnabled: false,
     featuredTitle: "",
     featuredProductIds: [],
+    cartSuggestions: { enabled: true, productIds: [] },
     featuredTemplate: DEFAULT_FEATURED_TEMPLATE,
     timeZone: "Europe/Vienna",
     featuredSchedule: null,

@@ -76,9 +76,17 @@ test("a guest orders at the table a waiter opened, and it goes straight to the k
 
   expect((await admin(request, "post", "/api/admin/tables/G5/ordering", { open: true })).ok()).toBe(true);
   await page.locator("#cartSheet .sheet-close").click();
-  // Opened: the cart no longer says it.
+  // Opened: the cart no longer says it. No drink yet: it offers three, one tap each, and stops once one is in.
   await page.locator("#cartBar").click();
   await expect(page.locator("#tableNotOpen")).toHaveCount(0);
+  const suggest = page.locator("#cartSuggest");
+  await expect(suggest.locator("h3")).toHaveText("来点喝的？");
+  await expect(suggest.locator("li")).toHaveCount(3);
+  const drinkName = (await suggest.locator("li b").first().textContent()) ?? "";
+  await suggest.locator("li button").first().click();
+  await expect(page.locator("#cartSheet .cart-line", { hasText: drinkName })).toBeVisible();
+  await expect(suggest).toHaveCount(0);
+  await page.locator("#cartSheet .cart-line", { hasText: drinkName }).getByRole("button", { name: "−" }).click();
   await page.locator("#cartSheet .sheet-close").click();
 
   // A dish with its options and two of it, from its card.

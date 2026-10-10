@@ -398,6 +398,8 @@ export interface ApiSettings {
   featuredEnabled: boolean;
   featuredTitle: string;
   featuredProductIds: string[];
+  /** The cart's "something to drink?": on or off, and the owner's picks (empty: the best sellers). */
+  cartSuggestions: { enabled: boolean; productIds: string[] };
   featuredTemplate: FeaturedTemplateId;
   /** The restaurant's clock ("Europe/Vienna"), which the pages' hours follow. */
   timeZone: string;
@@ -662,6 +664,8 @@ export interface ApiMenuSettings {
   reservations?: boolean;
   /** The points a guest gets for signing up from a table's code; 0 or absent: none. */
   /** Where to rate the restaurant, asked once an order is paid; absent: not asked. */
+  /** Drinks the cart offers while it has none; absent: none offered. */
+  suggestions?: string[];
   reviewUrl?: string;
   signupPoints?: number;
 }

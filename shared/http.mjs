@@ -369,6 +369,23 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     return null;
   }
 
+  /**
+   * The drinks the cart offers while it has none: the owner's picks, else the
+   * best sellers of the last month, else the first drinks on the menu; only
+   * what a guest can order now. Nothing when switched off.
+   */
+  function cartSuggestionsFor(suggestions, products, bestSellers) {
+    if (!suggestions?.enabled) return {};
+    const orderable = new Map(products.filter((product) => product.kind === "drink" && !product.bundleItems?.length).map((product) => [product.id, product]));
+    if (suggestions.productIds.length) {
+      const picked = suggestions.productIds.filter((id) => orderable.has(id));
+      return picked.length ? { suggestions: picked } : {};
+    }
+    // Three: the best sellers first, topped up from the menu's own order.
+    const ids = [...new Set([...bestSellers.filter((id) => orderable.has(id)), ...orderable.keys()])].slice(0, 3);
+    return ids.length ? { suggestions: ids } : {};
+  }
+
   /** Responses that changed nothing anyone watches (a POS keeping its table): no live event, no audit. */
   const QUIET = new WeakSet();
   const quiet = (response) => {
@@ -399,7 +416,12 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     // /api/catalog
     if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
       const settings = await store.getSettings();
-      return json({ products: await store.listProducts(true, settings.timeZone), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) });
+      const suggestions = settings.cartSuggestions;
+      const [products, bestSellers] = await Promise.all([
+        store.listProducts(true, settings.timeZone),
+        suggestions?.enabled && !suggestions.productIds.length ? store.topDrinks(30, 3) : []
+      ]);
+      return json({ products, theme: settings.menuTheme, languages: settings.menuLanguages, menu: { ...menuSettingsView(settings), ...cartSuggestionsFor(suggestions, products, bestSellers) } });
     }
 
     // /api/orders and /api/orders/:id/status
