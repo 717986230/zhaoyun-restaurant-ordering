@@ -40,7 +40,8 @@ test.beforeAll(async ({ request }, testInfo) => {
     menuLanguages: ["zh", "en", "de"],
     customerAccounts: true,
     guestOrdering: { enabled: true, dineIn: true, pickup: true, requireOpenTable: true, minIntervalSeconds: 0 },
-    loyalty: { enabled: true, pointsPerEuro: 1, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 }
+    loyalty: { enabled: true, pointsPerEuro: 1, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 },
+    reviewUrl: "https://g.page/r/chiri-kitchen/review"
   })).ok()).toBe(true);
   tableToken = (await (await admin(request, "post", "/api/admin/tables", { table: "G5" })).json()).table.token;
 });
@@ -185,6 +186,15 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   expect(paid.status()).toBe(201);
 
   await page.reload();
+  // Paid: asked once for a review, on the page the owner set; not again once answered.
+  const review = page.locator("#reviewPrompt");
+  await expect(review).toContainText("吃得满意吗？");
+  await expect(review.getByRole("link", { name: /去评价/ })).toHaveAttribute("href", "https://g.page/r/chiri-kitchen/review");
+  await review.getByRole("button", { name: "以后再说" }).click();
+  await expect(review).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  await expect(page.locator("#reviewPrompt")).toHaveCount(0);
   await page.locator("#accountBtn").click();
   await expect(sheet.locator(".points-balance b")).toHaveText("32");
   await sheet.locator(".reward-list button", { hasText: "兑换" }).click();

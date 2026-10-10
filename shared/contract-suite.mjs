@@ -156,6 +156,16 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.ok(Buffer.from(served.bytes).equals(png), "the upload comes back byte for byte");
     }],
 
+    ["the review link: a web address or nothing, and the menu has it only when set", async () => {
+      const save = (reviewUrl) => call("PUT", "/api/admin/settings", { admin: true, body: { reviewUrl } });
+      assert.equal((await save("not a link")).status, 400);
+      assert.equal((await save("http://example.com/review")).status, 400, "https only");
+      assert.equal((await save("https://g.page/r/chiri/review")).json.reviewUrl, "https://g.page/r/chiri/review");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.reviewUrl, "https://g.page/r/chiri/review");
+      assert.equal((await save("")).json.reviewUrl, "");
+      assert.equal((await call("GET", "/api/catalog")).json.menu.reviewUrl, undefined, "not set: guests are not asked");
+    }],
+
     ["the installed apps' icons: the owner's own in place of the built ones, and back again", async () => {
       assert.equal((await call("GET", "/api/admin/app-icons")).status, 401);
       assert.deepEqual((await call("GET", "/api/admin/app-icons", { admin: true })).json.icons, { menu: null, pos: null, admin: null });

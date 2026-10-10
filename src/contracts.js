@@ -158,6 +158,7 @@ export const SettingsBody = Type.Object({
   restaurantName: Type.Optional(Type.String({ minLength: 1, maxLength: 40 })),
   menuTitle: Type.Optional(Type.String({ minLength: 1, maxLength: 24 })),
   // Who issues the receipts, and the register's id (shared/settings.mjs checks the form).
+  reviewUrl: Type.Optional(Type.String({ maxLength: 500 })),
   companyName: Type.Optional(Type.String({ maxLength: 80 })),
   companyAddress: Type.Optional(Type.String({ maxLength: 160 })),
   companyUid: Type.Optional(Type.String({ maxLength: 16 })),
