@@ -2387,6 +2387,34 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await save({ enabled: true, productIds: [] });
     }],
 
+    ["今日概况: the day so far for the owner — sales, best sellers, seated tables and what they owe, today's bookings", async () => {
+      assert.equal((await call("GET", "/api/admin/today")).status, 401);
+      assert.equal((await call("GET", "/api/admin/today", { role: "staff" })).status, 403, "the owner's");
+      const before = (await call("GET", "/api/admin/today", { admin: true })).json.today;
+      assert.match(before.date, /^\d{4}-\d{2}-\d{2}$/);
+
+      // A table seated and unpaid counts as open; once paid, it is in the day's sales.
+      const dish = (await call("GET", "/api/catalog")).json.products.find((product) => product.kind === "food" && !product.bundleItems?.length);
+      const device = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Today" } })).json.token;
+      const waiter = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Today", pin: "9753" } })).json.staff;
+      const staff = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: device, body: { staffId: waiter.id, pin: "9753" } })).json.token };
+      assert.equal((await call("POST", "/api/pos/tables/TD1/claim", staff)).status, 200);
+      const placed = await call("POST", "/api/pos/orders", { ...staff, body: { clientRequestId: `today-${Date.now()}`, table: "TD1", note: "", items: [{ id: dish.id, qty: 7 }] } });
+      assert.equal(placed.status, 201, JSON.stringify(placed.json));
+      const seated = (await call("GET", "/api/admin/today", { admin: true })).json.today;
+      assert.equal(seated.seatedTables, before.seatedTables + 1);
+      assert.equal(seated.openCents - before.openCents, Math.round(placed.json.order.total * 100));
+
+      const bill = (await call("GET", "/api/admin/tables/TD1/bill", staff)).json.bill;
+      assert.equal((await call("POST", "/api/admin/checkout", { ...staff, body: { table: "TD1", items: bill.items.map((line) => ({ orderItemId: line.orderItemId, quantity: line.qty })), payments: [{ type: "card", amount: bill.total }] } })).status, 201);
+      const after = (await call("GET", "/api/admin/today", { admin: true })).json.today;
+      assert.equal(after.receipts, before.receipts + 1);
+      assert.equal(after.grossCents - before.grossCents, Math.round(bill.total * 100));
+      assert.equal(after.seatedTables, before.seatedTables, "paid: no longer open");
+      assert.ok(after.top.length <= 5 && after.top.some((item) => item.quantity >= 7), "the dish sold seven times is among the best sellers");
+      assert.ok(Array.isArray(after.bookings));
+    }],
+
     ["delivery platforms: their orders come in by webhook once each, the floor accepts and the kitchen prints, a cancel voids, the report counts them", async () => {
       const stamp = Date.now().toString(36);
       const { timeZone } = (await call("GET", "/api/admin/settings", { admin: true })).json;

@@ -26,6 +26,7 @@ import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-veri
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
+import { restaurantDay } from "./stock.mjs";
 import { liveEvent } from "./live.mjs";
 import { ICON_APPS, ICON_SIZES, iconRequest, isPng, servedManifest, MAX_ICON_BYTES, svgHoldingPng } from "./app-icons.mjs";
 import { createRateLimiter } from "./rate-limit.mjs";
@@ -1277,6 +1278,29 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
 
       // Guests' accounts, the manager's side: look a guest up, change their
       // points with a reason, set a new password, remove the account.
+      // 今日概况: the day so far, on one screen — sales, the best sellers, the
+      // tables seated now and what they still owe, and the day's bookings.
+      if (path.length === 3 && path[2] === "today" && method === "GET") {
+        const settings = await store.getSettings();
+        const date = restaurantDay(settings.timeZone);
+        const [report, tables, bookings] = await Promise.all([store.salesReport(date, date), store.tablesOverview(), store.reservations.today()]);
+        const seated = tables.filter((table) => table.state === "seated");
+        return json({
+          today: {
+            date,
+            receipts: report.totals.receipts,
+            grossCents: report.totals.grossCents,
+            averageCents: report.totals.averageCents,
+            top: [...report.items].sort((left, right) => right.quantity - left.quantity || right.grossCents - left.grossCents).slice(0, 5)
+              .map((item) => ({ name: item.name, names: item.names, quantity: item.quantity, grossCents: item.grossCents })),
+            seatedTables: seated.length,
+            openCents: seated.reduce((sum, table) => sum + Math.round(table.total * 100), 0),
+            bookings: bookings.map((booking) => ({ id: booking.id, time: booking.time, name: booking.name, party: booking.party, table: booking.table, status: booking.status, reference: booking.reference })),
+            bookedGuests: bookings.reduce((sum, booking) => sum + booking.party, 0)
+          }
+        });
+      }
+
       // The sales report over the manager's days: GET /api/admin/reports/sales?from=YYYY-MM-DD&to=YYYY-MM-DD
       if (path.length === 4 && path[2] === "reports" && path[3] === "sales" && method === "GET") {
         try {

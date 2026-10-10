@@ -4596,3 +4596,51 @@ em.voided {
   color: var(--a-accent);
   font-size: 18px;
 }
+
+/* 今日概况: the day so far. */
+.today-date {
+  margin-left: 8px;
+  color: var(--a-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+.today-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.today-list li {
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--a-line);
+}
+.today-list li:last-child {
+  border-bottom: 0;
+}
+.today-rank {
+  color: var(--a-muted);
+  font-variant-numeric: tabular-nums;
+}
+.today-time {
+  color: var(--a-ink);
+  font-weight: 600;
+}
+.today-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.today-name small,
+.today-list li > small {
+  color: var(--a-muted);
+}
+.today-list b {
+  font-variant-numeric: tabular-nums;
+}
+.today-status.pending {
+  color: var(--a-danger);
+}

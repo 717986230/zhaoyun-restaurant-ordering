@@ -285,6 +285,22 @@ export interface ApiSalesReport {
   delivery?: ApiDeliveryTotals[];
 }
 
+/** 今日概况: the day so far (GET /api/admin/today). */
+export interface ApiToday {
+  date: string;
+  receipts: number;
+  grossCents: number;
+  averageCents: number;
+  /** The five dishes sold most today, by how many. */
+  top: Array<{ name: string; names: { zh: string; de: string; en: string } | null; quantity: number; grossCents: number }>;
+  /** Tables seated now, and what they still have to pay. */
+  seatedTables: number;
+  openCents: number;
+  /** Today's bookings still to come or at the table, by time. */
+  bookings: Array<{ id: string; time: string; name: string; party: number; table: string | null; status: ReservationStatus; reference: string }>;
+  bookedGuests: number;
+}
+
 /** One entry of the journal (DEP 131), chained to the one before by its hash. */
 export interface ApiJournalEntry { seq: number; at: string; kind: string; ref: string | null; payload: unknown; prevHash: string; hash: string }
 export interface ApiJournalExport { entries: ApiJournalEntry[]; verification: { ok: boolean; brokenAt: number | null; reason: "chain" | "content" | null } }
