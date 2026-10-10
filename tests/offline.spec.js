@@ -26,6 +26,8 @@ test("a menu opened once opens again with no network, and says so", async ({ pag
   await expect(page.locator(".offline-bar")).toHaveText("Offline · showing the menu as last loaded");
 
   await context.setOffline(false);
+  await page.reload();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
   await expect(page.locator(".offline-bar")).toHaveCount(0);
 });
 

@@ -40,7 +40,7 @@ import { ServiceSheet } from "../features/service/ServiceSheet";
  */
 export function App() {
   const { state, dispatch } = useCustomerState();
-  const { data: catalog } = useCatalog();
+  const { data: catalog, error: catalogError } = useCatalog();
   const queryClient = useQueryClient();
   const handleAdminTap = useKiosk();
   const [scheme, toggleScheme] = useColorScheme(catalog.menu?.defaultScheme);
@@ -59,7 +59,9 @@ export function App() {
   const languages = catalog.languages?.length ? catalog.languages : DEFAULT_MENU_LANGUAGES;
   const language = resolveMenuLanguage(state.languageChosen ? state.language : null, languages, navigator.languages ?? []);
   useEffect(() => { document.documentElement.lang = language; }, [language]);
-  const online = useOnline();
+  // The phone's own word, or the menu failing to reach the server at all (a
+  // TypeError from fetch, not a refusal): phones on a dead Wi-Fi often still say online.
+  const online = useOnline() && !(catalogError instanceof TypeError);
 
   useEffect(() => restaurantApi.connect((message: RealtimeEnvelope) => {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });
