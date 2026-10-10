@@ -3,8 +3,8 @@ import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zha
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
 export type AdminTab = "catalog" | "board" | "tables" | "reservations" | "delivery" | "reports" | "printers" | "guests" | "system" | "links" | "today";
-/** "sets" is every dish that packages others, whatever its kind. */
-export type ProductFilter = "all" | "food" | "drink" | "sushi" | "sets";
+/** "sets" is every dish that packages others, whatever its kind; "nophoto" every dish (not set) with no picture or video. */
+export type ProductFilter = "all" | "food" | "drink" | "sushi" | "sets" | "nophoto";
 
 /**
  * What the console knows about the door in front of it. `checking` is the

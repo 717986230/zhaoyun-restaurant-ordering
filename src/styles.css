@@ -4716,3 +4716,24 @@ button:focus-visible,
   min-height: 46px;
   border-radius: 14px;
 }
+
+/* Offline: a small note at the foot of the screen; taps go through it. */
+.offline-bar {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-3);
+  color: var(--ink);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow-1);
+  pointer-events: none;
+}

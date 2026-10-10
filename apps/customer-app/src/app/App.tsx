@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeEnvelope } from "@zhaoyun/contracts";
@@ -11,6 +11,7 @@ import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, resolveMenuLanguage 
 import { CatalogScreen } from "../features/catalog/CatalogScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
 import { useMinuteClock } from "./useMinuteClock";
+import { t } from "./i18n";
 import { DEFAULT_TIME_ZONE, isOnSchedule } from "../../../../src/schedule.js";
 import { summarize } from "./cart";
 import { orderingState } from "./ordering";
@@ -58,6 +59,7 @@ export function App() {
   const languages = catalog.languages?.length ? catalog.languages : DEFAULT_MENU_LANGUAGES;
   const language = resolveMenuLanguage(state.languageChosen ? state.language : null, languages, navigator.languages ?? []);
   useEffect(() => { document.documentElement.lang = language; }, [language]);
+  const online = useOnline();
 
   useEffect(() => restaurantApi.connect((message: RealtimeEnvelope) => {
     if (message.type === "catalog.changed") void queryClient.invalidateQueries({ queryKey: ["catalog"] });
@@ -103,6 +105,7 @@ export function App() {
   }, [featuredSettings, products]);
 
   return <main className="app-shell">
+    {!online && <div className="offline-bar" role="status">{t(language, "offlineMenu")}</div>}
     <CatalogScreen
       state={{ ...state, language }}
       dispatch={dispatch}
@@ -132,4 +135,16 @@ export function App() {
     <div className={`toast ${state.toast ? "show" : ""}`} role="status" aria-live="polite">{state.toast}</div>
     <ReviewPrompt placed={state.placed} reviewUrl={catalog.menu?.reviewUrl} language={language} />
   </main>;
+}
+
+/** Whether the phone says it has a network; the menu says so when it has not. */
+function useOnline() {
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
+  return online;
 }

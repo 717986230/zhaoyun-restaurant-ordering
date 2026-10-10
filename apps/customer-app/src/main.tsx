@@ -17,7 +17,12 @@ const queryClient = new QueryClient({
   }
 });
 
-markPlatform();
+const platform = markPlatform();
+// The menu opens without a signal too (public/sw.js). Not in the tablet app,
+// which carries its files with it, nor on the dev server, whose files change under it.
+if (platform === "web" && import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => { navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {}); });
+}
 // A crash on a guest's phone reaches the server's log, not only the phone.
 const reportError = reportClientErrors("menu", apiBaseUrl);
 // Before the first render, so a guest who picked light never sees a dark flash.

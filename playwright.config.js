@@ -16,6 +16,9 @@ export default defineConfig({
   fullyParallel: true,
   use: {
     baseURL: "http://127.0.0.1:5173",
+    // The menu's service worker (public/sw.js) would answer requests that the
+    // tests mock with page.route; only the offline spec lets it run.
+    serviceWorkers: "block",
     trace: "retain-on-failure",
     screenshot: "only-on-failure"
   },
