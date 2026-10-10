@@ -149,8 +149,11 @@ export function CatalogPanel(props: Props) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [formError, setFormError] = useState("");
   const productIndex = useMemo(() => new Map(props.products.map((item) => [item.id, item])), [props.products]);
+  // A set shows its dishes' pictures, so only a dish of its own can be missing one.
+  const missingPhoto = (product: Product) => !product.bundleItems?.length && !product.media.length;
+  const missingCount = props.products.filter(missingPhoto).length;
   const rows = props.products.filter((product) => props.filter === "all"
-    || (props.filter === "sets" ? Boolean(product.bundleItems?.length) : product.kind === props.filter));
+    || (props.filter === "sets" ? Boolean(product.bundleItems?.length) : props.filter === "nophoto" ? missingPhoto(product) : product.kind === props.filter));
   const kindLabels: Record<Product["kind"], string> = { food: t("kindFood"), drink: t("kindDrink"), sushi: t("kindSushi") };
   const stationOptions: Array<[AdminProductInput["printStation"], string]> = [
     ["kitchen", t("stationKitchen")], ["bar", t("stationBar")], ["sushi", t("stationSushi")], ["front", t("stationFront")]
@@ -262,7 +265,9 @@ export function CatalogPanel(props: Props) {
           <button className="primary-action" onClick={() => open(null)}>＋ {t("catalogNew")}</button>
         </div>
       </header>
-      <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}</div>
+      <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}
+        {/* Only while some dish has no picture: the guests see a drawn mark in its place. */}
+        {(missingCount > 0 || props.filter === "nophoto") && <button id="filterNoPhoto" className={props.filter === "nophoto" ? "active" : ""} onClick={() => props.onFilter("nophoto")}>{t("filterNoPhoto", { count: missingCount })}</button>}</div>
       <div className="product-list">{rows.length ? rows.map((row) => {
         return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}{row.leftToday === 0 && <em className="draft-mark">{t("stockOutToday")}</em>}{row.leftToday ? <em className="draft-mark">{t("stockLeftToday", { n: row.leftToday })}</em> : null}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>

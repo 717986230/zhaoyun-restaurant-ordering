@@ -20,6 +20,7 @@ const copy = {
 
     orderPlaced: "订单已提交",
     orderQueued: "服务器离线，订单已保存并等待自动重试",
+    offlineMenu: "没有网络 · 显示的是上次保存的菜单",
     orderRejected: "订单未被接受，请检查菜品或购物车",
     orderTableLocked: "这桌正在结账，暂时不能下单，请呼叫服务员",
     orderUnconfirmed: "订单尚未被餐厅服务器确认",
@@ -56,6 +57,7 @@ const copy = {
     statusPreparing: "In Zubereitung", statusReady: "Fertig zum Servieren", statusCompleted: "Abgeschlossen", statusCancelled: "Storniert",
 
     orderPlaced: "Bestellung übermittelt",
+    offlineMenu: "Offline · die zuletzt geladene Speisekarte",
     orderQueued: "Server offline — die Bestellung ist gespeichert und wird automatisch erneut gesendet",
     orderRejected: "Bestellung nicht angenommen, bitte Gerichte und Warenkorb prüfen",
     orderTableLocked: "Dieser Tisch wird gerade abgerechnet — bitte den Service rufen",
@@ -93,6 +95,7 @@ const copy = {
     statusPreparing: "Being prepared", statusReady: "Ready to serve", statusCompleted: "Completed", statusCancelled: "Cancelled",
 
     orderPlaced: "Order submitted",
+    offlineMenu: "Offline · showing the menu as last loaded",
     orderQueued: "Server offline — your order is saved and will be resent automatically",
     orderRejected: "Order was not accepted, please check the dishes in your cart",
     orderTableLocked: "This table is being settled — please ask a waiter",

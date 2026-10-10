@@ -1231,3 +1231,25 @@ test("the console opens on today: takings, the best sellers, tables still eating
   await expect(panel.locator("#todayTop li")).toHaveCount(2);
   await expect(panel.locator("#todayBookings li")).toContainText(["18:30王先生 · 4 位 · 07 号桌已确认"]);
 });
+
+test("the dishes still without a photo are one tap away, and the tap goes once they all have one", async ({ page }) => {
+  const dish = (id, media) => ({
+    id, sku: `D${id}`, kind: "food", category: "MAIN", names: { zh: `菜 ${id}`, de: `Gericht ${id}`, en: `Dish ${id}` }, description: "",
+    price: 10, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", modifiers: [],
+    media: media ? [{ type: "image", url: "/media/x.jpg" }] : []
+  });
+  let products = [dish("1", true), dish("2", false), dish("3", true), dish("4", false)];
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products }) }));
+  await page.route("**/media/x.jpg", (route) => route.fulfill({ status: 404 }));
+  await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
+  await page.locator("#filterNoPhoto").click();
+  await expect(page.locator("#filterNoPhoto")).toHaveText("缺照片 2");
+  await expect(page.locator(".product-row")).toHaveText([/菜 2/, /菜 4/]);
+
+  products = products.map((product) => dish(product.id, true));
+  await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
+  await expect(page.locator("#filterNoPhoto")).toHaveCount(0);
+});
