@@ -65,6 +65,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     setsSchedule: null,
     navPinned: [],
     navLabels: {},
+    reviewUrl: "",
     companyName: "",
     companyAddress: "",
     companyUid: "",

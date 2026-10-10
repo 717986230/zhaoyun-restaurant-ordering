@@ -349,7 +349,8 @@ export function SettingsPanel(props: Props) {
     void props.onSaveSettings({
       restaurantName: String(data.get("restaurantName") || "").trim(),
       menuTitle: String(data.get("menuTitle") || "").trim(),
-      timeZone: String(data.get("timeZone") || "")
+      timeZone: String(data.get("timeZone") || ""),
+      reviewUrl: String(data.get("reviewUrl") || "").trim()
     }, "restaurantSaved");
   }
 
@@ -431,10 +432,12 @@ export function SettingsPanel(props: Props) {
       <Section id="restaurant" title={t("sectionRestaurant")} summary={`${settings.restaurantName} · ${settings.menuTitle}`}>
         {/* Keyed on the saved values so the fields show what the server kept
             (trimmed, spaces collapsed) once a save comes back. */}
-        <form key={`${settings.restaurantName}|${settings.menuTitle}|${settings.timeZone}`} className="editor-form" onSubmit={saveRestaurant}>
+        <form key={`${settings.restaurantName}|${settings.menuTitle}|${settings.timeZone}|${settings.reviewUrl}`} className="editor-form" onSubmit={saveRestaurant}>
           <label><span>{t("restaurantName")}</span><input name="restaurantName" required maxLength={40} defaultValue={settings.restaurantName} /></label>
           <label><span>{t("menuTitle")}</span><input name="menuTitle" required maxLength={24} defaultValue={settings.menuTitle} /></label>
           <label><span>{t("timeZone")}</span><select name="timeZone" defaultValue={settings.timeZone}>{timeZoneOptions(settings.timeZone, language).map(([zone, name]) => <option key={zone} value={zone}>{name}</option>)}</select></label>
+          {/* Guests are asked to rate the restaurant here once their order is paid; empty: never asked. */}
+          <label><span>{t("reviewUrl")}</span><input id="reviewUrl" name="reviewUrl" type="url" inputMode="url" maxLength={500} placeholder="https://g.page/r/…/review" defaultValue={settings.reviewUrl ?? ""} /><small className="settings-hint">{t("reviewUrlHint")}</small></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>

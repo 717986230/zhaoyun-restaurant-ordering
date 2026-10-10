@@ -7,7 +7,7 @@ import { CalendarIcon, MoonIcon, PersonIcon, SunIcon } from "../../components/Li
 import { flyToCart } from "../../app/motion";
 import type { DishPart, FeaturedTemplateId, MenuLanguage, Product, SelectedModifier } from "@zhaoyun/domain";
 import type { NavLabels } from "@zhaoyun/contracts";
-import { allergenLabel } from "../../../../../src/allergens.js";
+import { ALLERGEN_CODES, allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import { assignedTableNo } from "../../app/table";
@@ -489,13 +489,49 @@ function FeaturedPage({ title, eyebrow, template, products, byId, language, onOp
   </div>;
 }
 
-export function CatalogScreen({ state, dispatch, products, catalog = products, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {}, ordering, account, cart, reservations = false }: Props) {
+const EXCLUDED_KEY = "zy_exclude_allergens";
+
+function rememberedExclusions(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(EXCLUDED_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored.filter((code): code is string => typeof code === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberExclusions(codes: string[]): void {
+  try { localStorage.setItem(EXCLUDED_KEY, JSON.stringify(codes)); } catch { /* This visit only. */ }
+}
+
+/** The dishes without any of `excluded` among their declared allergens. */
+export function withoutAllergens(products: Product[], excluded: string[]): Product[] {
+  return excluded.length ? products.filter((product) => !product.allergens.some((code) => excluded.includes(code))) : products;
+}
+
+/** The allergens this menu declares, in the printed order (A, B, C …). */
+export function allergensOn(products: Product[]): string[] {
+  const present = new Set(products.flatMap((product) => product.allergens));
+  return ALLERGEN_CODES.filter((code) => present.has(code));
+}
+
+export function CatalogScreen({ state, dispatch, products: allProducts, catalog = allProducts, languages, title, showTableNumber, scheme, onToggleScheme, onAdminTap, featured, navPinned = [], navLabels = {}, ordering, account, cart, reservations = false }: Props) {
   // How many of each dish are in the cart already, on its "+" in the list: the row says what the tap did.
   const inCart = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of Object.values(state.cart)) counts.set(entry.productId, (counts.get(entry.productId) ?? 0) + entry.quantity);
     return counts;
   }, [state.cart]);
+  // Allergens the guest left out (过敏原筛选): every page, search and the promotions go without them.
+  const [excluded, setExcluded] = useState<string[]>(rememberedExclusions);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const products = useMemo(() => withoutAllergens(allProducts, excluded), [allProducts, excluded]);
+  const menuAllergens = useMemo(() => allergensOn(allProducts), [allProducts]);
+  const toggleAllergen = (code: string) => setExcluded((current) => {
+    const next = current.includes(code) ? current.filter((entry) => entry !== code) : [...current, code];
+    rememberExclusions(next);
+    return next;
+  });
   const query = state.query.trim().toLowerCase();
   // A search looks through the whole menu, whatever page it was typed on.
   const onFeatured = Boolean(featured) && state.category === FEATURED_PAGE && !query;
@@ -690,7 +726,25 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
       <input id="searchInput" value={state.query} onChange={(event) => dispatch({ type: "query", query: event.target.value })} placeholder={t(state.language, "searchPlaceholder")} autoFocus={state.searchOpen} />
       <button id="clearSearch" onClick={() => dispatch({ type: "query", query: "" })}>{t(state.language, "clear")}</button>
     </div>
-    <nav id="chips" ref={chipsRef} className="chips">{categories.map((category) => <button key={category} className={`chip ${category === FEATURED_PAGE ? "chip-featured" : ""} ${category === SETS_PAGE ? "chip-sets" : ""} ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}</nav>
+    <nav id="chips" ref={chipsRef} className="chips">
+      {/* First, before the pages: the guest's own filter, not a page of its own. */}
+      {menuAllergens.length > 0 && <button type="button" id="allergenFilterBtn" className={`filter-chip ${excluded.length ? "filtering" : ""}`} aria-expanded={filterOpen} aria-controls="allergenFilter" onClick={() => setFilterOpen((open) => !open)}>
+        {g(state.language, "allergenFilter")}{excluded.length ? ` · ${excluded.length}` : ""}
+      </button>}
+      {categories.map((category) => <button key={category} className={`chip ${category === FEATURED_PAGE ? "chip-featured" : ""} ${category === SETS_PAGE ? "chip-sets" : ""} ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}
+    </nav>
+    {filterOpen && <div id="allergenFilter" className="allergen-filter" role="group" aria-label={g(state.language, "allergenFilterTitle")}>
+      <p>{g(state.language, "allergenFilterTitle")}</p>
+      <div className="allergen-filter-options">{menuAllergens.map((code) => <label key={code} className={excluded.includes(code) ? "on" : ""}>
+        <input type="checkbox" checked={excluded.includes(code)} onChange={() => toggleAllergen(code)} />
+        <b className="allergen">{code}</b>{allergenLabel(code, state.language)}
+      </label>)}</div>
+      <small>{g(state.language, "allergenFilterNote")}</small>
+    </div>}
+    {excluded.length > 0 && <p className="allergen-filter-bar" id="allergenFilterBar">
+      <span>{g(state.language, "allergenHidden", { list: excluded.map((code) => allergenLabel(code, state.language)).join("、"), n: allProducts.length - products.length })}</span>
+      <button type="button" className="link-button" onClick={() => { rememberExclusions([]); setExcluded([]); }}>{g(state.language, "allergenClear")}</button>
+    </p>}
     <div className="festive-garland" aria-hidden="true" />
     {/* Behind an open dish the list only shows through, dimmed: out of reach of taps, the keyboard and screen readers. */}
     <div id="stack" ref={stackRef} className="stack" inert={Boolean(activeProduct)}>
@@ -700,7 +754,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           initial={enter}
           animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
-          {onFeatured && featured ? <FeaturedPage title={featured.title || t(state.language, "featuredDefault")} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
+          {onFeatured && featured ? <FeaturedPage title={featured.title || t(state.language, "featuredDefault")} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={withoutAllergens(featured.products, excluded)} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : visible.length ? visible.slice(0, rowLimit).map((product, index) =>
               <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>

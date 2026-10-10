@@ -22,6 +22,7 @@ import { CartSheet } from "../features/cart/CartSheet";
 // Booking a table opens over the menu; its code and styles load on the first tap.
 const BookingSheet = lazy(() => import("../booking/BookingSheet"));
 import { OrdersSheet } from "../features/orders/OrdersSheet";
+import { ReviewPrompt } from "../features/orders/ReviewPrompt";
 import { ServiceSheet } from "../features/service/ServiceSheet";
 
 /**
@@ -129,5 +130,6 @@ export function App() {
       {sheet === "booking" && <Suspense key="booking" fallback={null}><BookingSheet language={language} onClose={() => dispatch({ type: "sheet", sheet: null })} /></Suspense>}
     </AnimatePresence>
     <div className={`toast ${state.toast ? "show" : ""}`} role="status" aria-live="polite">{state.toast}</div>
+    <ReviewPrompt placed={state.placed} reviewUrl={catalog.menu?.reviewUrl} language={language} />
   </main>;
 }

@@ -411,6 +411,8 @@ export interface ApiSettings {
    *  menu language; a missing name keeps the menu's own wording. */
   navLabels: NavLabels;
   /** Who issues the receipts (§ 132a BAO); an empty name is the restaurant's. */
+  /** The review page (Google) guests are asked to rate the restaurant on once paid; empty: never asked. */
+  reviewUrl: string;
   companyName: string;
   companyAddress: string;
   /** ATU and eight digits, or empty. */
@@ -659,6 +661,8 @@ export interface ApiMenuSettings {
   /** Guests can book a table online; absent from an older server. */
   reservations?: boolean;
   /** The points a guest gets for signing up from a table's code; 0 or absent: none. */
+  /** Where to rate the restaurant, asked once an order is paid; absent: not asked. */
+  reviewUrl?: string;
   signupPoints?: number;
 }
 

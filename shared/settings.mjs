@@ -200,6 +200,16 @@ function normalizeUid(value) {
   return uid;
 }
 
+/** Where a guest writes a review (Google, usually); empty: no prompt after paying. */
+function normalizeReviewUrl(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  let url;
+  try { url = new URL(text); } catch { throw new Error("The review link must be a web address (https://…)"); }
+  if (url.protocol !== "https:" || text.length > 500) throw new Error("The review link must be a web address (https://…)");
+  return url.href;
+}
+
 function normalizeCashRegisterId(value) {
   const id = String(value ?? "").trim().toUpperCase();
   if (!/^[A-Z0-9][A-Z0-9_-]{0,31}$/.test(id)) throw new Error("A register id is letters, digits, - or _");
@@ -216,6 +226,8 @@ export const APP_SETTINGS = {
   // Who issues the receipts, as the receipt has to say (§ 132a BAO): the
   // business's legal name and address, and its VAT number (UID) when it has
   // one. Empty name: the restaurant's name.
+  // The review page guests are asked to rate the restaurant on, once their order is paid.
+  reviewUrl: { key: "review_url", fallback: () => "", normalize: normalizeReviewUrl },
   companyName: { key: "company_name", fallback: () => "", normalize: optionalText("Company name", 80) },
   companyAddress: { key: "company_address", fallback: () => "", normalize: optionalText("Company address", 160) },
   companyUid: { key: "company_uid", fallback: () => "", normalize: normalizeUid },
@@ -350,6 +362,8 @@ export function menuSettingsView(settings) {
     ordering: orderingMenuView(settings.guestOrdering),
     // Whether the menu links to the booking page.
     reservations: Boolean(settings.reservations?.enabled),
+    // Asked once an order is paid; absent when the owner has set no review page.
+    ...(settings.reviewUrl ? { reviewUrl: settings.reviewUrl } : {}),
     // A new account brings these points, once (shared/http.mjs, register); said only when it does.
     ...(customerAccountsOn(settings) && settings.reservations?.signupPoints ? { signupPoints: settings.reservations.signupPoints } : {}),
     loyalty: settings.loyalty?.enabled

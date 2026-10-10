@@ -3709,6 +3709,120 @@ button:focus-visible,
   text-align: center;
 }
 
+/* 过敏原: the guest's own filter, opened from the first chip. */
+/* Pinned to the row's left edge: always whole in view while the pages scroll under it. */
+.filter-chip {
+  flex: 0 0 auto;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  box-shadow: 8px 0 10px -4px var(--bg);
+  color: var(--muted);
+  padding: 8px 14px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+.filter-chip.filtering {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.allergen-filter {
+  margin: 4px 16px 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2, var(--panel-3));
+  display: grid;
+  gap: 10px;
+}
+.allergen-filter p {
+  margin: 0;
+  font-weight: 600;
+}
+.allergen-filter small {
+  color: var(--muted);
+}
+.allergen-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.allergen-filter-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.allergen-filter-options label.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.allergen-filter-options input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.allergen-filter-options label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.allergen-filter-bar {
+  margin: 0 16px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* After paying: one card at the bottom, asking for a review. */
+.review-prompt {
+  position: fixed;
+  z-index: 90;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  max-width: 460px;
+  margin: 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-3);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+.review-prompt p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+.review-prompt span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.review-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.review-prompt-actions a.primary {
+  text-decoration: none;
+  text-align: center;
+}
+
 /* At the table, before it is opened: said at the top of the cart. */
 .cart-hint.table-not-open {
   margin: 0 0 10px;
