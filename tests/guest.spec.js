@@ -118,6 +118,31 @@ test("a guest orders at the table a waiter opened, and it goes straight to the k
   expect(calls.map((call) => [call.type, call.status])).toEqual([["pay", "open"]]);
 });
 
+test("a guest leaves out an allergen: the dishes with it are hidden everywhere, and back with one tap", async ({ page }) => {
+  await page.goto("/");
+  await expect(row(page, "R4")).toBeVisible();
+  await page.locator("#allergenFilterBtn").click();
+  const filter = page.locator("#allergenFilter");
+  await expect(filter).toContainText("如有严重过敏，请再告诉服务员");
+  await filter.locator("label", { hasText: "甲壳类" }).click();
+  // 虾仁拉面 (B) is gone; 蔬菜拉面 stays; the bar says what is hidden.
+  await expect(row(page, "R4")).toHaveCount(0);
+  await expect(row(page, "R1")).toBeVisible();
+  await expect(page.locator("#allergenFilterBar")).toContainText("已隐藏含 甲壳类 的菜");
+  await expect(page.locator("#allergenFilterBtn")).toHaveText("⚠ 过敏原筛选 · 1");
+  // A search does not bring it back.
+  await page.locator("#searchBtn").click();
+  await page.locator("#searchInput").fill("虾");
+  await expect(row(page, "R4")).toHaveCount(0);
+  await page.locator("#clearSearch").click();
+  // Kept on this phone for the next visit, and cleared with one tap.
+  await page.reload();
+  await expect(page.locator("#allergenFilterBar")).toBeVisible();
+  await page.locator("#allergenFilterBar").getByRole("button", { name: "全部显示" }).click();
+  await expect(row(page, "R4")).toBeVisible();
+  await expect(page.locator("#allergenFilterBar")).toHaveCount(0);
+});
+
 test("a phone that scanned no table card has no one to call", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".dish-card").first()).toBeVisible();
