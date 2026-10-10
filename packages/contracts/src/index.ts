@@ -285,6 +285,22 @@ export interface ApiSalesReport {
   delivery?: ApiDeliveryTotals[];
 }
 
+/** 今日概况: the day so far (GET /api/admin/today). */
+export interface ApiToday {
+  date: string;
+  receipts: number;
+  grossCents: number;
+  averageCents: number;
+  /** The five dishes sold most today, by how many. */
+  top: Array<{ name: string; names: { zh: string; de: string; en: string } | null; quantity: number; grossCents: number }>;
+  /** Tables seated now, and what they still have to pay. */
+  seatedTables: number;
+  openCents: number;
+  /** Today's bookings still to come or at the table, by time. */
+  bookings: Array<{ id: string; time: string; name: string; party: number; table: string | null; status: ReservationStatus; reference: string }>;
+  bookedGuests: number;
+}
+
 /** One entry of the journal (DEP 131), chained to the one before by its hash. */
 export interface ApiJournalEntry { seq: number; at: string; kind: string; ref: string | null; payload: unknown; prevHash: string; hash: string }
 export interface ApiJournalExport { entries: ApiJournalEntry[]; verification: { ok: boolean; brokenAt: number | null; reason: "chain" | "content" | null } }
@@ -398,6 +414,8 @@ export interface ApiSettings {
   featuredEnabled: boolean;
   featuredTitle: string;
   featuredProductIds: string[];
+  /** The cart's "something to drink?": on or off, and the owner's picks (empty: the best sellers). */
+  cartSuggestions: { enabled: boolean; productIds: string[] };
   featuredTemplate: FeaturedTemplateId;
   /** The restaurant's clock ("Europe/Vienna"), which the pages' hours follow. */
   timeZone: string;
@@ -662,6 +680,8 @@ export interface ApiMenuSettings {
   reservations?: boolean;
   /** The points a guest gets for signing up from a table's code; 0 or absent: none. */
   /** Where to rate the restaurant, asked once an order is paid; absent: not asked. */
+  /** Drinks the cart offers while it has none; absent: none offered. */
+  suggestions?: string[];
   reviewUrl?: string;
   signupPoints?: number;
 }

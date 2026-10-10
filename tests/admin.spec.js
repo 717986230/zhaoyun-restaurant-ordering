@@ -64,6 +64,13 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/admin/staff", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff: [] }) }));
   await page.route("**/api/admin/pos-devices", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ devices: [] }) }));
   await page.route("**/api/admin/staff/activity", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff: [] }) }));
+  await page.route("**/api/admin/today", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ today: {
+    date: "2026-10-10", receipts: 12, grossCents: 48650, averageCents: 4054,
+    top: [{ name: "宫保鸡丁", quantity: 9, grossCents: 11610 }, { name: "酸辣汤", quantity: 6, grossCents: 3540 }],
+    seatedTables: 2, openCents: 6380,
+    bookings: [{ id: "r1", time: "18:30", name: "王先生", party: 4, table: "07", status: "confirmed", reference: "AB12" }],
+    bookedGuests: 4
+  } }) }));
   await page.route("**/api/admin/app-icons", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ icons: { menu: null, pos: null, admin: null } }) }));
   await page.goto("/admin.html");
 });
@@ -400,7 +407,7 @@ test("the console says Admin, and switches its own language without touching the
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("菜品订单桌位预约外卖报表打印顾客设置跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日菜品订单桌位预约外卖报表打印顾客设置跳转");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
@@ -435,12 +442,12 @@ test("orders, tables and printers stay out of the way until ordering is switched
   appSettings.showOrdering = false;
   await page.reload();
   const nav = page.getByRole("navigation", { name: "管理模块" });
-  await expect(nav).toHaveText("菜品预约外卖顾客设置跳转");
+  await expect(nav).toHaveText("今日菜品预约外卖顾客设置跳转");
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("菜品订单桌位预约外卖报表打印顾客设置跳转");
+  await expect(nav).toHaveText("今日菜品订单桌位预约外卖报表打印顾客设置跳转");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
@@ -515,6 +522,7 @@ test("on a computer the dishes page fits the window, and the long list scrolls i
   for (const [width, height] of [[1024, 700], [1440, 900], [1920, 1080]]) {
     await page.setViewportSize({ width, height });
     await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
     await expect(page.locator(".product-row")).toHaveCount(120);
     const measured = await page.evaluate(() => {
       const list = document.querySelector(".product-list");
@@ -549,6 +557,7 @@ test("the header and tabs stay on screen, and a long page goes back to its top i
   // A phone: the whole page scrolls, under the header and the tabs.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-row")).toHaveCount(120);
   await expect(page.locator(".back-to-top")).not.toHaveClass(/\bon\b/);
   await page.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight / 2));
@@ -565,6 +574,7 @@ test("the header and tabs stay on screen, and a long page goes back to its top i
   // A computer: the dish list scrolls in its own box, and the button follows it there.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-row")).toHaveCount(120);
   const list = page.locator(".product-list");
   await list.evaluate((node) => { node.scrollTop = node.scrollHeight; });
@@ -730,6 +740,7 @@ test("on a computer, a long set's editor keeps its save button on screen", async
   await page.unroute("**/api/admin/products");
   await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [...dishes, set] }) }));
   await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
   await page.locator(".product-row", { hasText: "大套餐" }).click();
   await expect(page.getByRole("button", { name: "保存修改" })).toBeInViewport();
 });
@@ -910,6 +921,18 @@ test("跳转 lists the other apps, each a tap away in a tab of its own", async (
   // Served from here, not beside it on workers.dev: the stock project's own page, with how to set it up.
   await expect(page.locator('[data-link="inventory"]')).toHaveAttribute("href", "https://github.com/717986230/restaurant-stock");
   await expect(page.locator('[data-link="pos"]')).toHaveAttribute("href", /\/pos\.html$/);
+});
+
+test("the owner chooses the drinks the cart offers, or leaves it to the best sellers, or switches it off", async ({ page }) => {
+  appSettings.cartSuggestions = { enabled: true, productIds: [] };
+  await openSettingsCards(page);
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  const card = page.locator("#suggestDrinks");
+  await expect(card).toContainText("自动推荐最近 30 天卖得最好的 3 款饮品");
+  await card.getByRole("switch").uncheck();
+  await expect.poll(() => appSettings.cartSuggestions.enabled).toBe(false);
+  await expect(card.locator("#suggestAdd")).toHaveCount(0);
 });
 
 test("the restaurant's time zone is chosen in settings", async ({ page }) => {
@@ -1196,4 +1219,15 @@ test("the manager reads the takings for a period: totals, hours, dishes and wait
   expect(text.startsWith("﻿"), "Excel reads it as UTF-8").toBe(true);
   expect(text).toContain('"黑椒牛柳","1","34.50"');
   expect(text).toContain('"Ramen, ""scharf""","2","14.50"');
+});
+
+test("the console opens on today: takings, the best sellers, tables still eating and the day's bookings", async ({ page }) => {
+  const panel = page.locator("#todayPanel");
+  await expect(page.getByRole("button", { name: "今日", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(panel.locator("#todayGross")).toContainText("486.50");
+  await expect(panel.locator("#todaySeatedNow")).toHaveText("2");
+  await expect(panel).toContainText("未结");
+  await expect(panel.locator("#todayTop li").first()).toContainText("宫保鸡丁");
+  await expect(panel.locator("#todayTop li")).toHaveCount(2);
+  await expect(panel.locator("#todayBookings li")).toContainText(["18:30王先生 · 4 位 · 07 号桌已确认"]);
 });

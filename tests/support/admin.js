@@ -5,7 +5,7 @@
  * what it did across a reload, as the owner would.
  */
 export const SETTINGS_CARDS = [
-  "restaurant", "appearance", "app-icons", "languages", "nav", "tabNames", "featured", "sets", "vat", "company", "modules", "staff", "tables", "password",
+  "restaurant", "appearance", "app-icons", "languages", "nav", "tabNames", "featured", "suggest", "sets", "vat", "company", "modules", "staff", "tables", "password",
   "guest-ordering", "guest-accounts", "guest-loyalty", "guest-list"
 ];
 

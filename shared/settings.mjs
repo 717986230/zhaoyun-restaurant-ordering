@@ -172,6 +172,22 @@ export function renamedCategorySettings(settings, from, to) {
 }
 
 /** The dishes on the promotions page, in the order the owner put them; no repeats. */
+/** At most this many drinks are offered in the cart. */
+export const MAX_CART_SUGGESTIONS = 6;
+
+/** The cart's "something to drink?": on or off, and the owner's own picks (none: the best sellers). */
+function normalizeCartSuggestions(value) {
+  if (!value || typeof value !== "object") throw new Error("Cart suggestions must be an object");
+  const productIds = [];
+  for (const item of Array.isArray(value.productIds) ? value.productIds : []) {
+    const id = String(item ?? "").trim();
+    if (!id || id.length > 64) throw new Error("Suggested product ids must be 1 to 64 characters");
+    if (!productIds.includes(id)) productIds.push(id);
+  }
+  if (productIds.length > MAX_CART_SUGGESTIONS) throw new Error(`At most ${MAX_CART_SUGGESTIONS} suggested drinks`);
+  return { enabled: value.enabled !== false, productIds };
+}
+
 function normalizeFeaturedIds(value) {
   if (!Array.isArray(value)) throw new Error("Featured products must be a list");
   const ids = [];
@@ -274,6 +290,8 @@ export const APP_SETTINGS = {
   // wording ("精选推荐" / "Empfehlungen" / "Signature").
   featuredEnabled: { key: "featured_enabled", fallback: () => false, normalize: flag("featuredEnabled") },
   featuredTitle: { key: "featured_title", fallback: () => "", normalize: optionalText("Featured title", 32) },
+  // The cart's "something to drink?" (加购推荐): on unless switched off, the owner's picks or the best sellers.
+  cartSuggestions: { key: "cart_suggestions", fallback: () => ({ enabled: true, productIds: [] }), normalize: normalizeCartSuggestions },
   featuredProductIds: { key: "featured_products", fallback: () => [], normalize: normalizeFeaturedIds },
   // The restaurant's clock, which the pages' hours below follow.
   timeZone: { key: "time_zone", fallback: () => DEFAULT_TIME_ZONE, normalize: normalizeTimeZone },

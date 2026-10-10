@@ -3709,6 +3709,46 @@ button:focus-visible,
   text-align: center;
 }
 
+/* The cart's "something to drink?": a short list, one tap each. */
+.cart-suggest {
+  margin: 4px 0 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+.cart-suggest h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.cart-suggest ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cart-suggest li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cart-suggest li span {
+  display: grid;
+  min-width: 0;
+}
+.cart-suggest li small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cart-suggest button {
+  flex: none;
+  min-width: 44px;
+  min-height: 40px;
+}
+
 /* 过敏原: the guest's own filter, opened from the first chip. */
 /* Pinned to the row's left edge: always whole in view while the pages scroll under it. */
 .filter-chip {

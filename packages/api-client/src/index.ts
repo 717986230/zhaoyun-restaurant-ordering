@@ -1,4 +1,4 @@
-import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, AppIconFiles, IconApp,
+import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles, IconApp,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
@@ -59,6 +59,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     featuredEnabled: false,
     featuredTitle: "",
     featuredProductIds: [],
+    cartSuggestions: { enabled: true, productIds: [] },
     featuredTemplate: DEFAULT_FEATURED_TEMPLATE,
     timeZone: "Europe/Vienna",
     featuredSchedule: null,
@@ -403,6 +404,8 @@ export class AdminApi {
   }
   deleteCustomer(id: string): Promise<void> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   /** Sales from `from` to `to` (YYYY-MM-DD, both included, the restaurant's days). */
+  /** 今日概况: today's sales, best sellers, seated tables and bookings. */
+  today(): Promise<{ today: ApiToday }> { return this.#request("/api/admin/today"); }
   salesReport(from: string, to: string): Promise<{ report: ApiSalesReport }> {
     return this.#request(`/api/admin/reports/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   }

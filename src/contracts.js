@@ -171,6 +171,7 @@ export const SettingsBody = Type.Object({
   featuredEnabled: Type.Optional(Type.Boolean()),
   featuredTitle: Type.Optional(Type.String({ maxLength: 32 })),
   featuredProductIds: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { maxItems: 40 })),
+  cartSuggestions: Type.Optional(Type.Object({ enabled: Type.Boolean(), productIds: Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { maxItems: 6 }) })),
   featuredTemplate: Type.Optional(literals(FEATURED_TEMPLATES)),
   // An IANA zone ("Europe/Vienna"); which ones exist is Intl's to say.
   timeZone: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),

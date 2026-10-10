@@ -17,6 +17,7 @@ import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { GuestsPanel } from "../features/guests/GuestsPanel";
 import { LinksPanel } from "../features/links/LinksPanel";
 import { ReportsPanel } from "../features/reports/ReportsPanel";
+import { TodayPanel } from "../features/reports/TodayPanel";
 import { ReservationsPanel } from "../features/reservations/ReservationsPanel";
 import { DeliveryPanel } from "../features/delivery/DeliveryPanel";
 import { BackToTop } from "./BackToTop";
@@ -36,7 +37,7 @@ function SignOutIcon() {
 }
 
 const initialState: AdminState = {
-  tab: "catalog", role: null, account: null,
+  tab: "today", role: null, account: null,
   gate: { checking: true, registered: false, busy: false, error: null, reachable: true },
   auditEntries: [],
   connected: false, connectionError: null, products: [], printers: [], printBridges: [], printQueue: null, printFound: [],
@@ -59,7 +60,7 @@ const LIVE_SETTLE_MS = 250;
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
   if (role === "staff") return ["board", "tables", "reservations", "delivery", "links"];
-  return showOrdering ? ["catalog", "board", "tables", "reservations", "delivery", "reports", "printers", "guests", "system", "links"] : ["catalog", "reservations", "delivery", "guests", "system", "links"];
+  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "delivery", "reports", "printers", "guests", "system", "links"] : ["today", "catalog", "reservations", "delivery", "guests", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
@@ -72,7 +73,8 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
   printers: "tabPrinters",
   guests: "tabGuests",
   system: "tabSettings",
-  links: "tabLinks"
+  links: "tabLinks",
+  today: "tabToday"
 };
 
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
@@ -666,6 +668,7 @@ export function App() {
       {state.tab === "delivery" && <DeliveryPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
       {state.tab === "reservations" && <ReservationsPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
       {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
+      {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel

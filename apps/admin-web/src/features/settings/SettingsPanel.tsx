@@ -297,12 +297,12 @@ function VatRates({ products, onSet }: { products: Product[]; onSet: (category: 
 }
 
 /** The promotions page's dishes, in the order a guest sees them. */
-function FeaturedList({ ids, products, onChange }: { ids: string[]; products: Product[]; onChange: (ids: string[]) => void }) {
+function FeaturedList({ ids, products, onChange, empty = "featuredEmpty" }: { ids: string[]; products: Product[]; onChange: (ids: string[]) => void; empty?: CopyKey }) {
   const { t, language } = useI18n();
   const byId = new Map(products.map((product) => [product.id, product]));
   // A dish deleted since it was chosen is simply not listed, and drops out on the next save.
   const shown = ids.filter((id) => byId.has(id));
-  if (!shown.length) return <p className="settings-hint">{t("featuredEmpty")}</p>;
+  if (!shown.length) return <p className="settings-hint">{t(empty)}</p>;
   const move = (index: number, by: number) => {
     const next = [...shown];
     const [item] = next.splice(index, 1);
@@ -321,6 +321,29 @@ function FeaturedList({ ids, products, onChange }: { ids: string[]; products: Pr
       </span>
     </li>;
   })}</ol>;
+}
+
+/**
+ * The cart's "something to drink?": on or off, and the owner's own drinks
+ * (up to six, in order). None picked: the month's three best sellers.
+ */
+function SuggestDrinks({ settings, products, onSave }: { settings: ApiSettings; products: Product[]; onSave: (value: ApiSettings["cartSuggestions"]) => void }) {
+  const { t, language } = useI18n();
+  const value = settings.cartSuggestions;
+  const drinks = products.filter((product) => product.kind === "drink" && !product.bundleItems?.length && !value.productIds.includes(product.id));
+  return <div className="suggest-drinks" id="suggestDrinks">
+    <Toggle checked={value.enabled} label={t("suggestOn")} onChange={(enabled) => onSave({ ...value, enabled })} />
+    <p className="settings-hint">{t("suggestHint")}</p>
+    {value.enabled && <>
+      <FeaturedList ids={value.productIds} products={products} empty="suggestAuto" onChange={(productIds) => onSave({ ...value, productIds })} />
+      {value.productIds.length < 6 && <label className="suggest-add"><span>{t("suggestAdd")}</span>
+        <select id="suggestAdd" value="" onChange={(event) => { if (event.target.value) onSave({ ...value, productIds: [...value.productIds, event.target.value] }); }}>
+          <option value="">{t("suggestPick")}</option>
+          {drinks.map((product) => <option key={product.id} value={product.id}>{product.sku} · {product.names[language] || product.names.zh || product.names.de}</option>)}
+        </select>
+      </label>}
+    </>}
+  </div>;
 }
 
 /** The settings page's groups, for the chips at its top. */
@@ -522,6 +545,9 @@ export function SettingsPanel(props: Props) {
             <FeaturedList ids={settings.featuredProductIds} products={props.products} onChange={(featuredProductIds) => void props.onSaveSettings({ featuredProductIds }, "featuredSaved")} />
           </div>
         </div>
+      </Section>
+      <Section id="suggest" title={t("sectionSuggest")} summary={!settings.cartSuggestions.enabled ? t("foldOff") : settings.cartSuggestions.productIds.length ? t("suggestCount", { count: settings.cartSuggestions.productIds.length }) : t("suggestAutoShort")}>
+        <SuggestDrinks settings={settings} products={props.products} onSave={(cartSuggestions) => void props.onSaveSettings({ cartSuggestions }, "suggestSaved")} />
       </Section>
       <Section id="sets" title={t("sectionSets")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>

@@ -1250,6 +1250,15 @@ export function createStore(driver) {
     ping: async () => Boolean(await first("SELECT 1 AS ok")),
     hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables LIMIT 1")),
     /** Whether a waiter has opened the table for its guests to order (开台), and it has not run out. */
+    /** The drinks ordered most in the last `days`, cancelled orders aside: what the cart offers when the owner picked none. */
+    topDrinks: async (days = 30, limit = 3) => (await all(
+      `SELECT order_items.product_id AS id, SUM(order_items.quantity) AS sold FROM order_items
+         JOIN orders ON orders.id = order_items.order_id
+         JOIN products ON products.id = order_items.product_id
+       WHERE products.kind = 'drink' AND orders.status <> 'cancelled' AND orders.created_at >= ?
+       GROUP BY order_items.product_id ORDER BY sold DESC, order_items.product_id LIMIT ?`,
+      new Date(Date.now() - days * 86_400_000).toISOString(), limit
+    )).map((row) => String(row.id)),
     tableOpenForGuests: async (table) => Boolean(await first("SELECT table_no FROM table_sessions WHERE table_no = ? AND expires_at > ?", String(table), now())),
     // 2 before 10: numbers in the order a waiter counts them.
     listTables: async () => (await all("SELECT * FROM restaurant_tables ORDER BY length(table_no), table_no")).map(tableView),

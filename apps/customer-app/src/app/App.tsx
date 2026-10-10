@@ -123,7 +123,7 @@ export function App() {
       reservations={catalog.menu?.reservations ?? false}
     />
     <AnimatePresence>
-      {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} />}
+      {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} suggestions={catalog.menu?.suggestions ?? []} />}
       {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} signupPoints={catalog.menu?.signupPoints ?? 0} />}
       {sheet === "service" && serviceTable && <ServiceSheet key="service" state={{ ...state, language }} dispatch={dispatch} table={serviceTable} />}
       {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}

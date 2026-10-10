@@ -26,6 +26,7 @@ import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-veri
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
 import { customerAccountsOn, menuSettingsView } from "./settings.mjs";
+import { restaurantDay } from "./stock.mjs";
 import { liveEvent } from "./live.mjs";
 import { ICON_APPS, ICON_SIZES, iconRequest, isPng, servedManifest, MAX_ICON_BYTES, svgHoldingPng } from "./app-icons.mjs";
 import { createRateLimiter } from "./rate-limit.mjs";
@@ -369,6 +370,23 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     return null;
   }
 
+  /**
+   * The drinks the cart offers while it has none: the owner's picks, else the
+   * best sellers of the last month, else the first drinks on the menu; only
+   * what a guest can order now. Nothing when switched off.
+   */
+  function cartSuggestionsFor(suggestions, products, bestSellers) {
+    if (!suggestions?.enabled) return {};
+    const orderable = new Map(products.filter((product) => product.kind === "drink" && !product.bundleItems?.length).map((product) => [product.id, product]));
+    if (suggestions.productIds.length) {
+      const picked = suggestions.productIds.filter((id) => orderable.has(id));
+      return picked.length ? { suggestions: picked } : {};
+    }
+    // Three: the best sellers first, topped up from the menu's own order.
+    const ids = [...new Set([...bestSellers.filter((id) => orderable.has(id)), ...orderable.keys()])].slice(0, 3);
+    return ids.length ? { suggestions: ids } : {};
+  }
+
   /** Responses that changed nothing anyone watches (a POS keeping its table): no live event, no audit. */
   const QUIET = new WeakSet();
   const quiet = (response) => {
@@ -399,7 +417,12 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     // /api/catalog
     if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
       const settings = await store.getSettings();
-      return json({ products: await store.listProducts(true, settings.timeZone), theme: settings.menuTheme, languages: settings.menuLanguages, menu: menuSettingsView(settings) });
+      const suggestions = settings.cartSuggestions;
+      const [products, bestSellers] = await Promise.all([
+        store.listProducts(true, settings.timeZone),
+        suggestions?.enabled && !suggestions.productIds.length ? store.topDrinks(30, 3) : []
+      ]);
+      return json({ products, theme: settings.menuTheme, languages: settings.menuLanguages, menu: { ...menuSettingsView(settings), ...cartSuggestionsFor(suggestions, products, bestSellers) } });
     }
 
     // /api/orders and /api/orders/:id/status
@@ -1255,6 +1278,29 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
 
       // Guests' accounts, the manager's side: look a guest up, change their
       // points with a reason, set a new password, remove the account.
+      // 今日概况: the day so far, on one screen — sales, the best sellers, the
+      // tables seated now and what they still owe, and the day's bookings.
+      if (path.length === 3 && path[2] === "today" && method === "GET") {
+        const settings = await store.getSettings();
+        const date = restaurantDay(settings.timeZone);
+        const [report, tables, bookings] = await Promise.all([store.salesReport(date, date), store.tablesOverview(), store.reservations.today()]);
+        const seated = tables.filter((table) => table.state === "seated");
+        return json({
+          today: {
+            date,
+            receipts: report.totals.receipts,
+            grossCents: report.totals.grossCents,
+            averageCents: report.totals.averageCents,
+            top: [...report.items].sort((left, right) => right.quantity - left.quantity || right.grossCents - left.grossCents).slice(0, 5)
+              .map((item) => ({ name: item.name, names: item.names, quantity: item.quantity, grossCents: item.grossCents })),
+            seatedTables: seated.length,
+            openCents: seated.reduce((sum, table) => sum + Math.round(table.total * 100), 0),
+            bookings: bookings.map((booking) => ({ id: booking.id, time: booking.time, name: booking.name, party: booking.party, table: booking.table, status: booking.status, reference: booking.reference })),
+            bookedGuests: bookings.reduce((sum, booking) => sum + booking.party, 0)
+          }
+        });
+      }
+
       // The sales report over the manager's days: GET /api/admin/reports/sales?from=YYYY-MM-DD&to=YYYY-MM-DD
       if (path.length === 4 && path[2] === "reports" && path[3] === "sales" && method === "GET") {
         try {

@@ -460,7 +460,8 @@ export function contractChecks(call, assert, { liveBase } = {}) {
     ["the restaurant's name, the menu's title and its look are the owner's to set", async () => {
       const before = await call("GET", "/api/catalog");
       // Ordering is on here only because the checks above switched it on (OPEN_ORDERING).
-      const { ordering: _ordering, ...fresh } = before.json.menu;
+      // The cart's drink suggestions are checked on their own further down.
+      const { ordering: _ordering, suggestions: _suggestions, ...fresh } = before.json.menu;
       assert.deepEqual(fresh, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null, reservations: false },
         "a fresh restaurant ships with these");
 
@@ -476,7 +477,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       });
       assert.equal(saved.status, 200);
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
-      const { ordering: _orderingNow, ...menu } = (await call("GET", "/api/catalog")).json.menu;
+      const { ordering: _orderingNow, suggestions: _suggestionsNow, ...menu } = (await call("GET", "/api/catalog")).json.menu;
       assert.deepEqual(menu,
         { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null, reservations: false });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
@@ -2351,6 +2352,67 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const settle = () => call("POST", "/api/admin/checkout", { ...asWaiter, body: { table: "H2", items: bill.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "cash", amount: bill.total }] } });
       const paid = await Promise.all([settle(), settle()]);
       assert.equal(paid.filter((response) => response.status === 201).length, 1, JSON.stringify(paid.map((response) => [response.status, response.json.error])));
+    }],
+
+    ["the cart offers drinks: the owner's picks, else the month's best sellers, else the first on the menu; or none when switched off", async () => {
+      const drinks = (await call("GET", "/api/catalog")).json.products.filter((product) => product.kind === "drink" && !product.bundleItems?.length);
+      assert.ok(drinks.length >= 4, "the seed menu has drinks");
+      const menu = async () => (await call("GET", "/api/catalog")).json.menu;
+      const save = (cartSuggestions) => call("PUT", "/api/admin/settings", { admin: true, body: { cartSuggestions } });
+
+      // Nothing picked: three, the best sellers first, the menu's own order after them.
+      assert.equal((await save({ enabled: true, productIds: [] })).status, 200);
+      const before = (await menu()).suggestions;
+      assert.equal(before.length, 3);
+      assert.ok(before.every((id) => drinks.some((drink) => drink.id === id)), "drinks only");
+
+      // Sold: the best seller leads.
+      const best = drinks.at(-1);
+      const device = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Bar" } })).json.token;
+      const waiter = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Bar", pin: "7531" } })).json.staff;
+      const asWaiter = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: device, body: { staffId: waiter.id, pin: "7531" } })).json.token };
+      assert.equal((await call("POST", "/api/pos/tables/BR1/claim", asWaiter)).status, 200);
+      assert.equal((await call("POST", "/api/pos/orders", { ...asWaiter, body: { clientRequestId: `bar-${Date.now()}`, table: "BR1", note: "", items: [{ id: best.id, qty: 9 }] } })).status, 201);
+      assert.equal((await menu()).suggestions[0], best.id, "the month's best seller first");
+
+      // The owner's own picks, in their order; something that is not a drink is left out.
+      const dish = (await call("GET", "/api/catalog")).json.products.find((product) => product.kind === "food");
+      assert.equal((await save({ enabled: true, productIds: [drinks[1].id, dish.id, drinks[0].id] })).status, 200);
+      assert.deepEqual((await menu()).suggestions, [drinks[1].id, drinks[0].id]);
+      assert.equal((await save({ enabled: true, productIds: Array.from({ length: 7 }, (_, index) => `x${index}`) })).status, 400, "six at most");
+
+      // Switched off: none.
+      await save({ enabled: false, productIds: [] });
+      assert.equal((await menu()).suggestions, undefined);
+      await save({ enabled: true, productIds: [] });
+    }],
+
+    ["今日概况: the day so far for the owner — sales, best sellers, seated tables and what they owe, today's bookings", async () => {
+      assert.equal((await call("GET", "/api/admin/today")).status, 401);
+      assert.equal((await call("GET", "/api/admin/today", { role: "staff" })).status, 403, "the owner's");
+      const before = (await call("GET", "/api/admin/today", { admin: true })).json.today;
+      assert.match(before.date, /^\d{4}-\d{2}-\d{2}$/);
+
+      // A table seated and unpaid counts as open; once paid, it is in the day's sales.
+      const dish = (await call("GET", "/api/catalog")).json.products.find((product) => product.kind === "food" && !product.bundleItems?.length);
+      const device = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Today" } })).json.token;
+      const waiter = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Today", pin: "9753" } })).json.staff;
+      const staff = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: device, body: { staffId: waiter.id, pin: "9753" } })).json.token };
+      assert.equal((await call("POST", "/api/pos/tables/TD1/claim", staff)).status, 200);
+      const placed = await call("POST", "/api/pos/orders", { ...staff, body: { clientRequestId: `today-${Date.now()}`, table: "TD1", note: "", items: [{ id: dish.id, qty: 7 }] } });
+      assert.equal(placed.status, 201, JSON.stringify(placed.json));
+      const seated = (await call("GET", "/api/admin/today", { admin: true })).json.today;
+      assert.equal(seated.seatedTables, before.seatedTables + 1);
+      assert.equal(seated.openCents - before.openCents, Math.round(placed.json.order.total * 100));
+
+      const bill = (await call("GET", "/api/admin/tables/TD1/bill", staff)).json.bill;
+      assert.equal((await call("POST", "/api/admin/checkout", { ...staff, body: { table: "TD1", items: bill.items.map((line) => ({ orderItemId: line.orderItemId, quantity: line.qty })), payments: [{ type: "card", amount: bill.total }] } })).status, 201);
+      const after = (await call("GET", "/api/admin/today", { admin: true })).json.today;
+      assert.equal(after.receipts, before.receipts + 1);
+      assert.equal(after.grossCents - before.grossCents, Math.round(bill.total * 100));
+      assert.equal(after.seatedTables, before.seatedTables, "paid: no longer open");
+      assert.ok(after.top.length <= 5 && after.top.some((item) => item.quantity >= 7), "the dish sold seven times is among the best sellers");
+      assert.ok(Array.isArray(after.bookings));
     }],
 
     ["delivery platforms: their orders come in by webhook once each, the floor accepts and the kitchen prints, a cancel voids, the report counts them", async () => {
