@@ -154,6 +154,42 @@ test("a manager picks a menu style, and the choice is saved", async ({ page }) =
   await expect(page.locator(".theme-swatch.selected")).toHaveText("中秋节");
 });
 
+test("a festive style left on past its season is flagged, with one tap to what fits now", async ({ page, context }) => {
+  // The console's clock is mid-October: past National Day, before Halloween.
+  await context.addInitScript(() => {
+    const fixed = new Date("2026-10-12T12:00:00+02:00").getTime();
+    const Real = Date;
+    class Fixed extends Real { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } }
+    // eslint-disable-next-line no-global-assign
+    Date = Fixed;
+  });
+  menuTheme = "christmas";
+  await page.reload();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  const hint = page.locator("#themeSeasonHint");
+  await expect(hint).toContainText("圣诞节");
+  await expect(hint).toContainText("季节已经过了");
+  // Nothing is in season on 12 Oct, so it offers the everyday default.
+  await hint.getByRole("button", { name: "换成「墨玉」" }).click();
+  await expect.poll(() => menuTheme).toBe("jade");
+  await expect(page.locator("#themeSeasonHint")).toHaveCount(0);
+});
+
+test("a festive style shows no reminder while it is in season", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    const fixed = new Date("2026-12-20T12:00:00+01:00").getTime();
+    const Real = Date;
+    class Fixed extends Real { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } }
+    // eslint-disable-next-line no-global-assign
+    Date = Fixed;
+  });
+  menuTheme = "christmas";
+  await page.reload();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await expect(page.locator(".theme-picker.festive")).toBeVisible();
+  await expect(page.locator("#themeSeasonHint")).toHaveCount(0);
+});
+
 test("a manager chooses the menu's languages, and cannot switch off the last one", async ({ page }) => {
   await page.getByRole("button", { name: "设置", exact: true }).click();
   const languages = page.getByRole("group", { name: "菜单语言" });
