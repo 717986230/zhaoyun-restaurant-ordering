@@ -1216,16 +1216,31 @@ test("the manager adds, renumbers and removes tables, and a table open on a POS 
   expect(dialogs[1]).toContain("删除桌 4");
 });
 
-test("the manager reads the takings for a period: totals, hours, dishes and waiters, and downloads the dishes as CSV", async ({ page }) => {
+test("the manager reads the takings for a period: totals, hours, dishes and waiters, and downloads the dishes as CSV", async ({ page, context }) => {
+  // A fixed clock, so "today" and the period before it are known days.
+  await context.addInitScript(() => {
+    const fixed = new Date("2026-10-12T12:00:00+02:00").getTime();
+    const Real = Date;
+    class Fixed extends Real { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } }
+    // eslint-disable-next-line no-global-assign
+    Date = Fixed;
+  });
   const asked = [];
   const empty = { cash: 0, card: 0, voucher: 0 };
   await page.route("**/api/admin/reports/sales?*", (route) => {
     const url = new URL(route.request().url());
-    asked.push([url.searchParams.get("from"), url.searchParams.get("to")]);
-    const days = url.searchParams.get("from") === url.searchParams.get("to") ? [url.searchParams.get("from")] : ["2026-09-01", "2026-09-02"];
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    asked.push([from, to]);
+    // 12 Oct is this period; anything earlier is the one before, with half the
+    // takings, so the ↑ against it is a known 100%.
+    const current = to === "2026-10-12";
+    const gross = current ? 4900 : 2450;
+    const receipts = current ? 2 : 1;
+    const days = from === to ? [from] : ["2026-09-01", "2026-09-02"];
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ report: {
-      from: url.searchParams.get("from"), to: url.searchParams.get("to"), timeZone: "Europe/Vienna",
-      totals: { sales: 3, stornos: 1, receipts: 2, averageCents: 2450, firstReceiptNo: 1, lastReceiptNo: 4, grossCents: 4900, vat: [{ percent: 10, grossCents: 4900, netCents: 4455, vatCents: 445 }], payments: { ...empty, cash: 1500, card: 3400 }, vouchersSoldCents: 0, discountCents: 0, cashCents: 1500 },
+      from, to, timeZone: "Europe/Vienna",
+      totals: { sales: 3, stornos: 1, receipts, averageCents: 2450, firstReceiptNo: 1, lastReceiptNo: 4, grossCents: gross, vat: [{ percent: 10, grossCents: gross, netCents: 4455, vatCents: 445 }], payments: { ...empty, cash: 1500, card: 3400 }, vouchersSoldCents: 0, discountCents: 0, cashCents: 1500 },
       days: days.map((date, index) => ({ date, receipts: 1 + index, grossCents: 2000 + index * 900 })),
       hours: Array.from({ length: 24 }, (_, hour) => ({ hour, receipts: hour === 12 ? 2 : 0, grossCents: hour === 12 ? 4900 : 0 })),
       items: [
@@ -1240,13 +1255,17 @@ test("the manager reads the takings for a period: totals, hours, dishes and wait
 
   await expect(page.locator("[data-report=gross]")).toHaveText("€49.00");
   await expect(page.locator("[data-report=receipts]")).toHaveText("2");
-  expect(asked[0][0]).toBe(asked[0][1]);
+  // Today is a day of its own; the period before it is yesterday (the 11th).
+  expect(asked[0]).toEqual(["2026-10-12", "2026-10-12"]);
+  await expect.poll(() => asked.some(([from, to]) => from === "2026-10-11" && to === "2026-10-11")).toBe(true);
+  // Takings doubled against the day before, so each tile wears its ↑100%.
+  await expect(page.locator(".report-tile", { hasText: "营业额" }).locator(".report-delta.up")).toHaveText("↑100%");
   await expect(page.locator(".report-bar-slot")).toHaveCount(24);
   await expect(page.locator(".report-items tbody tr").first()).toContainText("黑椒牛柳");
   await expect(page.locator(".report-card", { hasText: "跑堂" })).toContainText("Li");
 
   await page.getByRole("button", { name: "本月" }).click();
-  await expect.poll(() => asked.at(-1)?.[0]).toMatch(/^\d{4}-\d{2}-01$/);
+  await expect.poll(() => asked.some(([from]) => /^\d{4}-\d{2}-01$/.test(from))).toBe(true);
   await expect(page.locator(".report-card", { hasText: "每日营业额" }).locator(".report-bar-slot")).toHaveCount(2);
 
   const [download] = await Promise.all([page.waitForEvent("download"), page.locator("[data-action=items-csv]").click()]);
