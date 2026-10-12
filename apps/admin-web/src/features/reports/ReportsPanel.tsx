@@ -39,6 +39,24 @@ function rangeOf(preset: Preset, timeZone: string): [string, string] {
   }
 }
 
+/** The equal-length period ending the day before `from`: this week against the
+ *  seven days before it, a custom span against the span of the same length
+ *  right before. Always a like-for-like window, whatever the preset. */
+function previousRange(from: string, to: string): [string, string] {
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  const days = Math.round((end - start) / DAY_MS) + 1;
+  const prevTo = start - DAY_MS;
+  return [isoDay(prevTo - (days - 1) * DAY_MS), isoDay(prevTo)];
+}
+
+/** The change from `before` to `now` as a signed percentage, or null when
+ *  there is nothing to compare against (no earlier period, or it was zero). */
+function changePct(now: number, before: number | undefined): number | null {
+  if (before === undefined || before === 0) return null;
+  return Math.round((now - before) / before * 100);
+}
+
 /** A CSV the way Excel opens it right: a BOM for UTF-8, fields quoted. */
 function downloadCsv(name: string, rows: Array<Array<string | number>>) {
   const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
@@ -74,6 +92,16 @@ function Bars({ label, points, money }: { label: string; points: Array<{ key: st
   </figure>;
 }
 
+/** The ↑/↓ against the previous period, on a tile: up is good, down is not,
+ *  a flat dash when there is nothing to compare against. */
+function Delta({ pct, label }: { pct: number | null; label: string }) {
+  if (pct === null) return null;
+  const dir = pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+  return <small className={`report-delta ${dir}`} data-delta={dir} title={label}>
+    {dir === "up" ? "↑" : dir === "down" ? "↓" : ""}{Math.abs(pct)}%
+  </small>;
+}
+
 /**
  * Sales over the manager's days: what the day closings add up to, and what
  * they do not show — the dishes, the hours, the waiters. Built from the
@@ -85,13 +113,19 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
   const [range, setRange] = useState<[string, string]>(() => rangeOf("today", timeZone));
   const [preset, setPreset] = useState<Preset | null>("today");
   const [report, setReport] = useState<ApiSalesReport | null>(null);
+  // The same-length period right before this one, for the ↑/↓ against it.
+  const [previous, setPrevious] = useState<ApiSalesReport["totals"] | null>(null);
   const [busy, setBusy] = useState(false);
   const money = (cents: number) => formatMoney(cents, language);
 
   const load = useCallback(async (from: string, to: string) => {
     setBusy(true);
+    setPrevious(null);
     try {
       setReport((await api.salesReport(from, to)).report);
+      const [prevFrom, prevTo] = previousRange(from, to);
+      // The comparison is a nicety: if it fails, the report itself still shows.
+      api.salesReport(prevFrom, prevTo).then((result) => setPrevious(result.report.totals)).catch(() => {});
     } catch (error) { failed(error); } finally { setBusy(false); }
   }, [api, failed]);
 
@@ -129,8 +163,8 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
 
     {report && totals && <>
       <div className="report-tiles">
-        <div className="report-tile"><small>{t("reportGross")}</small><b data-report="gross">{money(totals.grossCents)}</b></div>
-        <div className="report-tile"><small>{t("reportReceipts")}</small><b data-report="receipts">{totals.receipts}</b></div>
+        <div className="report-tile"><small>{t("reportGross")}</small><b data-report="gross">{money(totals.grossCents)}</b><Delta pct={changePct(totals.grossCents, previous?.grossCents)} label={t("reportVsPrev")} /></div>
+        <div className="report-tile"><small>{t("reportReceipts")}</small><b data-report="receipts">{totals.receipts}</b><Delta pct={changePct(totals.receipts, previous?.receipts)} label={t("reportVsPrev")} /></div>
         <div className="report-tile"><small>{t("reportAverage")}</small><b>{money(totals.averageCents)}</b></div>
         <div className="report-tile"><small>{t("reportStornos")}</small><b>{totals.stornos}</b></div>
         {(totals.discountCents ?? 0) !== 0 && <div className="report-tile"><small>{t("reportDiscounts")}</small><b>{money(totals.discountCents ?? 0)}</b></div>}

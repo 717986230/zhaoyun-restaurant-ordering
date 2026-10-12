@@ -3697,6 +3697,17 @@ em.voided {
   font-variant-numeric: tabular-nums;
 }
 
+/* The change against the previous period: a quiet line under the figure,
+   coloured only to say which way it went. */
+.report-delta {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--a-muted);
+}
+.report-delta.up { color: var(--a-ok); }
+.report-delta.down { color: var(--a-danger); }
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
