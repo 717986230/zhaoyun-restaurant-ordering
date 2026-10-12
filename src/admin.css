@@ -1834,6 +1834,20 @@ em.voided {
   line-height: 1.5;
 }
 
+/* A festive style left on past its season: set apart from the plain hints so
+   the owner notices, with the one-tap switch reading as the action it is. */
+.theme-season {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--a-line);
+  background: var(--a-accent-wash);
+  color: var(--a-ink);
+}
+.theme-season .link-button {
+  font-weight: 600;
+}
+
 /* The installed apps' icons: each with its picture, what it wears, and the two actions. */
 .app-icon-list {
   display: grid;

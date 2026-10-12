@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AdminApi, AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
 import type { AccountUpdateCommand, ApiAccount, ApiSettings, ColorScheme, MenuLanguage, NavLabels, VatPercent } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, drinkTabs, FEATURED_TEMPLATES, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themePattern } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME, drinkTabs, FEATURED_TEMPLATES, festiveThemeInSeason, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themeOutOfSeason, themePattern } from "@zhaoyun/domain";
 import { translate, useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { TableCards } from "./TableCards";
@@ -471,6 +471,20 @@ export function SettingsPanel(props: Props) {
             on and one to take off again. Each button wears its own pattern. */}
         <p className="settings-label">{t("festiveThemes")}</p>
         <div className="theme-picker festive">{Object.values(MENU_THEMES).filter((theme) => theme.festive).map(themeButton)}</div>
+        {/* A festive set left on past its season (e.g. Christmas in October):
+            a gentle reminder, with one tap to the set that fits now, or off. */}
+        {(() => {
+          const stale = themeOutOfSeason(settings.menuTheme);
+          if (!stale) return null;
+          const fits = festiveThemeInSeason() ?? MENU_THEMES[DEFAULT_MENU_THEME];
+          return <p className="settings-hint theme-season" id="themeSeasonHint" role="status">
+            {t("themeOutOfSeason", { theme: themeName(stale) })}
+            {" "}
+            <button type="button" className="link-button" onClick={() => void props.onSaveSettings({ menuTheme: fits.id }, "menuStyleSaved")}>
+              {t("themeSwitchTo", { theme: themeName(fits) })}
+            </button>
+          </p>;
+        })()}
         <p className="settings-label">{t("defaultScheme")}</p>
         <div className="scheme-picker" role="group" aria-label={t("defaultScheme")}>{(["dark", "light"] as ColorScheme[]).map((scheme) => <button
           key={scheme}
