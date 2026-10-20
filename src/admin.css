@@ -598,6 +598,19 @@ h2 {
   font: 18px Georgia, serif;
 }
 
+/* A dish still waiting for its photo: a dashed box with the word, so it reads
+   as a gap to fill, not a finished thumbnail. */
+.product-thumb.thumb-pending {
+  border: 1px dashed var(--a-line-dash);
+  background: transparent;
+}
+.product-thumb.thumb-pending small {
+  color: var(--a-muted);
+  font-size: 10px;
+  line-height: 1.1;
+  text-align: center;
+}
+
 .product-copy b,
 .product-copy small,
 .printer-row b,

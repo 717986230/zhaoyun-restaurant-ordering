@@ -1302,6 +1302,8 @@ test("the dishes still without a photo are one tap away, and the tap goes once t
   await page.locator("#filterNoPhoto").click();
   await expect(page.locator("#filterNoPhoto")).toHaveText("缺照片 2");
   await expect(page.locator(".product-row")).toHaveText([/菜 2/, /菜 4/]);
+  // A dish with no picture reads as awaiting one, not a drawn mark.
+  await expect(page.locator(".product-row", { hasText: "菜 2" }).locator(".thumb-pending")).toHaveText("待上传");
 
   products = products.map((product) => dish(product.id, true));
   await page.reload();

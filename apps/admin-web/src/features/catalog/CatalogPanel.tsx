@@ -85,6 +85,7 @@ function readBundleItems(form: FormData): BundleItem[] {
  */
 /** A dish's picture at list size; a set shows up to four of its dishes. */
 function ProductThumb({ product, byId, mediaUrl }: { product: Product; byId: Map<string, Product>; mediaUrl: (path: string) => string }) {
+  const { t } = useI18n();
   const one = (dish: Product) => {
     const media = dish.media[0];
     return media?.type === "image"
@@ -92,9 +93,14 @@ function ProductThumb({ product, byId, mediaUrl }: { product: Product; byId: Map
       : <span key={dish.id} className="media-mark">{media?.type === "video" ? "▶" : dish.kind === "drink" ? "杯" : dish.kind === "sushi" ? "鮨" : "菜"}</span>;
   };
   const parts = (product.bundleItems ?? []).flatMap((item) => byId.get(item.productId) ?? []).slice(0, 4);
-  return parts.length > 1
-    ? <span className={`product-thumb thumb-collage n${parts.length}`}>{parts.map(one)}</span>
-    : <span className="product-thumb">{one(product)}</span>;
+  if (parts.length > 1) return <span className={`product-thumb thumb-collage n${parts.length}`}>{parts.map(one)}</span>;
+  // A single dish with no picture of its own: the owner removed the stock photo
+  // and a real one is still to come, so the thumb says so rather than drawing a
+  // generic mark. Sets (handled above) show their dishes' pictures instead.
+  if (!product.bundleItems?.length && !product.media.length) {
+    return <span className="product-thumb thumb-pending"><small>{t("photoPending")}</small></span>;
+  }
+  return <span className="product-thumb">{one(product)}</span>;
 }
 
 /**
