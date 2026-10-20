@@ -7,7 +7,7 @@ import { useCatalog } from "./useCatalog";
 import { useCustomerState } from "./model";
 import { useMenuTheme } from "./useMenuTheme";
 import { useColorScheme } from "./useColorScheme";
-import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, resolveMenuLanguage } from "@zhaoyun/domain";
+import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, festiveThemeInSeason, resolveMenuLanguage } from "@zhaoyun/domain";
 import { CatalogScreen } from "../features/catalog/CatalogScreen";
 import { useKiosk } from "../features/kiosk/useKiosk";
 import { useMinuteClock } from "./useMinuteClock";
@@ -51,7 +51,13 @@ export function App() {
     // What an iPhone writes under the icon when the menu is added to the home screen.
     if (name) document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", name);
   }, [catalog.menu?.restaurantName, menuTitle]);
-  useMenuTheme(catalog.theme, scheme);
+  // When the owner has the menu dress itself for the season, a festive style
+  // whose window covers today is worn in place of the chosen one; off-season,
+  // and whenever the switch is off, the chosen style stands. The minute clock
+  // below re-renders the menu as days turn, so this follows the calendar on
+  // its own with nothing to remember to switch.
+  const themeId = catalog.menu?.seasonal ? (festiveThemeInSeason()?.id ?? catalog.theme) : catalog.theme;
+  useMenuTheme(themeId, scheme);
 
   // The flags the restaurant switched on in 连接设置, and the one of them this
   // guest reads: their own pick while it is still offered, else their phone's

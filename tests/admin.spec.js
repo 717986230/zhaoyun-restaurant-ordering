@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
   menuLanguages = ["en", "de"];
   // Orders, tables and printers are behind the ordering module, which a
   // restaurant turns on once guests can order; these tests run with it on.
-  appSettings = { restaurantName: "赵云", menuTitle: "La Carte", menuDefaultScheme: "dark", showTableNumber: true, showOrdering: true, featuredEnabled: false, featuredTitle: "", featuredProductIds: [] };
+  appSettings = { restaurantName: "赵云", menuTitle: "La Carte", menuDefaultScheme: "dark", showTableNumber: true, seasonalTheme: false, showOrdering: true, featuredEnabled: false, featuredTitle: "", featuredProductIds: [] };
   await page.addInitScript(() => sessionStorage.setItem("zy_admin_token", "test-admin"));
   await openSettingsCards(page);
   await page.route("**/api/health", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
@@ -187,6 +187,31 @@ test("a festive style shows no reminder while it is in season", async ({ page, c
   await page.reload();
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.locator(".theme-picker.festive")).toBeVisible();
+  await expect(page.locator("#themeSeasonHint")).toHaveCount(0);
+});
+
+test("a manager has the menu dress for the season on its own, and sees what it wears now", async ({ page, context }) => {
+  // Mid-October: past National Day, before Halloween — no festival on now.
+  await context.addInitScript(() => {
+    const fixed = new Date("2026-10-12T12:00:00+02:00").getTime();
+    const Real = Date;
+    class Fixed extends Real { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } }
+    // eslint-disable-next-line no-global-assign
+    Date = Fixed;
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await expect(page.locator("#themeSeasonNow")).toHaveCount(0);
+
+  await page.getByRole("switch", { name: "按季节自动换装" }).click();
+  await expect.poll(() => appSettings.seasonalTheme).toBe(true);
+  // Nothing in season on 12 Oct, so it keeps the chosen everyday style.
+  await expect(page.locator("#themeSeasonNow")).toContainText("现在不是节日");
+  await expect(page.locator("#themeSeasonNow")).toContainText("墨玉");
+  // With it on, the out-of-season reminder stands down even on a festive base.
+  menuTheme = "christmas";
+  await page.reload();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.locator("#themeSeasonHint")).toHaveCount(0);
 });
 

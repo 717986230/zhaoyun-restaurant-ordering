@@ -300,6 +300,35 @@ test("an everyday style has no pattern, and no garland taking room", async ({ pa
   await expect(page.locator(".festive-garland")).toBeHidden();
 });
 
+test("dressing for the season wears the festive style the day calls for, and the chosen one off-season", async ({ page }) => {
+  const serve = (menu) => page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products, theme: "jade", languages: ["zh", "en", "de"], menu }) }));
+  const menuTheme = () => page.evaluate(() => document.documentElement.dataset.menuTheme);
+  await page.unroute("**/api/catalog");
+
+  // In Christmas's window, the base is jade but the menu wears christmas.
+  await page.addInitScript(() => {
+    const fixed = new Date("2026-12-20T12:00:00+01:00").getTime();
+    const Real = Date;
+    class Fixed extends Real { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } }
+    // eslint-disable-next-line no-global-assign
+    Date = Fixed;
+  });
+  await serve({ title: "La Carte", restaurantName: "Chiri", defaultScheme: "dark", showTableNumber: true, seasonal: true });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  await expect.poll(menuTheme).toBe("christmas");
+  expect(await page.evaluate(() => document.documentElement.hasAttribute("data-festive"))).toBe(true);
+
+  // With the switch off, the same day leaves the chosen jade in place.
+  await page.unroute("**/api/catalog");
+  await serve({ title: "La Carte", restaurantName: "Chiri", defaultScheme: "dark", showTableNumber: true });
+  await page.reload();
+  await expect(page.locator(".dish-card").first()).toBeVisible();
+  await expect.poll(menuTheme).toBe("jade");
+});
+
 test("the owner's title, table-number choice and default look reach the guest", async ({ page }) => {
   await page.unroute("**/api/catalog");
   await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({

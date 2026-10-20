@@ -406,6 +406,9 @@ export interface ApiSettings {
   /** What a guest sees before touching the sun/moon; their own pick wins. */
   menuDefaultScheme: ColorScheme;
   showTableNumber: boolean;
+  /** Dress the menu for the season on its own: wear a festive style whose
+   *  window covers today, and fall back to the chosen one off-season. */
+  seasonalTheme: boolean;
   /** Orders, table billing and printers in the admin console; off while the
    *  menu is view-only. */
   showOrdering: boolean;
@@ -659,6 +662,9 @@ export interface ApiMenuSettings {
   restaurantName: string;
   defaultScheme: ColorScheme;
   showTableNumber: boolean;
+  /** The menu dresses itself for the season; absent (false) otherwise. The
+   *  festive style it then wears is resolved on the menu, from the day. */
+  seasonal?: boolean;
   /** The restaurant's clock; absent from a server older than page hours. */
   timeZone?: string;
   /** When the set menus page is on; null or absent: always. */

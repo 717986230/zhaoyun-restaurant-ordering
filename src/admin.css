@@ -1999,6 +1999,15 @@ em.voided {
   flex: 1;
 }
 
+/* A line of explanation under a switch's label. */
+.settings-switch-hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--a-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .settings-cards-button {
   justify-self: start;
 }

@@ -167,6 +167,7 @@ export const SettingsBody = Type.Object({
   floorTables: Type.Optional(Type.Integer({ minimum: 0, maximum: 200 })),
   menuDefaultScheme: Type.Optional(literals(COLOR_SCHEMES)),
   showTableNumber: Type.Optional(Type.Boolean()),
+  seasonalTheme: Type.Optional(Type.Boolean()),
   showOrdering: Type.Optional(Type.Boolean()),
   featuredEnabled: Type.Optional(Type.Boolean()),
   featuredTitle: Type.Optional(Type.String({ maxLength: 32 })),

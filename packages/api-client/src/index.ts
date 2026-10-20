@@ -55,6 +55,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     menuTitle: "La Carte",
     menuDefaultScheme: "dark",
     showTableNumber: true,
+    seasonalTheme: false,
     showOrdering: false,
     featuredEnabled: false,
     featuredTitle: "",
