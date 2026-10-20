@@ -430,6 +430,27 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await call("PUT", "/api/admin/settings", { admin: true, body: { menuTheme: "jade" } });
     }],
 
+    ["dressing for the season is off until switched on, and then the catalogue says so", async () => {
+      const before = await call("GET", "/api/catalog");
+      assert.equal(before.json.menu.seasonal, undefined, "a fresh restaurant does not dress for the season");
+
+      assert.equal((await call("PUT", "/api/admin/settings", { body: { seasonalTheme: true } })).status, 401, "a token is needed");
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { seasonalTheme: "yes" } })).status, 400, "it is a flag");
+
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { seasonalTheme: true } });
+      assert.equal(saved.status, 200);
+      assert.equal(saved.json.seasonalTheme, true);
+
+      // The chosen style is still stored; the menu is what decides which festive
+      // one to wear from the day, so the catalogue only carries the switch.
+      const after = await call("GET", "/api/catalog");
+      assert.equal(after.json.menu.seasonal, true, "the menu is told to dress for the season");
+      assert.equal(after.json.theme, "jade", "the chosen style is still carried as the off-season one");
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { seasonalTheme: false } });
+      assert.equal((await call("GET", "/api/catalog")).json.menu.seasonal, undefined, "off again");
+    }],
+
     ["the menu offers English and German until a manager picks otherwise", async () => {
       const before = await call("GET", "/api/catalog");
       assert.deepEqual(before.json.languages, ["en", "de"], "a fresh restaurant offers English and German");

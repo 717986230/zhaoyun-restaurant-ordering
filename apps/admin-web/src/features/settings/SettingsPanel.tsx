@@ -115,10 +115,10 @@ export function Section({ title, children, id, wide = false, summary }: { title:
 
 /** A switch that saves on change: the setting is on screen the moment it is
  *  flipped, and the console puts it back if the save fails. */
-export function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
+export function Toggle({ checked, label, hint, onChange }: { checked: boolean; label: string; hint?: string; onChange: (value: boolean) => void }) {
   return <label className="settings-switch">
     <input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-    <span>{label}</span>
+    <span>{label}{hint && <small className="settings-switch-hint">{hint}</small>}</span>
   </label>;
 }
 
@@ -471,9 +471,20 @@ export function SettingsPanel(props: Props) {
             on and one to take off again. Each button wears its own pattern. */}
         <p className="settings-label">{t("festiveThemes")}</p>
         <div className="theme-picker festive">{Object.values(MENU_THEMES).filter((theme) => theme.festive).map(themeButton)}</div>
+        {/* Dress the menu for the season on its own: a festive style whose
+            window covers today is worn in place of the one above, and the one
+            above comes back when the season is over. */}
+        <Toggle checked={settings.seasonalTheme} label={t("seasonalTheme")} hint={t("seasonalThemeHint")} onChange={(seasonalTheme) => void props.onSaveSettings({ seasonalTheme }, "appearanceSaved")} />
+        {settings.seasonalTheme && (() => {
+          const now = festiveThemeInSeason();
+          return <p className="settings-hint theme-season" id="themeSeasonNow" role="status">
+            {now ? t("seasonalThemeNow", { theme: themeName(now) }) : t("seasonalThemeOff", { theme: themeName(MENU_THEMES[settings.menuTheme] ?? MENU_THEMES.jade) })}
+          </p>;
+        })()}
         {/* A festive set left on past its season (e.g. Christmas in October):
-            a gentle reminder, with one tap to the set that fits now, or off. */}
-        {(() => {
+            a gentle reminder, with one tap to the set that fits now, or off.
+            Only when the menu is not already dressing itself for the season. */}
+        {!settings.seasonalTheme && (() => {
           const stale = themeOutOfSeason(settings.menuTheme);
           if (!stale) return null;
           const fits = festiveThemeInSeason() ?? MENU_THEMES[DEFAULT_MENU_THEME];

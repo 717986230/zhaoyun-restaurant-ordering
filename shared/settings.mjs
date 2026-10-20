@@ -282,6 +282,12 @@ export const APP_SETTINGS = {
     }
   },
   showTableNumber: { key: "show_table_number", fallback: () => true, normalize: flag("showTableNumber") },
+  // Dress the menu for the season on its own: when on, a festive style whose
+  // window covers today is worn in place of the chosen one, and the chosen one
+  // comes back when the season is over. Off: the menu wears exactly what the
+  // owner picked. The menu resolves which festive style fits (packages/domain,
+  // festiveThemeInSeason); the server only carries the switch.
+  seasonalTheme: { key: "seasonal_theme", fallback: () => false, normalize: flag("seasonalTheme") },
   // Orders, table billing and printers in the admin console. Off while the
   // menu is view-only: those sections would have nothing to show.
   showOrdering: { key: "admin_show_ordering", fallback: () => false, normalize: flag("showOrdering") },
@@ -371,6 +377,9 @@ export function menuSettingsView(settings) {
     restaurantName: settings.restaurantName,
     defaultScheme: settings.menuDefaultScheme,
     showTableNumber: settings.showTableNumber,
+    // Whether the menu dresses itself for the season; the style it then wears
+    // is worked out on the menu, from the day. Absent (false) on an older server.
+    ...(settings.seasonalTheme ? { seasonal: true } : {}),
     timeZone: settings.timeZone,
     setsSchedule: settings.setsSchedule,
     navPinned: settings.navPinned,
