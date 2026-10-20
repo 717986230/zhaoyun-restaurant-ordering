@@ -449,6 +449,10 @@ html.bk-root body {
 
 .bk-page {
   --bk-serif: Georgia, "Noto Serif SC", "Songti SC", serif;
+  /* The menu's bundled display serif (styles.css), for the booking's marquee
+     moments — the title and the big numbers on the ticket — so the two pages
+     read as one restaurant. The quieter serif text keeps --bk-serif. */
+  --bk-display: var(--font-display);
   --bk-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   gap: 14px;
 }
@@ -457,7 +461,7 @@ html.bk-root body {
   padding: 12px 0 6px;
 }
 .bk-head h1 {
-  font-family: var(--bk-serif);
+  font-family: var(--bk-display);
   font-weight: 500;
   font-size: clamp(32px, 9vw, 44px);
   line-height: 1.05;
@@ -692,11 +696,11 @@ html.bk-root body {
   gap: 4px;
 }
 .bk-when strong {
-  font-family: var(--bk-serif);
-  font-weight: 500;
+  font-family: var(--bk-display);
+  font-weight: 600;
   font-size: clamp(48px, 16vw, 64px);
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums lining-nums;
 }
 .bk-when span {
@@ -900,11 +904,11 @@ html.bk-root body {
 }
 .bk-pass-front strong,
 .bk-pass-back strong {
-  font-family: var(--bk-serif);
-  font-weight: 500;
+  font-family: var(--bk-display);
+  font-weight: 600;
   font-size: clamp(48px, 16vw, 64px);
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums lining-nums;
 }
 .bk-pass-back strong {
