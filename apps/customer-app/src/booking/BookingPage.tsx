@@ -459,6 +459,40 @@ function rememberContact(name: string, phone: string): void {
  * the one card that is left: signing in, proving the email, or the name and
  * mobile number, filled in from the last booking on this phone.
  */
+/**
+ * A table seen from above, its chairs the number it seats: a little plan the
+ * guest reads at a glance — round for a two-top, a longer bench as the party
+ * grows — so the choice is a seating map, not a list. Decorative: the table's
+ * name and its seat count stay in the text beside it, and the SVG inherits the
+ * tile's colour so the chosen (and the greyed-out) tile carry straight over.
+ */
+function TableSeating({ seats }: { seats: number }) {
+  const shown = Math.max(1, Math.min(seats, 10));
+  const top = Math.ceil(shown / 2);
+  const bottom = shown - top;
+  const chairW = 11;
+  const chairGap = 4;
+  const cols = Math.max(top, bottom, 1);
+  const tableW = cols * chairW + (cols - 1) * chairGap;
+  const width = tableW + 12;
+  const height = 52;
+  const cx = width / 2;
+  const round = shown <= 2;
+  const row = (count: number, y: number) => {
+    const rowW = count * chairW + (count - 1) * chairGap;
+    const x0 = cx - rowW / 2;
+    return Array.from({ length: count }, (_, i) =>
+      <rect key={i} x={x0 + i * (chairW + chairGap)} y={y} width={chairW} height={8} rx={3} className="bk-seat-chair" />);
+  };
+  return <svg className="bk-seat-plan" viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-hidden="true" focusable="false">
+    {top ? row(top, 2) : null}
+    {round
+      ? <circle cx={cx} cy={height / 2} r={13} className="bk-seat-table" />
+      : <rect x={cx - tableW / 2} y={16} width={tableW} height={20} rx={7} className="bk-seat-table" />}
+    {bottom ? row(bottom, height - 10) : null}
+  </svg>;
+}
+
 function BookingForm({ language, info, customer, recent, onSignedIn, onVerified, onBooked }: {
   language: BookingLanguage; info: ApiBookingInfo; customer: ApiCustomer | null;
   recent: { name: string; phone: string } | null;
@@ -639,7 +673,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
         {tables.map((choice) => <button key={choice.table} type="button" role="radio" aria-checked={choice.table === table} data-table={choice.table}
           disabled={!choice.available} className={`bk-table ${choice.table === table ? "active" : ""}`} onClick={() => { setTable(choice.table); setError(""); setBringUp("bookingFinish"); }}>
           <strong>{b(language, "tableName", { table: choice.table })}</strong>
-          <span className="bk-seats" aria-hidden="true">{"●".repeat(Math.min(choice.seats, 12))}</span>
+          <TableSeating seats={choice.seats} />
           <small>{choice.available ? b(language, "tableSeats", { seats: choice.seats }) : choice.seats < party ? b(language, "tableSmall") : b(language, "tableBooked")}</small>
         </button>)}
       </div> : null}

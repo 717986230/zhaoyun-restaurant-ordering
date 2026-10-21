@@ -74,7 +74,11 @@ jobs:
         run: npm run build
 
       # The browsers are kept between runs, by Playwright's own version: a
-      # download that stalls once cost a whole twenty-minute run.
+      # download that stalls once cost a whole twenty-minute run. The runner
+      # image id is in the key too: a browser build is linked against that
+      # image's system libraries (libicu and friends), so when the image rolls
+      # the cached build must be re-downloaded or WebKit fails to launch with
+      # a "cannot open shared object file" on a now-missing .so.
       - name: Playwright version
         id: playwright
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
@@ -84,7 +88,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ steps.playwright.outputs.version }}
 
       # WebKit for the iPhone projects: every browser on iOS is WebKit. A
       # stalled download is cut off after four minutes and tried again, up to
