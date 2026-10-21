@@ -1386,3 +1386,15 @@ html.bk-root body {
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Add-to-calendar sits among the booking's actions; its icon rides with the label. */
+.bk-add-cal {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.bk-add-cal svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}

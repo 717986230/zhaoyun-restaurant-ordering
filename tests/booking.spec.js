@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import jsQR from "jsqr";
@@ -170,6 +170,15 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator("#bookingPointsLeft")).toHaveText("已扣 5 积分，还剩 5 积分");
   const reference = (await page.locator("#bookingReference").textContent()).trim();
   expect(reference).toMatch(/^[A-Z2-9]{6}$/);
+  // Adding it to the guest's own calendar: a valid .ics for this very booking.
+  const [calendarFile] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("#bookingAddCalendar").click()
+  ]);
+  expect(calendarFile.suggestedFilename()).toBe(`booking-${reference}.ics`);
+  const ics = readFileSync(await calendarFile.path(), "utf8");
+  expect(ics).toContain("BEGIN:VCALENDAR");
+  expect(ics).toContain(`UID:${reference}@zhaoyun`);
   // Shown above, it is not listed a second time under it.
   await expect(page.locator(`#myBookings [data-reference="${reference}"]`)).toHaveCount(0);
   // A tap turns the ticket over to the number, to show at the door; another turns it back.
