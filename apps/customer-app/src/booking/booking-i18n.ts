@@ -7,7 +7,7 @@ export type BookingLanguage = "zh" | "de" | "en";
 const copy = {
   zh: {
     title: "预约餐桌", loading: "正在加载…", off: "目前不接受在线预约，请直接致电餐厅。", failedLoad: "连不上餐厅，请稍后再试。", retry: "重试",
-    party: "人数", guests: "{n} 位", moreGuests: "更多", largeParty: "超过 {n} 位请直接致电餐厅。", date: "日期", otherDate: "其他日期", closed: "休息",
+    party: "人数", guests: "{n} 位", moreGuests: "更多", largeParty: "超过 {n} 位请直接致电餐厅。", date: "日期", otherDate: "其他日期", closed: "休息", lunch: "午市", dinner: "晚市", prevMonth: "上个月", nextMonth: "下个月",
     time: "时间", noTimes: "这一天没有可预约的时间。", fullDay: "这一天已经订满了，请换一天。", pickTime: "请选择时间", full: "已满", timesLoading: "正在查看空位…",
     signInTitle: "登录后预约", signInLead: "没有账户？用邮箱或手机号注册，不需要验证码。", signIn: "登录", register: "注册", loginEmail: "邮箱或手机号", password: "密码", passwordHint: "至少 6 位",
     signedInAs: "已登录：{email}", signOut: "退出", account: "个人中心", signInToSee: "登录后查看。请在页面下方登录。", close: "关闭", themeLight: "浅色", themeDark: "深色", chooseTime: "请选择", showMemberCode: "显示会员码", hideMemberCode: "收起会员码", pointsShortLine: "预约一次需要 {min} 积分，你现在有 {points} 积分。", pointsHowWelcome: "到店消费结账时请服务员扫会员码，赠送 {welcome} 积分。", ruleSignup: "注册送 {n} 积分", ruleBooking: "每次预约扣 {n} 积分（取消退回）", ruleWelcome: "首次到店消费送 {n} 积分", ruleNoShow: "预约未到另扣 {n} 积分", bookingCost: "扣 {n} 积分", pointsLabel: "积分", pointsSpent: "已扣 {n} 积分，还剩 {points} 积分", pointsBack: "已退回 {n} 积分，现有 {points} 积分", signupBonus: "新用户注册即送 {n} 积分。", pointsBalance: "{points} 积分", memberTitle: "会员预约", memberRule: "预约需要 {min} 积分。首次到店消费后赠送 {welcome} 积分；预约未按时到店会扣 {noShow} 积分。", pointsShort: "你现在有 {points} 积分，还差 {missing} 积分才能在线预约。", memberHow: "到店消费结账时，请服务员扫这个会员码，即赠送 {welcome} 积分（在店里用这个账户扫码点餐的，结账后自动赠送）。", memberQrAlt: "会员码", memberRefresh: "已到店领取？刷新积分", wrongLogin: "账号或密码不对", emailTaken: "这个邮箱或手机号已经注册过，请直接登录", forgot: "忘记密码？请联系餐厅重设。",
@@ -27,7 +27,7 @@ const copy = {
   },
   de: {
     title: "Tisch reservieren", loading: "Wird geladen …", off: "Online-Reservierungen sind derzeit nicht möglich – bitte rufen Sie uns an.", failedLoad: "Keine Verbindung zum Restaurant – bitte später noch einmal.", retry: "Erneut versuchen",
-    party: "Personen", guests: "{n} Pers.", moreGuests: "Mehr", largeParty: "Ab {n} Personen bitte telefonisch reservieren.", date: "Datum", otherDate: "Anderes Datum", closed: "Ruhetag",
+    party: "Personen", guests: "{n} Pers.", moreGuests: "Mehr", largeParty: "Ab {n} Personen bitte telefonisch reservieren.", date: "Datum", otherDate: "Anderes Datum", closed: "Ruhetag", lunch: "Mittag", dinner: "Abend", prevMonth: "Voriger Monat", nextMonth: "Nächster Monat",
     time: "Uhrzeit", noTimes: "An diesem Tag gibt es keine Reservierungszeiten.", fullDay: "Dieser Tag ist ausgebucht – bitte einen anderen wählen.", pickTime: "Bitte eine Uhrzeit wählen", full: "ausgebucht", timesLoading: "Freie Tische werden gesucht …",
     signInTitle: "Zum Reservieren anmelden", signInLead: "Noch kein Konto? Mit E-Mail oder Handynummer registrieren – ohne Code.", signIn: "Anmelden", register: "Registrieren", loginEmail: "E-Mail oder Handynummer", password: "Passwort", passwordHint: "Mindestens 6 Zeichen",
     signedInAs: "Angemeldet: {email}", signOut: "Abmelden", account: "Mein Konto", signInToSee: "Bitte unten auf der Seite anmelden.", close: "Schließen", themeLight: "Hell", themeDark: "Dunkel", chooseTime: "Wählen", showMemberCode: "Mitgliedscode zeigen", hideMemberCode: "Mitgliedscode ausblenden", pointsShortLine: "Eine Reservierung braucht {min} Punkte, Sie haben {points}.", pointsHowWelcome: "Zeigen Sie beim Bezahlen im Restaurant Ihren Mitgliedscode – dafür gibt es {welcome} Punkte.", ruleSignup: "{n} Punkte für die Registrierung", ruleBooking: "{n} Punkte pro Reservierung (zurück bei Storno)", ruleWelcome: "{n} Punkte für den ersten Besuch", ruleNoShow: "{n} Punkte mehr bei Nichterscheinen", bookingCost: "{n} Punkte", pointsLabel: "Punkte", pointsSpent: "{n} Punkte abgezogen, {points} übrig", pointsBack: "{n} Punkte zurück, jetzt {points}", signupBonus: "Neu hier? Registrieren und {n} Punkte geschenkt bekommen.", pointsBalance: "{points} Punkte", memberTitle: "Reservieren für Mitglieder", memberRule: "Zum Reservieren brauchen Sie {min} Punkte. Nach Ihrem ersten Besuch schenken wir Ihnen {welcome} Punkte; eine nicht wahrgenommene Reservierung kostet {noShow} Punkte.", pointsShort: "Sie haben {points} Punkte – es fehlen noch {missing}, um online zu reservieren.", memberHow: "Zeigen Sie beim Bezahlen im Restaurant diesen Mitgliedscode – wir scannen ihn und schenken Ihnen {welcome} Punkte (bestellen Sie vor Ort mit diesem Konto, kommen sie nach dem Bezahlen von selbst).", memberQrAlt: "Mitgliedscode", memberRefresh: "Schon da gewesen? Punkte aktualisieren", wrongLogin: "Konto oder Passwort falsch", emailTaken: "Diese E-Mail oder Nummer ist schon registriert – bitte anmelden", forgot: "Passwort vergessen? Das Restaurant setzt es neu.",
@@ -47,7 +47,7 @@ const copy = {
   },
   en: {
     title: "Book a table", loading: "Loading…", off: "Online booking is not available right now – please call us.", failedLoad: "Cannot reach the restaurant – please try again later.", retry: "Try again",
-    party: "Guests", guests: "{n}", moreGuests: "More", largeParty: "For more than {n} guests, please call us.", date: "Date", otherDate: "Another date", closed: "Closed",
+    party: "Guests", guests: "{n}", moreGuests: "More", largeParty: "For more than {n} guests, please call us.", date: "Date", otherDate: "Another date", closed: "Closed", lunch: "Lunch", dinner: "Dinner", prevMonth: "Previous month", nextMonth: "Next month",
     time: "Time", noTimes: "No booking times on this day.", fullDay: "This day is fully booked – please pick another.", pickTime: "Please pick a time", full: "full", timesLoading: "Checking free tables…",
     signInTitle: "Sign in to book", signInLead: "No account yet? Register with an email or a mobile number – no code needed.", signIn: "Sign in", register: "Register", loginEmail: "Email or mobile number", password: "Password", passwordHint: "At least 6 characters",
     signedInAs: "Signed in: {email}", signOut: "Sign out", account: "My account", signInToSee: "Please sign in further down the page.", close: "Close", themeLight: "Light", themeDark: "Dark", chooseTime: "Pick", showMemberCode: "Show member code", hideMemberCode: "Hide member code", pointsShortLine: "A booking takes {min} points; you have {points}.", pointsHowWelcome: "Show your member code when you pay at the restaurant for {welcome} points.", ruleSignup: "{n} points for signing up", ruleBooking: "{n} points per booking (back if cancelled)", ruleWelcome: "{n} points for your first visit", ruleNoShow: "{n} more points if you miss a booking", bookingCost: "{n} points", pointsLabel: "Points", pointsSpent: "{n} points taken, {points} left", pointsBack: "{n} points back, {points} now", signupBonus: "New here? Sign up for {n} points on us.", pointsBalance: "{points} points", memberTitle: "Booking for members", memberRule: "Booking takes {min} points. Your first visit brings {welcome} points; a booking not kept costs {noShow} points.", pointsShort: "You have {points} points – {missing} more to book online.", memberHow: "When you pay at the restaurant, show this member code: we scan it and give you {welcome} points (order at the table with this account and they come by themselves once paid).", memberQrAlt: "Member code", memberRefresh: "Been in already? Refresh your points", wrongLogin: "Wrong account or password", emailTaken: "This email or number is registered already – please sign in", forgot: "Forgot your password? The restaurant can set a new one.",
@@ -88,6 +88,18 @@ const LOCALES: Record<BookingLanguage, string> = { zh: "zh-CN", de: "de-AT", en:
 /** "Sa., 3. Okt." — a calendar day in the guest's language, read as the restaurant's day. */
 export function formatDay(language: BookingLanguage, date: string, options: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" }): string {
   return new Intl.DateTimeFormat(LOCALES[language], { ...options, timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+}
+
+/** "Oktober 2026" — the heading over a month of the calendar, in the guest's language. */
+export function formatMonth(language: BookingLanguage, yearMonth: string): string {
+  return new Intl.DateTimeFormat(LOCALES[language], { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${yearMonth}-01T12:00:00Z`));
+}
+
+/** The seven weekday initials, Monday first, for the calendar's header row. */
+export function weekdayInitials(language: BookingLanguage): string[] {
+  const format = new Intl.DateTimeFormat(LOCALES[language], { weekday: "narrow", timeZone: "UTC" });
+  // 2024-01-01 is a Monday; the week runs Mon–Sun, as the day grid does.
+  return Array.from({ length: 7 }, (_, index) => format.format(new Date(Date.UTC(2024, 0, 1 + index, 12))));
 }
 
 const LANGUAGE_KEY = "zy_booking_language";
