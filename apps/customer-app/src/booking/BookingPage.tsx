@@ -727,6 +727,40 @@ function useQr(text: string): string {
   return qr;
 }
 
+/** A calendar day+time as an ICS floating-local stamp "YYYYMMDDTHHMMSS", `addHours` later. */
+function icsStamp(date: string, time: string, addHours: number): string {
+  const when = new Date(`${date}T${time}:00Z`);
+  when.setUTCHours(when.getUTCHours() + addHours);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${when.getUTCFullYear()}${pad(when.getUTCMonth() + 1)}${pad(when.getUTCDate())}T${pad(when.getUTCHours())}${pad(when.getUTCMinutes())}00`;
+}
+
+/** Commas, semicolons, backslashes and newlines are escaped in an ICS text value. */
+function escapeIcs(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/([,;])/g, "\\$1").replace(/\r?\n/g, "\\n");
+}
+
+/**
+ * The booking as an .ics event the guest adds to their own calendar. The time
+ * is floating — no timezone — so a guest who read "19:00" keeps 19:00, as the
+ * restaurant means it; the table is held two hours, the usual sitting.
+ */
+function bookingIcs(summary: string, location: string, description: string, date: string, time: string, reference: string): string {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//zhaoyun//booking//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${reference}@zhaoyun`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${icsStamp(date, time, 0)}`,
+    `DTEND:${icsStamp(date, time, 2)}`,
+    `SUMMARY:${escapeIcs(summary)}`,
+    ...(location ? [`LOCATION:${escapeIcs(location)}`] : []),
+    `DESCRIPTION:${escapeIcs(description)}`,
+    "END:VEVENT", "END:VCALENDAR"
+  ].join("\r\n");
+}
+
 function BookingDetails({ language, booking, held, info, customer, onChange, onAnother }: {
   language: BookingLanguage; booking: ApiGuestReservation; held: Held; info: ApiBookingInfo | null; customer: ApiCustomer | null;
   onChange: (booking: ApiGuestReservation) => void; onAnother: () => void;
@@ -735,6 +769,22 @@ function BookingDetails({ language, booking, held, info, customer, onChange, onA
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const link = linkFor(held);
+
+  // The booking saved to the guest's own calendar: a file their phone opens
+  // into Apple/Google Calendar, for a reminder the restaurant need not send.
+  function addToCalendar() {
+    const summary = info?.restaurantName ? `${info.restaurantName} · ${b(language, "calendarTitle")}` : b(language, "calendarTitle");
+    const description = [b(language, "partyOf", { n: booking.party }), booking.table ? b(language, "tableName", { table: booking.table }) : "", `${b(language, "reference")}: ${booking.reference}`].filter(Boolean).join(" · ");
+    const ics = bookingIcs(summary, info?.restaurantName ?? "", description, booking.date, booking.time, booking.reference);
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `booking-${booking.reference}.ics`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
 
   async function cancel() {
     if (!window.confirm(b(language, "cancelConfirm"))) return;
@@ -806,6 +856,7 @@ function BookingDetails({ language, booking, held, info, customer, onChange, onA
     </div> : null}
     {error ? <p className="bk-error" role="alert">{error}</p> : null}
     <div className="bk-actions">
+      {active ? <button type="button" className="bk-secondary bk-add-cal" id="bookingAddCalendar" onClick={addToCalendar}><CalendarIcon />{b(language, "addToCalendar")}</button> : null}
       {active && booking.cancellable !== false ? <button type="button" className="bk-danger" id="bookingCancel" disabled={busy} onClick={() => void cancel()}>{b(language, "cancel")}</button> : null}
       {active && booking.cancellable === false ? <p className="bk-muted">{b(language, "cannotCancel")}</p> : null}
       {info?.enabled ? <button type="button" className="bk-secondary" id="bookingAnother" onClick={onAnother}>{b(language, "another")}</button> : null}
