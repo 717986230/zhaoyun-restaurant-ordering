@@ -73,6 +73,33 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.addInitScript((base) => localStorage.setItem("zy_api_base", base), API);
 });
 
+/** Click the index-th bookable day in the calendar, moving to later months as needed; returns its date. */
+async function pickDay(page, index) {
+  for (let guard = 0; guard < 4; guard += 1) {
+    const days = page.locator(".bk-cal-day[data-date]:not([disabled])");
+    const count = await days.count();
+    if (index < count) {
+      const cell = days.nth(index);
+      const date = await cell.getAttribute("data-date");
+      await cell.click();
+      return date;
+    }
+    index -= count;
+    await page.locator(".bk-cal-nav").nth(1).click();
+  }
+  throw new Error("no bookable day in range");
+}
+
+/** Click a specific date in the calendar, moving forward to its month if it is not shown. */
+async function clickDay(page, date) {
+  for (let guard = 0; guard < 4; guard += 1) {
+    const cell = page.locator(`.bk-cal-day[data-date="${date}"]`);
+    if ((await cell.count()) > 0) { await cell.click(); return; }
+    await page.locator(".bk-cal-nav").nth(1).click();
+  }
+  throw new Error(`date not reachable: ${date}`);
+}
+
 test("a guest signs up, picks day, time and table, sees the booking and cancels it; the limits say no in words", async ({ page, request }) => {
   await page.goto("/book.html?lang=zh");
   await expect(page.getByRole("heading", { name: "预约餐桌" })).toBeVisible();
@@ -137,12 +164,10 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await expect(page.locator("#bookingEmail")).toHaveCount(0);
   await page.locator("#bookingName").fill("Mia");
 
-  // Three at the table: a date, a time, then a table big enough.
-  // Three dropdowns: how many, which day, what time.
+  // Three at the table: how many, which day on the calendar, what time, then a table big enough.
   await page.locator("#bookingParty").fill("3");
-  const day = await page.locator("#bookingDate option").nth(2).getAttribute("value");
-  await page.locator("#bookingDate").selectOption(day);
-  await page.locator("#bookingTime").selectOption("19:00");
+  const day = await pickDay(page, 2);
+  await page.locator('.bk-slot[data-time="19:00"]').click();
   await expect(page.locator('[data-table="2"]')).toBeDisabled();
   await expect(page.locator('[data-table="2"]')).toContainText("座位不够");
   await page.locator('[data-table="4"]').click();
@@ -195,15 +220,15 @@ test("a guest signs up, picks day, time and table, sees the booking and cancels 
   await page.keyboard.press("Escape");
   await expect(page.locator("#bookingPanel")).toHaveCount(0);
   await page.locator("#bookingParty").fill("2");
-  await page.locator("#bookingDate").selectOption(day);
-  await page.locator("#bookingTime").selectOption("13:00");
+  await clickDay(page, day);
+  await page.locator('.bk-slot[data-time="13:00"]').click();
   await page.locator('[data-table="2"]').click();
   await page.locator("#bookingContact").fill("mia@example.com");
   await page.locator("#bookingSubmit").click();
   await expect(page.locator("#bookingError")).toHaveText("同一天最多预约 1 次。");
 
   // The table taken at 19:00 is taken for the whole stay.
-  await page.locator("#bookingTime").selectOption("20:00");
+  await page.locator('.bk-slot[data-time="20:00"]').click();
   await expect(page.locator('[data-table="4"]')).toBeDisabled();
   await expect(page.locator('[data-table="4"]')).toContainText("已订");
 

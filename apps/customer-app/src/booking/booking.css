@@ -1386,3 +1386,179 @@ html.bk-root body {
   font-size: 14px;
   font-weight: 600;
 }
+
+/* ---------------------------------------------------------------------------
+   Picking when to come (2026-10): a count, a calendar, then the times. The
+   day was a dropdown and the time another; a calendar reads as a calendar and
+   the times as times, grouped into lunch and dinner. The card itself (bk-card)
+   lays these out in a column with its own gap.
+   ------------------------------------------------------------------------ */
+
+/* The party sits on its own short line above the calendar, not full width. */
+.bk-party-field {
+  max-width: 150px;
+}
+.bk-party-field input#bookingParty {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The calendar. */
+.bk-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.bk-cal-title {
+  font-family: var(--bk-display);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: 0.01em;
+}
+.bk-cal-nav {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s var(--bk-ease), background 0.2s var(--bk-ease);
+}
+.bk-cal-nav:not(:disabled):hover {
+  border-color: var(--line-strong);
+}
+.bk-cal-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.bk-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+}
+.bk-cal-wd {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  padding-bottom: 2px;
+}
+.bk-cal-blank {
+  visibility: hidden;
+}
+.bk-cal-day {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.18s var(--bk-ease), border-color 0.18s var(--bk-ease), color 0.18s, transform 0.18s var(--bk-ease), box-shadow 0.18s;
+}
+.bk-cal-day:not(:disabled):not(.active):hover {
+  border-color: var(--line-strong);
+}
+.bk-cal-day:disabled {
+  background: transparent;
+  color: var(--faint);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bk-cal-day.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* The times, grouped into lunch and dinner. */
+.bk-times-label {
+  margin: 0 0 2px;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+}
+.bk-meal {
+  margin: 8px 0 7px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.bk-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bk-slot {
+  min-width: 74px;
+  min-height: 46px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums lining-nums;
+  cursor: pointer;
+  transition: background 0.2s var(--bk-ease), border-color 0.2s var(--bk-ease), color 0.2s, transform 0.2s var(--bk-ease), box-shadow 0.2s;
+}
+.bk-slot:not(:disabled):not(.active):hover {
+  border-color: var(--line-strong);
+}
+.bk-slot:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bk-slot small {
+  font-family: var(--bk-serif);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.bk-slot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-cal-day,
+  .bk-cal-nav,
+  .bk-slot {
+    transition: none;
+  }
+  .bk-cal-day.active,
+  .bk-slot.active {
+    transform: none;
+  }
+}
