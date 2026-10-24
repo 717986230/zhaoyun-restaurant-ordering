@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { ALLERGENS } from "../../../../../src/allergens.js";
-import type { BundleItem, ModifierGroup, Product, VatPercent } from "@zhaoyun/domain";
+import type { BundleItem, ModifierGroup, Product, ProductMedia, VatPercent } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
 import { formatMoney, useI18n } from "../../app/i18n";
@@ -147,6 +147,37 @@ function BundleFieldset({ product, products, mediaUrl }: { product: Product | nu
   </fieldset>;
 }
 
+/**
+ * The dish's picture, with the file field: the photo (or video) on the dish
+ * now, the one just picked the moment it is chosen, or "待上传" when there is
+ * none — so uploading real photos one after another, nobody saves the wrong
+ * file blind. The field keeps its name, so the form submits it unchanged.
+ */
+function MediaField({ current, mediaUrl }: { current: ProductMedia | null; mediaUrl: (path: string) => string }) {
+  const { t } = useI18n();
+  const [picked, setPicked] = useState<{ url: string; video: boolean } | null>(null);
+  // The object URL is this browser's handle on the chosen file; let it go when
+  // another is picked or the field unmounts (a different dish, or the form closes).
+  useEffect(() => () => { if (picked) URL.revokeObjectURL(picked.url); }, [picked]);
+  const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setPicked((previous) => {
+      if (previous) URL.revokeObjectURL(previous.url);
+      return file ? { url: URL.createObjectURL(file), video: file.type.startsWith("video") } : null;
+    });
+  };
+  const shown = picked ?? (current ? { url: mediaUrl(current.url), video: current.type === "video" } : null);
+  return <label className={`upload-zone has-preview ${shown ? "" : "is-empty"}`}>
+    <input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" onChange={onChange} />
+    <span className="upload-thumb" aria-hidden="true">
+      {shown
+        ? (shown.video ? <video className="upload-preview" src={shown.url} muted playsInline /> : <img className="upload-preview" src={shown.url} alt="" />)
+        : <span className="upload-pending">{t("photoPending")}</span>}
+    </span>
+    <span className="upload-text"><b>{picked ? t("mediaPicked") : current ? t("mediaReplace") : t("fieldMedia")}</b><small>{t("fieldMediaHint")}</small></span>
+  </label>;
+}
+
 export function CatalogPanel(props: Props) {
   const { t, language } = useI18n();
   // On a phone the list and the form cannot both be on screen, so the list
@@ -240,7 +271,7 @@ export function CatalogPanel(props: Props) {
       <label><span>{t("fieldIngredients")}</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
       <div className="field-grid three"><label><span>{t("fieldTime")}</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>{t("fieldPortion")}</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>{t("fieldLevel")}</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
       <fieldset className="allergen-picker"><legend>{t("fieldAllergens")}</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {language === "zh" ? allergen.zh : allergen.de}</span></label>)}</fieldset>
-      <label className="upload-zone"><input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" /><b>{t("fieldMedia")}</b><small>{t("fieldMediaHint")}</small></label>
+      <MediaField current={product?.media?.[0] ?? null} mediaUrl={props.mediaUrl} />
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
       <label className="daily-limit"><span>{t("fieldDailyLimit")}</span><input name="dailyLimit" id="dailyLimit" type="number" min="1" max="9999" step="1" inputMode="numeric" defaultValue={product?.dailyLimit ?? ""} placeholder={t("dailyLimitNone")} />
         {product?.leftToday !== undefined && product?.leftToday !== null ? <small className="settings-hint">{t("dailyLimitToday", { n: product.leftToday })}</small> : null}</label>

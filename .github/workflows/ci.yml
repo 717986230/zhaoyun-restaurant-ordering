@@ -54,7 +54,10 @@ jobs:
   # (playwright.config.js), so they start at once instead of after checks.
   e2e:
     name: Browser tests (${{ matrix.shard }}/3)
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: that label moved to Ubuntu 26, whose ICU is
+    # newer than the libicudata.so.74 the cached WebKit build links against, so
+    # WebKit (the iPhone projects) failed to launch. 24.04 ships ICU 74.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false

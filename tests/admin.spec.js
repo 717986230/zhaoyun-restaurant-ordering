@@ -1335,3 +1335,32 @@ test("the dishes still without a photo are one tap away, and the tap goes once t
   await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator("#filterNoPhoto")).toHaveCount(0);
 });
+
+test("the photo field shows the current picture, the 待上传 gap, and the file just picked", async ({ page }) => {
+  const dish = (id, media) => ({
+    id, sku: `D${id}`, kind: "food", category: "MAIN", names: { zh: `菜 ${id}`, de: `Gericht ${id}`, en: `Dish ${id}` }, description: "",
+    price: 10, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", modifiers: [],
+    media: media ? [{ type: "image", url: "/media/have.jpg" }] : []
+  });
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [dish("1", true), dish("2", false)] }) }));
+  // A 1×1 PNG so the current-photo preview has something real to draw.
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC", "base64");
+  await page.route("**/media/have.jpg", (route) => route.fulfill({ status: 200, contentType: "image/png", body: png }));
+  await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
+
+  // A dish with a photo shows it, and the field offers to replace it.
+  await page.locator(".product-row", { hasText: "菜 1" }).click();
+  const field = page.locator(".upload-zone");
+  await expect(field.locator(".upload-preview")).toHaveAttribute("src", /\/media\/have\.jpg/);
+  await expect(field).toContainText("点此更换照片");
+
+  // A dish with none shows the 待上传 gap; picking a file previews it at once.
+  await page.locator(".editor-back").click();
+  await page.locator(".product-row", { hasText: "菜 2" }).click();
+  await expect(field.locator(".upload-pending")).toHaveText("待上传");
+  await field.locator('input[name="media"]').setInputFiles({ name: "new.png", mimeType: "image/png", buffer: png });
+  await expect(field.locator(".upload-preview")).toHaveAttribute("src", /^blob:/);
+  await expect(field).toContainText("已选好");
+});
