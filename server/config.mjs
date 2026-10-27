@@ -57,7 +57,9 @@ export const config = {
   // simply not connected.
   delivery: deliveryConfig(process.env),
   // Email the guests' codes go out with (docs/MAIL.md): Brevo, or nothing.
-  mail: mailConfig(process.env)
+  mail: mailConfig(process.env),
+  // Where an unplanned-error alert goes (needs mail configured too); unset, errors are logged only.
+  ownerAlertEmail: process.env.OWNER_ALERT_EMAIL || null
 };
 
 if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) {

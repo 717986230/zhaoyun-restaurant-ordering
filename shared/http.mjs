@@ -21,7 +21,7 @@ import {
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { alertMessage, bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
@@ -54,6 +54,9 @@ const GUESS_MAX_PER_IDENTITY = 20;
 const AUDIT_FIELDS = ["status", "table", "sku", "price", "vatPercent", "published", "available", "name", "role", "enabled", "rotateToken"];
 // A booking's: never the guest's name or number, which the audit log would keep past the booking's own retention.
 const RESERVATION_AUDIT_FIELDS = ["status", "table", "date", "time", "party"];
+// At most one owner alert per this long, so a burst of 500s is one email, not
+// a flood. Kept per isolate, so several isolates may each send one — still few.
+const ALERT_COOLDOWN_MS = 10 * 60_000;
 
 /** Constant-time compare, so a wrong token leaks nothing through timing. */
 function tokenMatches(provided, expected) {
@@ -175,7 +178,10 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
     // Guest sign-ups from one address in ten minutes: a full dining room on
     // the restaurant's Wi-Fi, not a script making accounts for their points.
-    registerLimiter: createRateLimiter({ windowMs: 10 * 60_000, max: 40 })
+    registerLimiter: createRateLimiter({ windowMs: 10 * 60_000, max: 40 }),
+    // When the owner was last told about an unplanned error, so the cooldown
+    // above holds across requests (ALERT_COOLDOWN_MS).
+    errorAlert: { lastSentAt: 0 }
   };
 }
 
@@ -193,7 +199,7 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
  * `handle(request, { ip })` answers with a Response, or null for anything that
  * is not the API's — the web app, a picture the database does not have.
  */
-export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients, version = null, delivery = {}, mail = null, fetch: send = (...args) => fetch(...args) }) {
+export function createApi({ store, tokens = {}, state = createApiState(), uploads, publish = () => {}, realtimeClients, version = null, delivery = {}, mail = null, ownerAlertEmail = null, defer = (task) => { Promise.resolve(task).catch(() => {}); }, fetch: send = (...args) => fetch(...args) }) {
   const options = { realtimeClients, version };
   // foodora's bearer token, kept between calls until it runs out (per isolate on a Worker).
   const platformTokens = new Map();
@@ -313,6 +319,28 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
   function throttlePublic(limiter, ctx, message) {
     const { allowed, retryAfter } = limiter.check(ctx.ip || "unknown");
     return allowed ? null : json({ error: message, retryAfter }, 429, { "retry-after": String(retryAfter) });
+  }
+
+  /**
+   * An unplanned error just became a 500. Tell the owner, best-effort: only
+   * when this deployment can send mail (Brevo) and has an address to send to
+   * (OWNER_ALERT_EMAIL), and at most once per cooldown (ALERT_COOLDOWN_MS) so a
+   * burst is one email. Never throws — the request already failed, and the
+   * telling of it must not fail the host's request lifecycle in turn.
+   */
+  async function alertOwner(detail) {
+    if (!mail || !ownerAlertEmail) return;
+    const now = Date.now();
+    if (now - state.errorAlert.lastSentAt < ALERT_COOLDOWN_MS) return;
+    state.errorAlert.lastSentAt = now;
+    try {
+      let restaurant = "";
+      // The settings read may itself be what failed; the alert goes out regardless.
+      try { restaurant = (await store.getSettings()).restaurantName; } catch { /* no name, still send */ }
+      await sendMail({ to: ownerAlertEmail, ...alertMessage({ ...detail, restaurant }) });
+    } catch (error) {
+      console.error(JSON.stringify({ level: "error", msg: "owner alert not sent", error: String(error?.message ?? error) }));
+    }
   }
 
   /**
@@ -1652,6 +1680,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     } catch (error) {
       // One line a log search can find by the id the caller was given.
       console.error(JSON.stringify({ level: "error", msg: "request failed", requestId, method: request.method, path: url.pathname, error: String(error?.message ?? error), stack: error?.stack }));
+      // Tell the owner out of band, without holding up the 500 (the host runs
+      // it to completion — ctx.waitUntil on a Worker; the running process on Node).
+      defer(alertOwner({ method: request.method, path: url.pathname, requestId, time: new Date().toISOString() }));
       response = json({ error: "Internal server error", ...(requestId ? { requestId } : {}) }, 500);
     }
     if (!response || !writing || QUIET.has(response)) return response;
