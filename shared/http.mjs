@@ -21,7 +21,7 @@ import {
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { alertMessage, bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { alertMessage, bookingMessage, codeMessage, createMailer, mailStatus, testMessage } from "./mail.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
@@ -294,28 +294,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     };
   }
 
-  /** A burst from one device to a public route: a 429 with how long to wait, or nothing. */
   /**
    * One email (shared/mail.mjs): through Brevo, or into the outbox for the
    * tests. False when it could not go; why is in the log, never the key.
    */
-  async function sendMail(message) {
-    if (!mail) return false;
-    if (mail.provider === "outbox") {
-      await store.customers.recordOutbox(message);
-      return true;
-    }
-    const { url: address, init } = brevoRequest(mail, message, (await store.getSettings()).restaurantName);
-    try {
-      const response = await send(address, init);
-      if (response.ok) return true;
-      console.error(JSON.stringify({ level: "error", msg: "mail not sent", status: response.status, detail: (await response.text()).slice(0, 300) }));
-    } catch (error) {
-      console.error(JSON.stringify({ level: "error", msg: "mail not sent", error: String(error?.message ?? error) }));
-    }
-    return false;
-  }
+  const sendMail = createMailer({ mail, store, send });
 
+  /** A burst from one device to a public route: a 429 with how long to wait, or nothing. */
   function throttlePublic(limiter, ctx, message) {
     const { allowed, retryAfter } = limiter.check(ctx.ip || "unknown");
     return allowed ? null : json({ error: message, retryAfter }, 429, { "retry-after": String(retryAfter) });

@@ -65,7 +65,9 @@ const COPY = {
     bookingParty: "人数：{party} 位",
     bookingTable: "桌号：{table}",
     bookingReference: "预约号：{reference}",
-    bookingManage: "查看或取消预约：{url}"
+    bookingManage: "查看或取消预约：{url}",
+    reminderSubject: "{restaurant}：预约提醒 · 明天 {date} {time}",
+    reminderLead: "提醒您，明天在 {restaurant} 有一个预约："
   },
   de: {
     subject: "{restaurant} – Ihr Bestätigungscode: {code}",
@@ -82,7 +84,9 @@ const COPY = {
     bookingParty: "Personen: {party}",
     bookingTable: "Tisch: {table}",
     bookingReference: "Buchungsnr.: {reference}",
-    bookingManage: "Reservierung ansehen oder stornieren: {url}"
+    bookingManage: "Reservierung ansehen oder stornieren: {url}",
+    reminderSubject: "{restaurant} – Erinnerung an Ihre Reservierung · morgen {date} {time}",
+    reminderLead: "Zur Erinnerung: Sie haben morgen eine Reservierung im {restaurant}:"
   },
   en: {
     subject: "{restaurant} – your verification code: {code}",
@@ -99,7 +103,9 @@ const COPY = {
     bookingParty: "Party: {party}",
     bookingTable: "Table: {table}",
     bookingReference: "Reference: {reference}",
-    bookingManage: "View or cancel your booking: {url}"
+    bookingManage: "View or cancel your booking: {url}",
+    reminderSubject: "{restaurant} – a reminder about your booking · tomorrow {date} {time}",
+    reminderLead: "A reminder: you have a booking at {restaurant} tomorrow:"
   }
 };
 
@@ -146,6 +152,57 @@ export function bookingMessage(reservation, { language = "de", restaurant = "", 
     subject: fill(confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject, values),
     text: `${lead}\n\n${lines.join("\n")}\n${manage ? `\n${manage}\n` : ""}`,
     html: `<p>${escapeHtml(lead)}</p><ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>${manage ? `<p><a href="${escapeHtml(manageUrl)}">${escapeHtml(fill(copy.bookingManage, { url: "" }).replace(/[:：]\s*$/, ""))}</a></p>` : ""}`
+  };
+}
+
+/**
+ * The reminder a guest gets the day before a confirmed booking, with the same
+ * day, time, party, table and reference as the confirmation. No cancel link:
+ * the one-time token behind it was given only to the guest's phone when they
+ * booked and is kept here only as a hash, so a later reminder cannot carry it.
+ */
+export function reminderMessage(reservation, { language = "de", restaurant = "" } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const values = { restaurant: restaurant || "Restaurant", date: reservation.date, time: reservation.time, party: reservation.party, table: reservation.table ?? "", reference: reservation.reference };
+  const lines = [
+    fill(copy.bookingDate, values),
+    fill(copy.bookingTime, values),
+    fill(copy.bookingParty, values),
+    ...(reservation.table ? [fill(copy.bookingTable, values)] : []),
+    fill(copy.bookingReference, values)
+  ];
+  const lead = fill(copy.reminderLead, values);
+  return {
+    subject: fill(copy.reminderSubject, values),
+    text: `${lead}\n\n${lines.join("\n")}\n`,
+    html: `<p>${escapeHtml(lead)}</p><ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+  };
+}
+
+/**
+ * How a deployment sends one message, given its mail config and store: Brevo
+ * when it has a key, the outbox table when the tests ask for it (MAIL_OUTBOX),
+ * nothing at all when mail is off. The same sender the guests' codes use, so
+ * createApi and the scheduled reminder (shared/reminders.mjs) send alike.
+ * Returns true when the message went out (or was kept for a test), false when
+ * it could not; never throws.
+ */
+export function createMailer({ mail, store, send = (...args) => fetch(...args) }) {
+  return async function sendMail(message) {
+    if (!mail) return false;
+    if (mail.provider === "outbox") {
+      await store.customers.recordOutbox(message);
+      return true;
+    }
+    const { url: address, init } = brevoRequest(mail, message, (await store.getSettings()).restaurantName);
+    try {
+      const response = await send(address, init);
+      if (response.ok) return true;
+      console.error(JSON.stringify({ level: "error", msg: "mail not sent", status: response.status, detail: (await response.text()).slice(0, 300) }));
+    } catch (error) {
+      console.error(JSON.stringify({ level: "error", msg: "mail not sent", error: String(error?.message ?? error) }));
+    }
+    return false;
   };
 }
 
