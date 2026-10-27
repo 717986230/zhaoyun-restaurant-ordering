@@ -59,6 +59,7 @@ export function registerRoutes(app, { database, realtime, config }) {
     version: config.version ?? null,
     delivery: config.delivery ?? {},
     mail: config.mail ?? null,
+    ownerAlertEmail: config.ownerAlertEmail ?? null,
     ...(config.deliveryFetch ? { fetch: config.deliveryFetch } : {})
   });
 

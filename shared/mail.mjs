@@ -155,3 +155,28 @@ export function testMessage({ language = "de", restaurant = "" } = {}) {
   const values = { restaurant: restaurant || "Restaurant" };
   return { subject: fill(copy.testSubject, values), text: `${copy.test}\n`, html: `<p>${escapeHtml(copy.test)}</p>` };
 }
+
+/**
+ * The email the owner gets when the system hits an error it did not plan for
+ * (a request that ended in a 500). The caller sends it best-effort and at most
+ * once per cooldown, so a burst of failures is one email, not a flood. Written
+ * in all three languages, because the owner may read any of them, with the
+ * request id that matches the line in the host's log (docs/OPERATIONS.md).
+ */
+export function alertMessage({ restaurant = "", method = "", path = "", requestId = "", time = "" } = {}) {
+  const name = restaurant || "Restaurant";
+  const where = `${method} ${path}`.trim();
+  const facts = [
+    `时间 / Zeit / time: ${time}`,
+    `请求 / Anfrage / request: ${where}`,
+    ...(requestId ? [`编号 / ID: ${requestId}`] : [])
+  ];
+  const zh = `${name} 的点餐系统刚刚遇到一个未预料到的错误（一次请求失败，返回 500）。可能还有更多，详见托管平台（Cloudflare）的日志。`;
+  const de = `Im Bestellsystem von ${name} ist ein unerwarteter Fehler aufgetreten (eine Anfrage schlug mit 500 fehl). Weitere Details stehen im Log der Hosting-Plattform (Cloudflare).`;
+  const en = `${name}'s ordering system hit an unexpected error (a request failed with 500). There may be more — see the hosting platform's log (Cloudflare).`;
+  return {
+    subject: `${name}：系统出错提醒 / Systemfehler / system error`,
+    text: `${zh}\n\n${de}\n\n${en}\n\n${facts.join("\n")}\n`,
+    html: `<p>${escapeHtml(zh)}</p><p>${escapeHtml(de)}</p><p>${escapeHtml(en)}</p><ul>${facts.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+  };
+}
