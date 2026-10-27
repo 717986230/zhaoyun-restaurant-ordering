@@ -239,7 +239,8 @@ export function createReservationStore(driver, { settings }) {
       if (!guestMayCancel(row, clock)) throw reservationError("This booking can no longer be cancelled online; please call us", "TOO_LATE", 409);
       // Cancelled in time: what it cost comes back with it.
       await writeStatus(row, "cancelled", (await context()).rules);
-      return { ...guestReservationView(await byId(row.id)), cancellable: false };
+      // justCancelled marks the real transition, so the guest is emailed once and not on a repeat click.
+      return { ...guestReservationView(await byId(row.id)), cancellable: false, justCancelled: true };
     },
 
     /**

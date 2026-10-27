@@ -1952,6 +1952,12 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.ok(first.json.token, "the guest's link to their booking");
       assert.equal(first.json.reservation.table, null, "no table until the floor gives one");
       assert.equal(first.json.reservation.source, undefined, "no staff fields for the guest");
+      // The guest gets the booking by email (shared/mail.mjs), in the language they booked in.
+      const bookedMail = (await call("GET", "/api/admin/mail/outbox", { admin: true })).json.messages[0];
+      assert.equal(bookedMail.to, "anna@example.com");
+      assert.match(bookedMail.subject, /Reservierung bestätigt/, "German, as booked");
+      assert.match(bookedMail.subject, new RegExp(first.json.reservation.reference), "with the reference");
+      assert.match(bookedMail.text, /18:00/, "and the time they chose");
       const second = await book({ date: day, time: "19:00", party: 4, name: "Ben", phone: "0660 7654321" });
       assert.equal(second.status, 201, "six and four make ten: exactly full at 19:00");
 
@@ -1986,6 +1992,18 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(byEmail.status, 201, JSON.stringify(byEmail.json));
       assert.match(byEmail.json.reservation.email, /^anna-/);
       assert.equal((await call("GET", `/api/reservations/availability?date=${day}&party=9`)).status, 200, "a larger party is not turned away");
+
+      // Cancelling by the guest's own link reaches them by email too.
+      const cancelByLink = await call("POST", `/api/reservations/${byEmail.json.reservation.id}/cancel`, { headers: { "x-reservation-token": byEmail.json.token } });
+      assert.equal(cancelByLink.status, 200);
+      assert.equal(cancelByLink.json.reservation.status, "cancelled");
+      assert.equal(cancelByLink.json.reservation.justCancelled, undefined, "the store's own signal never reaches the guest");
+      const cancelledMail = (await call("GET", "/api/admin/mail/outbox", { admin: true })).json.messages[0];
+      assert.equal(cancelledMail.to, byEmail.json.reservation.email);
+      assert.match(cancelledMail.subject, /storniert/, "the cancellation notice");
+      // The same call again changes nothing and sends nothing more.
+      assert.equal((await call("POST", `/api/reservations/${byEmail.json.reservation.id}/cancel`, { headers: { "x-reservation-token": byEmail.json.token } })).status, 200);
+      assert.equal((await call("GET", "/api/admin/mail/outbox", { admin: true })).json.messages[0].createdAt, cancelledMail.createdAt, "no second cancellation email");
 
       // The guest's own link.
       const mine = (id, token, method = "GET", suffix = "") => call(method, `/api/reservations/${id}${suffix}`, { headers: token ? { "x-reservation-token": token } : {} });

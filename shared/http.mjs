@@ -21,7 +21,7 @@ import {
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { brevoRequest, codeMessage, mailStatus, reservationMessage, testMessage } from "./mail.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
@@ -308,6 +308,23 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       console.error(JSON.stringify({ level: "error", msg: "mail not sent", error: String(error?.message ?? error) }));
     }
     return false;
+  }
+
+  /**
+   * The guest's booking, by email, best effort (shared/mail.mjs): nothing goes
+   * out where mail is off or the booking has no address, and a mail that fails
+   * never fails the booking — the guest already has their confirmation on
+   * screen. `kind` is the booking's standing: "confirmed", "pending" or
+   * "cancelled".
+   */
+  async function notifyReservation(reservation, kind = reservation?.status) {
+    if (!mail || !reservation?.email) return;
+    try {
+      const message = reservationMessage(reservation, { language: reservation.language ?? "de", restaurant: (await store.getSettings()).restaurantName, kind });
+      await sendMail({ to: reservation.email, ...message });
+    } catch (error) {
+      console.error(JSON.stringify({ level: "error", msg: "reservation mail not sent", error: String(error?.message ?? error) }));
+    }
   }
 
   function throttlePublic(limiter, ctx, message) {
@@ -685,7 +702,10 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const customer = await store.customers.session(request.headers.get("x-customer-token"));
           // An account by mobile number has no email to prove; one by email proves it, where mail goes out.
           if (mail && customer && !customer.emailVerified && !customer.phone) return json({ error: "Please verify your email address first", code: "EMAIL_UNVERIFIED" }, 403);
-          return json(await reservations.create(value, { customer }), 201);
+          const created = await reservations.create(value, { customer });
+          // The guest's confirmation by email, once the booking is safely written.
+          await notifyReservation(created.reservation);
+          return json(created, 201);
         }
         const token = request.headers.get("x-reservation-token");
         if (path.length === 3 && method === "GET") {
@@ -694,8 +714,12 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         }
         if (path.length === 4 && path[3] === "cancel" && method === "POST") {
           const customer = await store.customers.session(request.headers.get("x-customer-token"));
-          const reservation = await reservations.cancelForGuest(path[2], token, customer?.id ?? null);
-          return reservation ? json({ reservation }) : fail("Booking not found", 404);
+          const cancelledResult = await reservations.cancelForGuest(path[2], token, customer?.id ?? null);
+          if (!cancelledResult) return fail("Booking not found", 404);
+          // justCancelled is the store's own signal, not part of the guest's view: email once, then drop it.
+          const { justCancelled, ...reservation } = cancelledResult;
+          if (justCancelled) await notifyReservation(reservation, "cancelled");
+          return json({ reservation });
         }
       } catch (error) {
         return reservationRefusal(error);
