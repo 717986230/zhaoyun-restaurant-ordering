@@ -53,3 +53,10 @@ new_sqlite_classes = ["LiveHub"]
 # few days. Included in the Free plan.
 [observability]
 enabled = true
+
+# Once a day, the Worker emails tomorrow's confirmed bookings their reminder
+# (workers/index.mjs scheduled, shared/reminders.mjs). 09:00 UTC is late
+# morning in Austria (UTC+1/+2) — a reminder for the next day, not the middle
+# of the night. Does nothing unless mail (Brevo) and reservations are both on.
+[triggers]
+crons = ["0 9 * * *"]

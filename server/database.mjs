@@ -476,6 +476,15 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    -- One row per booking already reminded (shared/reminders.mjs): the
+    -- day-before reminder email is sent once and never again, whatever the
+    -- schedule fires. A row, not a column, so the migration is a no-op on a
+    -- database created from today's schema. See migrations/0069_reservation_reminders.sql.
+    CREATE TABLE IF NOT EXISTS reservation_reminders (
+      reservation_id TEXT PRIMARY KEY,
+      sent_at TEXT NOT NULL
+    );
+
     -- Orders from the delivery platforms (shared/delivery.mjs), once per
     -- platform and platform id. See migrations/0063_delivery_orders.sql.
     CREATE TABLE IF NOT EXISTS delivery_orders (

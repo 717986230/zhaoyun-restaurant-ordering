@@ -277,6 +277,33 @@ export function createReservationStore(driver, { settings }) {
       return rows.map(reservationView);
     },
 
+    /**
+     * Confirmed bookings on `date` with an address to reach the guest and no
+     * reminder sent yet — for the day-before reminder (shared/reminders.mjs).
+     * The address is the one on the booking, or the account's when the booking
+     * gave only a phone. A booking already in reservation_reminders is left out.
+     */
+    async remindableFor(date) {
+      const rows = await driver.all(
+        `SELECT reservations.*, COALESCE(NULLIF(reservations.email, ''), customers.email) AS reach_email
+           FROM reservations
+           LEFT JOIN customers ON customers.id = reservations.customer_id
+           LEFT JOIN reservation_reminders ON reservation_reminders.reservation_id = reservations.id
+          WHERE reservations.date = ? AND reservations.status = 'confirmed'
+            AND reservation_reminders.reservation_id IS NULL
+          ORDER BY reservations.time, reservations.created_at`,
+        String(date)
+      );
+      return rows
+        .filter((row) => row.reach_email)
+        .map((row) => ({ id: row.id, reference: row.reference, date: row.date, time: row.time, party: row.party, table: row.table_no || "", status: row.status, language: row.language || "", email: row.reach_email }));
+    },
+
+    /** This booking has now been reminded; a second reminder never goes out. */
+    async markReminded(id, at = now()) {
+      await driver.run("INSERT OR IGNORE INTO reservation_reminders (reservation_id, sent_at) VALUES (?, ?)", String(id), at);
+    },
+
     async update(id, input) {
       const current = await byId(id);
       if (!current) return null;

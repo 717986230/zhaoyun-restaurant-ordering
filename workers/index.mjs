@@ -11,6 +11,7 @@ import { createStore } from "../shared/store.mjs";
 import { d1Driver } from "./d1-driver.mjs";
 import { deliveryConfig } from "../shared/delivery.mjs";
 import { mailConfig } from "../shared/mail.mjs";
+import { remindReservations } from "../shared/reminders.mjs";
 import { openLive, publishLive } from "./live.mjs";
 
 export { LiveHub } from "./live.mjs";
@@ -100,5 +101,20 @@ export default {
     if (!headers.has("content-security-policy")) headers.set("content-security-policy", "default-src 'none'; frame-ancestors 'none'");
     headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
     return new Response(response.body, { status: response.status, headers });
+  },
+
+  // The Cron Trigger (wrangler.toml [triggers]): once a day, email tomorrow's
+  // confirmed bookings their reminder (shared/reminders.mjs). Off on its own
+  // when mail or reservations are off; this just runs it to completion.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil((async () => {
+      try {
+        const store = createStore(d1Driver(env.DB));
+        const result = await remindReservations({ store, mail: mailConfig(env) });
+        console.log(JSON.stringify({ level: "info", msg: "reservation reminders", ...result }));
+      } catch (error) {
+        console.error(JSON.stringify({ level: "error", msg: "reservation reminders failed", error: String(error?.message ?? error) }));
+      }
+    })());
   }
 };
