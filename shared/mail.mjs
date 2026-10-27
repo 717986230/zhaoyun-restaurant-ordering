@@ -55,21 +55,51 @@ const COPY = {
     lead: "你的邮箱验证码是：",
     expires: "验证码 {minutes} 分钟内有效。不是你本人操作的话，忽略这封邮件即可。",
     testSubject: "{restaurant}：测试邮件",
-    test: "邮件服务已经连通，顾客会收到这样的验证码邮件。"
+    test: "邮件服务已经连通，顾客会收到这样的验证码邮件。",
+    bookingConfirmedSubject: "{restaurant}：预约已确认 · {date} {time}",
+    bookingPendingSubject: "{restaurant}：预约已收到 · {date} {time}",
+    bookingConfirmedLead: "你的预约已确认：",
+    bookingPendingLead: "我们收到了你的预约，正在确认，确认后会再通知你：",
+    bookingDate: "日期：{date}",
+    bookingTime: "时间：{time}",
+    bookingParty: "人数：{party} 位",
+    bookingTable: "桌号：{table}",
+    bookingReference: "预约号：{reference}",
+    bookingManage: "查看或取消预约：{url}"
   },
   de: {
     subject: "{restaurant} – Ihr Bestätigungscode: {code}",
     lead: "Ihr Bestätigungscode lautet:",
     expires: "Der Code ist {minutes} Minuten gültig. Wenn Sie das nicht angefordert haben, können Sie diese E-Mail ignorieren.",
     testSubject: "{restaurant}: Test-E-Mail",
-    test: "Der E-Mail-Versand funktioniert – so erhalten Gäste ihren Bestätigungscode."
+    test: "Der E-Mail-Versand funktioniert – so erhalten Gäste ihren Bestätigungscode.",
+    bookingConfirmedSubject: "{restaurant} – Reservierung bestätigt · {date} {time}",
+    bookingPendingSubject: "{restaurant} – Reservierung eingegangen · {date} {time}",
+    bookingConfirmedLead: "Ihre Reservierung ist bestätigt:",
+    bookingPendingLead: "Wir haben Ihre Reservierung erhalten und bestätigen sie in Kürze:",
+    bookingDate: "Datum: {date}",
+    bookingTime: "Uhrzeit: {time}",
+    bookingParty: "Personen: {party}",
+    bookingTable: "Tisch: {table}",
+    bookingReference: "Buchungsnr.: {reference}",
+    bookingManage: "Reservierung ansehen oder stornieren: {url}"
   },
   en: {
     subject: "{restaurant} – your verification code: {code}",
     lead: "Your verification code is:",
     expires: "The code is valid for {minutes} minutes. If you did not ask for it, you can ignore this email.",
     testSubject: "{restaurant}: test email",
-    test: "Email is working – this is how guests receive their verification code."
+    test: "Email is working – this is how guests receive their verification code.",
+    bookingConfirmedSubject: "{restaurant} – booking confirmed · {date} {time}",
+    bookingPendingSubject: "{restaurant} – booking received · {date} {time}",
+    bookingConfirmedLead: "Your booking is confirmed:",
+    bookingPendingLead: "We have your booking and will confirm it shortly:",
+    bookingDate: "Date: {date}",
+    bookingTime: "Time: {time}",
+    bookingParty: "Party: {party}",
+    bookingTable: "Table: {table}",
+    bookingReference: "Reference: {reference}",
+    bookingManage: "View or cancel your booking: {url}"
   }
 };
 
@@ -91,6 +121,31 @@ export function codeMessage(code, { language = "de", restaurant = "", minutes = 
     subject: fill(copy.subject, values),
     text: `${lead}\n\n${code}\n\n${expires}\n`,
     html: `<p>${escapeHtml(lead)}</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${escapeHtml(code)}</p><p style="color:#666">${escapeHtml(expires)}</p>`
+  };
+}
+
+/**
+ * The email a guest gets when they book online: confirmed at once, or received
+ * and awaiting the restaurant's confirmation, with the day, time, party, table
+ * (when one is set) and reference, and the link back to view or cancel it.
+ */
+export function bookingMessage(reservation, { language = "de", restaurant = "", manageUrl = "" } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const confirmed = reservation.status === "confirmed";
+  const values = { restaurant: restaurant || "Restaurant", date: reservation.date, time: reservation.time, party: reservation.party, table: reservation.table ?? "", reference: reservation.reference };
+  const lines = [
+    fill(copy.bookingDate, values),
+    fill(copy.bookingTime, values),
+    fill(copy.bookingParty, values),
+    ...(reservation.table ? [fill(copy.bookingTable, values)] : []),
+    fill(copy.bookingReference, values)
+  ];
+  const lead = fill(confirmed ? copy.bookingConfirmedLead : copy.bookingPendingLead, values);
+  const manage = manageUrl ? fill(copy.bookingManage, { url: manageUrl }) : "";
+  return {
+    subject: fill(confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject, values),
+    text: `${lead}\n\n${lines.join("\n")}\n${manage ? `\n${manage}\n` : ""}`,
+    html: `<p>${escapeHtml(lead)}</p><ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>${manage ? `<p><a href="${escapeHtml(manageUrl)}">${escapeHtml(fill(copy.bookingManage, { url: "" }).replace(/[:：]\s*$/, ""))}</a></p>` : ""}`
   };
 }
 

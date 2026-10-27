@@ -1952,6 +1952,12 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.ok(first.json.token, "the guest's link to their booking");
       assert.equal(first.json.reservation.table, null, "no table until the floor gives one");
       assert.equal(first.json.reservation.source, undefined, "no staff fields for the guest");
+      // The guest is emailed the booking, in its language, with its reference and a link that carries the token in the fragment.
+      const booked = (await call("GET", "/api/admin/mail/outbox?limit=50", { admin: true })).json.messages.find((entry) => entry.to === "anna@example.com" && /Reservierung/.test(entry.subject));
+      assert.ok(booked, "a booking email is sent to the guest");
+      assert.match(booked.subject, /bestätigt/, "confirmed at once while the owner lets it be");
+      assert.match(booked.text, new RegExp(first.json.reservation.reference), "it carries the reference");
+      assert.match(booked.text, /\/book\.html\?r=[^#\s]+#t=/, "and a link to view or cancel it, the token in the fragment");
       const second = await book({ date: day, time: "19:00", party: 4, name: "Ben", phone: "0660 7654321" });
       assert.equal(second.status, 201, "six and four make ten: exactly full at 19:00");
 

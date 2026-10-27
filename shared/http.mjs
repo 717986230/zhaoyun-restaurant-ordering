@@ -21,7 +21,7 @@ import {
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
@@ -685,7 +685,21 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const customer = await store.customers.session(request.headers.get("x-customer-token"));
           // An account by mobile number has no email to prove; one by email proves it, where mail goes out.
           if (mail && customer && !customer.emailVerified && !customer.phone) return json({ error: "Please verify your email address first", code: "EMAIL_UNVERIFIED" }, 403);
-          return json(await reservations.create(value, { customer }), 201);
+          const created = await reservations.create(value, { customer });
+          // The booking is made; the email is a courtesy on top, so a mail
+          // hiccup never fails it. The token rides the link's fragment (#t=),
+          // which the booking page reads client-side and no server ever sees.
+          const booked = created.reservation;
+          if (mail && booked?.email && created.token) {
+            try {
+              const settings = await store.getSettings();
+              const manageUrl = `${url.origin}/book.html?r=${encodeURIComponent(booked.id)}#t=${encodeURIComponent(created.token)}`;
+              await sendMail({ to: booked.email, ...bookingMessage(booked, { language: booked.language || value.language, restaurant: settings.restaurantName, manageUrl }) });
+            } catch (error) {
+              console.error(JSON.stringify({ level: "error", msg: "booking mail not sent", error: String(error?.message ?? error) }));
+            }
+          }
+          return json(created, 201);
         }
         const token = request.headers.get("x-reservation-token");
         if (path.length === 3 && method === "GET") {
