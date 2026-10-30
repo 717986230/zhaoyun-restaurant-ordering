@@ -708,8 +708,21 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         }
         if (path.length === 4 && path[3] === "cancel" && method === "POST") {
           const customer = await store.customers.session(request.headers.get("x-customer-token"));
-          const reservation = await reservations.cancelForGuest(path[2], token, customer?.id ?? null);
-          return reservation ? json({ reservation }) : fail("Booking not found", 404);
+          const cancelledResult = await reservations.cancelForGuest(path[2], token, customer?.id ?? null);
+          if (!cancelledResult) return fail("Booking not found", 404);
+          // justCancelled is the store's own signal, not part of the guest's view: email once, then drop it.
+          const { justCancelled, ...reservation } = cancelledResult;
+          // The guest's cancellation notice, a courtesy like the confirmation:
+          // a mail hiccup never undoes the cancellation the guest just made.
+          if (mail && justCancelled && reservation.email) {
+            try {
+              const settings = await store.getSettings();
+              await sendMail({ to: reservation.email, ...bookingMessage(reservation, { language: reservation.language || "de", restaurant: settings.restaurantName }) });
+            } catch (error) {
+              console.error(JSON.stringify({ level: "error", msg: "cancellation mail not sent", error: String(error?.message ?? error) }));
+            }
+          }
+          return json({ reservation });
         }
       } catch (error) {
         return reservationRefusal(error);

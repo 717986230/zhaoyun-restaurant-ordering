@@ -60,6 +60,8 @@ const COPY = {
     bookingPendingSubject: "{restaurant}：预约已收到 · {date} {time}",
     bookingConfirmedLead: "你的预约已确认：",
     bookingPendingLead: "我们收到了你的预约，正在确认，确认后会再通知你：",
+    bookingCancelledSubject: "{restaurant}：预约已取消 · {date} {time}",
+    bookingCancelledLead: "你的以下预约已取消：",
     bookingDate: "日期：{date}",
     bookingTime: "时间：{time}",
     bookingParty: "人数：{party} 位",
@@ -77,6 +79,8 @@ const COPY = {
     bookingPendingSubject: "{restaurant} – Reservierung eingegangen · {date} {time}",
     bookingConfirmedLead: "Ihre Reservierung ist bestätigt:",
     bookingPendingLead: "Wir haben Ihre Reservierung erhalten und bestätigen sie in Kürze:",
+    bookingCancelledSubject: "{restaurant} – Reservierung storniert · {date} {time}",
+    bookingCancelledLead: "Ihre folgende Reservierung wurde storniert:",
     bookingDate: "Datum: {date}",
     bookingTime: "Uhrzeit: {time}",
     bookingParty: "Personen: {party}",
@@ -94,6 +98,8 @@ const COPY = {
     bookingPendingSubject: "{restaurant} – booking received · {date} {time}",
     bookingConfirmedLead: "Your booking is confirmed:",
     bookingPendingLead: "We have your booking and will confirm it shortly:",
+    bookingCancelledSubject: "{restaurant} – booking cancelled · {date} {time}",
+    bookingCancelledLead: "Your booking below has been cancelled:",
     bookingDate: "Date: {date}",
     bookingTime: "Time: {time}",
     bookingParty: "Party: {party}",
@@ -125,12 +131,15 @@ export function codeMessage(code, { language = "de", restaurant = "", minutes = 
 }
 
 /**
- * The email a guest gets when they book online: confirmed at once, or received
- * and awaiting the restaurant's confirmation, with the day, time, party, table
- * (when one is set) and reference, and the link back to view or cancel it.
+ * The email a guest gets about a booking they made online: confirmed at once,
+ * received and awaiting the restaurant's confirmation, or — once they cancel
+ * through their own link — cancelled. It carries the day, time, party, table
+ * (when one is set) and reference; the manage link rides along while the
+ * booking still stands, and is dropped once it is cancelled.
  */
 export function bookingMessage(reservation, { language = "de", restaurant = "", manageUrl = "" } = {}) {
   const copy = COPY[language] ?? COPY.de;
+  const cancelled = reservation.status === "cancelled";
   const confirmed = reservation.status === "confirmed";
   const values = { restaurant: restaurant || "Restaurant", date: reservation.date, time: reservation.time, party: reservation.party, table: reservation.table ?? "", reference: reservation.reference };
   const lines = [
@@ -140,10 +149,12 @@ export function bookingMessage(reservation, { language = "de", restaurant = "", 
     ...(reservation.table ? [fill(copy.bookingTable, values)] : []),
     fill(copy.bookingReference, values)
   ];
-  const lead = fill(confirmed ? copy.bookingConfirmedLead : copy.bookingPendingLead, values);
-  const manage = manageUrl ? fill(copy.bookingManage, { url: manageUrl }) : "";
+  const subject = cancelled ? copy.bookingCancelledSubject : confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject;
+  const lead = fill(cancelled ? copy.bookingCancelledLead : confirmed ? copy.bookingConfirmedLead : copy.bookingPendingLead, values);
+  // A cancelled booking has nothing left to manage, so no link.
+  const manage = !cancelled && manageUrl ? fill(copy.bookingManage, { url: manageUrl }) : "";
   return {
-    subject: fill(confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject, values),
+    subject: fill(subject, values),
     text: `${lead}\n\n${lines.join("\n")}\n${manage ? `\n${manage}\n` : ""}`,
     html: `<p>${escapeHtml(lead)}</p><ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>${manage ? `<p><a href="${escapeHtml(manageUrl)}">${escapeHtml(fill(copy.bookingManage, { url: "" }).replace(/[:：]\s*$/, ""))}</a></p>` : ""}`
   };

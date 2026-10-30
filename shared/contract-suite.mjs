@@ -2027,6 +2027,20 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(cancelled.json.reservation.status, "cancelled");
       assert.equal((await book({ date: day, time: "19:30", party: 2, name: "Cara", phone: "0660 1111111" })).status, 201);
 
+      // A guest who cancels through their link is emailed the cancellation, once.
+      // Keyed on the booking's own reference, since several bookings here share the account's email.
+      const reference = byEmail.json.reservation.reference;
+      const cancelOutbox = async () => (await call("GET", "/api/admin/mail/outbox?limit=100", { admin: true })).json.messages.filter((entry) => entry.to === byEmail.json.reservation.email && /storniert/.test(entry.subject) && new RegExp(reference).test(entry.text));
+      const dropped = await mine(byEmail.json.reservation.id, byEmail.json.token, "POST", "/cancel");
+      assert.equal(dropped.json.reservation.status, "cancelled");
+      assert.equal(dropped.json.reservation.justCancelled, undefined, "the store's signal never reaches the guest");
+      const cancelMail = await cancelOutbox();
+      assert.equal(cancelMail.length, 1, "one cancellation email to the guest");
+      assert.doesNotMatch(cancelMail[0].text, /#t=/, "and offers no link to a booking that is gone");
+      // Clicking cancel again changes nothing and does not email a second time.
+      assert.equal((await mine(byEmail.json.reservation.id, byEmail.json.token, "POST", "/cancel")).json.reservation.status, "cancelled");
+      assert.equal((await cancelOutbox()).length, 1, "a repeat cancel does not send again");
+
       // Taken by phone: any time and size, confirmed, and the floor decides where they sit.
       const phoned = await call("POST", "/api/admin/reservations", { role: "staff", body: { date: day, time: "18:15", party: 20, name: "Firma Huber", table: "12" } });
       assert.equal(phoned.status, 201);
