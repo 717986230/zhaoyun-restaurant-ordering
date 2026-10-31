@@ -236,6 +236,17 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-total { display: flex; justify-content: space-between; align-items: baseline; }
 .pos-total b { font-size: 30px; font-variant-numeric: tabular-nums; }
 .pos-pay-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+/* Pay-by-transfer GiroCode: a button under the pay types, and its QR dialog. */
+.pos-sepa-btn { width: 100%; margin-top: 6px; }
+.pos-sepa-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.6); }
+.pos-sepa-dialog { width: min(380px, 100%); max-height: 92vh; overflow-y: auto; text-align: center; background: var(--p-card, #fff); color: var(--p-ink, #12201a); border-radius: 12px; padding: 20px; display: grid; gap: 10px; justify-items: center; }
+.pos-sepa-dialog h2 { margin: 0; font-size: 1.1rem; }
+.pos-sepa-amount { margin: 0; font-size: 1.8rem; font-weight: 700; }
+.pos-sepa-qr { width: 320px; height: 320px; max-width: 100%; height: auto; aspect-ratio: 1; image-rendering: pixelated; }
+.pos-sepa-to { margin: 0; line-height: 1.5; }
+.pos-sepa-to code { word-break: break-all; }
+.pos-sepa-error { margin: 0; color: var(--p-danger, #b3261e); }
 .pos-payments { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .pos-payments li { display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 6px; padding: 10px; border-radius: 10px; background: var(--p-bg); }
 .pos-payments li > :not(button) { grid-column: 1; }

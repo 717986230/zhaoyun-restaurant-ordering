@@ -845,6 +845,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
+          const floorSettings = await store.getSettings();
           return json({
             tables: await store.tablesOverview(),
             claims: await store.liveClaims(),
@@ -854,7 +855,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             reservations: await store.reservations.today(),
             // Delivery platforms' orders not yet handed over.
             delivery: await store.delivery.open(),
-            takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent
+            takeawayDiscountPercent: floorSettings.takeawayDiscountPercent,
+            // The SEPA account for the pay-by-transfer GiroCode, if the shop set one.
+            sepaPayment: floorSettings.sepaPayment
           });
         }
         if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
