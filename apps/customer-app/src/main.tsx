@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { LazyMotion } from "motion/react";
 import { markPlatform } from "@zhaoyun/native-bridge";
 import { reportClientErrors } from "@zhaoyun/api-client";
 import { apiBaseUrl } from "./app/api";
@@ -9,6 +10,10 @@ import { applyColorScheme, storedColorScheme } from "./app/useColorScheme";
 import { cachedMenuSettings } from "./app/useCatalog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "../../../src/styles.css";
+
+// The menu renders with just the lightweight `m` component; the full motion
+// feature set loads as its own chunk right after first paint (app/motionFeatures).
+const loadMotionFeatures = () => import("./app/motionFeatures").then((mod) => mod.default);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,4 +36,4 @@ applyColorScheme(storedColorScheme() ?? cachedMenuSettings()?.defaultScheme ?? "
 const root = document.getElementById("app");
 if (!root) throw new Error("Customer app root was not found");
 
-createRoot(root).render(<StrictMode><ErrorBoundary onError={reportError}><QueryClientProvider client={queryClient}><App /></QueryClientProvider></ErrorBoundary></StrictMode>);
+createRoot(root).render(<StrictMode><ErrorBoundary onError={reportError}><QueryClientProvider client={queryClient}><LazyMotion features={loadMotionFeatures} strict><App /></LazyMotion></QueryClientProvider></ErrorBoundary></StrictMode>);
