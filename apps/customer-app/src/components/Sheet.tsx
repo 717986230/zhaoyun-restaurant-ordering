@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { motion, useDragControls, useReducedMotion } from "motion/react";
+import { m, useDragControls, useReducedMotion } from "motion/react";
 
 /** The curve the whole sheet moves on: fast off the mark, long soft landing. */
 const EASE = [0.2, 0.7, 0.2, 1] as const;
@@ -26,12 +26,12 @@ export function Sheet({ id, title, closeLabel, onClose, children, className = ""
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   const blur = (px: number) => ({ backdropFilter: `blur(${px}px)`, WebkitBackdropFilter: `blur(${px}px)` });
-  return <motion.div className="sheet-scrim"
+  return <m.div className="sheet-scrim"
     initial={reduceMotion ? { opacity: 0, ...blur(26) } : { opacity: 0, ...blur(0) }}
     animate={{ opacity: 1, ...blur(26), transition: { duration: reduceMotion ? 0 : 0.6, ease: EASE } }}
     exit={{ opacity: 0, ...blur(reduceMotion ? 26 : 0), transition: { duration: reduceMotion ? 0 : 0.24, ease: "easeIn" } }}
     onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <motion.section ref={pane} id={id} className={`sheet ${className}`} role="dialog" aria-modal="true" aria-label={title}
+    <m.section ref={pane} id={id} className={`sheet ${className}`} role="dialog" aria-modal="true" aria-label={title}
       initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 28 }}
       animate={{ opacity: 1, scale: 1, y: 0, transition: { duration: reduceMotion ? 0 : 0.6, ease: EASE } }}
       exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.97, y: 18, transition: { duration: 0.22, ease: "easeIn" } }}
@@ -45,6 +45,6 @@ export function Sheet({ id, title, closeLabel, onClose, children, className = ""
         <button type="button" className="sheet-close" aria-label={closeLabel} onClick={onClose}>×</button>
       </header>
       <div className="sheet-body">{children}</div>
-    </motion.section>
-  </motion.div>;
+    </m.section>
+  </m.div>;
 }
