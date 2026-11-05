@@ -670,6 +670,10 @@ export class RestaurantApi {
   reservation(id: string, token: string): Promise<{ reservation: ApiGuestReservation }> {
     return this.#request(`/api/reservations/${encodeURIComponent(id)}`, { headers: { "x-reservation-token": token } });
   }
+  /** A booking found again by its number and the phone or email it was made with — no account, no saved link. */
+  lookupReservation(reference: string, contact: string): Promise<{ reservation: ApiGuestReservation; token: string }> {
+    return this.#request("/api/reservations/lookup", { method: "POST", body: JSON.stringify({ reference, contact }) });
+  }
   /** The signed-in guest's own bookings. */
   myReservations(): Promise<{ reservations: ApiGuestReservation[] }> { return this.#request("/api/customer/reservations"); }
   /** A code to the signed-in guest's email; they type it back to book (shared/email-verify.mjs). */

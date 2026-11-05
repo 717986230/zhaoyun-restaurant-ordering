@@ -19,7 +19,7 @@ import {
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
-  ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
+  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
 import { bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
@@ -171,6 +171,9 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     // guests): a burst, not a script filling the evening. The guest's account
     // and its limits (shared/reservations.mjs, guestLimit) do the rest.
     reservationLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 60 }),
+    // Looking a booking up by its number needs a matching phone or email too, so
+    // the number alone reveals nothing; a tight limit stops a script trying many.
+    reservationLookupLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
     // Email codes from one address: each account has its own limits too (shared/email-verify.mjs).
     mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
     // Guest sign-ups from one address in ten minutes: a full dining room on
@@ -675,6 +678,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           // Whether a guest proves their email first: only where there is mail to send the code with.
           if (!date) return json({ booking: { ...(await reservations.booking()), emailVerification: Boolean(mail) } });
           return json(await reservations.availability(date, url.searchParams.get("party") ?? undefined, url.searchParams.get("time")));
+        }
+        if (path.length === 3 && path[2] === "lookup" && method === "POST") {
+          const limited = throttlePublic(state.reservationLookupLimiter, ctx, "Too many lookups from this device");
+          if (limited) return limited;
+          const { value, invalid } = await body(request, ReservationLookupBody);
+          if (invalid) return invalid;
+          const found = await reservations.lookup(value.reference, value.contact);
+          return found ? json(found, 200, { "cache-control": "no-store" }) : fail("Booking not found", 404);
         }
         if (path.length === 2 && method === "POST") {
           const limited = throttlePublic(state.reservationLimiter, ctx, "Too many bookings from this device");
