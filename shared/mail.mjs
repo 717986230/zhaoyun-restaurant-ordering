@@ -65,7 +65,10 @@ const COPY = {
     bookingParty: "人数：{party} 位",
     bookingTable: "桌号：{table}",
     bookingReference: "预约号：{reference}",
-    bookingManage: "查看或取消预约：{url}"
+    bookingManage: "查看或取消预约：{url}",
+    waitlistReadySubject: "{restaurant}：您的桌子准备好了",
+    waitlistReadyLead: "{name} 您好，您等候的桌子（{party} 位）已经准备好了，请到前台就座。",
+    waitlistReadyTail: "如果您已经离开或不再需要，请告知我们，谢谢。"
   },
   de: {
     subject: "{restaurant} – Ihr Bestätigungscode: {code}",
@@ -82,7 +85,10 @@ const COPY = {
     bookingParty: "Personen: {party}",
     bookingTable: "Tisch: {table}",
     bookingReference: "Buchungsnr.: {reference}",
-    bookingManage: "Reservierung ansehen oder stornieren: {url}"
+    bookingManage: "Reservierung ansehen oder stornieren: {url}",
+    waitlistReadySubject: "{restaurant} – Ihr Tisch ist bereit",
+    waitlistReadyLead: "Hallo {name}, Ihr Tisch für {party} Personen ist frei. Bitte kommen Sie zum Empfang.",
+    waitlistReadyTail: "Falls Sie schon gegangen sind oder den Tisch nicht mehr brauchen, sagen Sie uns bitte Bescheid."
   },
   en: {
     subject: "{restaurant} – your verification code: {code}",
@@ -99,7 +105,10 @@ const COPY = {
     bookingParty: "Party: {party}",
     bookingTable: "Table: {table}",
     bookingReference: "Reference: {reference}",
-    bookingManage: "View or cancel your booking: {url}"
+    bookingManage: "View or cancel your booking: {url}",
+    waitlistReadySubject: "{restaurant} – your table is ready",
+    waitlistReadyLead: "Hi {name}, your table for {party} is ready. Please come to the host stand.",
+    waitlistReadyTail: "If you have already left or no longer need the table, please let us know."
   }
 };
 
@@ -146,6 +155,19 @@ export function bookingMessage(reservation, { language = "de", restaurant = "", 
     subject: fill(confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject, values),
     text: `${lead}\n\n${lines.join("\n")}\n${manage ? `\n${manage}\n` : ""}`,
     html: `<p>${escapeHtml(lead)}</p><ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>${manage ? `<p><a href="${escapeHtml(manageUrl)}">${escapeHtml(fill(copy.bookingManage, { url: "" }).replace(/[:：]\s*$/, ""))}</a></p>` : ""}`
+  };
+}
+
+/** "Your table is ready" for a party on the walk-in waitlist (shared/waitlist.mjs). */
+export function waitlistReadyMessage(entry, { language = "de", restaurant = "" } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const values = { restaurant: restaurant || "Restaurant", name: entry.name, party: entry.party };
+  const lead = fill(copy.waitlistReadyLead, values);
+  const tail = copy.waitlistReadyTail;
+  return {
+    subject: fill(copy.waitlistReadySubject, values),
+    text: `${lead}\n\n${tail}\n`,
+    html: `<p>${escapeHtml(lead)}</p><p>${escapeHtml(tail)}</p>`
   };
 }
 

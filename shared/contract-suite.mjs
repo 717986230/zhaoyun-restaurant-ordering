@@ -2051,6 +2051,50 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("GET", "/api/catalog")).json.menu.reservations, false);
     }],
 
+    ["the floor runs a walk-in waitlist: a party joins, is notified (emailed that its table is ready), then seated; found in arrival order", async () => {
+      // The waitlist is the floor's: a token is needed, a staff PIN enough.
+      assert.equal((await call("GET", "/api/admin/waitlist")).status, 401);
+      const start = (await call("GET", "/api/admin/waitlist", { role: "staff" })).json;
+      assert.ok(Array.isArray(start.entries));
+      const before = start.entries.length;
+
+      // Name and size are required; a bad email is refused.
+      assert.equal((await call("POST", "/api/admin/waitlist", { role: "staff", body: { party: 2 } })).status, 400);
+      assert.equal((await call("POST", "/api/admin/waitlist", { role: "staff", body: { name: "Dana", party: 2, email: "not-an-email" } })).json.code, "INVALID");
+
+      const first = await call("POST", "/api/admin/waitlist", { role: "staff", body: { name: "Dana", party: 4, phone: "0660 1234567", email: "dana@example.com", language: "de" } });
+      assert.equal(first.status, 201);
+      assert.equal(first.json.entry.status, "waiting");
+      assert.equal(first.json.entry.party, 4);
+      assert.ok(first.json.entry.phone, "the number is kept");
+      const second = await call("POST", "/api/admin/waitlist", { role: "staff", body: { name: "Ben", party: 2 } });
+      assert.equal(second.status, 201);
+
+      const queue = (await call("GET", "/api/admin/waitlist", { role: "staff" })).json;
+      assert.equal(queue.entries.length, before + 2);
+      const dana = queue.entries.find((entry) => entry.id === first.json.entry.id);
+      const ben = queue.entries.find((entry) => entry.id === second.json.entry.id);
+      assert.ok(dana && ben && dana.position < ben.position, "first in, first in line");
+      assert.ok(queue.waiting >= 2);
+
+      // Notified: emailed once, best-effort, in their language; the moment is stamped.
+      const notified = await call("PATCH", `/api/admin/waitlist/${first.json.entry.id}`, { role: "staff", body: { status: "notified" } });
+      assert.equal(notified.json.entry.status, "notified");
+      assert.ok(notified.json.entry.notifiedAt, "the moment is stamped");
+      const ready = (await call("GET", "/api/admin/mail/outbox?limit=50", { admin: true })).json.messages.find((message) => message.to === "dana@example.com" && /Tisch/.test(message.subject));
+      assert.ok(ready, "the party is emailed that its table is ready");
+
+      // Seated: off the active queue.
+      assert.equal((await call("PATCH", `/api/admin/waitlist/${first.json.entry.id}`, { role: "staff", body: { status: "seated" } })).json.entry.status, "seated");
+      const afterSeat = (await call("GET", "/api/admin/waitlist", { role: "staff" })).json;
+      assert.ok(!afterSeat.entries.some((entry) => entry.id === first.json.entry.id), "a seated party leaves the queue");
+
+      // An unknown status is refused; a party can be cleared out for good.
+      assert.equal((await call("PATCH", `/api/admin/waitlist/${ben.id}`, { role: "staff", body: { status: "nope" } })).status, 400);
+      assert.equal((await call("DELETE", `/api/admin/waitlist/${ben.id}`, { role: "staff" })).status, 204);
+      assert.equal((await call("DELETE", `/api/admin/waitlist/${ben.id}`, { role: "staff" })).status, 404);
+    }],
+
     ["a guest picks their own table online: only a free one big enough, never one already booked for that stay", async () => {
       const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [{ table: "s1", seats: 2 }, { table: "S2", seats: 4 }], maxActivePerGuest: 20, maxPerDayPerGuest: 10, noShowLimit: 0, minPoints: 0, bookingPoints: 0 };
       assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, tables: [{ table: "S1", seats: 2 }, { table: "s1", seats: 4 }] } } })).status, 400, "a table listed twice");

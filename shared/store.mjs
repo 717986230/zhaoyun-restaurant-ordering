@@ -54,6 +54,7 @@ import {
 } from "./drawer.mjs";
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
+import { createWaitlistStore } from "./waitlist-store.mjs";
 import { appIconsView } from "./app-icons.mjs";
 import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
 import {
@@ -1077,6 +1078,8 @@ export function createStore(driver) {
     customers: createCustomerStore(driver, { ordersFor: (rows) => Promise.all(rows.map(viewOrder)) }),
     // Table reservations (shared/reservation-store.mjs), both backends alike.
     reservations: createReservationStore(driver, { settings: getSettings }),
+    // The walk-in waitlist (shared/waitlist-store.mjs), both backends alike.
+    waitlist: createWaitlistStore(driver),
     // Orders from the delivery platforms (shared/delivery-store.mjs), both backends alike.
     delivery: deliveryStore,
     /** For what the backends add of their own (seeding, the Node print agent). */
