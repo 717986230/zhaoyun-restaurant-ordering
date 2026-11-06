@@ -28,7 +28,7 @@ describe("Visual modifier editor", () => {
 
     // Now two "中文" fields exist: the group's and the option's.
     const zhFields = getAllByLabelText("中文");
-    fireEvent.change(zhFields[1], { target: { value: "微辣" } });
+    fireEvent.change(zhFields[1]!, { target: { value: "微辣" } });
     // 加价 is entered in euros and stored as cents.
     const price = container.querySelector(".modifier-price input") as HTMLInputElement;
     fireEvent.change(price, { target: { value: "1.5" } });
