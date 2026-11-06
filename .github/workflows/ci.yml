@@ -111,9 +111,26 @@ jobs:
       - name: Install the browsers' system libraries
         timeout-minutes: 15
         run: |
+          # A cut-off attempt (`timeout` killing npx) leaves its apt-get child
+          # running and holding the dpkg lock, so an instant retry dies on
+          # "Could not get lock /var/lib/dpkg/lock-frontend". Between attempts,
+          # stop any leftover apt/dpkg, repair a half-done install, and wait for
+          # the locks to clear before trying again.
+          recover_apt() {
+            sudo pkill -9 -f 'apt-get|apt\.systemd|unattended-upgr' 2>/dev/null || true
+            sudo dpkg --configure -a 2>/dev/null || true
+            for _ in $(seq 1 30); do
+              if ! sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 2
+            done
+          }
           for attempt in 1 2 3; do
-            if timeout 300 npx playwright install-deps chromium webkit; then exit 0; fi
+            # `-k 20` hard-kills a stalled attempt 20s after the first signal.
+            if timeout -k 20 300 npx playwright install-deps chromium webkit; then exit 0; fi
             echo "::warning::install-deps stalled or failed (attempt $attempt of 3)"
+            recover_apt
           done
           exit 1
 
