@@ -10,6 +10,13 @@
 - 候位数据同时落到 Node(SQLite)和 Cloudflare(D1)两套后端,合约测试对两边一致性做了校验。
 - **上线前提**:叫号邮件需要和预约邮件相同的 Brevo 配置;没配时不发邮件,其余功能照常。
 
+## 2026-11-02（日）· 修复 CI：npm audit 对 glob/minimatch 的告警
+
+### Fixed
+
+- **CI 的 `npm audit --omit=dev` 这步最近开始报 3 条中危告警**（`glob` 的 AbortSignal 绕过、`minimatch` 的 globparts 放大），都来自 `@fastify/static` 间接依赖的旧版 `glob`/`minimatch`——与业务代码无关，但会让所有 PR 和 main 的 CI 变红。
+- 在 `package.json` 加 `overrides`，把 `glob` 固定到 `^14.0.3`、`minimatch` 固定到 `^11.0.4`（均为已修复版本）。`npm audit --omit=dev` 恢复 **0 条漏洞**；typecheck / 单测 / server / worker / build 全绿。
+
 ## 2026-10-27（二）· 预约确认邮件
 
 ### Added
