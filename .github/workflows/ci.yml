@@ -103,10 +103,19 @@ jobs:
           done
           exit 1
 
-      # The system libraries the browsers need, from apt, whether or not they came from the cache.
+      # The system libraries the browsers need, from apt, whether or not they
+      # came from the cache. The apt mirror sometimes serves the font packages
+      # slowly and the install stalls past the step timeout, so a cut-off
+      # attempt is tried again, up to three times — the same way the browser
+      # download above is.
       - name: Install the browsers' system libraries
-        timeout-minutes: 6
-        run: npx playwright install-deps chromium webkit
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 300 npx playwright install-deps chromium webkit; then exit 0; fi
+            echo "::warning::install-deps stalled or failed (attempt $attempt of 3)"
+          done
+          exit 1
 
       - name: Responsive end-to-end tests
         run: npx playwright test --shard=${{ matrix.shard }}/3
