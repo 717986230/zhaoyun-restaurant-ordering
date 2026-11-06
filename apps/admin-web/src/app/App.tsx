@@ -19,6 +19,7 @@ import { LinksPanel } from "../features/links/LinksPanel";
 import { ReportsPanel } from "../features/reports/ReportsPanel";
 import { TodayPanel } from "../features/reports/TodayPanel";
 import { ReservationsPanel } from "../features/reservations/ReservationsPanel";
+import { WaitlistPanel } from "../features/waitlist/WaitlistPanel";
 import { DeliveryPanel } from "../features/delivery/DeliveryPanel";
 import { BackToTop } from "./BackToTop";
 
@@ -59,8 +60,8 @@ const LIVE_SETTLE_MS = 250;
  */
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
-  if (role === "staff") return ["board", "tables", "reservations", "delivery", "links"];
-  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "delivery", "reports", "printers", "guests", "system", "links"] : ["today", "catalog", "reservations", "delivery", "guests", "system", "links"];
+  if (role === "staff") return ["board", "tables", "reservations", "waitlist", "delivery", "links"];
+  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "printers", "guests", "system", "links"] : ["today", "catalog", "reservations", "waitlist", "delivery", "guests", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
@@ -68,6 +69,7 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
   board: "tabBoard",
   tables: "tabTables",
   reservations: "tabReservations",
+  waitlist: "tabWaitlist",
   delivery: "tabDelivery",
   reports: "tabReports",
   printers: "tabPrinters",
@@ -667,6 +669,7 @@ export function App() {
       {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} found={state.printFound} dishesPerStation={dishesPerStation} apiBase={adminApi.storage.baseUrl} onDelete={deletePrinter} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "delivery" && <DeliveryPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
       {state.tab === "reservations" && <ReservationsPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
+      {state.tab === "waitlist" && <WaitlistPanel api={adminApi} notify={notify} failed={reportFailed} liveTick={reservationTick} />}
       {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
       {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} />}

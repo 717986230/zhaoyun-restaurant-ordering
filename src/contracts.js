@@ -430,6 +430,30 @@ export const ReservationUpdateBody = Type.Object({
   table: Type.Optional(Type.String({ maxLength: 8 }))
 }, { additionalProperties: false, minProperties: 1 });
 
+// A party on the walk-in waitlist (shared/waitlist.mjs checks the rest: the
+// form of the phone and email). Only name and size are required.
+const WaitlistFields = {
+  name: Type.String({ minLength: 1, maxLength: 80 }),
+  party: Type.Integer({ minimum: 1, maximum: 500 }),
+  phone: Type.Optional(Type.String({ maxLength: 30 })),
+  email: Type.Optional(Type.String({ maxLength: 254 })),
+  notes: Type.Optional(Type.String({ maxLength: 500 })),
+  language: Type.Optional(Type.Union([Type.Literal("zh"), Type.Literal("en"), Type.Literal("de")]))
+};
+/** A party the floor adds at the door. */
+export const WaitlistBody = Type.Object({ ...WaitlistFields }, { additionalProperties: false });
+export const WAITLIST_STATUSES = ["waiting", "notified", "seated", "left"];
+/** A party on the waitlist changed by the floor: only what is sent changes. */
+export const WaitlistUpdateBody = Type.Object({
+  name: Type.Optional(WaitlistFields.name),
+  party: Type.Optional(WaitlistFields.party),
+  phone: Type.Optional(Type.String({ maxLength: 30 })),
+  email: Type.Optional(Type.String({ maxLength: 254 })),
+  notes: Type.Optional(Type.String({ maxLength: 500 })),
+  language: Type.Optional(WaitlistFields.language),
+  status: Type.Optional(literals(WAITLIST_STATUSES))
+}, { additionalProperties: false, minProperties: 1 });
+
 /** The floor's answer to a delivery platform's order (shared/delivery.mjs). */
 export const DeliveryActionBody = Type.Object({
   prepMinutes: Type.Optional(Type.Integer({ minimum: 5, maximum: 180 })),
