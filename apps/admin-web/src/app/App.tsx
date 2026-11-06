@@ -347,6 +347,21 @@ export function App() {
     }
   }
 
+  /** Applies one change (price / 上架 / 有货) to several dishes at once, each a
+   *  full PUT built from the dish as it is, so nothing else is touched. One
+   *  refresh and one toast at the end, however many dishes. */
+  async function bulkSaveProducts(updates: Array<{ id: string; input: AdminProductInput }>): Promise<void> {
+    if (!updates.length) return;
+    try {
+      for (const update of updates) await adminApi.updateProduct(update.id, update.input);
+      await connect();
+      notify(t("bulkSaved", { n: updates.length }));
+    } catch (error) {
+      failed(error, "saveFailed");
+      await connect();
+    }
+  }
+
   /** Copies a dish and opens the copy, so only what differs needs typing. */
   async function duplicateProduct(id: string) {
     try {
@@ -631,7 +646,7 @@ export function App() {
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     </div>
     <main>
-      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}
+      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onBulkSave={bulkSaveProducts} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel
         orders={state.orders}
         requests={state.requests}
