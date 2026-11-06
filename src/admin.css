@@ -2565,6 +2565,171 @@ em.voided {
   border-color: var(--a-accent-line);
 }
 
+/* 口味/规格 options, edited visually. Like .bundle-picker the selectors carry
+   .editor-form so the form's full-width label/input rules do not reach in. */
+.editor-form .modifier-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--a-line);
+  border-radius: 5px;
+  padding: 10px 12px 12px;
+}
+
+.editor-form .modifier-picker legend {
+  color: var(--a-ink-2);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.editor-form .modifier-groups {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-form .modifier-group {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--a-accent-line);
+  border-radius: 10px;
+  background: var(--a-accent-wash);
+}
+
+.editor-form .modifier-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+}
+
+.editor-form .modifier-names {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.editor-form .modifier-names input {
+  min-height: 38px;
+}
+
+.editor-form .modifier-group-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editor-form .modifier-selection {
+  display: flex;
+  gap: 4px;
+}
+
+.editor-form .modifier-selection label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-card);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.editor-form .modifier-selection input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+.editor-form .modifier-options {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-form .modifier-options li {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-form .modifier-options input {
+  min-height: 36px;
+}
+
+.editor-form .modifier-price {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+
+.editor-form .modifier-price span {
+  color: var(--a-ink-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.editor-form .modifier-price input {
+  width: 84px;
+  text-align: right;
+}
+
+.editor-form .modifier-remove {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--a-line-2);
+  border-radius: 8px;
+  background: var(--a-card);
+  color: var(--a-ink-2);
+  cursor: pointer;
+}
+
+.editor-form .modifier-empty {
+  margin: 0;
+  color: var(--a-ink-2);
+  font-size: 13px;
+}
+
+.editor-form .modifier-add-group {
+  justify-self: start;
+}
+
+.editor-form .modifier-json {
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.editor-form .modifier-json summary {
+  color: var(--a-ink-2);
+  cursor: pointer;
+}
+
+.editor-form .modifier-json textarea {
+  margin-top: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .editor-form .modifier-options li {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .editor-form .modifier-price {
+    grid-column: 1 / -1;
+  }
+}
+
 /* A set's thumbnail: up to four of its dishes. */
 .product-thumb.thumb-collage {
   display: grid;
