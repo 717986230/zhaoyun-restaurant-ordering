@@ -825,6 +825,55 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   text-transform: uppercase;
 }
 
+.pos-scan-find {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--p-line);
+  padding-top: 12px;
+}
+
+.pos-scan-find > input {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.pos-scan-matches {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pos-scan-matches button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  background: var(--p-card);
+  color: var(--p-ink);
+  text-align: start;
+  font-size: 15px;
+}
+
+.pos-scan-matches em {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: var(--p-accent-wash);
+  color: var(--p-accent);
+  font-style: normal;
+  font-weight: 700;
+}
+
 @keyframes pos-scan-in {
   from { opacity: 0; }
 }
