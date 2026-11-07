@@ -615,6 +615,85 @@ h2 {
   background: var(--a-rail);
 }
 
+/* 批量 mode: a leading checkbox column, so the row stays aligned with one
+   more child than usual. */
+.product-row.batch-row {
+  grid-template-columns: 26px 46px minmax(110px, 1fr) 62px 48px 82px 12px;
+}
+
+.product-row .batch-check {
+  font-size: 18px;
+  color: var(--a-ink-2);
+  text-align: center;
+}
+
+.product-row.batch-picked {
+  background: var(--a-accent-wash);
+}
+
+.product-row.batch-picked .batch-check {
+  color: var(--a-accent);
+}
+
+.batch-toggle.on {
+  border-color: var(--a-accent-line);
+  background: var(--a-accent-wash);
+  color: var(--a-accent);
+}
+
+/* The bulk action bar, shown between the filters and the list in 批量 mode. */
+.batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--a-accent-line);
+  border-radius: 8px;
+  background: var(--a-accent-wash);
+}
+
+.batch-bar .batch-select,
+.batch-bar .batch-price,
+.batch-bar .batch-flags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.batch-bar .batch-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--a-ink);
+}
+
+.batch-bar .batch-price select,
+.batch-bar .batch-price input {
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font-size: 13px;
+}
+
+.batch-bar .batch-price input {
+  width: 110px;
+}
+
+.batch-bar .ghost-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.batch-bar .form-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .product-thumb {
   width: 42px;
   height: 42px;
