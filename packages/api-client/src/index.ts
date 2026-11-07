@@ -134,6 +134,8 @@ export interface AdminProductInput {
   printStation: "kitchen" | "bar" | "sushi" | "front";
   available: boolean;
   published: boolean;
+  /** Where the dish sits in the menu; lower shows first (shared/products.mjs). */
+  sortOrder?: number;
   modifiers?: ModifierGroup[];
   bundleItems?: BundleItem[];
 }

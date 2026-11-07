@@ -58,6 +58,8 @@ export interface Product {
   available: boolean;
   published: boolean;
   printStation: PrintStation;
+  /** Where the dish sits in the menu: the guest list and admin both follow it. */
+  sortOrder?: number;
   /** 每日限量: the portions each day starts with, and what is left today; null for no limit. */
   dailyLimit?: number | null;
   leftToday?: number | null;
