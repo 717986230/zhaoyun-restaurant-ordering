@@ -4397,6 +4397,32 @@ button:focus-visible,
 /* A choosable group's name lines up with its chips (a legend is indented by default). */
 .dish-options.choosing .dish-options-group legend {
   padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dish-options-group legend .modifier-flag {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  opacity: 0.75;
+}
+
+.dish-options-group legend .modifier-flag.required {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  opacity: 1;
+}
+
+.detail-buy .primary.add-to-cart[data-blocked="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ---------------------------------------------------------------------------

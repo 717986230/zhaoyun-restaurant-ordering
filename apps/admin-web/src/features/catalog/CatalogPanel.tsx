@@ -172,7 +172,14 @@ export function ModifierFieldset({ product }: { product: Product | null }) {
 
   const addGroup = () => setGroups((current) => [...current, { id: freshId("grp"), names: { zh: "", de: "", en: "" }, selection: "single", options: [] }]);
   const removeGroup = (id: string) => setGroups((current) => current.filter((group) => group.id !== id));
-  const setSelection = (id: string, selection: ModifierGroup["selection"]) => setGroups((current) => current.map((group) => group.id === id ? { ...group, selection } : group));
+  const setSelection = (id: string, selection: ModifierGroup["selection"]) => setGroups((current) => current.map((group) => {
+    if (group.id !== id) return group;
+    // Leaving multi for single drops any max — a single group can only ever take one.
+    const { max: _max, ...rest } = group;
+    return selection === "single" ? { ...rest, selection } : { ...group, selection };
+  }));
+  const setRequired = (id: string, required: boolean) => setGroups((current) => current.map((group) => group.id === id ? { ...group, min: required ? Math.max(1, group.min ?? 1) : 0 } : group));
+  const setMax = (id: string, value: string) => setGroups((current) => current.map((group) => group.id === id ? { ...group, max: Math.max(0, Math.trunc(Number(value) || 0)) } : group));
   const setGroupName = (id: string, lang: "zh" | "de" | "en", value: string) => setGroups((current) => current.map((group) => group.id === id ? { ...group, names: { ...group.names, [lang]: value } } : group));
   const addOption = (groupId: string) => setGroups((current) => current.map((group) => group.id === groupId ? { ...group, options: [...group.options, { id: freshId("opt"), names: { zh: "", de: "", en: "" }, priceCents: 0 }] } : group));
   const removeOption = (groupId: string, optionId: string) => setGroups((current) => current.map((group) => group.id === groupId ? { ...group, options: group.options.filter((option) => option.id !== optionId) } : group));
@@ -206,6 +213,10 @@ export function ModifierFieldset({ product }: { product: Product | null }) {
             </label>)}</div>
             <button type="button" className="modifier-remove" onClick={() => removeGroup(group.id)} aria-label={t("modifierGroupRemove")} title={t("modifierGroupRemove")}>✕</button>
           </div>
+        </div>
+        <div className="modifier-limits">
+          <label className="modifier-required"><input type="checkbox" checked={(group.min ?? 0) > 0} onChange={(event) => setRequired(group.id, event.target.checked)} /><span>{t("modifierRequired")}</span></label>
+          {group.selection === "multi" && <label className="modifier-max"><span>{t("modifierMax")}</span><input type="number" min="0" step="1" inputMode="numeric" value={group.max ? group.max : ""} onChange={(event) => setMax(group.id, event.target.value)} placeholder={t("modifierMaxNone")} /></label>}
         </div>
         {group.options.length
           ? <ul className="modifier-options">{group.options.map((option) => <li key={option.id}>

@@ -2727,6 +2727,41 @@ em.voided {
   margin: 0;
 }
 
+.editor-form .modifier-limits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 6px 0 2px;
+}
+
+.editor-form .modifier-required,
+.editor-form .modifier-max {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--a-ink-2);
+}
+
+.editor-form .modifier-required input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+.editor-form .modifier-max input {
+  width: 72px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font-size: 13px;
+}
+
 .editor-form .modifier-options {
   display: grid;
   gap: 6px;
