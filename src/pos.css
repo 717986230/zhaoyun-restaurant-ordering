@@ -187,6 +187,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-ticket-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
 .pos-ticket-actions .pos-primary { grid-column: 1 / -1; min-height: 56px; font-size: 18px; }
 
+/* The order's bottom-sheet bar (phones only — hidden in the two-column layout). */
+.pos-sheet-bar { display: none; }
+
 .pos-menu { display: grid; gap: 10px; min-width: 0; }
 .pos-number input { min-height: 56px; font-size: 22px; font-weight: 700; }
 .pos-categories { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
@@ -300,10 +303,72 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 @media (max-width: 820px) {
   .pos-order, .pos-pay-screen { grid-template-columns: minmax(0, 1fr); }
-  .pos-ticket, .pos-pay-panel { position: static; max-height: none; }
-  /* The dishes first on a phone; the ticket and its buttons below them. */
-  .pos-order .pos-menu { order: -1; }
+  .pos-pay-panel { position: static; max-height: none; }
   .pos-dishes { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+
+  /* On a phone the order rides as a bottom sheet: a fixed summary bar sits at
+     the foot while the dishes keep the whole screen; tapping the bar slides the
+     full ticket up over a scrim. The bar and the sheet are separate layers, so
+     the sheet can slide clean off-screen whatever the bar's height. */
+  .pos-order { position: relative; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+
+  .pos-sheet-scrim { position: fixed; inset: 0; z-index: 38; background: rgba(10, 16, 13, 0.4); }
+
+  .pos-ticket {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 40;
+    margin: 0;
+    max-height: min(84vh, 680px);
+    border-radius: 18px 18px 0 0;
+    border-bottom: 0;
+    box-shadow: 0 -12px 34px rgba(10, 16, 13, 0.3);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    visibility: hidden;
+    transition: transform 0.26s ease, visibility 0.26s;
+  }
+  .pos-ticket.open { transform: translateY(0); visibility: visible; }
+
+  /* The collapsed bar: fixed at the foot, swapped out once the sheet is open. */
+  .pos-sheet-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 36;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--p-line);
+    background: var(--p-card);
+    box-shadow: 0 -6px 20px rgba(10, 16, 13, 0.12);
+  }
+  .pos-order.sheet-open .pos-sheet-bar { display: none; }
+  .pos-sheet-toggle {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+  }
+  .pos-sheet-grip { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 36px; height: 4px; border-radius: 999px; background: var(--p-line); }
+  .pos-sheet-title { flex: 0 0 auto; font-size: 17px; font-weight: 700; color: var(--p-ink); }
+  .pos-sheet-sum { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--p-muted); font-size: 14px; }
+  .pos-sheet-sum span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pos-sheet-sum b { flex: 0 0 auto; color: var(--p-ink); font-size: 18px; font-variant-numeric: tabular-nums; }
+  .pos-sheet-send { min-height: 52px; padding: 0 22px; font-size: 16px; }
+  .pos-sheet-send:disabled { opacity: 0.5; }
+}
+
+@media (max-width: 820px) and (prefers-reduced-motion: reduce) {
+  .pos-ticket { transition: none; }
 }
 
 @media (max-width: 520px) {

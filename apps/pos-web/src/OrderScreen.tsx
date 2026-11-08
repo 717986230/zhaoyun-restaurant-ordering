@@ -33,6 +33,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // 限量: tapping a dish asks how many portions are left today instead of adding it.
   const [stockMode, setStockMode] = useState(false);
   const [busy, setBusy] = useState(false);
+  // On a phone the ticket is a bottom sheet: collapsed to a summary bar while
+  // the dishes fill the screen, tapped up to see and change the whole order.
+  const [sheetOpen, setSheetOpen] = useState(false);
   // One id per batch sent: a retried tap is the same order, not a second one.
   const requestId = useRef(crypto.randomUUID());
 
@@ -138,6 +141,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       requestId.current = crypto.randomUUID();
       setCart([]);
       setNote("");
+      setSheetOpen(false);
       await loadBill();
       // The counts of limited dishes went down.
       if (cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined)) pos.refreshMenu();
@@ -177,9 +181,11 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
 
   const cartCents = cart.reduce((sum, line) => sum + (line.product.priceCents + line.modifiers.reduce((part, modifier) => part + modifier.priceCents, 0)) * line.quantity, 0);
   const sentCents = Math.round((bill?.total ?? 0) * 100);
+  const newCount = cart.reduce((sum, line) => sum + line.quantity, 0);
 
-  return <section className="pos-order">
-    <aside className="pos-ticket">
+  return <section className={`pos-order ${sheetOpen ? "sheet-open" : ""}`}>
+    {sheetOpen && <div className="pos-sheet-scrim" onClick={() => setSheetOpen(false)} />}
+    <aside className={`pos-ticket ${sheetOpen ? "open" : ""}`}>
       <div className="pos-ticket-head">
         <button type="button" onClick={() => leave({ name: "floor" })}>← {t("back")}</button>
         <h1>{pickupNo ? t("pickupNo", { no: pickupNo }) : t("table", { table })}</h1>
@@ -211,6 +217,19 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       </div>
       {orderingUntil && <p className="pos-muted pos-guest-ordering">{t("guestOrderingOn", { time: new Date(orderingUntil).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) })}</p>}
     </aside>
+
+    <div className="pos-sheet-bar">
+      <button type="button" className="pos-sheet-toggle" aria-expanded={sheetOpen}
+        aria-label={sheetOpen ? t("hideOrder") : t("showOrder")} onClick={() => setSheetOpen((open) => !open)}>
+        <span className="pos-sheet-grip" aria-hidden="true" />
+        <span className="pos-sheet-title">{pickupNo ? t("pickupNo", { no: pickupNo }) : t("table", { table })}</span>
+        <span className="pos-sheet-sum">
+          <span>{newCount ? t("sheetItems", { count: newCount }) : t("sent")}</span>
+          <b>{money(newCount ? cartCents : sentCents)}</b>
+        </span>
+      </button>
+      <button type="button" className="pos-primary pos-sheet-send" disabled={!cart.length || busy} onClick={() => void send()}>{t("sendKitchen")}</button>
+    </div>
 
     <div className="pos-menu">
       <form className="pos-number" onSubmit={byNumber}>
