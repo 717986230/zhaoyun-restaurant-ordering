@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import type { ApiBill } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
 import { ApiError } from "@zhaoyun/api-client";
+import { TAG_COLORS } from "../../../src/tag-colors.js";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 
@@ -59,6 +60,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
 
   const menu = useMemo(() => pos.products.filter((product) => product.published), [pos.products]);
   const categories = useMemo(() => [...new Set(menu.map((product) => product.category))], [menu]);
+  // A stable, distinct colour per category (by its order on the menu), so a
+  // waiter tells categories apart at a glance: the chip's dot and the dish's stripe.
+  const catColor = useCallback((entry: string) => TAG_COLORS[Math.max(0, categories.indexOf(entry)) % TAG_COLORS.length]!, [categories]);
   const shown = useMemo(() => {
     const text = query.trim().toLowerCase();
     return menu.filter((product) => (!category || product.category === category)
@@ -241,12 +245,15 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       </div>
       <nav className="pos-categories">
         <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
-        {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>{entry}</button>)}
+        {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>
+          <span className="pos-cat-dot" aria-hidden="true" style={{ background: catColor(entry) }} />{entry}
+        </button>)}
       </nav>
       <div className={`pos-dishes ${soldOutMode || stockMode ? "choosing-soldout" : ""}`}>{shown.map((product) => {
         const left = product.leftToday ?? null;
         const out = !product.available || left === 0;
         return <button key={product.id} type="button" data-sku={product.sku}
+          style={{ "--tag": catColor(product.category) } as CSSProperties}
           className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
           onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? askStock(product) : pick(product))}>
           <small>{product.sku}</small>
