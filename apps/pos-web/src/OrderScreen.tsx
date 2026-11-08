@@ -253,7 +253,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         const left = product.leftToday ?? null;
         const out = !product.available || left === 0;
         return <button key={product.id} type="button" data-sku={product.sku}
-          style={{ "--tag": catColor(product.category) } as CSSProperties}
+          style={{ "--tag": product.tagColor || catColor(product.category) } as CSSProperties}
           className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
           onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? askStock(product) : pick(product))}>
           <small>{product.sku}</small>

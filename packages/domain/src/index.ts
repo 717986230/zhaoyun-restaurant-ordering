@@ -51,6 +51,8 @@ export interface Product {
   details: { time: string; people: string; level: string; ingredients: string };
   appearance: { art: string; pattern: string };
   media: ProductMedia[];
+  /** 颜色标签: a palette colour (src/tag-colors.js) the POS tags the dish with; null/absent follows the category colour. */
+  tagColor?: string | null;
   modifiers?: ModifierGroup[];
   /** Present on a combo: the existing dishes it packages, by id. A combo is
    *  otherwise an ordinary product — its own name, price and photo. */

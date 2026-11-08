@@ -18,6 +18,7 @@ CREATE TABLE products (
       ingredients TEXT NOT NULL DEFAULT '',
       art TEXT NOT NULL DEFAULT '',
       pattern TEXT NOT NULL DEFAULT 'lines',
+      tag_color TEXT NOT NULL DEFAULT '',
       available INTEGER NOT NULL DEFAULT 1,
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,

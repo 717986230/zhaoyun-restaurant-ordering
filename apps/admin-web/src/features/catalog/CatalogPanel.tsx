@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import { ALLERGENS } from "../../../../../src/allergens.js";
+import { TAG_COLORS } from "../../../../../src/tag-colors.js";
 import type { BundleItem, ModifierGroup, Product, ProductMedia, VatPercent } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
@@ -203,6 +204,7 @@ function productToInput(product: Product): AdminProductInput {
     printStation: product.printStation,
     available: product.available,
     published: product.published,
+    tagColor: product.tagColor ?? null,
     modifiers: product.modifiers ?? [],
     bundleItems: product.bundleItems ?? []
   };
@@ -305,7 +307,8 @@ export function CatalogPanel(props: Props) {
       bundleItems: readBundleItems(data),
       printStation: readText(data, "printStation") as AdminProductInput["printStation"],
       available: data.get("available") === "on",
-      published: data.get("published") === "on"
+      published: data.get("published") === "on",
+      tagColor: readText(data, "tagColor")
     };
     const mediaInput = formElement.elements.namedItem("media") as HTMLInputElement;
     // 每日限量: empty is as many as ordered; saved on its own, and only when it changed.
@@ -347,6 +350,11 @@ export function CatalogPanel(props: Props) {
       <label><span>{t("fieldIngredients")}</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
       <div className="field-grid three"><label><span>{t("fieldTime")}</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>{t("fieldPortion")}</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>{t("fieldLevel")}</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
       <fieldset className="allergen-picker"><legend>{t("fieldAllergens")}</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {language === "zh" ? allergen.zh : allergen.de}</span></label>)}</fieldset>
+      <fieldset className="tag-colour-picker"><legend>{t("fieldTagColour")}</legend>
+        <label className="tag-colour-none"><input type="radio" name="tagColor" value="" defaultChecked={!product?.tagColor} /><span>{t("tagColourNone")}</span></label>
+        {TAG_COLORS.map((colour) => <label key={colour} className="tag-colour-swatch" style={{ "--swatch": colour } as CSSProperties}>
+          <input type="radio" name="tagColor" value={colour} defaultChecked={product?.tagColor === colour} /><span aria-hidden="true" /></label>)}
+      </fieldset>
       <MediaField current={product?.media?.[0] ?? null} mediaUrl={props.mediaUrl} />
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
       <label className="daily-limit"><span>{t("fieldDailyLimit")}</span><input name="dailyLimit" id="dailyLimit" type="number" min="1" max="9999" step="1" inputMode="numeric" defaultValue={product?.dailyLimit ?? ""} placeholder={t("dailyLimitNone")} />
