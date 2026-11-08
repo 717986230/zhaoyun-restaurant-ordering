@@ -1482,8 +1482,8 @@ em.voided {
 .tag-colour-picker legend { color: var(--a-ink-2); font-size: 12px; letter-spacing: 0.04em; }
 .tag-colour-none { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .tag-colour-none input { width: 16px; height: 16px; }
-.tag-colour-swatch { display: inline-grid; cursor: pointer; }
-.tag-colour-swatch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.tag-colour-swatch { position: relative; display: inline-grid; cursor: pointer; }
+.tag-colour-swatch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .tag-colour-swatch span {
   width: 26px;
   height: 26px;
