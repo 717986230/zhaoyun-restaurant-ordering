@@ -1397,6 +1397,14 @@ em.voided {
   font-size: 12px;
 }
 
+/* 谁做的: the waiter's name, when a POS device was signed in. */
+.audit-actor {
+  color: var(--a-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .audit-what b {
   font-size: 13px;
   font-weight: 600;

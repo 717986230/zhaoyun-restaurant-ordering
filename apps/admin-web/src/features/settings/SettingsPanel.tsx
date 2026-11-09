@@ -62,9 +62,15 @@ const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "
 
 function detailSummary(entry: AuditEntry): string {
   const parts = Object.entries(entry.detail)
-    .filter(([key, value]) => key !== "params" && value !== undefined && value !== null)
+    // `actor` is shown on its own next to the role; `params` is noise.
+    .filter(([key, value]) => key !== "params" && key !== "actor" && value !== undefined && value !== null)
     .map(([key, value]) => `${key}=${String(value)}`);
   return parts.length ? ` · ${parts.join(" ")}` : "";
+}
+
+/** The waiter who did it, when the action came from a signed-in POS device. */
+function actorOf(entry: AuditEntry): string {
+  return typeof entry.detail.actor === "string" ? entry.detail.actor : "";
 }
 
 /** The guest menu's address: where this console's API lives, else this site. */
@@ -671,7 +677,7 @@ export function SettingsPanel(props: Props) {
     <details className="settings-card settings-section">
       <summary><h2>{t("sectionAudit")}</h2></summary>
       <div className="audit-list settings-body">{props.auditEntries.length ? props.auditEntries.map((entry) => <div className={`audit-row ${entry.status >= 400 ? "denied" : ""}`} key={entry.id}>
-        <span className="audit-role">{ROLE_KEYS[entry.role] ? t(ROLE_KEYS[entry.role]) : entry.role}</span>
+        <span className="audit-role">{ROLE_KEYS[entry.role] ? t(ROLE_KEYS[entry.role]) : entry.role}{actorOf(entry) && <><br /><b className="audit-actor">{actorOf(entry)}</b></>}</span>
         <span className="audit-what"><b>{entry.method} {entry.route}</b><small>{new Date(entry.at).toLocaleString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")} · {entry.ip} · {entry.status}{detailSummary(entry)}</small></span>
       </div>) : <div className="admin-empty">{t("auditEmpty")}</div>}</div>
     </details>

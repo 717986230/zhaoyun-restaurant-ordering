@@ -1322,6 +1322,11 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const next = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
       assert.ok((await call("GET", `/api/admin/journal?from=${day}&to=${next}`, { admin: true })).json.entries.some((entry) => entry.kind === "item.voided" && entry.payload.reason === "Gast hat storniert"));
       assert.deepEqual((await call("GET", "/api/pos/settlement", asZhou)).json.totals.voids, { count: 1, cents });
+      // 操作记到人: the void's audit entry names Zhou, not just the role token the whole floor shares.
+      const voidAudit = (await call("GET", "/api/admin/audit", { admin: true })).json.entries
+        .find((entry) => entry.route === "/api/pos/tables/V1/void" && entry.status === 201);
+      assert.ok(voidAudit, "the void leaves an audit entry");
+      assert.equal(voidAudit.detail.actor, "Zhou", "the audit entry names who did it");
 
       // Paid, then printed again for the guest: the same receipt, marked a copy.
       const paid = (await call("POST", "/api/admin/checkout", { ...asZhou, body: { table: "V1", items: [{ orderItemId: line.orderItemId, quantity: 2 }], payments: [{ type: "card", amount: after.total }] } })).json.receipt;
