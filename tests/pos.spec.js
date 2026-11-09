@@ -87,10 +87,15 @@ test("a waiter orders by number, the kitchen gets it, and the table pays separat
   await confirmOptions(page);
   await expect(page.locator(".pos-lines.new li")).toHaveCount(2);
   await expect(page.locator(".pos-lines.new li").first()).toContainText("2");
+  // 已点份数: the dish shows a red count badge for the unsent order, before 送厨.
+  await expect(page.locator(`.pos-dishes button[data-sku="${first.sku}"] .pos-dish-count`)).toHaveText("2");
+  await expect(page.locator(`.pos-dishes button[data-sku="${second.sku}"] .pos-dish-count`)).toHaveText("1");
   await page.getByPlaceholder(/备注/).fill("少辣");
   await page.getByRole("button", { name: "送厨" }).click();
   await expect(page.locator(".pos-toast")).toContainText("已送厨：3 道菜");
   await expect(page.locator(".pos-lines.sent li")).toHaveCount(2);
+  // Once sent, the order empties and the badges clear.
+  await expect(page.locator(".pos-dish-count")).toHaveCount(0);
 
   const jobs = (await (await admin(request, "get", "/api/admin/print-jobs?status=queued&limit=50")).json()).jobs;
   const ticket = jobs.find((job) => job.payload.table === "5");
