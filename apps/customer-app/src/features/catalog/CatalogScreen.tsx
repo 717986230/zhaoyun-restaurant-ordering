@@ -5,7 +5,7 @@ import { InstallOffer } from "./InstallOffer";
 import { RollingNumber } from "../../components/RollingNumber";
 import { CalendarIcon, MoonIcon, PersonIcon, SunIcon } from "../../components/LineIcons";
 import { flyToCart } from "../../app/motion";
-import type { DishPart, FeaturedTemplateId, MenuLanguage, Product, SelectedModifier } from "@zhaoyun/domain";
+import type { DishPart, FeaturedTemplateId, MenuLanguage, ModifierGroup, Product, SelectedModifier } from "@zhaoyun/domain";
 import type { NavLabels } from "@zhaoyun/contracts";
 import { allergenLabel } from "../../../../../src/allergens.js";
 import { restaurantApi } from "../../app/api";
@@ -284,6 +284,19 @@ function Deconstruction({ product, language, reduceMotion, showing }: { product:
  * text. "加面 +2,50" tells a guest what they can ask the waiter for without
  * pretending a tap here does anything.
  */
+/** How many of a group's options the guest has picked. */
+function groupCount(group: ModifierGroup, selected: SelectedModifier[]): number {
+  return selected.filter((modifier) => group.options.some((option) => option.id === modifier.id)).length;
+}
+
+/** The first group whose 必选/最少 floor is not met yet, if any — the server enforces the same. */
+function unmetGroup(product: Product, selected: SelectedModifier[]): ModifierGroup | undefined {
+  return (product.modifiers ?? []).find((group) => {
+    const min = Math.max(0, Math.trunc(Number(group.min) || 0));
+    return min > 0 && groupCount(group, selected) < min;
+  });
+}
+
 function DishOptions({ product, language, selected, onChange }: { product: Product; language: CustomerState["language"]; selected?: SelectedModifier[]; onChange?: (modifiers: SelectedModifier[]) => void }) {
   if (!product.modifiers?.length) return null;
   // The guest may order: the same options, to choose from — one of a "single"
@@ -294,12 +307,20 @@ function DishOptions({ product, language, selected, onChange }: { product: Produ
       const group = product.modifiers?.find((candidate) => candidate.id === groupId);
       const siblings = new Set(single ? group?.options.map((candidate) => candidate.id) : []);
       const rest = selected.filter((modifier) => modifier.id !== option.id && !siblings.has(modifier.id));
+      // 最多: a multi group at its cap ignores a new pick (an already-chosen one still toggles off).
+      if (!single && !chosen.has(option.id) && group) {
+        const max = Math.max(0, Math.trunc(Number(group.max) || 0));
+        if (max > 0 && groupCount(group, selected) >= max) return;
+      }
       onChange(chosen.has(option.id) ? rest : [...rest, { id: option.id, name: localized(option.names, language), priceCents: option.priceCents }]);
     };
     return <div className="dish-options choosing" onClick={(event) => event.stopPropagation()}>
       <p className="modifier-heading">{t(language, "customize")}</p>
-      {product.modifiers.map((group) => <fieldset className="dish-options-group" key={group.id}>
-        <legend>{localized(group.names, language)}</legend>
+      {product.modifiers.map((group) => {
+        const min = Math.max(0, Math.trunc(Number(group.min) || 0));
+        const max = group.selection === "multi" ? Math.max(0, Math.trunc(Number(group.max) || 0)) : 0;
+        return <fieldset className="dish-options-group" key={group.id}>
+        <legend>{localized(group.names, language)}{min > 0 && <em className="modifier-flag required">{g(language, "modRequired")}</em>}{max > 0 && <em className="modifier-flag">{g(language, "modMax", { n: max })}</em>}</legend>
         {group.options.map((option) => <label key={option.id} className={chosen.has(option.id) ? "on" : ""}>
           <input type={group.selection === "single" ? "radio" : "checkbox"} name={`${product.id}-${group.id}`} checked={chosen.has(option.id)}
             onChange={() => pick(group.id, option, group.selection === "single")} onClick={(event) => {
@@ -308,7 +329,8 @@ function DishOptions({ product, language, selected, onChange }: { product: Produ
             }} />
           <span>{localized(option.names, language)}{option.priceCents > 0 ? ` +${formatPrice(option.priceCents, language)}` : ""}</span>
         </label>)}
-      </fieldset>)}
+      </fieldset>;
+      })}
     </div>;
   }
   return <div className="dish-options">
@@ -345,8 +367,11 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
   const seconds = (value: number) => (reduceMotion ? 0 : value);
   const optionsCents = state.detailModifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);
   const lineCents = (product.priceCents + optionsCents) * state.detailQuantity;
+  // 必选: an order the server would reject (a required group left unpicked) is stopped here first.
+  const missing = ordering.open ? unmetGroup(product, state.detailModifiers) : undefined;
   function addToCart(event: React.MouseEvent) {
     event.stopPropagation();
+    if (missing) { dispatch({ type: "toast", message: g(state.language, "modComplete", { name: localized(missing.names, state.language) }) }); return; }
     dispatch({ type: "add-to-cart", productId: product.id, quantity: state.detailQuantity, modifiers: state.detailModifiers });
     dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
     dispatch({ type: "close-product" });
@@ -408,7 +433,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
                 <button type="button" aria-label="+" onClick={() => dispatch({ type: "detail-quantity", quantity: state.detailQuantity + 1 })}>+</button>
               </div>}
             </div>
-            {ordering.open && <button type="button" className="primary add-to-cart" onClick={addToCart}>{g(state.language, "addToCart")} · {formatPrice(lineCents, state.language)}</button>}
+            {ordering.open && <button type="button" className="primary add-to-cart" aria-disabled={Boolean(missing)} data-blocked={missing ? "true" : undefined} onClick={addToCart}>{missing ? g(state.language, "modComplete", { name: localized(missing.names, state.language) }) : `${g(state.language, "addToCart")} · ${formatPrice(lineCents, state.language)}`}</button>}
           </div>
         </section>
         <section className="detail-face detail-back" aria-label={t(state.language, "detailRegion")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
@@ -723,6 +748,8 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
               {ordering.open && <button type="button" className="quick-add" aria-label={`${g(state.language, "addToCart")}: ${productName(product, state.language)}`}
                 onClick={(event) => {
                   event.stopPropagation();
+                  // A 必选 group can't be answered from the list, so open the card to choose.
+                  if (unmetGroup(product, [])) { dispatch({ type: "open-product", productId: product.id }); return; }
                   flyToCart(event.currentTarget);
                   dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [] });
                   dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });

@@ -63,6 +63,25 @@ describe("Visual modifier editor", () => {
     expect(submitted(container)).toEqual([]);
   });
 
+  it("marks a group 必选 and caps a multi group's 最多", () => {
+    const { container, getByText, getByLabelText } = render(<ModifierFieldset product={null} />);
+
+    fireEvent.click(getByText("＋ 新建规格组"));
+    // 必选 on a single group → min 1, and no 最多 control (single is always 1).
+    fireEvent.click(getByLabelText("必选"));
+    expect(submitted(container)[0].min).toBe(1);
+    expect(container.querySelector(".modifier-max")).toBeNull();
+
+    // Switch to 多选, then set 最多 to 3.
+    fireEvent.click(getByText("多选"));
+    const max = container.querySelector(".modifier-max input") as HTMLInputElement;
+    fireEvent.change(max, { target: { value: "3" } });
+    const group = submitted(container)[0];
+    expect(group.selection).toBe("multi");
+    expect(group.min).toBe(1);
+    expect(group.max).toBe(3);
+  });
+
   it("imports valid JSON through the advanced box and rejects invalid JSON", () => {
     const { container, getByText } = render(<ModifierFieldset product={null} />);
     fireEvent.click(getByText("高级：直接编辑 JSON"));
