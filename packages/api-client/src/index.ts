@@ -1,7 +1,7 @@
 import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles, IconApp,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
@@ -579,6 +579,10 @@ export class PosApi {
   /** The receipt on the front printer again, marked as a copy (Belegkopie). */
   reprintReceipt(id: string): Promise<void> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/print`, { method: "POST" }); }
   voucher(code: string): Promise<{ voucher: ApiVoucher }> { return this.#request(`/api/admin/vouchers/${encodeURIComponent(code)}`); }
+  /** Look a member up by email or mobile number, to read their balance (会员储值) or top it up. */
+  member(login: string): Promise<ApiMemberLookup> { return this.#request(`/api/admin/members?login=${encodeURIComponent(login)}`); }
+  /** Put money into a member's balance: a top-up receipt (0% VAT), the principal and the house bonus credited. */
+  topUp(command: TopUpCommand): Promise<TopUpResult> { return this.#request("/api/admin/topup", { method: "POST", body: JSON.stringify(command) }); }
   settlement(staffId?: string): Promise<{ totals: PosSettlement["totals"] }> { return this.#request(`/api/pos/settlement${staffId ? `?staffId=${encodeURIComponent(staffId)}` : ""}`); }
   settle(staffId?: string): Promise<{ settlement: PosSettlement }> { return this.#request("/api/pos/settlement", { method: "POST", body: JSON.stringify(staffId ? { staffId } : {}) }); }
   drawer(): Promise<{ drawer: PosDrawer | null }> { return this.#request("/api/pos/drawer"); }

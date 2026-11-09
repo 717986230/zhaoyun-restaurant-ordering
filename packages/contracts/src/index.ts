@@ -48,7 +48,7 @@ export type GuestOrderRefusal =
 /** A guest's own account (shared/customer.mjs). */
 /** `emailVerified`: the address, as it is now, was proved by a code (shared/email-verify.mjs). */
 /** A guest's account. Signed up by mobile number: `phone` is set, and `email` holds the same number (how they sign in). */
-export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string }
+export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string; balanceCents?: number }
 /** `signupBonus`: signed up from a table's code, and the points for it given. */
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer; signupBonus?: boolean }
 /** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */
@@ -64,6 +64,17 @@ export type PointsKind = "welcome" | "no_show" | "no_show_back" | "signup" | "bo
 export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string; kind?: PointsKind }
 /** A member's code scanned at the counter: the guest, and whether this visit gave the first visit's bonus. */
 export interface ApiMemberVisit { customer: ApiCustomer; granted: boolean; welcomePoints: number; minPoints: number }
+/** A member looked up at the till by email or mobile number (GET /api/admin/members?login=): the guest with their balance. */
+export interface ApiMemberLookup { member: ApiCustomer }
+/** A top-up at the counter (POST /api/admin/topup): principal paid in, plus any bonus from the tiers. */
+export interface TopUpCommand {
+  clientRequestId?: string;
+  memberId: string;
+  amount: number;
+  payments: Array<{ type: "cash" | "card"; amount: number; tendered?: number }>;
+}
+/** The outcome of a top-up: the receipt booked, and the member's account as it now stands (`balanceCents` already includes the bonus). */
+export interface TopUpResult { receipt: ApiReceipt; member: ApiCustomer }
 /**
  * Everything the restaurant keeps about one guest's account, as they may ask
  * for it (GDPR Art. 15 and 20): machine-readable, in one file.
@@ -202,7 +213,7 @@ export interface ApiBill {
   printJobId?: string;
 }
 
-export type PaymentType = "cash" | "card" | "voucher";
+export type PaymentType = "cash" | "card" | "voucher" | "balance";
 
 /** A receipt of the register (shared/register.mjs). Amounts in cents. */
 export interface ApiReceipt {
@@ -212,7 +223,7 @@ export interface ApiReceipt {
   type: "sale" | "storno";
   table: string | null;
   lines: Array<{
-    kind: "item" | "voucher" | "discount";
+    kind: "item" | "voucher" | "discount" | "topup";
     names?: { zh: string; de: string; en: string };
     orderItemId?: string;
     code?: string;
@@ -222,11 +233,15 @@ export interface ApiReceipt {
     unitPriceCents: number;
     totalCents: number;
     vatSplit: Array<{ percent: number; cents: number }>;
+    /** On a `topup` line: the member credited, and the bonus added on top. */
+    memberId?: string;
+    memberName?: string;
+    bonusCents?: number;
   }>;
   vat: Array<{ percent: number; grossCents: number; netCents: number; vatCents: number }>;
   totalCents: number;
   /** `tipCents`: Trinkgeld paid with it, beside the amount and not in the total. */
-  payments: Array<{ type: PaymentType; amountCents: number; tenderedCents?: number; changeCents?: number; voucherCode?: string; tipCents?: number }>;
+  payments: Array<{ type: PaymentType; amountCents: number; tenderedCents?: number; changeCents?: number; voucherCode?: string; tipCents?: number; memberId?: string }>;
   refersTo: string | null;
   refersToNo: number | null;
   reason: string | null;
@@ -248,7 +263,7 @@ export interface CheckoutCommand {
   discountPercent?: number;
   items?: Array<{ orderItemId: string; quantity: number }>;
   vouchers?: Array<{ amount: number }>;
-  payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number }>;
+  payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number; memberId?: string }>;
 }
 
 export interface ApiVoucher { code: string; valueCents: number; balanceCents: number; voided: boolean; createdAt: string }
@@ -262,6 +277,8 @@ export interface ApiClosingTotals {
   vat: Array<{ percent: number; grossCents: number; netCents: number; vatCents: number }>;
   payments: Record<PaymentType, number>;
   vouchersSoldCents: number;
+  /** Top-ups sold over the days: the principal paid in, the booking of a multi-purpose voucher, not revenue. */
+  topUpsSoldCents?: number;
   discountCents?: number;
   cashCents: number;
   /** Trinkgeld per way paid: the staff's, not in the takings (absent on closings from before tips). */
