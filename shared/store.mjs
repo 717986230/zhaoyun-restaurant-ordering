@@ -67,7 +67,7 @@ const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 
 const PRODUCT_COLUMNS = [
   "id", "sku", "kind", "category", "name_zh", "name_de", "name_en", "description", "price_cents",
-  "allergens_json", "prep_time", "portion", "level", "ingredients", "art", "pattern", "available",
+  "allergens_json", "prep_time", "portion", "level", "ingredients", "art", "pattern", "tag_color", "available",
   "published", "sort_order", "print_station", "modifiers_json", "vat_percent", "bundle_items_json", "created_at", "updated_at"
 ];
 
@@ -79,7 +79,7 @@ export function productInsertParams(product, timestamp) {
     product.id, product.sku, product.kind, product.category, product.nameZh,
     product.nameDe, product.nameEn, product.description, product.priceCents,
     product.allergensJson, product.prepTime, product.portion, product.level,
-    product.ingredients, product.art, product.pattern, product.available,
+    product.ingredients, product.art, product.pattern, product.tagColor, product.available,
     product.published, product.sortOrder, product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, timestamp
   ];
 }
@@ -223,13 +223,13 @@ export function createStore(driver) {
       await run(
         `UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
            name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
-           portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, available = ?,
+           portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, tag_color = ?, available = ?,
            published = ?, sort_order = ?, print_station = ?, modifiers_json = ?,
            vat_percent = ?, bundle_items_json = ?, updated_at = ? WHERE id = ?`,
         product.sku, product.kind, product.category, product.nameZh, product.nameDe,
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
-        product.pattern, product.available, product.published, product.sortOrder,
+        product.pattern, product.tagColor, product.available, product.published, product.sortOrder,
         product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, product.id
       );
     } else {

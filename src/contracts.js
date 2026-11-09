@@ -130,6 +130,9 @@ export const ProductBody = Type.Object({
     art: Type.String({ maxLength: 400 }),
     pattern: Type.String({ maxLength: 32 })
   })),
+  // 颜色标签: a palette colour, or "" / null to follow the category colour.
+  // normalizeTagColor (shared/products.mjs) keeps only real palette values.
+  tagColor: Type.Optional(Type.Union([Type.String({ maxLength: 16 }), Type.Null()])),
   modifiers: Type.Optional(Type.Array(ModifierGroup, { maxItems: 16 })),
   // A combo: the existing dishes it packages, so it is otherwise a normal
   // product with its own name, price and photo, not a distinct product kind.

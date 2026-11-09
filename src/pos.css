@@ -193,7 +193,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-menu { display: grid; gap: 10px; min-width: 0; }
 .pos-number input { min-height: 56px; font-size: 22px; font-weight: 700; }
 .pos-categories { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
-.pos-categories button { flex: 0 0 auto; }
+.pos-categories button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; }
+/* A category's colour, so a waiter tells categories apart at a glance. */
+.pos-cat-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--p-line); flex: 0 0 auto; }
 
 .pos-dishes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 
@@ -201,6 +203,8 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   display: grid;
   align-content: start;
   gap: 4px;
+  /* The dish's category colour as a left stripe (inset, so it adds no width). */
+  box-shadow: inset 4px 0 0 var(--tag, transparent);
   min-height: 92px;
   padding: 10px;
   text-align: left;

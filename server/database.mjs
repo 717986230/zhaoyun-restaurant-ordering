@@ -49,6 +49,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       ingredients TEXT NOT NULL DEFAULT '',
       art TEXT NOT NULL DEFAULT '',
       pattern TEXT NOT NULL DEFAULT 'lines',
+      tag_color TEXT NOT NULL DEFAULT '',
       available INTEGER NOT NULL DEFAULT 1,
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
@@ -626,7 +627,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
     "ALTER TABLE orders ADD COLUMN billed_at TEXT",
     "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
-    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'"
+    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE products ADD COLUMN tag_color TEXT NOT NULL DEFAULT ''"
   ]) {
     try {
       db.exec(statement);
