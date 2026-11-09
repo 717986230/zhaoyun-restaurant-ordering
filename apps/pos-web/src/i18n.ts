@@ -260,6 +260,11 @@ const zh = {
   qrBadge: "扫码",
   pickupBadge: "线上自取",
   payNothing: "积分兑换，无需付款",
+  queuedOffline: "断网了：{count} 道菜已离线保存，联网后自动补发",
+  queueResent: "已补发 {table} 桌 {count} 道菜",
+  queueDropped: "{table} 桌 {count} 道菜补发被拒：{reason}",
+  queuePendingOne: "1 单菜等联网补发",
+  queuePendingMany: "{count} 单菜等联网补发",
 };
 
 type Copy = typeof zh;
@@ -518,6 +523,11 @@ const de: Copy = {
   qrBadge: "QR",
   pickupBadge: "Online",
   payNothing: "Prämie, nichts zu zahlen",
+  queuedOffline: "Offline: {count} Posten gespeichert, werden bei Verbindung automatisch gesendet",
+  queueResent: "Nachgesendet: Tisch {table}, {count} Posten",
+  queueDropped: "Tisch {table}, {count} Posten abgelehnt: {reason}",
+  queuePendingOne: "1 Bon wartet auf Verbindung",
+  queuePendingMany: "{count} Bons warten auf Verbindung",
 };
 
 const en: Copy = {
@@ -774,6 +784,11 @@ const en: Copy = {
   qrBadge: "QR",
   pickupBadge: "Online",
   payNothing: "Reward, nothing to pay",
+  queuedOffline: "Offline: {count} items saved, they send automatically once connected",
+  queueResent: "Resent table {table}: {count} items",
+  queueDropped: "Table {table}: {count} items rejected: {reason}",
+  queuePendingOne: "1 ticket waiting to send",
+  queuePendingMany: "{count} tickets waiting to send",
 };
 
 const copies: Record<PosLanguage, Copy> = { zh, de, en };
