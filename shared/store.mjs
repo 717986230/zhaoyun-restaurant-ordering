@@ -33,7 +33,7 @@ import { discoveredPrinterView, normalizeBridgeReport, normalizePrinter, PRINT_S
 import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
-  ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, receiptPrintPayload,
+  ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, planTopUp, receiptPrintPayload,
   receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
 } from "./register.mjs";
 import {
@@ -45,7 +45,10 @@ import {
   DELETE_ACCOUNT_SESSIONS_SQL, DELETE_EXPIRED_ACCOUNT_SESSIONS_SQL, INSERT_ACCOUNT_SESSION_SQL, MIGRATED_LOGIN, normalizeAccountName, normalizeLogin,
   normalizeRegistration, OWNER_ACCOUNT_SQL, REGISTER_ACCOUNT_SQL, storedPassword, UPDATE_ACCOUNT_SQL
 } from "./account.mjs";
-import { earnPointsStatements, isOverdrawn, refundPointsStatements, reversePointsStatements, welcomePointsStatements } from "./customer.mjs";
+import {
+  customerView, earnPointsStatements, isOverdrawn, refundBalanceStatements, refundPointsStatements, reverseBalanceStatements,
+  reversePointsStatements, spendBalanceStatements, topUpBalanceStatements, welcomePointsStatements
+} from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
 import { createDeliveryStore } from "./delivery-store.mjs";
 import {
@@ -534,13 +537,17 @@ export function createStore(driver) {
       const itemRows = ids.length ? await selectByIds(CHECKOUT_ITEMS_SQL, ids) : [];
       const codes = [...new Set((Array.isArray(input.payments) ? input.payments : []).filter((payment) => payment.type === "voucher").map((payment) => normalizeVoucherCode(payment.voucherCode)))];
       const voucherRows = codes.length ? await selectByIds("SELECT * FROM vouchers WHERE code IN (?)", codes) : [];
+      const memberIds = [...new Set((Array.isArray(input.payments) ? input.payments : []).filter((payment) => payment.type === "balance").map((payment) => String(payment.memberId ?? "")).filter(Boolean))];
+      const memberRows = memberIds.length
+        ? await selectByIds("SELECT customers.id, COALESCE((SELECT balance_cents FROM member_balances WHERE member_balances.customer_id = customers.id), 0) AS balance_cents FROM customers WHERE customers.id IN (?)", memberIds)
+        : [];
       // Another device's open table is theirs to pay, before anything else is looked at.
       const openTable = input.table || itemRows[0]?.table_no;
       // The console has no table of its own: one open on a POS is that POS's.
       if (openTable) assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(openTable).toUpperCase()), pos?.deviceId ?? null);
       const settings = await getSettings();
       const plan = planCheckout({ ...input, clientRequestId: requestId }, {
-        itemRows, voucherRows, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1, settings, role, staff: pos?.staff ?? null
+        itemRows, voucherRows, memberRows, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1, settings, role, staff: pos?.staff ?? null
       });
       const at = plan.receipt.createdAt;
       const view = plannedReceiptView(plan.receipt);
@@ -550,6 +557,8 @@ export function createStore(driver) {
         ...plan.receiptItems.map((item) => sql("INSERT INTO receipt_items (receipt_id, order_item_id, quantity) VALUES (?, ?, ?)", plan.receipt.id, item.orderItemId, item.quantity)),
         ...plan.vouchers.map((voucher) => sql(INSERT_VOUCHER_SQL, voucher.code, voucher.valueCents, voucher.valueCents, plan.receipt.id, at, at)),
         ...plan.voucherDebits.map((debit) => sql(DEBIT_VOUCHER_SQL, debit.amountCents, at, debit.code)),
+        // Members' stored value spent on this bill (shared/customer.mjs).
+        ...(spendBalanceStatements(plan.receipt.id, plan.balanceDebits, at)),
         ...(table ? [
           sql(SETTLE_PAID_TABLE_SQL, at, at, table, table),
           sql(UNLOCK_PAID_TABLE_SQL, at, table.toUpperCase(), table),
@@ -590,17 +599,72 @@ export function createStore(driver) {
       });
       const at = plan.receipt.createdAt;
       const view = plannedReceiptView(plan.receipt, original.receipt_no);
-      await batch([
-        sql(INSERT_RECEIPT_SQL, ...receiptRow(plan.receipt)),
-        ...plan.refunds.map((refund) => sql(CREDIT_VOUCHER_SQL, refund.amountCents, at, refund.code)),
-        ...plan.voided.map((code) => sql(VOID_VOUCHER_SQL, at, at, code)),
-        sql(REOPEN_ORDERS_SQL, at, original.id),
-        ...(reversePointsStatements(plan.receipt.id, original.id, at)),
-        printStatement(receiptPrintPayload(view, settings), at),
-        await journalStatement(last, "receipt.storno", plan.receipt.id, view, at)
-      ]);
+      try {
+        await batch([
+          sql(INSERT_RECEIPT_SQL, ...receiptRow(plan.receipt)),
+          ...plan.refunds.map((refund) => sql(CREDIT_VOUCHER_SQL, refund.amountCents, at, refund.code)),
+          ...plan.voided.map((code) => sql(VOID_VOUCHER_SQL, at, at, code)),
+          sql(REOPEN_ORDERS_SQL, at, original.id),
+          ...(reversePointsStatements(plan.receipt.id, original.id, at)),
+          // A bill paid from balances given back; a top-up's money and bonus taken back.
+          ...(refundBalanceStatements(plan.receipt.id, plan.balanceRefunds, at)),
+          ...(reverseBalanceStatements(plan.receipt.id, plan.balanceReversals, at)),
+          printStatement(receiptPrintPayload(view, settings), at),
+          await journalStatement(last, "receipt.storno", plan.receipt.id, view, at)
+        ]);
+      } catch (error) {
+        // The member spent the top-up before it was cancelled: their balance would go below zero.
+        if (isOverdrawn(error) && plan.balanceReversals.length) throw new Error("This top-up has been spent and cannot be cancelled");
+        throw error;
+      }
       return receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", plan.receipt.id));
     });
+  }
+
+  /**
+   * A member puts money in (会员储值充值): a top-up receipt (0% line, paid cash
+   * or card — planTopUp), the money and the house's bonus added to their
+   * balance, in one batch and in the journal, exactly as a sale is. Idempotent
+   * on clientRequestId, so a tap sent twice tops up once.
+   */
+  async function topUp(input, role, pos = null) {
+    const requestId = String(input.clientRequestId || uuid());
+    const existing = await first("SELECT * FROM receipts WHERE client_request_id = ?", requestId);
+    if (existing) return topUpResult(existing);
+    return retrying(async () => {
+      const last = await lastJournal();
+      const member = await first("SELECT * FROM customers WHERE id = ?", String(input.memberId ?? ""));
+      const settings = await getSettings();
+      const plan = planTopUp({ ...input, clientRequestId: requestId }, {
+        member, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1,
+        settings, membership: settings.membership, role, staff: pos?.staff ?? null
+      });
+      const at = plan.receipt.createdAt;
+      const view = plannedReceiptView(plan.receipt);
+      const statements = [
+        sql(INSERT_RECEIPT_SQL, ...receiptRow(plan.receipt)),
+        ...(topUpBalanceStatements(plan.credit.memberId, plan.credit.principalCents, plan.credit.bonusCents, plan.receipt.id, at)),
+        printStatement(receiptPrintPayload(view, settings), at),
+        await journalStatement(last, "receipt.issued", plan.receipt.id, view, at)
+      ];
+      try {
+        await batch(statements);
+      } catch (error) {
+        const committed = await first("SELECT * FROM receipts WHERE client_request_id = ?", requestId);
+        if (committed) return topUpResult(committed);
+        throw error;
+      }
+      return topUpResult(await first("SELECT * FROM receipts WHERE id = ?", plan.receipt.id), plan.credit.memberId);
+    });
+  }
+
+  /** A top-up's receipt, and the member's balance as it now stands. */
+  async function topUpResult(receiptRow, memberId = null) {
+    const id = memberId ?? parseJson(receiptRow.lines_json, [])[0]?.memberId;
+    const member = id
+      ? await first("SELECT customers.*, COALESCE((SELECT balance_cents FROM member_balances WHERE member_balances.customer_id = customers.id), 0) AS balance_cents FROM customers WHERE id = ?", String(id))
+      : null;
+    return { receipt: await receiptDetail(receiptRow), member: customerView(member) };
   }
 
   /** The day's closing (Z report) over the receipts since the last one. Null when there are none. */
@@ -1402,6 +1466,7 @@ export function createStore(driver) {
       return { ...bill, issuedAt: timestamp, printJobId: jobId };
     },
     checkout,
+    topUp,
     stornoReceipt,
     closeDay,
     exportJournal,

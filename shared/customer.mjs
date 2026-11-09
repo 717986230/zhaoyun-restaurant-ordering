@@ -36,10 +36,37 @@ import { checkMobile } from "./phone.mjs";
 export const CUSTOMER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const POINTS_REASONS = ["earn", "reverse", "redeem", "refund", "adjust"];
 
+/**
+ * The stored value a member keeps in the house (会员储值 / Guthaben). Its own
+ * ledger (balance_ledger) and a balance (customers.balance_cents) written
+ * together, the way points are, with a CHECK of its own (balance_cents >= 0)
+ * so two bills spending the same balance at once cannot both succeed.
+ *
+ * In Austria a top-up is the sale of a multi-purpose voucher (Mehrzweck-
+ * gutschein): the money is taken at 0% and no tax is due until it is spent on
+ * food or drink — exactly as a value voucher (shared/register.mjs, planCheckout).
+ * So a top-up is a receipt of its own with a 0% line, paid cash or card, and
+ * `balance` is a way to pay a later bill, beside cash, card and voucher.
+ *
+ *  - topup:   the money a member puts in, on a top-up receipt;
+ *  - bonus:   what the house adds on top (充值赠送), not paid for and not taxed;
+ *  - spend:   a bill settled from the balance (a `balance` payment);
+ *  - refund:  that bill cancelled (storno), the balance given back;
+ *  - reverse: a top-up cancelled (storno), the money and bonus taken back;
+ *  - adjust:  the manager, by hand, with a note.
+ */
+export const BALANCE_REASONS = ["topup", "bonus", "spend", "refund", "adjust", "reverse"];
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_MAX = 40;
 const MAX_REWARDS = 30;
 const MAX_POINTS = 1_000_000;
+/** A single top-up is at most this much, as a value voucher is (shared/register.mjs). */
+export const MAX_TOPUP_CENTS = 100_000;
+/** A manager's hand-change of a balance is at most this much either way. */
+const MAX_BALANCE_CENTS = 1_000_000;
+/** At most this many top-up tiers, and a tier's bonus is at most a whole top-up. */
+const MAX_TOPUP_TIERS = 20;
 
 /** An email, compared without case. */
 export function normalizeEmail(value) {
@@ -81,7 +108,7 @@ export function normalizeCustomerRegistration(input) {
 /** A guest as they see themselves, and as the console lists them: never the hash. */
 export function customerView(row) {
   return row ? {
-    id: row.id, email: row.email, name: row.name, points: row.points, createdAt: row.created_at,
+    id: row.id, email: row.email, name: row.name, points: row.points, balanceCents: row.balance_cents ?? 0, createdAt: row.created_at,
     // Signed up with a mobile number: `email` is that number too, for the lists that show who it is.
     ...(isPhoneLogin(row.email) ? { phone: row.email } : {}),
     ...(row.email_verified !== undefined ? { emailVerified: Boolean(row.email_verified) } : {})
@@ -146,6 +173,57 @@ export function rewardPrices(loyalty) {
   return loyalty?.enabled ? new Map(loyalty.rewards.map((reward) => [reward.productId, reward.points])) : null;
 }
 
+/**
+ * The membership top-up programme as the owner sets it (app_settings
+ * "membership"). Off until switched on. `tiers` give a bonus for a top-up of
+ * at least so much (充 100 送 10): the most generous tier a top-up reaches is
+ * the one that applies, so they are kept sorted and the amounts are whole
+ * cents. The bonus is the house's gift, not money the member pays.
+ */
+export const MEMBERSHIP_DEFAULTS = Object.freeze({ enabled: false, tiers: [] });
+
+export function normalizeMembership(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Membership settings must be an object");
+  const known = new Set(Object.keys(MEMBERSHIP_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown membership setting ${key}`);
+  const merged = { ...MEMBERSHIP_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Membership enabled must be true or false");
+  if (!Array.isArray(merged.tiers) || merged.tiers.length > MAX_TOPUP_TIERS) throw new Error(`At most ${MAX_TOPUP_TIERS} top-up tiers`);
+  const seen = new Set();
+  const tiers = merged.tiers.map((tier) => {
+    const thresholdCents = Number(tier?.thresholdCents);
+    const bonusCents = Number(tier?.bonusCents);
+    if (!Number.isInteger(thresholdCents) || thresholdCents < 1 || thresholdCents > MAX_TOPUP_CENTS) throw new Error("A tier's top-up is 1 cent to 1000 euros");
+    if (!Number.isInteger(bonusCents) || bonusCents < 0 || bonusCents > MAX_TOPUP_CENTS) throw new Error("A tier's bonus is 0 to 1000 euros");
+    if (seen.has(thresholdCents)) throw new Error("A top-up amount is a tier once");
+    seen.add(thresholdCents);
+    return { thresholdCents, bonusCents };
+  }).sort((left, right) => left.thresholdCents - right.thresholdCents);
+  return { enabled: merged.enabled, tiers };
+}
+
+/** The bonus a top-up of `amountCents` earns: the most generous tier it reaches, or none. */
+export function bonusForTopUp(membership, amountCents) {
+  if (!membership?.enabled || !Array.isArray(membership.tiers)) return 0;
+  let bonus = 0;
+  for (const tier of membership.tiers) if (amountCents >= tier.thresholdCents) bonus = tier.bonusCents;
+  return bonus;
+}
+
+/** A balance ledger line as a member sees it, and as the console lists it. */
+export function balanceEntryView(row) {
+  return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, createdAt: row.created_at };
+}
+
+/** A manager's change of a member's balance: cents, not zero, and a note. */
+export function normalizeBalanceAdjustment(input) {
+  const deltaCents = Math.round(Number(input?.amount) * 100);
+  if (!Number.isInteger(deltaCents) || deltaCents === 0 || Math.abs(deltaCents) > MAX_BALANCE_CENTS) throw new Error("A change of balance is an amount, not zero");
+  const note = String(input?.note ?? "").trim().replace(/\s+/g, " ");
+  if (!note || note.length > 120) throw new Error("Say why the balance changes (1–120 characters)");
+  return { deltaCents, note };
+}
+
 /** A manager's change of a guest's points: a whole number, not zero, and a note. */
 export function normalizePointsAdjustment(input) {
   const delta = Number(input?.delta);
@@ -163,8 +241,10 @@ export function isOverdrawn(error) {
 /** Whether the account's address, as it is now, was proved by a code (shared/email-verify.mjs). */
 const EMAIL_VERIFIED_COLUMN = `(SELECT 1 FROM customer_verified_emails AS verified
     WHERE verified.customer_id = customers.id AND verified.email = customers.email) AS email_verified`;
-export const CUSTOMER_BY_EMAIL_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN} FROM customers WHERE email = ?`;
-export const CUSTOMER_BY_ID_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN} FROM customers WHERE id = ?`;
+/** The member's stored value, read beside the account (shared/customer.mjs). Zero when they have no row yet. */
+const BALANCE_COLUMN = `COALESCE((SELECT balance_cents FROM member_balances WHERE member_balances.customer_id = customers.id), 0) AS balance_cents`;
+export const CUSTOMER_BY_EMAIL_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE email = ?`;
+export const CUSTOMER_BY_ID_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE id = ?`;
 export const INSERT_CUSTOMER_SQL = `INSERT INTO customers (id, email, name, password_hash, password_salt, password_iterations, points, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`;
 export const UPDATE_CUSTOMER_SQL = "UPDATE customers SET name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = ? WHERE id = ?";
@@ -175,6 +255,9 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   `UPDATE reservations SET customer_id = NULL, name = '', phone = '', email = '', notes = '', token_hash = NULL,
      status = CASE WHEN status IN ('pending', 'confirmed') THEN 'cancelled' ELSE status END WHERE customer_id = ?`,
   "DELETE FROM points_ledger WHERE customer_id = ?",
+  // Their balance goes with them (GDPR erasure): any money left is written off, not kept.
+  "DELETE FROM balance_ledger WHERE customer_id = ?",
+  "DELETE FROM member_balances WHERE customer_id = ?",
   "DELETE FROM customer_favorites WHERE customer_id = ?",
   "DELETE FROM customer_sessions WHERE customer_id = ?",
   "DELETE FROM email_codes WHERE customer_id = ?",
@@ -182,12 +265,12 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   "DELETE FROM customers WHERE id = ?"
 ];
 /** The console's list: newest first, or those whose email or name holds the search. */
-export const SEARCH_CUSTOMERS_SQL = `SELECT * FROM customers
+export const SEARCH_CUSTOMERS_SQL = `SELECT customers.*, ${BALANCE_COLUMN} FROM customers
   WHERE (? = '' OR email LIKE '%' || ? || '%' OR name LIKE '%' || ? || '%')
   ORDER BY created_at DESC LIMIT ?`;
 
 export const INSERT_CUSTOMER_SESSION_SQL = "INSERT INTO customer_sessions (token_hash, customer_id, expires_at, created_at) VALUES (?, ?, ?, ?)";
-export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*, ${EMAIL_VERIFIED_COLUMN}
+export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN}
   FROM customer_sessions JOIN customers ON customers.id = customer_sessions.customer_id
   WHERE customer_sessions.token_hash = ?`;
 export const DELETE_CUSTOMER_SESSION_SQL = "DELETE FROM customer_sessions WHERE token_hash = ?";
@@ -203,6 +286,27 @@ export const POINTS_HISTORY_SQL = "SELECT * FROM points_ledger WHERE customer_id
 export const INSERT_POINTS_SQL = "INSERT INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
 /** Fails the write (CHECK points >= 0) when the guest has fewer points than it takes. */
 export const CHANGE_POINTS_SQL = "UPDATE customers SET points = points + ?, updated_at = ? WHERE id = ?";
+
+export const BALANCE_HISTORY_SQL = "SELECT * FROM balance_ledger WHERE customer_id = ? ORDER BY created_at DESC, id DESC LIMIT ?";
+export const INSERT_BALANCE_SQL = "INSERT INTO balance_ledger (id, customer_id, delta_cents, reason, ref, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+/** A member's balance row, made the first time they have one (starts at zero). Parameters: customer id, at. */
+export const ENSURE_BALANCE_SQL = "INSERT OR IGNORE INTO member_balances (customer_id, balance_cents, updated_at) VALUES (?, 0, ?)";
+/**
+ * Moves a member's balance by `delta`. Run after ENSURE_BALANCE_SQL in the
+ * same batch, so the row is there. Fails the write (CHECK balance_cents >= 0)
+ * when a spend or a take-back would leave less than nothing — a top-up
+ * already spent cannot be reversed, and a bill cannot spend what is not there.
+ * Parameters: delta, at, customer id.
+ */
+export const CHANGE_BALANCE_SQL = "UPDATE member_balances SET balance_cents = balance_cents + ?, updated_at = ? WHERE customer_id = ?";
+
+/** Makes the member's row if need be, then moves it: the pair every balance change runs. */
+export function changeBalanceStatements(memberId, delta, at) {
+  return [
+    [ENSURE_BALANCE_SQL, [memberId, at]],
+    [CHANGE_BALANCE_SQL, [delta, at, memberId]]
+  ];
+}
 
 /**
  * Points for a paid receipt, run after its receipt_items in the same
@@ -383,4 +487,43 @@ export function refundPointsStatements(orderId, at) {
     [REFUND_POINTS_SQL, [at, orderId]],
     [APPLY_POINTS_SQL, applyPointsParams(orderId, "refund", at)]
   ];
+}
+
+// ——— Stored value: what a top-up, a bill or a storno adds to its own batch.
+
+/** A top-up receipt: the money in, and the house's bonus on top, added to the member's balance. */
+export function topUpBalanceStatements(memberId, principalCents, bonusCents, receiptId, at) {
+  const statements = [
+    [INSERT_BALANCE_SQL, [`topup-${receiptId}`, memberId, principalCents, "topup", receiptId, "", at]],
+    ...changeBalanceStatements(memberId, principalCents, at)
+  ];
+  if (bonusCents) statements.push(
+    [INSERT_BALANCE_SQL, [`bonus-${receiptId}`, memberId, bonusCents, "bonus", receiptId, "", at]],
+    ...changeBalanceStatements(memberId, bonusCents, at)
+  );
+  return statements;
+}
+
+/** A bill settled from balances: each member's share taken, or the batch refused (CHECK >= 0). */
+export function spendBalanceStatements(receiptId, debits, at) {
+  return debits.flatMap((debit, index) => [
+    [INSERT_BALANCE_SQL, [`spend-${receiptId}-${index}`, debit.memberId, -debit.amountCents, "spend", receiptId, "", at]],
+    ...changeBalanceStatements(debit.memberId, -debit.amountCents, at)
+  ]);
+}
+
+/** That bill cancelled: each member's share given back. */
+export function refundBalanceStatements(stornoId, refunds, at) {
+  return refunds.flatMap((refund, index) => [
+    [INSERT_BALANCE_SQL, [`refund-${stornoId}-${index}`, refund.memberId, refund.amountCents, "refund", stornoId, "", at]],
+    ...changeBalanceStatements(refund.memberId, refund.amountCents, at)
+  ]);
+}
+
+/** A top-up cancelled: the money and its bonus taken back, or the batch refused if already spent. */
+export function reverseBalanceStatements(stornoId, reversals, at) {
+  return reversals.flatMap((reversal, index) => [
+    [INSERT_BALANCE_SQL, [`reverse-${stornoId}-${index}`, reversal.memberId, -reversal.amountCents, "reverse", stornoId, "", at]],
+    ...changeBalanceStatements(reversal.memberId, -reversal.amountCents, at)
+  ]);
 }
