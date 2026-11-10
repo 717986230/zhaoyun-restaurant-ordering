@@ -244,6 +244,12 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-move-other { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
 .pos-move-other input { min-height: 48px; }
 .pos-move .pos-modal-actions { grid-template-columns: 1fr; }
+.pos-move-grid button.pos-seat-booked { display: grid; gap: 2px; border-color: var(--p-accent); color: var(--p-accent); }
+.pos-move-grid button.pos-seat-booked small { font-size: 11px; font-weight: 600; }
+
+.pos-stock-form { display: grid; gap: 12px; }
+.pos-stock-form input { min-height: 52px; font-size: 22px; text-align: center; }
+.pos-stock-form .pos-primary { min-height: 52px; font-size: 18px; }
 
 .pos-pay-screen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
 .pos-pay-lines { display: grid; gap: 10px; min-width: 0; }

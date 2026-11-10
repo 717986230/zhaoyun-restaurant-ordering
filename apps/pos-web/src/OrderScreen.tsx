@@ -36,6 +36,8 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const [busy, setBusy] = useState(false);
   // 转桌: the destination picker — free tables to tap, instead of typing a number blind.
   const [moving, setMoving] = useState(false);
+  // 限量: the dish whose "how many left today" is being set.
+  const [stockFor, setStockFor] = useState<Product | null>(null);
   // On a phone the ticket is a bottom sheet: collapsed to a summary bar while
   // the dishes fill the screen, tapped up to see and change the whole order.
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -86,12 +88,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     return product.modifiers?.length ? setChoosing(product) : add(product);
   };
 
-  /** "How many are left today?": a number, or nothing for no limit today. */
-  async function askStock(product: Product) {
-    const answer = window.prompt(t("stockPrompt", { name: name(product) }), product.leftToday === null || product.leftToday === undefined ? "" : String(product.leftToday));
-    if (answer === null) return;
-    const trimmed = answer.trim();
-    const leftToday = trimmed === "" ? null : Number(trimmed);
+  /** "How many are left today?": a number, or null for no limit today. */
+  async function askStock(product: Product, leftToday: number | null) {
+    setStockFor(null);
     if (leftToday !== null && (!Number.isInteger(leftToday) || leftToday < 0 || leftToday > 9999)) return pos.notify(t("stockInvalid"), "error");
     try {
       await api.setStock(product.id, { leftToday });
@@ -267,7 +266,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         return <button key={product.id} type="button" data-sku={product.sku}
           style={{ "--tag": product.tagColor || catColor(product.category) } as CSSProperties}
           className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
-          onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? askStock(product) : pick(product))}>
+          onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? setStockFor(product) : pick(product))}>
           <small>{product.sku}</small>
           <b>{name(product)}</b>
           <span>{!product.available ? t("soldOut") : left === 0 ? t("stockOut") : money(product.priceCents)}</span>
@@ -278,6 +277,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     </div>
 
     {moving && <MoveDialog pos={pos} from={table} onCancel={() => setMoving(false)} onMove={(to) => void move(to)} />}
+    {stockFor && <StockDialog pos={pos} product={stockFor} onCancel={() => setStockFor(null)} onSet={(leftToday) => void askStock(stockFor, leftToday)} />}
     {voiding && <VoidDialog pos={pos} item={voiding} onCancel={() => setVoiding(null)} onVoid={(quantity, reason) => void voidLine(voiding, quantity, reason)} />}
     {choosing && <ModifierPicker pos={pos} product={choosing} onCancel={() => setChoosing(null)} onAdd={(modifiers) => { add(choosing, modifiers); setChoosing(null); }} />}
   </section>;
@@ -336,6 +336,25 @@ function MoveDialog({ pos, from, onMove, onCancel }: { pos: Pos; from: string; o
         <button type="button" onClick={onCancel}>{t("cancel")}</button>
       </div>
     </div>
+  </div>;
+}
+
+/** 限量: how many portions of a dish are left today — a number, or "no limit". */
+function StockDialog({ pos, product, onSet, onCancel }: { pos: Pos; product: Product; onSet: (leftToday: number | null) => void; onCancel: () => void }) {
+  const { t, language } = pos;
+  const current = product.leftToday === null || product.leftToday === undefined ? "" : String(product.leftToday);
+  const [value, setValue] = useState(current);
+  const name = product.names[language] || product.names.zh || product.names.de;
+  return <div className="pos-modal" role="dialog" aria-label={t("stockMode")}>
+    <form className="pos-card pos-stock-form" onSubmit={(event) => { event.preventDefault(); const text = value.trim(); onSet(text === "" ? null : Number(text)); }}>
+      <h2>{t("stockTitle", { name })}</h2>
+      <input inputMode="numeric" autoFocus value={value} maxLength={4} placeholder={t("stockUnlimited")} aria-label={t("stockTitle", { name })} onChange={(event) => setValue(event.target.value.replace(/[^0-9]/g, ""))} />
+      <div className="pos-modal-actions">
+        <button type="button" onClick={onCancel}>{t("cancel")}</button>
+        <button type="button" onClick={() => onSet(null)}>{t("stockNoLimit")}</button>
+      </div>
+      <button type="submit" className="pos-primary">{t("stockSave")}</button>
+    </form>
   </div>;
 }
 
