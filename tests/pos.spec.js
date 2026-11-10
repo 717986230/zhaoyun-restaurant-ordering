@@ -229,11 +229,14 @@ test("a booking is checked in at the door by its number: seated at its table, or
   await scanner.locator("#posScanReference").press("Enter");
   await expect(toast).toHaveText("今天没有这个预约：ZZZZ99");
 
-  // No table booked: the waiter is asked for one.
-  page.once("dialog", (dialog) => dialog.accept("8"));
+  // No table booked: the waiter is shown the free tables (or types one) to seat them at.
   await page.locator("#posScanBooking").click();
   await scanner.locator("#posScanReference").fill(`ZYRES:${novak.reference}`);
   await scanner.locator("#posScanReference").press("Enter");
+  const seat = page.getByRole("dialog", { name: /入座到哪张桌/ });
+  await expect(seat).toBeVisible();
+  await seat.locator(".pos-move-other input").fill("8");
+  await seat.getByRole("button", { name: "入座", exact: true }).click();
   await expect(toast).toHaveText("已核销：Novak · 2 位 · 桌 8");
   await expect(bookings.locator(`[data-booking="${novak.reference}"]`)).toHaveAttribute("data-status", "seated");
 
