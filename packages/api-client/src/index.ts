@@ -34,6 +34,7 @@ export function toProduct(product: ApiCatalogProduct): Product {
     available: product.available ?? true,
     published: product.published ?? true,
     printStation: product.printStation ?? (product.kind === "drink" ? "bar" : product.kind === "sushi" ? "sushi" : "kitchen"),
+    printPrinterId: product.printPrinterId ?? null,
     dailyLimit: product.dailyLimit ?? null,
     leftToday: product.leftToday ?? null
   };
@@ -132,6 +133,8 @@ export interface AdminProductInput {
   allergens: string[];
   vatPercent?: VatPercent;
   printStation: "kitchen" | "bar" | "sushi" | "front";
+  /** 指定出单打印机: a printer id this dish prints on, over its station; null/"" routes by station. */
+  printPrinterId?: string | null;
   available: boolean;
   published: boolean;
   /** 颜色标签: a palette colour (src/tag-colors.js) or null/"" to follow the category colour. */

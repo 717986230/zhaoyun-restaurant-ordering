@@ -60,6 +60,9 @@ export interface Product {
   available: boolean;
   published: boolean;
   printStation: PrintStation;
+  /** 指定出单打印机: the id of one printer (a PrinterProfile) this dish prints
+   *  on, over the printers of its station; null/absent routes by station. */
+  printPrinterId?: string | null;
   /** 每日限量: the portions each day starts with, and what is left today; null for no limit. */
   dailyLimit?: number | null;
   leftToday?: number | null;

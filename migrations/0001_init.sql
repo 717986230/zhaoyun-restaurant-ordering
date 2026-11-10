@@ -23,6 +23,7 @@ CREATE TABLE products (
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
+      print_printer_id TEXT NOT NULL DEFAULT '',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10,
       bundle_items_json TEXT NOT NULL DEFAULT '[]',

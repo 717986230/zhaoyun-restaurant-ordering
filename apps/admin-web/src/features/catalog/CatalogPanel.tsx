@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import { ALLERGENS } from "../../../../../src/allergens.js";
 import { TAG_COLORS } from "../../../../../src/tag-colors.js";
-import type { BundleItem, ModifierGroup, Product, ProductMedia, VatPercent } from "@zhaoyun/domain";
+import type { BundleItem, ModifierGroup, PrinterProfile, Product, ProductMedia, VatPercent } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
 import { formatMoney, useI18n } from "../../app/i18n";
@@ -10,6 +10,8 @@ import type { AdminLanguage, Translate } from "../../app/i18n";
 
 interface Props {
   products: Product[];
+  /** The configured printers, so a dish can be pinned to one by name. */
+  printers: PrinterProfile[];
   editing: Product | null;
   filter: ProductFilter;
   mediaUrl: (path: string) => string;
@@ -28,6 +30,32 @@ interface Props {
 }
 
 function readText(form: FormData, name: string): string { return String(form.get(name) || "").trim(); }
+
+/**
+ * The "print to" control holds either a station (`station:<role>`) or one
+ * printer (`printer:<id>`). A pinned printer sets the dish's station to that
+ * printer's own, so the right print bridge still claims the ticket; a printer
+ * that has since vanished falls back to routing by station.
+ */
+function readPrintTarget(form: FormData, printers: PrinterProfile[], current: Product | null): { printStation: AdminProductInput["printStation"]; printPrinterId: string | null } {
+  const value = readText(form, "printTarget");
+  if (value.startsWith("printer:")) {
+    const id = value.slice("printer:".length);
+    const printer = printers.find((entry) => entry.id === id);
+    if (printer) return { printStation: printer.role, printPrinterId: printer.id };
+  }
+  const station = (value.startsWith("station:") ? value.slice("station:".length) : value) as AdminProductInput["printStation"];
+  // With no printers to choose from, the control cannot show a pin the dish
+  // already has, so a station choice here must not silently drop it.
+  if (!printers.length && current?.printPrinterId) return { printStation: current.printStation, printPrinterId: current.printPrinterId };
+  return { printStation: station, printPrinterId: null };
+}
+
+/** The control's current value for a dish: its pinned printer if still configured, else its station. */
+function printTargetValue(product: Product | null, printers: PrinterProfile[]): string {
+  const pinned = product?.printPrinterId && printers.some((entry) => entry.id === product.printPrinterId);
+  return pinned ? `printer:${product!.printPrinterId}` : `station:${product?.printStation ?? "kitchen"}`;
+}
 
 function isModifierGroup(value: unknown): value is ModifierGroup {
   if (!value || typeof value !== "object") return false;
@@ -202,6 +230,7 @@ function productToInput(product: Product): AdminProductInput {
     allergens: [...product.allergens],
     vatPercent: product.vatPercent,
     printStation: product.printStation,
+    printPrinterId: product.printPrinterId ?? null,
     available: product.available,
     published: product.published,
     tagColor: product.tagColor ?? null,
@@ -233,6 +262,7 @@ export function CatalogPanel(props: Props) {
   const stationOptions: Array<[AdminProductInput["printStation"], string]> = [
     ["kitchen", t("stationKitchen")], ["bar", t("stationBar")], ["sushi", t("stationSushi")], ["front", t("stationFront")]
   ];
+  const stationLabel = new Map(stationOptions);
 
   function open(product: Product | null) {
     props.onEdit(product);
@@ -305,7 +335,7 @@ export function CatalogPanel(props: Props) {
       ...(data.get("vatPercent") ? { vatPercent: Number(data.get("vatPercent")) as VatPercent } : {}),
       modifiers,
       bundleItems: readBundleItems(data),
-      printStation: readText(data, "printStation") as AdminProductInput["printStation"],
+      ...readPrintTarget(data, props.printers, props.editing),
       available: data.get("available") === "on",
       published: data.get("published") === "on",
       tagColor: readText(data, "tagColor")
@@ -366,7 +396,10 @@ export function CatalogPanel(props: Props) {
         <summary>{t("advanced")}</summary>
         <div className="field-grid three">
           <label><span>{t("fieldSku")}</span><input name="sku" defaultValue={product?.sku ?? ""} placeholder={t("fieldSkuHint")} /></label>
-          <label><span>{t("fieldStation")}</span><select name="printStation" defaultValue={product?.printStation ?? "kitchen"}>{stationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label><span>{t("fieldPrintTarget")}</span><select name="printTarget" defaultValue={printTargetValue(product, props.printers)}>
+            <optgroup label={t("printTargetByStation")}>{stationOptions.map(([value, label]) => <option key={value} value={`station:${value}`}>{label}</option>)}</optgroup>
+            {props.printers.length > 0 && <optgroup label={t("printTargetPrinter")}>{props.printers.map((printer) => <option key={printer.id} value={`printer:${printer.id}`}>{printer.name} · {stationLabel.get(printer.role) ?? printer.role}{printer.enabled ? "" : ` (${t("printerDisabledHint")})`}</option>)}</optgroup>}
+          </select></label>
         </div>
         <label><span>{t("fieldModifiers")}</span><textarea name="modifiers" rows={8} spellCheck={false} defaultValue={JSON.stringify(product?.modifiers ?? [], null, 2)} placeholder={'[{"id":"spice","names":{"zh":"辣度","de":"Scharf","en":"Spice"},"selection":"single","options":[]}]'} /><small>{t("fieldModifiersHint")}</small></label>
       </details>

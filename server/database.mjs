@@ -54,6 +54,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
+      print_printer_id TEXT NOT NULL DEFAULT '',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10,
       bundle_items_json TEXT NOT NULL DEFAULT '[]',
@@ -628,7 +629,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE orders ADD COLUMN billed_at TEXT",
     "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
     "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'",
-    "ALTER TABLE products ADD COLUMN tag_color TEXT NOT NULL DEFAULT ''"
+    "ALTER TABLE products ADD COLUMN tag_color TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE products ADD COLUMN print_printer_id TEXT NOT NULL DEFAULT ''"
   ]) {
     try {
       db.exec(statement);
