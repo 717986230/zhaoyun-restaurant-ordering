@@ -34,6 +34,8 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // 限量: tapping a dish asks how many portions are left today instead of adding it.
   const [stockMode, setStockMode] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 转桌: the destination picker — free tables to tap, instead of typing a number blind.
+  const [moving, setMoving] = useState(false);
   // On a phone the ticket is a bottom sheet: collapsed to a summary bar while
   // the dishes fill the screen, tapped up to see and change the whole order.
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -173,12 +175,13 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       pos.notify(t(session ? "guestOrderingOpened" : "guestOrderingClosed", { table }));
     } catch (error) { pos.failed(error); }
   }
-  async function move() {
-    const to = window.prompt(t("moveTo"))?.trim().toUpperCase();
-    if (!to) return;
+  async function move(to: string) {
+    const target = to.trim().toUpperCase();
+    if (!target) return;
+    setMoving(false);
     try {
-      await api.move(table, to);
-      pos.notify(t("moved", { to }));
+      await api.move(table, target);
+      pos.notify(t("moved", { to: target }));
       go({ name: "floor" });
     } catch (error) { pos.failed(error); }
   }
@@ -222,7 +225,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         <button type="button" className="pos-primary" disabled={!cart.length || busy} onClick={() => void send()}>{t("sendKitchen")}</button>
         <button type="button" disabled={!bill?.items.length} onClick={() => void printBill()}>{t("printBill")}</button>
         <button type="button" className="pos-pay" disabled={!bill?.items.length} onClick={() => leave({ name: "pay", table })}>{t("pay")}</button>
-        {!pickupNo && <button type="button" disabled={!bill?.items.length} onClick={() => void move()}>{t("moveTable")}</button>}
+        {!pickupNo && <button type="button" disabled={!bill?.items.length} onClick={() => setMoving(true)}>{t("moveTable")}</button>}
         {!pickupNo && !/^TA-/i.test(table) && <button type="button" className={orderingUntil ? "pos-on" : ""} onClick={() => void toggleGuestOrdering()}>
           {orderingUntil ? t("guestOrderingClose") : t("guestOrderingOpen")}
         </button>}
@@ -274,6 +277,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       })}</div>
     </div>
 
+    {moving && <MoveDialog pos={pos} from={table} onCancel={() => setMoving(false)} onMove={(to) => void move(to)} />}
     {voiding && <VoidDialog pos={pos} item={voiding} onCancel={() => setVoiding(null)} onVoid={(quantity, reason) => void voidLine(voiding, quantity, reason)} />}
     {choosing && <ModifierPicker pos={pos} product={choosing} onCancel={() => setChoosing(null)} onAdd={(modifiers) => { add(choosing, modifiers); setChoosing(null); }} />}
   </section>;
@@ -300,6 +304,38 @@ function VoidDialog({ pos, item, onVoid, onCancel }: { pos: Pos; item: ApiBill["
         <button type="submit" className="pos-primary pos-danger" disabled={!reason.trim()}>{t("voidConfirm")}</button>
       </div>
     </form>
+  </div>;
+}
+
+/**
+ * 转桌: where to move the open table. The free tables are laid out to tap — no
+ * typing a number blind during service — with a text box for anything else
+ * (a table not shown, or merging onto one in use).
+ */
+function MoveDialog({ pos, from, onMove, onCancel }: { pos: Pos; from: string; onMove: (to: string) => void; onCancel: () => void }) {
+  const { t } = pos;
+  const [tables, setTables] = useState<{ table: string; state: string; total: number }[] | null>(null);
+  const [other, setOther] = useState("");
+  useEffect(() => {
+    api.floor().then((floor) => setTables(floor.tables)).catch(() => setTables([]));
+  }, []);
+  const up = from.toUpperCase();
+  const room = (tables ?? []).filter((entry) => !/^TA-/i.test(entry.table) && entry.table.toUpperCase() !== up);
+  const free = room.filter((entry) => entry.state === "free");
+  return <div className="pos-modal" role="dialog" aria-label={t("moveTitle", { from })}>
+    <div className="pos-card pos-move">
+      <h2>{t("moveTitle", { from })}</h2>
+      {tables === null ? <p className="pos-muted">{t("moveLoading")}</p>
+        : free.length ? <div className="pos-move-grid">{free.map((entry) => <button key={entry.table} type="button" onClick={() => onMove(entry.table)}>{entry.table}</button>)}</div>
+          : <p className="pos-muted">{t("moveNoFree")}</p>}
+      <form className="pos-move-other" onSubmit={(event) => { event.preventDefault(); if (other.trim()) onMove(other); }}>
+        <input value={other} maxLength={8} autoCapitalize="characters" placeholder={t("moveOther")} aria-label={t("moveOther")} onChange={(event) => setOther(event.target.value)} />
+        <button type="submit" disabled={!other.trim()}>{t("moveGo")}</button>
+      </form>
+      <div className="pos-modal-actions">
+        <button type="button" onClick={onCancel}>{t("cancel")}</button>
+      </div>
+    </div>
   </div>;
 }
 
