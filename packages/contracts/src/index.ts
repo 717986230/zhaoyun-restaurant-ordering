@@ -62,6 +62,9 @@ export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
  */
 export type PointsKind = "welcome" | "no_show" | "no_show_back" | "signup" | "booking" | "booking_back";
 export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string; kind?: PointsKind }
+/** A line in a member's stored-value ledger (shared/customer.mjs, balanceEntryView). */
+export type BalanceReason = "topup" | "bonus" | "spend" | "refund" | "adjust" | "reverse";
+export interface ApiBalanceEntry { id: string; deltaCents: number; reason: BalanceReason; ref: string | null; note: string; createdAt: string }
 /** A member's code scanned at the counter: the guest, and whether this visit gave the first visit's bonus. */
 export interface ApiMemberVisit { customer: ApiCustomer; granted: boolean; welcomePoints: number; minPoints: number }
 /** A member looked up at the till by email or mobile number (GET /api/admin/members?login=): the guest with their balance. */
@@ -114,6 +117,13 @@ export interface ApiLoyalty {
   pointsPerEuro: number;
   rewards: Array<{ productId: string; points: number }>;
   maxRewardsPerOrder: number;
+}
+
+/** 会员储值 bonus tiers (shared/customer.mjs): top up to `thresholdCents`, the house adds `bonusCents`. */
+export interface ApiMembership {
+  enabled: boolean;
+  /** Sorted ascending by threshold; a top-up takes the most generous tier at or below its amount. */
+  tiers: Array<{ thresholdCents: number; bonusCents: number }>;
 }
 
 /** A table open for its guests' phones (开台). */
@@ -465,6 +475,8 @@ export interface ApiSettings {
   customerAccounts: boolean;
   guestOrdering: ApiGuestOrdering;
   loyalty: ApiLoyalty;
+  /** 会员储值: whether top-ups are on, and the bonus tiers (shared/customer.mjs). */
+  membership: ApiMembership;
   /** Online table bookings and their rules (shared/reservations.mjs). */
   reservations: ApiReservationSettings;
   /** The delivery platforms: which are on, and how their orders come in (shared/delivery.mjs). */
