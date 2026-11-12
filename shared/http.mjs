@@ -17,11 +17,12 @@ import { Value } from "@sinclair/typebox/value";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, EmailCodeBody, EmailVerifyBody, MailTestBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
-  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
+  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
-  ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
+  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { birthdayMessage, bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
@@ -171,6 +172,9 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     // guests): a burst, not a script filling the evening. The guest's account
     // and its limits (shared/reservations.mjs, guestLimit) do the rest.
     reservationLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 60 }),
+    // Looking a booking up by its number needs a matching phone or email too, so
+    // the number alone reveals nothing; a tight limit stops a script trying many.
+    reservationLookupLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
     // Email codes from one address: each account has its own limits too (shared/email-verify.mjs).
     mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
     // Guest sign-ups from one address in ten minutes: a full dining room on
@@ -582,6 +586,22 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return json({ favorites: await customers.setFavorite(customer.id, path[3], method === "PUT") });
         }
         if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
+        // 会员储值: the guest's own balance history (read-only; top-ups happen at the counter).
+        // The member's own ledger: their money, not who at the till booked it —
+        // the operator is the restaurant's audit trail, kept off the guest's view.
+        if (rest === "balance" && method === "GET") return json({ entries: (await customers.balanceHistory(customer.id)).map(({ operator: _operator, ...entry }) => entry) });
+        // 生日营销: the member's own birthday (month and day only), to read or set.
+        if (rest === "birthday" && method === "GET") return json({ birthday: await customers.birthday(customer.id) });
+        if (rest === "birthday" && method === "POST") {
+          const { value, invalid } = await body(request, BirthdayBody);
+          if (invalid) return invalid;
+          if (value.clear) { await customers.clearBirthday(customer.id); return json({ birthday: null }); }
+          try {
+            return json({ birthday: await customers.setBirthday(customer.id, value) });
+          } catch (error) {
+            return fail(error.message, 400);
+          }
+        }
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
         if (rest === "reservations" && method === "GET") return json({ reservations: await store.reservations.forCustomer(customer.id) }, 200, { "cache-control": "no-store" });
@@ -675,6 +695,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           // Whether a guest proves their email first: only where there is mail to send the code with.
           if (!date) return json({ booking: { ...(await reservations.booking()), emailVerification: Boolean(mail) } });
           return json(await reservations.availability(date, url.searchParams.get("party") ?? undefined, url.searchParams.get("time")));
+        }
+        if (path.length === 3 && path[2] === "lookup" && method === "POST") {
+          const limited = throttlePublic(state.reservationLookupLimiter, ctx, "Too many lookups from this device");
+          if (limited) return limited;
+          const { value, invalid } = await body(request, ReservationLookupBody);
+          if (invalid) return invalid;
+          const found = await reservations.lookup(value.reference, value.contact);
+          return found ? json(found, 200, { "cache-control": "no-store" }) : fail("Booking not found", 404);
         }
         if (path.length === 2 && method === "POST") {
           const limited = throttlePublic(state.reservationLimiter, ctx, "Too many bookings from this device");
@@ -1157,6 +1185,29 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         return visit ? json(visit) : fail("No such member", 404);
       }
 
+      // A member looked up at the till by their email or mobile number, to
+      // read their balance (会员储值) and pay a bill from it, or to top it up.
+      if (path[2] === "members" && path.length === 3 && method === "GET") {
+        const { denied } = await gate("staff");
+        if (denied) return denied;
+        const member = await store.customers.byLogin(url.searchParams.get("login") ?? "");
+        return member ? json({ member }) : fail("No such member", 404);
+      }
+
+      // A member putting money in (会员储值充值): a top-up receipt, the money and
+      // the house's bonus added to their balance (shared/register.mjs, planTopUp).
+      if (path.length === 3 && path[2] === "topup" && method === "POST") {
+        const { denied, role, pos } = await gate("staff");
+        if (denied) return denied;
+        try {
+          const { value, invalid } = await body(request, TopUpBody);
+          if (invalid) return invalid;
+          return json(await store.topUp(value, role, pos), 201);
+        } catch (error) {
+          return fail(error.message, error.code === "NOT_FOUND" ? 404 : 400);
+        }
+      }
+
       // Table bookings are the floor's: the waiters take them by phone, seat
       // them and mark who never came. Erasing one for good is the manager's.
       if (path[2] === "reservations" && path.length <= 4) {
@@ -1336,6 +1387,15 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return coded(error);
         }
       }
+
+      // 会员数据看板 (read-only): GET /api/admin/reports/members?from=YYYY-MM-DD&to=YYYY-MM-DD
+      if (path.length === 4 && path[2] === "reports" && path[3] === "members" && method === "GET") {
+        try {
+          return json({ report: await store.memberReport(url.searchParams.get("from"), url.searchParams.get("to")) });
+        } catch (error) {
+          return coded(error);
+        }
+      }
       if (path[2] === "customers") {
         const customers = store.customers;
         try {
@@ -1351,6 +1411,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             const { value, invalid } = await body(request, PointsAdjustBody);
             if (invalid) return invalid;
             const customer = await customers.adjustPoints(id, value);
+            return customer ? json({ customer }) : fail("Guest not found", 404);
+          }
+          // The manager changes a member's balance by hand (退款 / 调整), with a
+          // required note; who made the change goes on the ledger too.
+          if (path.length === 5 && path[4] === "balance" && method === "POST") {
+            const { value, invalid } = await body(request, BalanceAdjustBody);
+            if (invalid) return invalid;
+            const customer = await customers.adjustBalance(id, value, pos?.staff?.name || role || "");
             return customer ? json({ customer }) : fail("Guest not found", 404);
           }
           if (path.length === 5 && path[4] === "password" && method === "POST") {
@@ -1650,7 +1718,42 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
    * (shared/live.mjs) and a staff write recorded in the audit log. An error
    * nobody planned for is a 500 that says nothing about the inside.
    */
-  return async function serve(request, { ip = "", requestId = "" } = {}) {
+  /**
+   * 生日祝福邮件, the daily job (the Worker's cron, the Node server's timer):
+   * from 09:00 in the restaurant's own time zone, each member whose birthday it
+   * is today gets one greeting with the birthday offer. Off unless the owner
+   * switched the birthday perk and its email on, and mail is set up. Each
+   * greeting is claimed in the database before it is sent, so running the job
+   * every hour, or twice at once, still mails a member once a year; a send that
+   * fails gives the claim back for the next run. Members who signed up with a
+   * mobile number have no address to write to and are left out.
+   */
+  async function birthdayGreetings(at = new Date()) {
+    const settings = await store.getSettings();
+    const perk = settings.birthdayPerk;
+    if (!mail || !perk?.enabled || !perk.greetByEmail) return { sent: 0, skipped: "off" };
+    const today = localDayIn(settings.timeZone, at);
+    if (today.hour < 9) return { sent: 0, skipped: "early" };
+    // German where the menu has it (an Austrian restaurant's guests); otherwise the menu's own language.
+    const offered = settings.menuLanguages ?? [];
+    const language = offered.includes("de") || !offered.length ? "de" : offered.includes("en") ? "en" : "zh";
+    let sent = 0;
+    let failed = 0;
+    for (const member of await store.customers.birthdaysDue(today)) {
+      if (isPhoneLogin(member.email)) continue;
+      if (!(await store.customers.claimGreeting(member.id, today.year))) continue;
+      const name = member.name || String(member.email).split("@")[0];
+      const message = birthdayMessage(name, { language, restaurant: settings.restaurantName, discountPercent: perk.discountPercent });
+      if (await sendMail({ to: member.email, ...message })) sent += 1;
+      else { failed += 1; await store.customers.releaseGreeting(member.id, today.year); }
+    }
+    return { sent, failed };
+  }
+
+  serve.birthdayGreetings = birthdayGreetings;
+  return serve;
+
+  async function serve(request, { ip = "", requestId = "" } = {}) {
     const ctx = { ip, requestId, role: null, audited: false };
     const url = new URL(request.url);
     const writing = !["GET", "HEAD", "OPTIONS"].includes(request.method);
