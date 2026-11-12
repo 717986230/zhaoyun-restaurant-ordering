@@ -60,6 +60,17 @@ export type Screen =
 const LANGUAGE_NAMES: Record<PosLanguage, string> = { zh: "中文", de: "Deutsch", en: "English" };
 
 /**
+ * The standalone screens (no table) are kept in the URL hash, so a deep link
+ * opens straight to one. A cashier can save pos.html#topup to the home screen
+ * and, once signed in, land on 会员充值 every time. Table screens aren't
+ * deep-linked — they need a table picked on the floor.
+ */
+function screenFromHash(): Screen | null {
+  const key = (typeof location === "undefined" ? "" : location.hash.replace(/^#/, ""));
+  return key === "topup" || key === "records" || key === "floor" ? { name: key } : null;
+}
+
+/**
  * The POS: what the waiters and the counter work with.
  *
  * A device first has to be paired by the manager; then a waiter picks their
@@ -72,7 +83,7 @@ export function App() {
   const [paired, setPaired] = useState(Boolean(api.deviceToken));
   const [staff, setStaff] = useState<PosStaff | null>(api.session?.staff ?? null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [screen, setScreen] = useState<Screen>({ name: "floor" });
+  const [screen, setScreen] = useState<Screen>(() => screenFromHash() ?? { name: "floor" });
   const [toast, setToast] = useState<{ message: string; kind: "ok" | "error" } | null>(null);
   const [live, setLive] = useState(false);
   const listeners = useRef(new Set<LiveListener>());
@@ -98,6 +109,18 @@ export function App() {
     document.documentElement.lang = language === "zh" ? "zh-CN" : language;
     try { localStorage.setItem("zy_pos_language", language); } catch { /* not kept */ }
   }, [language]);
+
+  // Keep the hash in step with the standalone screens, so #topup is a saveable
+  // deep link; table screens (order/pay) carry no table in the URL, so clear it.
+  useEffect(() => {
+    try { location.hash = screen.name === "topup" || screen.name === "records" ? screen.name : ""; } catch { /* no history here */ }
+  }, [screen.name]);
+  // A deep link or back/forward changing the hash navigates to that screen.
+  useEffect(() => {
+    const onHash = () => { const next = screenFromHash(); if (next) setScreen((current) => (current.name === next.name ? current : next)); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const loadCatalog = useCallback(() => {
     api.catalog().then(({ products: list }) => setProducts(list.map(toProduct))).catch(failed);

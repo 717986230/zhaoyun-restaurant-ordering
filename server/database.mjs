@@ -18,7 +18,7 @@ import { createStore, PRODUCT_INSERT_SQL, productInsertParams } from "../shared/
  * d1:migrations): a new table goes here and, for a D1 already deployed, into
  * a hand-written migration of its own.
  */
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 
 export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS } = {}) {
@@ -429,6 +429,18 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       ref TEXT,
       note TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
+    );
+
+    -- Who booked each balance change (会员储值操作人): keyed by the ledger
+    -- entry's id. A table of its own, not a column on balance_ledger, because a
+    -- deployed D1 can be given a new table safely but not a new column (SQLite
+    -- has no ADD COLUMN IF NOT EXISTS, and 0001 is regenerated from this schema
+    -- so a later ADD COLUMN would collide on a fresh deploy). A top-up and a
+    -- manager's hand-adjust record their operator here, so a member's ledger is
+    -- a full audit trail. See migrations/0070_balance_operator.sql.
+    CREATE TABLE IF NOT EXISTS balance_operators (
+      ledger_id TEXT PRIMARY KEY,
+      operator TEXT NOT NULL DEFAULT ''
     );
 
     -- A guest's own order from the menu (shared/ordering.mjs): at the table or

@@ -643,7 +643,7 @@ export function createStore(driver) {
       const view = plannedReceiptView(plan.receipt);
       const statements = [
         sql(INSERT_RECEIPT_SQL, ...receiptRow(plan.receipt)),
-        ...(topUpBalanceStatements(plan.credit.memberId, plan.credit.principalCents, plan.credit.bonusCents, plan.receipt.id, at)),
+        ...(topUpBalanceStatements(plan.credit.memberId, plan.credit.principalCents, plan.credit.bonusCents, plan.receipt.id, at, plan.credit.reason, plan.credit.operator)),
         printStatement(receiptPrintPayload(view, settings), at),
         await journalStatement(last, "receipt.issued", plan.receipt.id, view, at)
       ];

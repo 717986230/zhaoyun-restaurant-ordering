@@ -322,6 +322,10 @@ CREATE TABLE balance_ledger (
       note TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
     );
+CREATE TABLE balance_operators (
+      ledger_id TEXT PRIMARY KEY,
+      operator TEXT NOT NULL DEFAULT ''
+    );
 CREATE TABLE guest_orders (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
       customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,

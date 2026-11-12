@@ -18,8 +18,14 @@ export function TopUp({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const [member, setMember] = useState<ApiCustomer | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "card">("cash");
+  // 充值原因必填（防止绕过）: a preset reason, or free text under「其他」. Kept with
+  // the balance ledger so no credit is ever booked without a recorded why.
+  const [reasonKey, setReasonKey] = useState<"topUpReasonNormal" | "topUpReasonPromo" | "topUpReasonRefund" | "topUpReasonOther" | "">("");
+  const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
   const requestId = useRef(crypto.randomUUID());
+
+  const reasonText = reasonKey === "topUpReasonOther" ? custom.trim() : reasonKey ? t(reasonKey) : "";
 
   async function find() {
     const value = login.trim();
@@ -40,6 +46,7 @@ export function TopUp({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
         clientRequestId: requestId.current,
         memberId: member.id,
         amount: cents / 100,
+        reason: reasonText,
         payments: [{ type: method, amount: cents / 100 }]
       });
       const bonus = receipt.lines.find((line) => line.kind === "topup")?.bonusCents ?? 0;
@@ -47,6 +54,8 @@ export function TopUp({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       requestId.current = crypto.randomUUID();
       setMember(updated);
       setAmount("");
+      setReasonKey("");
+      setCustom("");
     } catch (error) {
       pos.failed(error);
     } finally {
@@ -54,7 +63,8 @@ export function TopUp({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
     }
   }
 
-  const canConfirm = Boolean(member) && toCents(amount) > 0 && !busy;
+  const canConfirm = Boolean(member) && toCents(amount) > 0 && reasonText.length > 0 && !busy;
+  const REASONS = ["topUpReasonNormal", "topUpReasonPromo", "topUpReasonRefund", "topUpReasonOther"] as const;
 
   return <section className="pos-card pos-topup">
     <div className="pos-ticket-head">
@@ -79,6 +89,11 @@ export function TopUp({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
         <button type="button" className={method === "cash" ? "on" : ""} aria-pressed={method === "cash"} onClick={() => setMethod("cash")}>{t("cash")}</button>
         <button type="button" className={method === "card" ? "on" : ""} aria-pressed={method === "card"} onClick={() => setMethod("card")}>{t("card")}</button>
       </div>
+      <p className="pos-topup-reason-label">{t("topUpReason")}</p>
+      <div className="pos-pay-types pos-topup-reasons" role="group">
+        {REASONS.map((key) => <button key={key} type="button" className={reasonKey === key ? "on" : ""} aria-pressed={reasonKey === key} onClick={() => setReasonKey(key)}>{t(key)}</button>)}
+      </div>
+      {reasonKey === "topUpReasonOther" && <label className="pos-topup-amount"><span>{t("topUpReasonCustom")}</span><input value={custom} maxLength={120} placeholder={t("topUpReasonCustomHint")} onChange={(event) => setCustom(event.target.value)} /></label>}
       <button type="button" className="pos-primary" disabled={!canConfirm} onClick={() => void confirm()}>{busy ? t("topUpBusy") : t("topUpConfirm")}</button>
     </>}
   </section>;

@@ -583,7 +583,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         }
         if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
         // 会员储值: the guest's own balance history (read-only; top-ups happen at the counter).
-        if (rest === "balance" && method === "GET") return json({ entries: await customers.balanceHistory(customer.id) });
+        // The member's own ledger: their money, not who at the till booked it —
+        // the operator is the restaurant's audit trail, kept off the guest's view.
+        if (rest === "balance" && method === "GET") return json({ entries: (await customers.balanceHistory(customer.id)).map(({ operator: _operator, ...entry }) => entry) });
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
         if (rest === "reservations" && method === "GET") return json({ reservations: await store.reservations.forCustomer(customer.id) }, 200, { "cache-control": "no-store" });
@@ -1365,11 +1367,12 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             const customer = await customers.adjustPoints(id, value);
             return customer ? json({ customer }) : fail("Guest not found", 404);
           }
-          // The manager changes a member's balance by hand (退款 / 调整), with a note.
+          // The manager changes a member's balance by hand (退款 / 调整), with a
+          // required note; who made the change goes on the ledger too.
           if (path.length === 5 && path[4] === "balance" && method === "POST") {
             const { value, invalid } = await body(request, BalanceAdjustBody);
             if (invalid) return invalid;
-            const customer = await customers.adjustBalance(id, value);
+            const customer = await customers.adjustBalance(id, value, pos?.staff?.name || role || "");
             return customer ? json({ customer }) : fail("Guest not found", 404);
           }
           if (path.length === 5 && path[4] === "password" && method === "POST") {

@@ -101,7 +101,7 @@ function MemberList({ api, notify, failed }: { api: AdminApi; notify: (message: 
       {open?.customer.id === customer.id && <div className="customer-history">
         <small>{t("balanceHistory", { amount: formatMoney(open.customer.balanceCents ?? 0, language) })}</small>
         {open.balance.length === 0 ? <p className="settings-hint">{t("membersNoLedger")}</p> : <ul>{open.balance.map((entry) => <li key={entry.id}>
-          <span>{formatTime(entry.createdAt, language)}</span><span>{t(BALANCE_REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.deltaCents > 0 ? `+${formatMoney(entry.deltaCents, language)}` : formatMoney(entry.deltaCents, language)}</b>
+          <span>{formatTime(entry.createdAt, language)}</span><span>{t(BALANCE_REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}{entry.operator ? ` · ${t("balanceBy", { operator: entry.operator })}` : ""}</span><b>{entry.deltaCents > 0 ? `+${formatMoney(entry.deltaCents, language)}` : formatMoney(entry.deltaCents, language)}</b>
         </li>)}</ul>}
       </div>}
     </li>)}</ul>}
