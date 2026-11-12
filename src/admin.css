@@ -493,6 +493,44 @@ h2 {
   font-size: 11px;
 }
 
+/* With a preview: the picture (or the 待上传 placeholder) on the left, the
+   prompt beside it; the file input still covers the whole zone. */
+.upload-zone.has-preview {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 12px;
+  place-items: stretch;
+  text-align: left;
+  padding: 10px 12px;
+}
+.upload-thumb {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--a-tint);
+}
+.upload-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.upload-pending {
+  color: var(--a-muted);
+  font-size: 11px;
+}
+.upload-text {
+  display: grid;
+  gap: 2px;
+}
+.upload-zone.has-preview.is-empty .upload-thumb {
+  border: 1px dashed var(--a-line-dash);
+  background: transparent;
+}
+
 .switch-row {
   display: flex;
   gap: 22px;
@@ -575,6 +613,85 @@ h2 {
 .product-row.selected,
 .printer-row:hover {
   background: var(--a-rail);
+}
+
+/* 批量 mode: a leading checkbox column, so the row stays aligned with one
+   more child than usual. */
+.product-row.batch-row {
+  grid-template-columns: 26px 46px minmax(110px, 1fr) 62px 48px 82px 12px;
+}
+
+.product-row .batch-check {
+  font-size: 18px;
+  color: var(--a-ink-2);
+  text-align: center;
+}
+
+.product-row.batch-picked {
+  background: var(--a-accent-wash);
+}
+
+.product-row.batch-picked .batch-check {
+  color: var(--a-accent);
+}
+
+.batch-toggle.on {
+  border-color: var(--a-accent-line);
+  background: var(--a-accent-wash);
+  color: var(--a-accent);
+}
+
+/* The bulk action bar, shown between the filters and the list in 批量 mode. */
+.batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--a-accent-line);
+  border-radius: 8px;
+  background: var(--a-accent-wash);
+}
+
+.batch-bar .batch-select,
+.batch-bar .batch-price,
+.batch-bar .batch-flags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.batch-bar .batch-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--a-ink);
+}
+
+.batch-bar .batch-price select,
+.batch-bar .batch-price input {
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font-size: 13px;
+}
+
+.batch-bar .batch-price input {
+  width: 110px;
+}
+
+.batch-bar .ghost-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.batch-bar .form-error {
+  flex-basis: 100%;
+  margin: 0;
 }
 
 .product-thumb {
@@ -1352,6 +1469,31 @@ em.voided {
   height: 16px;
 }
 
+/* 颜色标签: the dish's POS colour — a swatch row, or "default" to follow its category. */
+.tag-colour-picker {
+  border: 1px solid var(--a-line);
+  border-radius: 5px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.tag-colour-picker legend { color: var(--a-ink-2); font-size: 12px; letter-spacing: 0.04em; }
+.tag-colour-none { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.tag-colour-none input { width: 16px; height: 16px; }
+.tag-colour-swatch { position: relative; display: inline-grid; cursor: pointer; }
+.tag-colour-swatch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.tag-colour-swatch span {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px var(--a-line-2);
+}
+.tag-colour-swatch input:checked + span { box-shadow: 0 0 0 2px var(--a-card), 0 0 0 4px var(--swatch); }
+.tag-colour-swatch input:focus-visible + span { outline: 2px solid var(--swatch); outline-offset: 2px; }
+
 .bundle-picker {
   border: 1px solid var(--a-line);
   border-radius: 5px;
@@ -1824,6 +1966,16 @@ em.voided {
 
 .settings-grid > .wide {
   column-span: all;
+}
+
+/* 会员 page is only two full-width cards (储值设置 + 会员与余额列表, the
+   latter column-span: all). With one normal card before a span-all card,
+   Safari/WebKit balances that first card into a full-height column box and
+   leaves a tall blank gap above the list. There is nothing to pack into two
+   columns here anyway, so drop multicol and just stack them. */
+#membersPanel .settings-grid {
+  columns: auto;
+  display: block;
 }
 
 .settings-card {
@@ -4691,3 +4843,6 @@ em.voided {
 .today-status.pending {
   color: var(--a-danger);
 }
+
+/* A form says what blocks its save, in place. */
+.form-warning { color: var(--a-danger); font-weight: 600; }
