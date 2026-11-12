@@ -295,6 +295,7 @@ function productToInput(product: Product): AdminProductInput {
     printStation: product.printStation,
     available: product.available,
     published: product.published,
+    ...(product.sortOrder === undefined ? {} : { sortOrder: product.sortOrder }),
     tagColor: product.tagColor ?? null,
     modifiers: product.modifiers ?? [],
     bundleItems: product.bundleItems ?? []
@@ -314,6 +315,11 @@ export function CatalogPanel(props: Props) {
   const [priceMode, setPriceMode] = useState<"fixed" | "percent">("fixed");
   const [priceValue, setPriceValue] = useState("");
   const [batchError, setBatchError] = useState("");
+  // 排序: drag or ↑↓ a working copy of the whole catalogue, then save sortOrder.
+  const [sortMode, setSortMode] = useState(false);
+  const [order, setOrder] = useState<Product[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [sortError, setSortError] = useState("");
   const productIndex = useMemo(() => new Map(props.products.map((item) => [item.id, item])), [props.products]);
   // A set shows its dishes' pictures, so only a dish of its own can be missing one.
   const missingPhoto = (product: Product) => !product.bundleItems?.length && !product.media.length;
@@ -369,6 +375,46 @@ export function CatalogPanel(props: Props) {
     if (!selected.size || !window.confirm(t("batchConfirm", { n: selected.size }))) return;
     setBatchError("");
     void props.onBulkSave(selectedUpdates((input, product) => { input.price = nextPriceCents(product.priceCents, priceMode, value) / 100; })).then(() => setPriceValue(""));
+  }
+
+  function enterSort() {
+    setBatchMode(false);
+    setSelected(new Set());
+    setOrder([...props.products]);
+    setDragIndex(null);
+    setSortError("");
+    setSortMode(true);
+  }
+
+  /** Move the dish at `index` by `delta` places (−1 up, +1 down). */
+  function moveDish(index: number, delta: number) {
+    setOrder((current) => {
+      const target = index + delta;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next;
+    });
+  }
+
+  /** Drop the dragged dish before the one at `index`. */
+  function dropOnto(index: number) {
+    setOrder((current) => {
+      if (dragIndex === null || dragIndex === index) return current;
+      const next = [...current];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(index, 0, moved!);
+      return next;
+    });
+    setDragIndex(null);
+  }
+
+  /** Save only the dishes whose place actually changed, as their new sortOrder. */
+  function saveOrder() {
+    const updates = order.flatMap((dish, index) => dish.sortOrder === index ? [] : [{ id: dish.id, input: { ...productToInput(dish), sortOrder: index } }]);
+    if (!updates.length) { setSortError(t("sortUnchanged")); return; }
+    setSortError("");
+    void props.onBulkSave(updates).then(() => setSortMode(false));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -474,10 +520,34 @@ export function CatalogPanel(props: Props) {
         <div><h1>{t("catalogTitle")}</h1><p>{t("catalogCount", { count: props.products.length })}</p></div>
         <div className="list-head-actions">
           <button className="icon-action" onClick={() => void props.onRefresh()} title={t("refresh")} aria-label={t("refresh")}>↻</button>
-          <button className={`ghost-action batch-toggle ${batchMode ? "on" : ""}`} aria-pressed={batchMode} onClick={() => batchMode ? leaveBatch() : setBatchMode(true)}>☑ {t(batchMode ? "batchExit" : "batchMode")}</button>
-          <button className="primary-action" onClick={() => open(null)}>＋ {t("catalogNew")}</button>
+          {!sortMode && <button className={`ghost-action batch-toggle ${batchMode ? "on" : ""}`} aria-pressed={batchMode} onClick={() => batchMode ? leaveBatch() : setBatchMode(true)}>☑ {t(batchMode ? "batchExit" : "batchMode")}</button>}
+          {!batchMode && <button className={`ghost-action sort-toggle ${sortMode ? "on" : ""}`} aria-pressed={sortMode} onClick={() => { if (sortMode) { setSortMode(false); setSortError(""); } else enterSort(); }}>⇅ {t(sortMode ? "sortExit" : "sortMode")}</button>}
+          {!sortMode && !batchMode && <button className="primary-action" onClick={() => open(null)}>＋ {t("catalogNew")}</button>}
         </div>
       </header>
+      {sortMode ? <div className="sort-pane">
+        <div className="sort-bar">
+          <p className="sort-hint">{t("sortHint")}</p>
+          <button type="button" className="primary-action" onClick={saveOrder}>{t("sortSave")}</button>
+        </div>
+        {sortError && <p className="form-error" role="alert">{sortError}</p>}
+        <ul className="sort-list">{order.map((dish, index) => <li
+          key={dish.id}
+          className={`sort-row ${dragIndex === index ? "dragging" : ""}`}
+          draggable
+          onDragStart={() => setDragIndex(index)}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={() => dropOnto(index)}
+          onDragEnd={() => setDragIndex(null)}>
+          <span className="sort-handle" aria-hidden="true" title={t("sortDrag")}>⣿</span>
+          <ProductThumb product={dish} byId={productIndex} mediaUrl={props.mediaUrl} />
+          <span className="product-copy"><b>{nameIn(dish, language)}</b><small>{dish.sku} · {dish.category}</small></span>
+          <span className="sort-moves">
+            <button type="button" className="icon-action" disabled={index === 0} onClick={() => moveDish(index, -1)} aria-label={t("sortUp")} title={t("sortUp")}>↑</button>
+            <button type="button" className="icon-action" disabled={index === order.length - 1} onClick={() => moveDish(index, 1)} aria-label={t("sortDown")} title={t("sortDown")}>↓</button>
+          </span>
+        </li>)}</ul>
+      </div> : <>
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}
         {/* Only while some dish has no picture: the guests see a drawn mark in its place. */}
         {(missingCount > 0 || props.filter === "nophoto") && <button id="filterNoPhoto" className={props.filter === "nophoto" ? "active" : ""} onClick={() => props.onFilter("nophoto")}>{t("filterNoPhoto", { count: missingCount })}</button>}</div>
@@ -507,6 +577,7 @@ export function CatalogPanel(props: Props) {
         const picked = selected.has(row.id);
         return <button className={`product-row ${product?.id === row.id ? "selected" : ""} ${batchMode ? "batch-row" : ""} ${picked ? "batch-picked" : ""}`} key={row.id} aria-pressed={batchMode ? picked : undefined} onClick={() => batchMode ? toggleSelect(row.id) : open(row)}>{batchMode && <span className="batch-check" aria-hidden="true">{picked ? "☑" : "☐"}</span>}<ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}{row.leftToday === 0 && <em className="draft-mark">{t("stockOutToday")}</em>}{row.leftToday ? <em className="draft-mark">{t("stockLeftToday", { n: row.leftToday })}</em> : null}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
+      </>}
     </section>
   </div></section>;
 }
