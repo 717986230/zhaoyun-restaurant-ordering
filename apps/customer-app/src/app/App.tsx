@@ -96,6 +96,7 @@ export function App() {
   const accountsOn = Boolean(catalog.menu?.accounts);
   const account = useCustomer(accountsOn);
   const loyalty = catalog.menu?.loyalty ?? null;
+  const birthdayPerk = catalog.menu?.birthdayPerk ?? null;
   const rewardPoints = useMemo(() => new Map((loyalty?.rewards ?? []).map((reward) => [reward.productId, reward.points])), [loyalty]);
   const cart = summarize(state.cart, catalog.products, rewardPoints);
   // A sheet whose feature was switched off while it was open closes.
@@ -135,7 +136,7 @@ export function App() {
     />
     <AnimatePresence>
       {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} suggestions={catalog.menu?.suggestions ?? []} />}
-      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} signupPoints={catalog.menu?.signupPoints ?? 0} />}
+      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} birthdayPerk={birthdayPerk} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} signupPoints={catalog.menu?.signupPoints ?? 0} />}
       {sheet === "service" && serviceTable && <ServiceSheet key="service" state={{ ...state, language }} dispatch={dispatch} table={serviceTable} />}
       {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}
       {sheet === "booking" && <Suspense key="booking" fallback={null}><BookingSheet language={language} onClose={() => dispatch({ type: "sheet", sheet: null })} /></Suspense>}

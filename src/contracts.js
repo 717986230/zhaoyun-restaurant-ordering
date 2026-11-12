@@ -209,6 +209,17 @@ export const SettingsBody = Type.Object({
     enabled: Type.Optional(Type.Boolean()),
     tiers: Type.Optional(Type.Array(Type.Object({ thresholdCents: Type.Number(), bonusCents: Type.Number() }), { maxItems: 20 }))
   }, { maxProperties: 4 })),
+  // 会员等级 + 会员价: the levels are shared/customer.mjs's to check.
+  memberTiers: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    tiers: Type.Optional(Type.Array(Type.Object({ name: Type.String({ maxLength: 40 }), thresholdCents: Type.Number(), discountPercent: Type.Number() }), { maxItems: 8 }))
+  }, { maxProperties: 4 })),
+  // 生日营销: the birthday discount is shared/customer.mjs's to check.
+  birthdayPerk: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    discountPercent: Type.Optional(Type.Number()),
+    greetByEmail: Type.Optional(Type.Boolean())
+  }, { maxProperties: 3 })),
   // Online table bookings; the rules are shared/reservations.mjs's to check.
   reservations: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),
@@ -492,6 +503,12 @@ export const CustomerRegisterBody = Type.Object({ email: Email, name: Type.Optio
 export const CustomerSignInBody = Type.Object({ email: Type.String({ maxLength: 254 }), password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
 // A code to the guest's email, and the code back (shared/email-verify.mjs).
 export const EmailCodeBody = Type.Object({ language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
+// 生日营销: a member sets their birth month and day, or clears it (shared/customer.mjs checks the date).
+export const BirthdayBody = Type.Object({
+  clear: Type.Optional(Type.Boolean()),
+  month: Type.Optional(Type.Integer({ minimum: 1, maximum: 12 })),
+  day: Type.Optional(Type.Integer({ minimum: 1, maximum: 31 }))
+}, { additionalProperties: false });
 export const EmailVerifyBody = Type.Object({ code: Type.String({ minLength: 1, maxLength: 12 }) }, { additionalProperties: false });
 // The console's test email to the owner's own address.
 export const MailTestBody = Type.Object({ to: Type.String({ minLength: 3, maxLength: 254 }), language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });

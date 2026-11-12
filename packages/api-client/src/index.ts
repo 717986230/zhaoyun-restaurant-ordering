@@ -1,9 +1,9 @@
 import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles, IconApp,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiMemberReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
-  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiBalanceEntry, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
+  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiMemberTiers, ApiBirthday, ApiBirthdayPerk, ApiBalanceEntry, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
   ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand
 } from "@zhaoyun/contracts";
@@ -78,6 +78,8 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     guestOrdering: { ...GUEST_ORDERING_DEFAULTS, hours: [] },
     loyalty: { ...LOYALTY_DEFAULTS, rewards: [] },
     membership: { ...MEMBERSHIP_DEFAULTS, tiers: [] },
+    memberTiers: { ...MEMBER_TIERS_DEFAULTS, tiers: [] },
+    birthdayPerk: { ...BIRTHDAY_PERK_DEFAULTS },
     reservations: { ...RESERVATION_DEFAULTS, hours: RESERVATION_DEFAULTS.hours.map((range) => ({ ...range, days: [...range.days] })), closedDates: [], tables: [] },
     delivery: { lieferando: { ...DELIVERY_PLATFORM_DEFAULTS }, foodora: { ...DELIVERY_PLATFORM_DEFAULTS } },
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
@@ -92,6 +94,10 @@ export const GUEST_ORDERING_DEFAULTS: ApiGuestOrdering = {
 export const LOYALTY_DEFAULTS: ApiLoyalty = { enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 };
 /** shared/customer.mjs, MEMBERSHIP_DEFAULTS. */
 export const MEMBERSHIP_DEFAULTS: ApiMembership = { enabled: false, tiers: [] };
+/** shared/customer.mjs, MEMBER_TIERS_DEFAULTS. */
+export const MEMBER_TIERS_DEFAULTS: ApiMemberTiers = { enabled: false, tiers: [] };
+/** shared/customer.mjs, BIRTHDAY_PERK_DEFAULTS. */
+export const BIRTHDAY_PERK_DEFAULTS: ApiBirthdayPerk = { enabled: false, discountPercent: 0, greetByEmail: false };
 /** shared/reservations.mjs, RESERVATION_DEFAULTS. */
 export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   enabled: false,
@@ -419,6 +425,10 @@ export class AdminApi {
   salesReport(from: string, to: string): Promise<{ report: ApiSalesReport }> {
     return this.#request(`/api/admin/reports/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   }
+  /** 会员数据看板: read-only member analytics over the same days. */
+  memberReport(from: string, to: string): Promise<{ report: ApiMemberReport }> {
+    return this.#request(`/api/admin/reports/members?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  }
   /** A guest's data, for a request that reached the restaurant by e-mail or at the counter. */
   exportCustomer(id: string): Promise<CustomerDataExport> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/export`); }
   // Table bookings: the floor's list, one taken by phone, a change, an erasure.
@@ -664,6 +674,12 @@ export class RestaurantApi {
   customerPoints(): Promise<{ entries: ApiPointsEntry[] }> { return this.#request("/api/customer/points"); }
   /** 会员储值: this guest's own stored-value ledger (read-only; top-ups are at the counter). */
   customerBalance(): Promise<{ entries: ApiBalanceEntry[] }> { return this.#request("/api/customer/balance"); }
+  /** 生日营销: the guest's own birthday (month and day), or null. */
+  customerBirthday(): Promise<{ birthday: ApiBirthday | null }> { return this.#request("/api/customer/birthday"); }
+  /** The guest sets their birthday (month and day only). */
+  setCustomerBirthday(month: number, day: number): Promise<{ birthday: ApiBirthday | null }> { return this.#request("/api/customer/birthday", { method: "POST", body: JSON.stringify({ month, day }) }); }
+  /** The guest clears their birthday. */
+  clearCustomerBirthday(): Promise<{ birthday: ApiBirthday | null }> { return this.#request("/api/customer/birthday", { method: "POST", body: JSON.stringify({ clear: true }) }); }
   customerOrders(): Promise<{ orders: ApiOrder[] }> { return this.#request("/api/customer/orders"); }
   /** Everything kept about this guest's account, to download. */
   exportCustomerData(): Promise<CustomerDataExport> { return this.#request("/api/customer/export"); }
