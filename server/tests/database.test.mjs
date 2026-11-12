@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { createDatabase } from "../database.mjs";
+import { TAG_COLORS } from "../../src/tag-colors.js";
 
 test("order writes wait for a busy write lock instead of failing immediately", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-sqlite-"));
@@ -35,4 +36,25 @@ test("order writes wait for a busy write lock instead of failing immediately", a
 
   agent.exec("ROLLBACK");
   assert.equal((await order("busy-order-0002")).table, "05");
+});
+
+test("a dish keeps a palette colour tag, and anything off-palette clears it", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-tagcolor-"));
+  const database = createDatabase(path.join(directory, "restaurant.sqlite"));
+  context.after(() => { database.close(); rmSync(directory, { recursive: true, force: true }); });
+
+  const created = await database.saveProduct({
+    sku: "TAG-1", kind: "food", category: "RAMEN",
+    names: { zh: "颜色测试", de: "", en: "" }, price: 9.9, printStation: "kitchen",
+    tagColor: TAG_COLORS[0]
+  });
+  assert.equal(created.tagColor, TAG_COLORS[0], "a palette colour is kept");
+
+  const offPalette = await database.saveProduct({ tagColor: "#123456" }, created.id);
+  assert.equal(offPalette.tagColor, null, "an off-palette value is dropped to none");
+
+  const reset = await database.saveProduct({ tagColor: TAG_COLORS[3] }, created.id);
+  assert.equal(reset.tagColor, TAG_COLORS[3]);
+  const cleared = await database.saveProduct({ tagColor: "" }, created.id);
+  assert.equal(cleared.tagColor, null, "an empty value clears the tag");
 });

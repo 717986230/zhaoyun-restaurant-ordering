@@ -48,7 +48,18 @@ export type GuestOrderRefusal =
 /** A guest's own account (shared/customer.mjs). */
 /** `emailVerified`: the address, as it is now, was proved by a code (shared/email-verify.mjs). */
 /** A guest's account. Signed up by mobile number: `phone` is set, and `email` holds the same number (how they sign in). */
-export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string }
+export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string; balanceCents?: number; membership?: ApiMembershipStatus }
+
+/** A member's birthday — month and day only, never the year (生日营销). */
+export interface ApiBirthday { month: number; day: number }
+
+/**
+ * 会员等级 + 生日营销: a member's standing — lifetime top-up, the level it reaches,
+ * the 会员价 discount to apply at the till (the greater of the level's and, in
+ * their birthday month, the birthday perk's), their birthday, and whether this
+ * is their birthday month (shared/customer.mjs, membershipStatus).
+ */
+export interface ApiMembershipStatus { growthCents: number; tier: string | null; tierLevel?: number; tierCount?: number; discountPercent: number; birthdayMonth?: boolean; birthday?: ApiBirthday | null }
 /** `signupBonus`: signed up from a table's code, and the points for it given. */
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer; signupBonus?: boolean }
 /** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */
@@ -62,8 +73,24 @@ export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
  */
 export type PointsKind = "welcome" | "no_show" | "no_show_back" | "signup" | "booking" | "booking_back";
 export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string; kind?: PointsKind }
+/** A line in a member's stored-value ledger (shared/customer.mjs, balanceEntryView). */
+export type BalanceReason = "topup" | "bonus" | "spend" | "refund" | "adjust" | "reverse";
+export interface ApiBalanceEntry { id: string; deltaCents: number; reason: BalanceReason; ref: string | null; note: string; operator: string; createdAt: string }
 /** A member's code scanned at the counter: the guest, and whether this visit gave the first visit's bonus. */
 export interface ApiMemberVisit { customer: ApiCustomer; granted: boolean; welcomePoints: number; minPoints: number }
+/** A member looked up at the till by email or mobile number (GET /api/admin/members?login=): the guest with their balance. */
+export interface ApiMemberLookup { member: ApiCustomer }
+/** A top-up at the counter (POST /api/admin/topup): principal paid in, plus any bonus from the tiers. */
+export interface TopUpCommand {
+  clientRequestId?: string;
+  memberId: string;
+  amount: number;
+  /** Why this top-up is being booked (required, server-enforced): recorded on the member's balance ledger so a free credit can't be slipped in untraceably. */
+  reason: string;
+  payments: Array<{ type: "cash" | "card"; amount: number; tendered?: number }>;
+}
+/** The outcome of a top-up: the receipt booked, and the member's account as it now stands (`balanceCents` already includes the bonus). */
+export interface TopUpResult { receipt: ApiReceipt; member: ApiCustomer }
 /**
  * Everything the restaurant keeps about one guest's account, as they may ask
  * for it (GDPR Art. 15 and 20): machine-readable, in one file.
@@ -100,10 +127,32 @@ export interface ApiGuestOrdering {
 /** Points for what guests pay, and the dishes they buy with them. */
 export interface ApiLoyalty {
   enabled: boolean;
+  /** pointsPerEuro points for every eurosPerPoint euros (默认每 10 欧元 1 积分). */
   pointsPerEuro: number;
+  eurosPerPoint: number;
+  /** 充值送积分: a top-up earns points at the same rate; balance-paid bills then earn nothing again. */
+  topUpPoints: boolean;
   rewards: Array<{ productId: string; points: number }>;
   maxRewardsPerOrder: number;
 }
+
+/** 会员储值 bonus tiers (shared/customer.mjs): top up to `thresholdCents`, the house adds `bonusCents`. */
+export interface ApiMembership {
+  enabled: boolean;
+  /** Sorted ascending by threshold; a top-up takes the most generous tier at or below its amount. */
+  tiers: Array<{ thresholdCents: number; bonusCents: number }>;
+}
+
+/** 会员等级 + 会员价: levels reached by lifetime top-up, each giving a counter discount (shared/customer.mjs). */
+export interface ApiMemberTiers {
+  enabled: boolean;
+  /** Sorted ascending by threshold; a member sits at the highest level their top-ups have passed. */
+  tiers: Array<{ name: string; thresholdCents: number; discountPercent: number }>;
+}
+
+/** 生日营销: a discount offered in a member's birthday month (shared/customer.mjs). */
+/** `greetByEmail`: a greeting email on the birthday itself (the daily job; needs mail set up). */
+export interface ApiBirthdayPerk { enabled: boolean; discountPercent: number; greetByEmail: boolean }
 
 /** A table open for its guests' phones (开台). */
 export interface ApiTableSession { table: string; openedAt: string; expiresAt: string; staffName: string | null }
@@ -202,7 +251,7 @@ export interface ApiBill {
   printJobId?: string;
 }
 
-export type PaymentType = "cash" | "card" | "voucher";
+export type PaymentType = "cash" | "card" | "voucher" | "balance";
 
 /** A receipt of the register (shared/register.mjs). Amounts in cents. */
 export interface ApiReceipt {
@@ -212,7 +261,7 @@ export interface ApiReceipt {
   type: "sale" | "storno";
   table: string | null;
   lines: Array<{
-    kind: "item" | "voucher" | "discount";
+    kind: "item" | "voucher" | "discount" | "topup";
     names?: { zh: string; de: string; en: string };
     orderItemId?: string;
     code?: string;
@@ -222,11 +271,15 @@ export interface ApiReceipt {
     unitPriceCents: number;
     totalCents: number;
     vatSplit: Array<{ percent: number; cents: number }>;
+    /** On a `topup` line: the member credited, and the bonus added on top. */
+    memberId?: string;
+    memberName?: string;
+    bonusCents?: number;
   }>;
   vat: Array<{ percent: number; grossCents: number; netCents: number; vatCents: number }>;
   totalCents: number;
   /** `tipCents`: Trinkgeld paid with it, beside the amount and not in the total. */
-  payments: Array<{ type: PaymentType; amountCents: number; tenderedCents?: number; changeCents?: number; voucherCode?: string; tipCents?: number }>;
+  payments: Array<{ type: PaymentType; amountCents: number; tenderedCents?: number; changeCents?: number; voucherCode?: string; tipCents?: number; memberId?: string }>;
   refersTo: string | null;
   refersToNo: number | null;
   reason: string | null;
@@ -248,7 +301,7 @@ export interface CheckoutCommand {
   discountPercent?: number;
   items?: Array<{ orderItemId: string; quantity: number }>;
   vouchers?: Array<{ amount: number }>;
-  payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number }>;
+  payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number; memberId?: string }>;
 }
 
 export interface ApiVoucher { code: string; valueCents: number; balanceCents: number; voided: boolean; createdAt: string }
@@ -262,6 +315,8 @@ export interface ApiClosingTotals {
   vat: Array<{ percent: number; grossCents: number; netCents: number; vatCents: number }>;
   payments: Record<PaymentType, number>;
   vouchersSoldCents: number;
+  /** Top-ups sold over the days: the principal paid in, the booking of a multi-purpose voucher, not revenue. */
+  topUpsSoldCents?: number;
   discountCents?: number;
   cashCents: number;
   /** Trinkgeld per way paid: the staff's, not in the takings (absent on closings from before tips). */
@@ -283,6 +338,23 @@ export interface ApiSalesReport {
   staff: Array<{ name: string; receipts: number; grossCents: number; tipsCents?: number }>;
   /** The delivery platforms' orders over the same days: not in the receipts, the platform collects the money. */
   delivery?: ApiDeliveryTotals[];
+}
+
+/** 会员数据看板: read-only member analytics over the manager's days (shared/reports.mjs, GET /api/admin/reports/members). */
+export interface ApiMemberReport {
+  from: string;
+  to: string;
+  timeZone: string;
+  /** total: all members now; new: accounts opened in the window; active: members who earned points or spent balance in the window. */
+  members: { total: number; new: number; active: number };
+  /** outstandingCents: balance held now; the rest is over the window — top-up principal, the house's bonus, and balance spent. */
+  balance: { outstandingCents: number; topUpCents: number; bonusCents: number; spentCents: number };
+  /** outstanding: points held now; earned and redeemed over the window. */
+  points: { outstanding: number; earned: number; redeemed: number };
+  /** Over the window: active members, those active on two or more days, and that share as a percentage. */
+  repeat: { buyers: number; repeatBuyers: number; ratePct: number };
+  topBalance: Array<{ id: string; name: string; email: string; balanceCents: number }>;
+  topPoints: Array<{ id: string; name: string; email: string; points: number }>;
 }
 
 /** 今日概况: the day so far (GET /api/admin/today). */
@@ -448,6 +520,10 @@ export interface ApiSettings {
   customerAccounts: boolean;
   guestOrdering: ApiGuestOrdering;
   loyalty: ApiLoyalty;
+  /** 会员储值: whether top-ups are on, and the bonus tiers (shared/customer.mjs). */
+  membership: ApiMembership;
+  memberTiers: ApiMemberTiers;
+  birthdayPerk: ApiBirthdayPerk;
   /** Online table bookings and their rules (shared/reservations.mjs). */
   reservations: ApiReservationSettings;
   /** The delivery platforms: which are on, and how their orders come in (shared/delivery.mjs). */
@@ -682,6 +758,9 @@ export interface ApiMenuSettings {
   ordering?: Pick<ApiGuestOrdering, "dineIn" | "pickup" | "hours" | "maxItems" | "maxOrderCents" | "requireOpenTable"> | null;
   /** The points programme, when it is on. */
   loyalty?: Omit<ApiLoyalty, "enabled"> | null;
+  /** 生日营销: the birthday-month member offer, when it is on. */
+  /** `email`: members are greeted by email on the day itself. */
+  birthdayPerk?: { discountPercent: number; email?: boolean } | null;
   /** Guests can book a table online; absent from an older server. */
   reservations?: boolean;
   /** The points a guest gets for signing up from a table's code; 0 or absent: none. */
