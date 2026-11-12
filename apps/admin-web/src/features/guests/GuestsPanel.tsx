@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi, CustomerDetail } from "@zhaoyun/api-client";
-import type { ApiCustomer, ApiGuestOrdering, ApiLoyalty, ApiMembership, ApiSchedule, ApiSettings, BalanceReason, PointsKind, PointsReason } from "@zhaoyun/contracts";
+import type { ApiCustomer, ApiGuestOrdering, ApiLoyalty, ApiSchedule, ApiSettings, PointsKind, PointsReason } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { formatMoney, formatTime, useI18n } from "../../app/i18n";
+import { formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { Section, Toggle } from "../settings/SettingsPanel";
 import { describeSchedule } from "../settings/ScheduleEditor";
@@ -39,9 +39,6 @@ export function GuestsPanel({ api, settings, products, notify, failed, onSaveSet
       </Section>
       <Section id="guest-loyalty" title={t("sectionLoyalty")} summary={t(settings.loyalty.enabled ? "orderingOn" : "orderingOff")}>
         <LoyaltyForm key={JSON.stringify(settings.loyalty)} loyalty={settings.loyalty} products={products} onSave={(loyalty) => onSaveSettings({ loyalty }, "loyaltySaved")} />
-      </Section>
-      <Section id="guest-membership" title={t("sectionMembership")} summary={t(settings.membership.enabled ? "orderingOn" : "orderingOff")}>
-        <MembershipForm key={JSON.stringify(settings.membership)} membership={settings.membership} onSave={(membership) => onSaveSettings({ membership }, "membershipSaved")} />
       </Section>
       <Section id="guest-list" title={t("sectionCustomers")} wide>
         <CustomerList api={api} notify={notify} failed={failed} />
@@ -138,30 +135,7 @@ function LoyaltyForm({ loyalty, products, onSave }: { loyalty: ApiLoyalty; produ
   </form>;
 }
 
-/** 会员储值赠送档位：充 X 送 Y，由服务端排序并取不超过充值额的最高一档。 */
-function MembershipForm({ membership, onSave }: { membership: ApiMembership; onSave: (value: ApiMembership) => Promise<void> | void }) {
-  const { t } = useI18n();
-  const [draft, setDraft] = useState(membership);
-  const changed = JSON.stringify(draft) !== JSON.stringify(membership);
-  const setTier = (index: number, key: "thresholdCents" | "bonusCents", cents: number) =>
-    setDraft((current) => ({ ...current, tiers: current.tiers.map((tier, at) => (at === index ? { ...tier, [key]: cents } : tier)) }));
-
-  return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
-    <Toggle checked={draft.enabled} label={t("membershipEnabled")} onChange={(enabled) => { setDraft({ ...draft, enabled }); void onSave({ ...draft, enabled }); }} />
-    <p className="settings-label">{t("membershipTiers")}</p>
-    <p className="settings-hint">{t("membershipTiersHint")}</p>
-    <ul className="reward-rows">{draft.tiers.map((tier, index) => <li key={index}>
-      <label><span>{t("membershipThreshold")}</span><input type="number" min={1} max={1000} step={1} value={tier.thresholdCents / 100} onChange={(event) => setTier(index, "thresholdCents", Math.round(Number(event.target.value) * 100))} /></label>
-      <label><span>{t("membershipBonus")}</span><input type="number" min={0} max={1000} step={1} value={tier.bonusCents / 100} onChange={(event) => setTier(index, "bonusCents", Math.round(Number(event.target.value) * 100))} /></label>
-      <button type="button" className="ghost-action" aria-label={t("remove")} onClick={() => setDraft({ ...draft, tiers: draft.tiers.filter((_, at) => at !== index) })}>✕</button>
-    </li>)}</ul>
-    {draft.tiers.length < 20 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { thresholdCents: 10000, bonusCents: 1000 }] })}>{t("membershipAddTier")}</button>}
-    <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
-  </form>;
-}
-
 const REASONS: Record<PointsReason, CopyKey> = { earn: "pointsEarn", reverse: "pointsReverse", redeem: "pointsRedeem", refund: "pointsRefund", adjust: "pointsAdjust" };
-const BALANCE_REASONS: Record<BalanceReason, CopyKey> = { topup: "balanceTopup", bonus: "balanceBonus", spend: "balanceSpend", refund: "balanceRefund", adjust: "balanceAdjust", reverse: "balanceReverse" };
 /** The booking membership's own lines among the adjustments (shared/customer.mjs). */
 const KINDS: Record<PointsKind, CopyKey> = { welcome: "pointsWelcome", no_show: "pointsNoShow", no_show_back: "pointsNoShowBack", signup: "pointsSignup", booking: "pointsBooking", booking_back: "pointsBookingBack" };
 
@@ -197,13 +171,6 @@ function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message
     const note = window.prompt(t("adjustNotePrompt"))?.trim();
     if (note) void act(customer, () => api.adjustPoints(customer.id, delta, note), "pointsAdjusted");
   }
-  /** 会员储值: the manager adds to or takes from a member's balance by hand (euros, + or −), with a note. */
-  function adjustBalance(customer: ApiCustomer) {
-    const amount = Number(window.prompt(t("adjustBalancePrompt", { email: customer.email }))?.trim().replace(",", "."));
-    if (!Number.isFinite(amount) || !amount) return;
-    const note = window.prompt(t("adjustNotePrompt"))?.trim();
-    if (note) void act(customer, () => api.adjustBalance(customer.id, amount, note), "balanceAdjusted");
-  }
   function reset(customer: ApiCustomer) {
     const password = window.prompt(t("resetCustomerPrompt", { email: customer.email }));
     if (password && password.length >= 6) void act(customer, () => api.resetCustomerPassword(customer.id, password), "customerPasswordReset");
@@ -231,10 +198,9 @@ function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message
     <input type="search" className="customer-search" placeholder={t("customersSearch")} value={query} onChange={(event) => setQuery(event.target.value)} />
     {!customers.length ? <p className="settings-hint">{t("customersEmpty")}</p> : <ul className="staff-list">{customers.map((customer) => <li key={customer.id} data-customer={customer.email}>
       <button type="button" className="customer-name" onClick={() => void show(customer)}><b>{customer.email}</b>{customer.name && <small>{customer.name}</small>}</button>
-      <span className="customer-points">{customer.points} ★{(customer.balanceCents ?? 0) > 0 ? <em className="customer-balance">{formatMoney(customer.balanceCents ?? 0, language)}</em> : null}</span>
+      <span className="customer-points">{customer.points} ★</span>
       <span className="staff-actions">
         <button type="button" className="ghost-action" onClick={() => adjust(customer)}>{t("adjustPoints")}</button>
-        <button type="button" className="ghost-action" onClick={() => adjustBalance(customer)}>{t("adjustBalance")}</button>
         <button type="button" className="ghost-action" onClick={() => reset(customer)}>{t("resetCustomerPassword")}</button>
         <button type="button" className="ghost-action" onClick={() => void exportData(customer)}>{t("exportCustomer")}</button>
         <button type="button" className="ghost-action danger" onClick={() => remove(customer)}>{t("deleteCustomer")}</button>
@@ -244,12 +210,6 @@ function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message
         <ul>{open.points.map((entry) => <li key={entry.id}>
           <span>{formatTime(entry.createdAt, language)}</span><span>{t(entry.kind ? KINDS[entry.kind] : REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</b>
         </li>)}</ul>
-        {open.balance.length > 0 && <>
-          <small>{t("balanceHistory", { amount: formatMoney(open.customer.balanceCents ?? 0, language) })}</small>
-          <ul>{open.balance.map((entry) => <li key={entry.id}>
-            <span>{formatTime(entry.createdAt, language)}</span><span>{t(BALANCE_REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.deltaCents > 0 ? `+${formatMoney(entry.deltaCents, language)}` : formatMoney(entry.deltaCents, language)}</b>
-          </li>)}</ul>
-        </>}
       </div>}
     </li>)}</ul>}
   </div>;
