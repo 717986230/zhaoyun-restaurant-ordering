@@ -97,6 +97,16 @@ export function App() {
     try { localStorage.setItem("zy_pos_language", language); } catch { /* not kept */ }
   }, [language]);
 
+  // Every screen opens at the top: the floor, a table's order, paying, the
+  // records — and pairing and signing in. The window is what scrolls (the
+  // ticket is sticky inside it), so a new screen must not inherit the last
+  // one's scroll position.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [screen, paired, staff]);
+
   const loadCatalog = useCallback(() => {
     api.catalog().then(({ products: list }) => setProducts(list.map(toProduct))).catch(failed);
   }, [failed]);
@@ -141,7 +151,7 @@ export function App() {
         {staff && <button type="button" onClick={() => { void api.signOut().finally(() => { setStaff(null); setScreen({ name: "floor" }); }); }}>{t("signOut")}</button>}
       </span>
     </header>
-    <main className="pos-main">{body}</main>
+    <main ref={mainRef} className="pos-main">{body}</main>
     <div className={`pos-toast ${toast ? `show ${toast.kind}` : ""}`} role="status">{toast?.message ?? ""}</div>
   </div>;
 }
