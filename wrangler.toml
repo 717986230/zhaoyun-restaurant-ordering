@@ -48,6 +48,13 @@ class_name = "LiveHub"
 tag = "live-hub-v1"
 new_sqlite_classes = ["LiveHub"]
 
+# 生日祝福邮件 (shared/http.mjs, birthdayGreetings): every hour on the hour.
+# The job sends nothing before 09:00 in the restaurant's time zone and greets
+# each member once a year, so the hourly beat only covers a missed run. Off
+# unless the owner switches the birthday email on in the console.
+[triggers]
+crons = ["0 * * * *"]
+
 # Workers Logs: every request and every console line (the API logs failures
 # as one JSON line with the request's id), searchable in the dashboard for a
 # few days. Included in the Free plan.
