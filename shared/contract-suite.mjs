@@ -2157,6 +2157,26 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await mine(first.json.reservation.id, second.json.token)).status, 404, "another guest's token opens nothing");
       assert.equal((await mine(second.json.reservation.id, "x".repeat(43), "POST", "/cancel")).status, 404);
 
+      // A guest with no account and no saved link finds their booking again by its
+      // number and the phone or email they booked with; a fresh link comes back.
+      const toFind = await book({ date: addDays(day, 2), time: "13:00", party: 2, name: "Lotte", phone: "0660 9090909" });
+      assert.equal(toFind.status, 201, JSON.stringify(toFind.json));
+      const lookup = (body) => call("POST", "/api/reservations/lookup", { body });
+      const found = await lookup({ reference: toFind.json.reservation.reference.toLowerCase(), contact: "0043 660 9090909" });
+      assert.equal(found.status, 200, "the number written another way, and the reference in any case, still match");
+      assert.equal(found.json.reservation.id, toFind.json.reservation.id);
+      assert.equal(found.json.reservation.name, "Lotte");
+      assert.equal(found.json.reservation.source, undefined, "no staff fields for the guest");
+      assert.ok(found.json.token, "a fresh link to view or cancel it");
+      assert.equal((await lookup({ reference: toFind.json.reservation.reference, contact: "0660 0000000" })).status, 404, "the contact must match the booking");
+      assert.equal((await lookup({ reference: "ZZZZZZ", contact: "0660 9090909" })).status, 404, "an unknown reference is not found");
+      assert.equal((await lookup({ reference: "ab", contact: "0660 9090909" })).status, 400, "the reference is at least four characters");
+      // The link the lookup gives manages the booking the usual way.
+      const refound = await mine(found.json.reservation.id, found.json.token);
+      assert.equal(refound.status, 200);
+      assert.equal(refound.json.reservation.cancellable, true);
+      assert.equal((await mine(found.json.reservation.id, found.json.token, "POST", "/cancel")).json.reservation.status, "cancelled");
+
       // The floor's list: today by default, any run of days by asking.
       assert.equal((await call("GET", `/api/admin/reservations?from=${day}&to=${day}`)).status, 401);
       const listed = (await call("GET", `/api/admin/reservations?from=${day}&to=${day}`, { role: "staff" })).json;

@@ -458,6 +458,11 @@ export const ReservationBody = Type.Object({
   // The guest's own table, where the restaurant lets guests pick one.
   table: Type.Optional(Type.String({ maxLength: 8 }))
 }, { additionalProperties: false });
+/** A guest looking a booking up again by its number and the way they can be reached. */
+export const ReservationLookupBody = Type.Object({
+  reference: Type.String({ minLength: 4, maxLength: 14 }),
+  contact: Type.String({ minLength: 3, maxLength: 254 })
+}, { additionalProperties: false });
 /** Taken by the staff, over the phone or at the door. */
 export const StaffReservationBody = Type.Object({
   ...ReservationFields,
