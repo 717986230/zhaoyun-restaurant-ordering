@@ -25,7 +25,8 @@ import {
   isPhoneLogin, MAX_FAVORITES, normalizeCustomerName, normalizeLogin, normalizeCustomerRegistration, normalizePointsAdjustment, pointsEntryView, POINTS_HISTORY_SQL,
   REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL,
   balanceEntryView, BALANCE_HISTORY_SQL, changeBalanceStatements, INSERT_BALANCE_SQL, normalizeBalanceAdjustment,
-  MEMBER_GROWTH_SQL, MEMBER_TIERS_DEFAULTS, membershipStatus
+  MEMBER_GROWTH_SQL, MEMBER_TIERS_DEFAULTS, membershipStatus,
+  BIRTHDAY_PERK_DEFAULTS, MEMBER_BIRTHDAY_SQL, UPSERT_BIRTHDAY_SQL, DELETE_BIRTHDAY_SQL, normalizeBirthday, isBirthdayMonth
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
 import { guestReservationView } from "./reservations.mjs";
@@ -50,21 +51,36 @@ function coded(message, code, status, extra = {}) {
   return error;
 }
 
-export function createCustomerStore(driver, { ordersFor, memberTiers }) {
-  // 会员等级: the owner's levels, or none when the caller gives no getter (tests).
-  const tiersNow = memberTiers ?? (async () => MEMBER_TIERS_DEFAULTS);
+export function createCustomerStore(driver, { ordersFor, membershipConfig }) {
+  // 会员等级 + 生日营销: the owner's levels, birthday perk and time zone, or
+  // their defaults when the caller gives no getter (tests).
+  const configNow = membershipConfig ?? (async () => ({ memberTiers: MEMBER_TIERS_DEFAULTS, birthdayPerk: BIRTHDAY_PERK_DEFAULTS, timeZone: "UTC" }));
+
+  /** The restaurant's current month (1–12), for the birthday window. */
+  function monthIn(timeZone) {
+    const value = new Intl.DateTimeFormat("en-CA", { timeZone: timeZone || "UTC", month: "2-digit" }).format(new Date());
+    return Number(value);
+  }
 
   /**
-   * A member view with their 会员等级 attached: lifetime top-up (read-only), the
-   * level it reaches, and that level's 会员价 discount. A plain `customerView`
-   * when there is no member to enrich. Never writes.
+   * A member view with their 会员等级 and 生日营销 attached: lifetime top-up
+   * (read-only), the level it reaches, that level's 会员价 discount, their
+   * birthday, and whether this is their birthday month — in which case the
+   * birthday discount is folded into `discountPercent` the till applies. A
+   * plain `customerView` when neither is on. Never writes.
    */
   async function withMembership(view) {
     if (!view) return view;
-    const tiers = await tiersNow();
-    if (!tiers?.enabled) return view;
-    const row = await driver.first(MEMBER_GROWTH_SQL, view.id);
-    return { ...view, membership: membershipStatus(row?.growth_cents ?? 0, tiers) };
+    const { memberTiers, birthdayPerk, timeZone } = await configNow();
+    const tiersOn = Boolean(memberTiers?.enabled);
+    const perkOn = Boolean(birthdayPerk?.enabled);
+    if (!tiersOn && !perkOn) return view;
+    const growth = tiersOn ? await driver.first(MEMBER_GROWTH_SQL, view.id) : null;
+    const birthday = perkOn ? (await driver.first(MEMBER_BIRTHDAY_SQL, view.id)) ?? null : null;
+    const base = membershipStatus(growth?.growth_cents ?? 0, tiersOn ? memberTiers : MEMBER_TIERS_DEFAULTS);
+    const birthdayMonth = perkOn && isBirthdayMonth(birthday, monthIn(timeZone));
+    const discountPercent = Math.max(base.discountPercent, birthdayMonth ? (birthdayPerk.discountPercent ?? 0) : 0);
+    return { ...view, membership: { ...base, discountPercent, birthdayMonth, birthday } };
   }
 
   async function openSession(row) {
@@ -344,6 +360,23 @@ export function createCustomerStore(driver, { ordersFor, memberTiers }) {
     },
     /** A guest as they see themselves, or null. */
     byIdView: async (customerId) => withMembership(customerView(await byId(customerId))),
+    /** 生日营销: a member's own birth month and day, or null. */
+    async birthday(customerId) {
+      return (await driver.first(MEMBER_BIRTHDAY_SQL, String(customerId))) ?? null;
+    },
+    /** A member sets their birthday (month and day only); null when there is no such member. */
+    async setBirthday(customerId, input) {
+      const row = await byId(customerId);
+      if (!row) return null;
+      const birthday = normalizeBirthday(input);
+      await driver.run(UPSERT_BIRTHDAY_SQL, row.id, birthday.month, birthday.day, now());
+      return birthday;
+    },
+    /** A member clears their birthday. */
+    async clearBirthday(customerId) {
+      await driver.run(DELETE_BIRTHDAY_SQL, String(customerId));
+      return true;
+    },
     async remove(customerId) {
       if (!(await byId(customerId))) return false;
       await removeAccount(customerId);

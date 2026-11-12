@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi, CustomerDetail } from "@zhaoyun/api-client";
-import type { ApiCustomer, ApiMemberReport, ApiMembership, ApiMemberTiers, ApiSettings, BalanceReason } from "@zhaoyun/contracts";
+import type { ApiBirthdayPerk, ApiCustomer, ApiMemberReport, ApiMembership, ApiMemberTiers, ApiSettings, BalanceReason } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { Section, Toggle } from "../settings/SettingsPanel";
@@ -48,6 +48,9 @@ export function MembersPanel({ api, settings, notify, failed, onSaveSettings }: 
       </Section>
       <Section id="member-tiers" title={t("sectionMemberTiers")} summary={t(settings.memberTiers.enabled ? "orderingOn" : "orderingOff")}>
         <MemberTiersForm key={JSON.stringify(settings.memberTiers)} memberTiers={settings.memberTiers} onSave={(memberTiers) => onSaveSettings({ memberTiers }, "memberTiersSaved")} />
+      </Section>
+      <Section id="member-birthday" title={t("sectionBirthdayPerk")} summary={t(settings.birthdayPerk.enabled ? "orderingOn" : "orderingOff")}>
+        <BirthdayPerkForm key={JSON.stringify(settings.birthdayPerk)} perk={settings.birthdayPerk} onSave={(birthdayPerk) => onSaveSettings({ birthdayPerk }, "birthdayPerkSaved")} />
       </Section>
       <Section id="member-list" title={t("membersListTitle")} wide>
         <MemberList api={api} notify={notify} failed={failed} />
@@ -114,6 +117,22 @@ function MemberStats({ api, timeZone, failed }: { api: AdminApi; timeZone: strin
     </>}
     {!report && busy && <div className="admin-empty">…</div>}
   </div>;
+}
+
+/**
+ * 生日营销：会员生日月享一个结账折扣，与会员等级折扣取较大者，走收银台整单折扣。
+ * 会员只填月/日（不含年份），由顾客在账户里自行填写。
+ */
+function BirthdayPerkForm({ perk, onSave }: { perk: ApiBirthdayPerk; onSave: (value: ApiBirthdayPerk) => Promise<void> | void }) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(perk);
+  const changed = JSON.stringify(draft) !== JSON.stringify(perk);
+  return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
+    <Toggle checked={draft.enabled} label={t("birthdayPerkEnabled")} onChange={(enabled) => { setDraft({ ...draft, enabled }); void onSave({ ...draft, enabled }); }} />
+    <p className="settings-hint">{t("birthdayPerkHint")}</p>
+    <label><span>{t("birthdayPerkDiscount")}</span><input type="number" min={0} max={100} step={1} value={draft.discountPercent} onChange={(event) => setDraft({ ...draft, discountPercent: Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))) })} /></label>
+    <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
+  </form>;
 }
 
 /**
@@ -206,6 +225,7 @@ function MemberList({ api, notify, failed }: { api: AdminApi; notify: (message: 
       </span>
       {open?.customer.id === customer.id && <div className="customer-history">
         {open.customer.membership?.tier && <small className="member-tier-line">{t("memberTierLabel", { tier: open.customer.membership.tier })}{open.customer.membership.discountPercent > 0 ? ` · ${t("memberPriceOff", { percent: String(open.customer.membership.discountPercent) })}` : ""} · {t("memberGrowthLabel", { amount: formatMoney(open.customer.membership.growthCents, language) })}</small>}
+        {open.customer.membership?.birthday && <small className="member-tier-line">{t("memberBirthdayLabel", { date: `${open.customer.membership.birthday.month}/${open.customer.membership.birthday.day}` })}{open.customer.membership.birthdayMonth ? " 🎂" : ""}</small>}
         <small>{t("balanceHistory", { amount: formatMoney(open.customer.balanceCents ?? 0, language) })}</small>
         {open.balance.length === 0 ? <p className="settings-hint">{t("membersNoLedger")}</p> : <ul>{open.balance.map((entry) => <li key={entry.id}>
           <span>{formatTime(entry.createdAt, language)}</span><span>{t(BALANCE_REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.deltaCents > 0 ? `+${formatMoney(entry.deltaCents, language)}` : formatMoney(entry.deltaCents, language)}</b>

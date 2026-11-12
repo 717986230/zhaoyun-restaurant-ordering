@@ -50,8 +50,16 @@ export type GuestOrderRefusal =
 /** A guest's account. Signed up by mobile number: `phone` is set, and `email` holds the same number (how they sign in). */
 export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string; balanceCents?: number; membership?: ApiMembershipStatus }
 
-/** 会员等级: a member's standing — lifetime top-up, the level it reaches, and the 会员价 discount that level earns (shared/customer.mjs, membershipStatus). */
-export interface ApiMembershipStatus { growthCents: number; tier: string | null; discountPercent: number }
+/** A member's birthday — month and day only, never the year (生日营销). */
+export interface ApiBirthday { month: number; day: number }
+
+/**
+ * 会员等级 + 生日营销: a member's standing — lifetime top-up, the level it reaches,
+ * the 会员价 discount to apply at the till (the greater of the level's and, in
+ * their birthday month, the birthday perk's), their birthday, and whether this
+ * is their birthday month (shared/customer.mjs, membershipStatus).
+ */
+export interface ApiMembershipStatus { growthCents: number; tier: string | null; discountPercent: number; birthdayMonth?: boolean; birthday?: ApiBirthday | null }
 /** `signupBonus`: signed up from a table's code, and the points for it given. */
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer; signupBonus?: boolean }
 /** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */
@@ -135,6 +143,9 @@ export interface ApiMemberTiers {
   /** Sorted ascending by threshold; a member sits at the highest level their top-ups have passed. */
   tiers: Array<{ name: string; thresholdCents: number; discountPercent: number }>;
 }
+
+/** 生日营销: a discount offered in a member's birthday month (shared/customer.mjs). */
+export interface ApiBirthdayPerk { enabled: boolean; discountPercent: number }
 
 /** A table open for its guests' phones (开台). */
 export interface ApiTableSession { table: string; openedAt: string; expiresAt: string; staffName: string | null }
@@ -505,6 +516,7 @@ export interface ApiSettings {
   /** 会员储值: whether top-ups are on, and the bonus tiers (shared/customer.mjs). */
   membership: ApiMembership;
   memberTiers: ApiMemberTiers;
+  birthdayPerk: ApiBirthdayPerk;
   /** Online table bookings and their rules (shared/reservations.mjs). */
   reservations: ApiReservationSettings;
   /** The delivery platforms: which are on, and how their orders come in (shared/delivery.mjs). */
@@ -739,6 +751,8 @@ export interface ApiMenuSettings {
   ordering?: Pick<ApiGuestOrdering, "dineIn" | "pickup" | "hours" | "maxItems" | "maxOrderCents" | "requireOpenTable"> | null;
   /** The points programme, when it is on. */
   loyalty?: Omit<ApiLoyalty, "enabled"> | null;
+  /** 生日营销: the birthday-month member offer, when it is on. */
+  birthdayPerk?: { discountPercent: number } | null;
   /** Guests can book a table online; absent from an older server. */
   reservations?: boolean;
   /** The points a guest gets for signing up from a table's code; 0 or absent: none. */

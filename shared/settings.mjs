@@ -8,7 +8,7 @@
 
 import { DEFAULT_TIME_ZONE, normalizeSchedule, normalizeTimeZone } from "../src/schedule.js";
 import { GUEST_ORDERING_DEFAULTS, normalizeGuestOrdering, orderingMenuView } from "./ordering.mjs";
-import { LOYALTY_DEFAULTS, MEMBER_TIERS_DEFAULTS, MEMBERSHIP_DEFAULTS, normalizeLoyalty, normalizeMemberTiers, normalizeMembership } from "./customer.mjs";
+import { BIRTHDAY_PERK_DEFAULTS, LOYALTY_DEFAULTS, MEMBER_TIERS_DEFAULTS, MEMBERSHIP_DEFAULTS, normalizeBirthdayPerk, normalizeLoyalty, normalizeMemberTiers, normalizeMembership } from "./customer.mjs";
 import { normalizeReservationSettings } from "./reservations.mjs";
 import { normalizeDeliverySettings } from "./delivery.mjs";
 
@@ -321,6 +321,8 @@ export const APP_SETTINGS = {
   membership: { key: "membership", fallback: () => ({ ...MEMBERSHIP_DEFAULTS, tiers: [] }), normalize: (value) => normalizeMembership(value) },
   // 会员等级 + 会员价: levels reached by lifetime top-up, each giving a counter discount (shared/customer.mjs).
   memberTiers: { key: "memberTiers", fallback: () => ({ ...MEMBER_TIERS_DEFAULTS, tiers: [] }), normalize: (value) => normalizeMemberTiers(value) },
+  // 生日营销: a discount offered in a member's birthday month (shared/customer.mjs).
+  birthdayPerk: { key: "birthdayPerk", fallback: () => ({ ...BIRTHDAY_PERK_DEFAULTS }), normalize: (value) => normalizeBirthdayPerk(value) },
   // Guests booking a table online, and the rules they book under (shared/reservations.mjs).
   reservations: { key: "reservations", fallback: () => normalizeReservationSettings({}), normalize: normalizeReservationSettings },
   // The delivery platforms: which are on, whether their orders go to the kitchen unasked, and how long one takes (shared/delivery.mjs).
@@ -400,6 +402,8 @@ export function menuSettingsView(settings) {
     loyalty: settings.loyalty?.enabled
       ? { pointsPerEuro: settings.loyalty.pointsPerEuro, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }
       : null,
+    // 生日营销: the birthday-month offer, so a member knows to add their birthday.
+    ...(settings.birthdayPerk?.enabled ? { birthdayPerk: { discountPercent: settings.birthdayPerk.discountPercent } } : {}),
     // Only when switched on: a guest has no use for a list of ids otherwise.
     featured: settings.featuredEnabled
       ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate, schedule: settings.featuredSchedule }
