@@ -26,7 +26,8 @@ import {
   REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL,
   balanceEntryView, BALANCE_HISTORY_SQL, changeBalanceStatements, INSERT_BALANCE_SQL, normalizeBalanceAdjustment,
   MEMBER_GROWTH_SQL, MEMBER_TIERS_DEFAULTS, membershipStatus,
-  BIRTHDAY_PERK_DEFAULTS, MEMBER_BIRTHDAY_SQL, UPSERT_BIRTHDAY_SQL, DELETE_BIRTHDAY_SQL, normalizeBirthday, isBirthdayMonth
+  BIRTHDAY_PERK_DEFAULTS, MEMBER_BIRTHDAY_SQL, UPSERT_BIRTHDAY_SQL, DELETE_BIRTHDAY_SQL, normalizeBirthday, isBirthdayMonth,
+  BIRTHDAYS_DUE_SQL, CLAIM_GREETING_SQL, RELEASE_GREETING_SQL, birthdayDaysFor
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
 import { guestReservationView } from "./reservations.mjs";
@@ -371,6 +372,19 @@ export function createCustomerStore(driver, { ordersFor, membershipConfig }) {
       const birthday = normalizeBirthday(input);
       await driver.run(UPSERT_BIRTHDAY_SQL, row.id, birthday.month, birthday.day, now());
       return birthday;
+    },
+    /** 生日祝福邮件: members to greet on `date` ({ year, month, day }), not yet greeted this year. */
+    async birthdaysDue(date, limit = 200) {
+      const days = birthdayDaysFor(date);
+      return driver.all(BIRTHDAYS_DUE_SQL, date.month, days[0], days[1] ?? days[0], date.year, limit);
+    },
+    /** Claims this year's greeting for a member: true when this run is the one to send it. */
+    async claimGreeting(customerId, year) {
+      return (await driver.run(CLAIM_GREETING_SQL, String(customerId), year, now())) > 0;
+    },
+    /** Gives a claim back after a failed send, so the next run tries again. */
+    async releaseGreeting(customerId, year) {
+      await driver.run(RELEASE_GREETING_SQL, String(customerId), year);
     },
     /** A member clears their birthday. */
     async clearBirthday(customerId) {

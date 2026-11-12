@@ -145,7 +145,8 @@ export interface ApiMemberTiers {
 }
 
 /** 生日营销: a discount offered in a member's birthday month (shared/customer.mjs). */
-export interface ApiBirthdayPerk { enabled: boolean; discountPercent: number }
+/** `greetByEmail`: a greeting email on the birthday itself (the daily job; needs mail set up). */
+export interface ApiBirthdayPerk { enabled: boolean; discountPercent: number; greetByEmail: boolean }
 
 /** A table open for its guests' phones (开台). */
 export interface ApiTableSession { table: string; openedAt: string; expiresAt: string; staffName: string | null }
@@ -752,7 +753,8 @@ export interface ApiMenuSettings {
   /** The points programme, when it is on. */
   loyalty?: Omit<ApiLoyalty, "enabled"> | null;
   /** 生日营销: the birthday-month member offer, when it is on. */
-  birthdayPerk?: { discountPercent: number } | null;
+  /** `email`: members are greeted by email on the day itself. */
+  birthdayPerk?: { discountPercent: number; email?: boolean } | null;
   /** Guests can book a table online; absent from an older server. */
   reservations?: boolean;
   /** The points a guest gets for signing up from a table's code; 0 or absent: none. */

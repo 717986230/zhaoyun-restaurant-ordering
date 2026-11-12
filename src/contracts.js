@@ -217,8 +217,9 @@ export const SettingsBody = Type.Object({
   // 生日营销: the birthday discount is shared/customer.mjs's to check.
   birthdayPerk: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),
-    discountPercent: Type.Optional(Type.Number())
-  }, { maxProperties: 2 })),
+    discountPercent: Type.Optional(Type.Number()),
+    greetByEmail: Type.Optional(Type.Boolean())
+  }, { maxProperties: 3 })),
   // Online table bookings; the rules are shared/reservations.mjs's to check.
   reservations: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),

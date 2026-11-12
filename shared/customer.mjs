@@ -268,7 +268,7 @@ export function membershipStatus(growthCents, memberTiers) {
  * `discountPercent` off at the till, through the same whole-bill discount a
  * tier uses. A member enters only their birth month and day — never the year.
  */
-export const BIRTHDAY_PERK_DEFAULTS = Object.freeze({ enabled: false, discountPercent: 0 });
+export const BIRTHDAY_PERK_DEFAULTS = Object.freeze({ enabled: false, discountPercent: 0, greetByEmail: false });
 
 export function normalizeBirthdayPerk(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Birthday-perk settings must be an object");
@@ -278,7 +278,8 @@ export function normalizeBirthdayPerk(value) {
   if (typeof merged.enabled !== "boolean") throw new Error("Birthday perk enabled must be true or false");
   const discountPercent = Number(merged.discountPercent);
   if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("The birthday discount is 0 to 100 percent");
-  return { enabled: merged.enabled, discountPercent };
+  if (typeof merged.greetByEmail !== "boolean") throw new Error("Birthday greeting email must be true or false");
+  return { enabled: merged.enabled, discountPercent, greetByEmail: merged.greetByEmail };
 }
 
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -296,6 +297,30 @@ export function normalizeBirthday(input) {
 export function isBirthdayMonth(birthday, month) {
   return Boolean(birthday) && Number(birthday.month) === Number(month);
 }
+
+/**
+ * 生日祝福邮件: the birthdays a greeting is due for on `date` (the restaurant's
+ * own calendar day, { year, month, day }). A 29 February birthday is greeted on
+ * 28 February in a year that has no 29th, so nobody is skipped for three years.
+ */
+export function birthdayDaysFor(date) {
+  const { year, month, day } = date;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return month === 2 && day === 28 && !leap ? [28, 29] : [day];
+}
+
+/** The restaurant's calendar day and hour now, in its own time zone. */
+export function localDayIn(timeZone, at = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: timeZone || "UTC", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" })
+    .formatToParts(at).map((part) => [part.type, part.value]));
+  return { year: Number(parts.year), month: Number(parts.month), day: Number(parts.day), hour: Number(parts.hour) };
+}
+
+/** Members whose birthday is on one of the days, with an address to write to, not yet greeted this year. */
+export const BIRTHDAYS_DUE_SQL = "SELECT c.id, c.email, c.name FROM member_birthdays b JOIN customers c ON c.id = b.customer_id WHERE b.month = ? AND b.day IN (?, ?) AND NOT EXISTS (SELECT 1 FROM birthday_greetings g WHERE g.customer_id = c.id AND g.year = ?) ORDER BY c.created_at LIMIT ?";
+/** Claimed before the mail goes out: 1 change when this run has it, 0 when another already did. */
+export const CLAIM_GREETING_SQL = "INSERT OR IGNORE INTO birthday_greetings (customer_id, year, sent_at) VALUES (?, ?, ?)";
+export const RELEASE_GREETING_SQL = "DELETE FROM birthday_greetings WHERE customer_id = ? AND year = ?";
 
 export const MEMBER_BIRTHDAY_SQL = "SELECT month, day FROM member_birthdays WHERE customer_id = ?";
 export const UPSERT_BIRTHDAY_SQL = "INSERT INTO member_birthdays (customer_id, month, day, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET month = excluded.month, day = excluded.day, updated_at = excluded.updated_at";

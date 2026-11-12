@@ -442,6 +442,16 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    -- 生日祝福邮件: one greeting a member a year, claimed before it is sent, so
+    -- two runs (or two Worker isolates) never mail the same member twice.
+    -- See migrations/0071_birthday_greetings.sql.
+    CREATE TABLE IF NOT EXISTS birthday_greetings (
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (customer_id, year)
+    );
+
     -- A guest's own order from the menu (shared/ordering.mjs): at the table or
     -- for pickup, by whom when signed in, and the points it spent.
     CREATE TABLE IF NOT EXISTS guest_orders (

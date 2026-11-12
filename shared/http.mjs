@@ -21,7 +21,8 @@ import {
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { birthdayMessage, bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
 import { resolveStaffRole, roleAllows } from "./auth.mjs";
@@ -1690,7 +1691,42 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
    * (shared/live.mjs) and a staff write recorded in the audit log. An error
    * nobody planned for is a 500 that says nothing about the inside.
    */
-  return async function serve(request, { ip = "", requestId = "" } = {}) {
+  /**
+   * 生日祝福邮件, the daily job (the Worker's cron, the Node server's timer):
+   * from 09:00 in the restaurant's own time zone, each member whose birthday it
+   * is today gets one greeting with the birthday offer. Off unless the owner
+   * switched the birthday perk and its email on, and mail is set up. Each
+   * greeting is claimed in the database before it is sent, so running the job
+   * every hour, or twice at once, still mails a member once a year; a send that
+   * fails gives the claim back for the next run. Members who signed up with a
+   * mobile number have no address to write to and are left out.
+   */
+  async function birthdayGreetings(at = new Date()) {
+    const settings = await store.getSettings();
+    const perk = settings.birthdayPerk;
+    if (!mail || !perk?.enabled || !perk.greetByEmail) return { sent: 0, skipped: "off" };
+    const today = localDayIn(settings.timeZone, at);
+    if (today.hour < 9) return { sent: 0, skipped: "early" };
+    // German where the menu has it (an Austrian restaurant's guests); otherwise the menu's own language.
+    const offered = settings.menuLanguages ?? [];
+    const language = offered.includes("de") || !offered.length ? "de" : offered.includes("en") ? "en" : "zh";
+    let sent = 0;
+    let failed = 0;
+    for (const member of await store.customers.birthdaysDue(today)) {
+      if (isPhoneLogin(member.email)) continue;
+      if (!(await store.customers.claimGreeting(member.id, today.year))) continue;
+      const name = member.name || String(member.email).split("@")[0];
+      const message = birthdayMessage(name, { language, restaurant: settings.restaurantName, discountPercent: perk.discountPercent });
+      if (await sendMail({ to: member.email, ...message })) sent += 1;
+      else { failed += 1; await store.customers.releaseGreeting(member.id, today.year); }
+    }
+    return { sent, failed };
+  }
+
+  serve.birthdayGreetings = birthdayGreetings;
+  return serve;
+
+  async function serve(request, { ip = "", requestId = "" } = {}) {
     const ctx = { ip, requestId, role: null, audited: false };
     const url = new URL(request.url);
     const writing = !["GET", "HEAD", "OPTIONS"].includes(request.method);

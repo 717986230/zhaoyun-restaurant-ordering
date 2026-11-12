@@ -97,7 +97,7 @@ export const MEMBERSHIP_DEFAULTS: ApiMembership = { enabled: false, tiers: [] };
 /** shared/customer.mjs, MEMBER_TIERS_DEFAULTS. */
 export const MEMBER_TIERS_DEFAULTS: ApiMemberTiers = { enabled: false, tiers: [] };
 /** shared/customer.mjs, BIRTHDAY_PERK_DEFAULTS. */
-export const BIRTHDAY_PERK_DEFAULTS: ApiBirthdayPerk = { enabled: false, discountPercent: 0 };
+export const BIRTHDAY_PERK_DEFAULTS: ApiBirthdayPerk = { enabled: false, discountPercent: 0, greetByEmail: false };
 /** shared/reservations.mjs, RESERVATION_DEFAULTS. */
 export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   enabled: false,

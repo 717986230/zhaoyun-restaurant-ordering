@@ -215,6 +215,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
       {customer.membership?.birthdayMonth
         ? <p className="cart-hint">{g(language, "birthdayMonthNote", { percent: birthdayPerk.discountPercent })}</p>
         : <p className="cart-hint">{g(language, "birthdayHint", { percent: birthdayPerk.discountPercent })}</p>}
+      {birthdayPerk.email && <p className="cart-hint">{g(language, "birthdayEmailNote")}</p>}
       <div className="birthday-fields">
         <label><span>{g(language, "birthMonth")}</span>
           <select value={bMonth} onChange={(event) => setBMonth(Number(event.target.value))}>

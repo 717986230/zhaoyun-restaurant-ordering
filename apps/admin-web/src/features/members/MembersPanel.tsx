@@ -130,6 +130,8 @@ function BirthdayPerkForm({ perk, onSave }: { perk: ApiBirthdayPerk; onSave: (va
   return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
     <Toggle checked={draft.enabled} label={t("birthdayPerkEnabled")} onChange={(enabled) => { setDraft({ ...draft, enabled }); void onSave({ ...draft, enabled }); }} />
     <p className="settings-hint">{t("birthdayPerkHint")}</p>
+    <Toggle checked={draft.greetByEmail} label={t("birthdayGreetEmail")} onChange={(greetByEmail) => setDraft({ ...draft, greetByEmail })} />
+    <p className="settings-hint">{t("birthdayGreetEmailHint")}</p>
     <label><span>{t("birthdayPerkDiscount")}</span><input type="number" min={0} max={100} step={1} value={draft.discountPercent} onChange={(event) => setDraft({ ...draft, discountPercent: Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))) })} /></label>
     <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
   </form>;

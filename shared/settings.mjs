@@ -403,7 +403,7 @@ export function menuSettingsView(settings) {
       ? { pointsPerEuro: settings.loyalty.pointsPerEuro, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }
       : null,
     // 生日营销: the birthday-month offer, so a member knows to add their birthday.
-    ...(settings.birthdayPerk?.enabled ? { birthdayPerk: { discountPercent: settings.birthdayPerk.discountPercent } } : {}),
+    ...(settings.birthdayPerk?.enabled ? { birthdayPerk: { discountPercent: settings.birthdayPerk.discountPercent, ...(settings.birthdayPerk.greetByEmail ? { email: true } : {}) } } : {}),
     // Only when switched on: a guest has no use for a list of ids otherwise.
     featured: settings.featuredEnabled
       ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate, schedule: settings.featuredSchedule }
