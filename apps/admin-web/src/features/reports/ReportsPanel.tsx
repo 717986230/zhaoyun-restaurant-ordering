@@ -74,6 +74,46 @@ function downloadCsv(name: string, rows: Array<Array<string | number>>) {
 const euros = (cents: number) => (cents / 100).toFixed(2);
 
 /**
+ * The whole report as one spreadsheet the owner can keep or forward: the
+ * headline numbers, then payments, VAT, the dishes and the waiters, each under
+ * its own heading with a blank row between. Built from the same figures the
+ * page shows, so the file agrees with the screen (and the Z reports) to the cent.
+ */
+export function fullReportRows(
+  report: ApiSalesReport,
+  t: (key: CopyKey, values?: Record<string, string | number>) => string,
+  itemName: (item: ApiSalesReport["items"][number]) => string
+): Array<Array<string | number>> {
+  const totals = report.totals;
+  const rows: Array<Array<string | number>> = [];
+  rows.push([t("reportsTitle"), `${report.from} — ${report.to}`]);
+  rows.push([]);
+  rows.push([t("reportGross"), euros(totals.grossCents)]);
+  rows.push([t("reportReceipts"), totals.receipts]);
+  rows.push([t("reportAverage"), euros(totals.averageCents)]);
+  rows.push([t("reportStornos"), totals.stornos]);
+  if ((totals.discountCents ?? 0) !== 0) rows.push([t("reportDiscounts"), euros(totals.discountCents ?? 0)]);
+  if (totals.vouchersSoldCents !== 0) rows.push([t("reportVouchers"), euros(totals.vouchersSoldCents)]);
+  if ((totals.tipsCents ?? 0) !== 0) rows.push([t("reportTips"), euros(totals.tipsCents ?? 0)]);
+  rows.push([]);
+  rows.push([t("reportPayments")]);
+  for (const type of ["cash", "card", "voucher", "balance"] as const) {
+    if (type === "balance" && (totals.payments.balance ?? 0) === 0) continue;
+    rows.push([t(type === "cash" ? "reportCash" : type === "card" ? "reportCard" : type === "voucher" ? "reportVoucher" : "reportBalance"), euros(totals.payments[type] ?? 0)]);
+  }
+  rows.push([]);
+  rows.push([t("reportVat"), t("billNet"), t("billVat"), t("billGross")]);
+  for (const group of totals.vat) rows.push([`${group.percent}%`, euros(group.netCents), euros(group.vatCents), euros(group.grossCents)]);
+  rows.push([]);
+  rows.push([t("reportStaff"), t("reportReceipts"), t("reportGross"), t("reportTips")]);
+  for (const person of report.staff) rows.push([person.name || t("reportConsole"), person.receipts, euros(person.grossCents), euros(person.tipsCents ?? 0)]);
+  rows.push([]);
+  rows.push([t("reportItems"), t("reportQuantity"), t("reportGross")]);
+  for (const item of report.items) rows.push([itemName(item), item.quantity, euros(item.grossCents)]);
+  return rows;
+}
+
+/**
  * One series of bars over a baseline: takings per hour or per day. Thin bars
  * with a small gap, the values on hover and in the table beside it — the
  * chart is for the shape, the table for the numbers.
@@ -141,8 +181,10 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
     <div className="list-head">
       <div>
         <h1>{t("reportsTitle")}</h1>
-        
       </div>
+      {report && (totals?.receipts !== 0 || totals?.stornos !== 0) && <div className="list-head-actions">
+        <button type="button" className="ghost-action" data-action="report-csv" onClick={() => downloadCsv(`sales-report_${suffix}.csv`, fullReportRows(report, t, itemName))}>⬇ {t("reportExportAll")}</button>
+      </div>}
     </div>
 
     <div className="report-range">
