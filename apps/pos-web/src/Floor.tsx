@@ -325,9 +325,10 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
         <button type="submit">{t("open")}</button>
       </form>
       <button type="button" className="pos-scan-open" id="posScanBooking" onClick={() => setScanning(true)}>{t("scanBooking")}</button>
+      <button type="button" className="pos-topup-open" onClick={() => go({ name: "topup" })}>{t("topUp")}</button>
       <button type="button" className="pos-primary" onClick={() => void newTakeaway()}>{t("newTakeaway")}</button>
     </div>
-    {scanning && <BookingScanner pos={pos} onFound={(code) => { setScanning(false); void scanned(pos, code, bookings, () => void load(), setSeating); }} onClose={() => setScanning(false)} />}
+    {scanning && <BookingScanner pos={pos} bookings={bookings} onFound={(code) => { setScanning(false); void scanned(pos, code, bookings, () => void load(), setSeating); }} onClose={() => setScanning(false)} />}
     {seating && <SeatDialog pos={pos} booking={seating} tables={tables} onCancel={() => setSeating(null)} onSeat={(table) => void doSeat(seating, table)} />}
     <h2>{t("tables")}</h2>
     <div className="pos-table-grid">{room.map(tile)}</div>

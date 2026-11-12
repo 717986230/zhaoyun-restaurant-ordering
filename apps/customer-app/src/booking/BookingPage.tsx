@@ -224,11 +224,15 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
   {/* A second pane of glass over the first, outside it so it covers the whole screen. */}
   {createPortal(<AnimatePresence>
     {sheet ? <Sheet key={sheet} id="bookingPanel" title={b(language, sheet === "bookings" ? "myBookings" : "account")} closeLabel={b(language, "close")} onClose={() => setSheet(null)}>
-      {!customer
-        ? <p className="bk-muted" id="bookingSignInToSee">{b(language, "signInToSee")}</p>
-        : sheet === "bookings"
-          // The booking open on the page is not listed a second time.
-          ? others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => { void loadMine(); refreshCustomer(); }} /> : <p className="bk-muted">{b(language, "noBookings")}</p>
+      {sheet === "bookings"
+        // Signed in: the guest's own list (the booking open on the page is not listed a second time).
+        // Always: finding a booking again by its number and contact, for a guest with no account or saved link.
+        ? <>
+            {customer ? (others.length ? <MyBookings language={language} bookings={others} info={info} onChange={() => { void loadMine(); refreshCustomer(); }} /> : <p className="bk-muted">{b(language, "noBookings")}</p>) : null}
+            <LookupCard language={language} onFound={(reservation, token) => { setSheet(null); booked(reservation, token); }} />
+          </>
+        : !customer
+          ? <p className="bk-muted" id="bookingSignInToSee">{b(language, "signInToSee")}</p>
           : <AccountPanel language={language} info={info} customer={customer} onRefreshed={setCustomer} onSignOut={() => { setSheet(null); void signOut(); }} />}
     </Sheet> : null}
   </AnimatePresence>, document.body)}
@@ -262,6 +266,45 @@ function MemberCode({ language, customer, id }: { language: BookingLanguage; cus
     </button>
     {shown && qr ? <span className="bk-member-code"><img id={id} src={qr} alt={b(language, "memberQrAlt")} width="220" height="220" /></span> : null}
   </>;
+}
+
+/**
+ * Finding a booking again by its number and the phone or email it was made
+ * with — for a guest with no account and no saved link, who only has the
+ * reference the page showed them. A match opens the booking the same way a
+ * fresh one does, from where they can see it or cancel it.
+ */
+function LookupCard({ language, onFound }: { language: BookingLanguage; onFound: (reservation: ApiGuestReservation, token: string) => void }) {
+  const [reference, setReference] = useState("");
+  const [contact, setContact] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { reservation, token } = await api.lookupReservation(reference.trim(), contact.trim());
+      onFound(reservation, token);
+    } catch (failure) {
+      setError(failure instanceof ApiError && failure.status === 429 ? bookingError(language, "RATE") : b(language, "lookupNotFound"));
+      setBusy(false);
+    }
+  }
+  const ready = reference.trim().length >= 4 && contact.trim().length >= 3;
+  return <section className="bk-card" id="bookingLookup">
+    <h2>{b(language, "lookupTitle")}</h2>
+    <p className="bk-muted">{b(language, "lookupLead")}</p>
+    {error ? <p className="bk-error" role="alert">{error}</p> : null}
+    <form onSubmit={submit}>
+      <label className="bk-field"><span>{b(language, "lookupReference")}</span>
+        <input id="bookingLookupReference" value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" spellCheck={false} maxLength={14} /></label>
+      <label className="bk-field"><span>{b(language, "lookupContact")}</span>
+        <input id="bookingLookupContact" value={contact} onChange={(event) => setContact(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} maxLength={254} placeholder={b(language, "contactHint")} /></label>
+      <button type="submit" className="bk-primary" disabled={!ready || busy}>{b(language, busy ? "lookupSubmitting" : "lookupSubmit")}</button>
+    </form>
+  </section>;
 }
 
 /** The signed-in guest's own bookings, each cancellable while it still may be. */
