@@ -9,6 +9,7 @@ import { applyColorScheme, storedColorScheme } from "./app/useColorScheme";
 import { cachedMenuSettings } from "./app/useCatalog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "../../../src/styles.css";
+import "../../../src/member-tier.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
