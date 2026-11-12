@@ -8,10 +8,19 @@
 
 import { DEFAULT_TIME_ZONE, isOnSchedule } from "../src/schedule.js";
 import { normalizeAllergens } from "../src/allergens.js";
+import { TAG_COLORS } from "../src/tag-colors.js";
 import { bool, parseJson, priceToCents, uuid } from "./core.mjs";
 import { PRINT_STATIONS } from "./printing.mjs";
 
 export const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
+
+/** The one colour a dish may carry, if the owner picked one: a palette value,
+ *  or "" for none (then the POS falls back to the category's colour). */
+const TAG_COLOR_SET = new Set(TAG_COLORS);
+export function normalizeTagColor(value) {
+  const colour = String(value ?? "").trim();
+  return TAG_COLOR_SET.has(colour) ? colour : "";
+}
 
 /**
  * The Austrian rates a restaurant charges (§ 10 UStG): 10% for food, 20% for
@@ -60,6 +69,7 @@ export function mapProduct(row, media = [], stock = null) {
       art: row.art,
       pattern: row.pattern
     },
+    tagColor: row.tag_color || null,
     modifiers: parseJson(row.modifiers_json, []),
     bundleItems: parseJson(row.bundle_items_json, []),
     available: Boolean(row.available),
@@ -108,6 +118,7 @@ export function normalizeProduct(input, current = {}) {
     ingredients: String(details.ingredients ?? current.ingredients ?? "").trim(),
     art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#2d3a35,#121416 78%)"),
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
+    tagColor: normalizeTagColor(input.tagColor ?? current.tag_color),
     modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
     bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
@@ -139,6 +150,7 @@ export function duplicateInput(product) {
     allergens: product.allergens,
     details: product.details,
     appearance: product.appearance,
+    tagColor: product.tagColor,
     modifiers: product.modifiers,
     bundleItems: product.bundleItems,
     available: product.available,
