@@ -1348,6 +1348,15 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return coded(error);
         }
       }
+
+      // 会员数据看板 (read-only): GET /api/admin/reports/members?from=YYYY-MM-DD&to=YYYY-MM-DD
+      if (path.length === 4 && path[2] === "reports" && path[3] === "members" && method === "GET") {
+        try {
+          return json({ report: await store.memberReport(url.searchParams.get("from"), url.searchParams.get("to")) });
+        } catch (error) {
+          return coded(error);
+        }
+      }
       if (path[2] === "customers") {
         const customers = store.customers;
         try {

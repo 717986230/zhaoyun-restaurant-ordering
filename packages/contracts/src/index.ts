@@ -312,6 +312,23 @@ export interface ApiSalesReport {
   delivery?: ApiDeliveryTotals[];
 }
 
+/** 会员数据看板: read-only member analytics over the manager's days (shared/reports.mjs, GET /api/admin/reports/members). */
+export interface ApiMemberReport {
+  from: string;
+  to: string;
+  timeZone: string;
+  /** total: all members now; new: accounts opened in the window; active: members who earned points or spent balance in the window. */
+  members: { total: number; new: number; active: number };
+  /** outstandingCents: balance held now; the rest is over the window — top-up principal, the house's bonus, and balance spent. */
+  balance: { outstandingCents: number; topUpCents: number; bonusCents: number; spentCents: number };
+  /** outstanding: points held now; earned and redeemed over the window. */
+  points: { outstanding: number; earned: number; redeemed: number };
+  /** Over the window: active members, those active on two or more days, and that share as a percentage. */
+  repeat: { buyers: number; repeatBuyers: number; ratePct: number };
+  topBalance: Array<{ id: string; name: string; email: string; balanceCents: number }>;
+  topPoints: Array<{ id: string; name: string; email: string; points: number }>;
+}
+
 /** 今日概况: the day so far (GET /api/admin/today). */
 export interface ApiToday {
   date: string;
