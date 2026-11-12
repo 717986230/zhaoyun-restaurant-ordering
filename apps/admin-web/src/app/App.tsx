@@ -251,6 +251,16 @@ export function App() {
     void loadTables();
   }, [state.tab, loadTables]);
 
+  // Each section is its own page: a tab switched to opens at the top, not
+  // wherever the last one was left scrolled. On a phone the whole window
+  // scrolls; the desktop catalog's framed panes are fresh on each mount, so
+  // taking the window (and the main column) back to the top is enough.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [state.tab]);
+
   // The board and the room follow the floor live (shared/live.mjs): a waiter's
   // order, a guest's call or a paid bill shows at once. Polling stays as the
   // net under it — slow while the channel is open, quick while it is not.
@@ -672,7 +682,7 @@ export function App() {
     </nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     </div>
-    <main>
+    <main ref={mainRef}>
       {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onBulkSave={bulkSaveProducts} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel
         orders={state.orders}
