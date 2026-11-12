@@ -5,6 +5,8 @@ import { App } from "./app/App";
 import { I18nProvider, initialAdminLanguage } from "./app/i18n";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "../../../src/admin.css";
+import "../../../src/popup.css";
+import "../../../src/member-tier.css";
 
 document.documentElement.lang = initialAdminLanguage();
 // A crash in the console reaches the server's log; the address is whatever the console is connected to.

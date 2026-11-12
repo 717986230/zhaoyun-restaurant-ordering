@@ -210,6 +210,7 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
         <div className="report-tile"><small>{t("reportStornos")}</small><b>{totals.stornos}</b></div>
         {(totals.discountCents ?? 0) !== 0 && <div className="report-tile"><small>{t("reportDiscounts")}</small><b>{money(totals.discountCents ?? 0)}</b></div>}
         {totals.vouchersSoldCents !== 0 && <div className="report-tile"><small>{t("reportVouchers")}</small><b>{money(totals.vouchersSoldCents)}</b></div>}
+        {(totals.topUpsSoldCents ?? 0) !== 0 && <div className="report-tile"><small>{t("reportTopUps")}</small><b>{money(totals.topUpsSoldCents ?? 0)}</b></div>}
         {(totals.tipsCents ?? 0) !== 0 && <div className="report-tile"><small>{t("reportTips")}</small><b data-report="tips">{money(totals.tipsCents ?? 0)}</b></div>}
       </div>
 
@@ -230,7 +231,7 @@ export function ReportsPanel({ api, timeZone, failed }: Props) {
         <section className="report-card">
           <h2>{t("reportPayments")}</h2>
           <table className="report-table">
-            <tbody>{(["cash", "card", "voucher"] as const).map((type) => <tr key={type}><td>{t(type === "cash" ? "reportCash" : type === "card" ? "reportCard" : "reportVoucher")}</td><td>{money(totals.payments[type] ?? 0)}</td></tr>)}</tbody>
+            <tbody>{(["cash", "card", "voucher", "balance"] as const).map((type) => (type === "balance" && (totals.payments.balance ?? 0) === 0 ? null : <tr key={type}><td>{t(type === "cash" ? "reportCash" : type === "card" ? "reportCard" : type === "voucher" ? "reportVoucher" : "reportBalance")}</td><td>{money(totals.payments[type] ?? 0)}</td></tr>))}</tbody>
           </table>
           <h2>{t("reportVat")}</h2>
           <table className="report-table">

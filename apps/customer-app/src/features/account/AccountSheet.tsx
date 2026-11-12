@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ApiMenuSettings } from "@zhaoyun/contracts";
+import type { ApiBirthday, ApiMenuSettings } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import type { Product } from "@zhaoyun/domain";
+import { memberTierVisual } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
-import { g, pointsReason } from "../../app/guest-i18n";
-import { productName, t } from "../../app/i18n";
+import { balanceReason, g, pointsReason, tierRank } from "../../app/guest-i18n";
+import { formatPrice, productName, t } from "../../app/i18n";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import type { OrderingState } from "../../app/ordering";
 import { Sheet } from "../../components/Sheet";
 import type { CustomerAccount } from "./useCustomer";
+import { MemberBadge } from "./MemberBadge";
+import { useTierEntry } from "./useTierEntry";
 
 interface Props {
   state: CustomerState;
@@ -17,6 +20,7 @@ interface Props {
   products: Product[];
   account: CustomerAccount;
   loyalty: ApiMenuSettings["loyalty"];
+  birthdayPerk: ApiMenuSettings["birthdayPerk"];
   ordering: OrderingState;
   /** Who keeps the data, for the privacy notice. */
   restaurantName: string;
@@ -59,12 +63,12 @@ async function downloadMyData(language: Language, dispatch: CustomerDispatch) {
  * and once in, their points and the rewards they buy with them, their
  * orders, and their settings — deleting the account included.
  */
-export function AccountSheet({ state, dispatch, products, account, loyalty, ordering, restaurantName, signupPoints }: Props) {
+export function AccountSheet({ state, dispatch, products, account, loyalty, birthdayPerk, ordering, restaurantName, signupPoints }: Props) {
   const language = state.language;
   const close = () => dispatch({ type: "sheet", sheet: null });
   return <Sheet id="accountSheet" title={g(language, "account")} closeLabel={t(language, "close")} onClose={close}>
     {account.signedIn && account.customer
-      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={restaurantName} signupPoints={signupPoints} />
+      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} birthdayPerk={birthdayPerk} ordering={ordering} restaurantName={restaurantName} signupPoints={signupPoints} />
       : <SignInForm language={language} account={account} restaurantName={restaurantName} signupPoints={signupPoints} />}
   </Sheet>;
 }
@@ -132,7 +136,7 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
   </form>;
 }
 
-function SignedIn({ state, dispatch, products, account, loyalty, ordering, restaurantName }: Props) {
+function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, ordering, restaurantName }: Props) {
   const language = state.language;
   const customer = account.customer!;
   const byId = new Map(products.map((product) => [product.id, product]));
@@ -142,6 +146,22 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
   });
   const [showHistory, setShowHistory] = useState(false);
   const history = useQuery({ queryKey: ["customer-points", customer.id, customer.points], enabled: showHistory, queryFn: () => restaurantApi.customerPoints() });
+  const [showTopUps, setShowTopUps] = useState(false);
+  const topUps = useQuery({ queryKey: ["customer-balance", customer.id, customer.balanceCents], enabled: showTopUps, queryFn: () => restaurantApi.customerBalance() });
+  const [saved, setSaved] = useState<ApiBirthday | null>(customer.membership?.birthday ?? null);
+  const [bMonth, setBMonth] = useState(saved?.month ?? 0);
+  const [bDay, setBDay] = useState(saved?.day ?? 0);
+  async function saveBirthday() {
+    if (!bMonth || !bDay) return;
+    try {
+      const { birthday } = await restaurantApi.setCustomerBirthday(bMonth, bDay);
+      setSaved(birthday);
+      dispatch({ type: "toast", message: g(language, "birthdaySaved") });
+    } catch (error) {
+      dispatch({ type: "toast", message: error instanceof ApiError ? error.message : g(language, "birthdaySaved") });
+    }
+  }
+  const dateOf = (iso: string) => new Date(iso).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB");
 
   function redeem(product: Product, points: number) {
     dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [], reward: true });
@@ -149,19 +169,42 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
     dispatch({ type: "sheet", sheet: "cart" });
   }
 
-  return <div className="guest-account">
+  const tierLevel = customer.membership?.tierLevel ?? 0;
+  const visual = memberTierVisual(tierLevel);
+  const { entering, muted, toggleMuted } = useTierEntry(visual?.theme ?? null);
+
+  return <div
+    className={`guest-account${visual ? " member-themed" : ""}${visual?.skin ? ` tier-skin-${visual.skin}` : ""}${entering ? " tier-entering" : ""}`}
+    data-tier-theme={visual?.theme}
+  >
+    {visual && <div className="member-crest" data-tier-theme={visual.theme}>
+      <div className="member-crest-art">
+        <MemberBadge level={tierLevel} rank={tierRank(language, visual.theme)} size="lg" animate={entering} initial={customer.name || customer.email} />
+      </div>
+      <div className="member-crest-text">
+        <span className="member-crest-rank">{tierRank(language, visual.theme)}</span>
+        <strong className="member-crest-name">{customer.membership?.tier}</strong>
+        <span className="member-crest-meta">
+          {customer.membership && customer.membership.discountPercent > 0 && <em>{g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}</em>}
+          <small>{g(language, "memberGrowth", { amount: formatPrice(customer.membership?.growthCents ?? 0, language) })}</small>
+        </span>
+        {visual.skin && <span className="member-crest-skin">{g(language, visual.skin === "gilded" ? "exclusiveGilded" : "exclusiveDark")}</span>}
+        <button type="button" className="member-mute" onClick={toggleMuted} aria-pressed={!muted}>{muted ? "🔕" : "🔔"} {g(language, muted ? "soundOff" : "soundOn")}</button>
+      </div>
+    </div>}
     {account.signupBonus > 0 && <p className="signup-bonus" id="signupBonusGot" role="status">{g(language, "signupBonusGot", { n: account.signupBonus })}</p>}
     <div className="guest-card">
       <div>
         <strong>{g(language, "welcome", { name: customer.name || customer.email.split("@")[0] || customer.email })}</strong>
         <small>{customer.email}</small>
+        {customer.membership?.tier && !visual && <small className="member-tier">{g(language, "myTier")}: {customer.membership.tier}{customer.membership.discountPercent > 0 ? ` · ${g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}` : ""}</small>}
       </div>
       {loyalty && <div className="points-balance" aria-label={g(language, "points")}><b>{customer.points}</b><small>{g(language, "points")}</small></div>}
     </div>
 
     {loyalty && <section className="guest-section">
       <h3>{g(language, "rewards")}</h3>
-      <p className="cart-hint">{g(language, "pointsLead", { n: loyalty.pointsPerEuro })}</p>
+      <p className="cart-hint">{g(language, "pointsLead", { n: loyalty.pointsPerEuro, e: loyalty.eurosPerPoint ?? 1 })}{loyalty.topUpPoints ? ` · ${g(language, "pointsTopUp")}` : ""}</p>
       {rewards.length > 0 && <ul className="reward-list">{rewards.map(({ product, points }) => {
         const affordable = customer.points >= points;
         return <li key={product.id}>
@@ -173,9 +216,46 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
       })}</ul>}
       <button type="button" className="link-button" onClick={() => setShowHistory(!showHistory)}>{g(language, "pointsHistory")} {showHistory ? "▴" : "▾"}</button>
       {showHistory && <ul className="points-history">{(history.data?.entries ?? []).map((entry) => <li key={entry.id}>
-        <span>{pointsReason(language, entry.reason, entry.kind)}{entry.note ? ` · ${entry.note}` : ""}<small>{new Date(entry.createdAt).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")}</small></span>
+        <span>{pointsReason(language, entry.reason, entry.kind)}{entry.note ? ` · ${entry.note}` : ""}<small>{dateOf(entry.createdAt)}</small></span>
         <b className={entry.delta > 0 ? "plus" : "minus"}>{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</b>
       </li>)}</ul>}
+    </section>}
+
+    {(customer.balanceCents ?? 0) > 0 && <section className="guest-section">
+      <h3>{g(language, "myBalance")}</h3>
+      <div className="points-balance" aria-label={g(language, "myBalance")}><b>{formatPrice(customer.balanceCents ?? 0, language)}</b></div>
+      <p className="cart-hint">{g(language, "topUpAtCounter")}</p>
+      <button type="button" className="link-button" onClick={() => setShowTopUps(!showTopUps)}>{g(language, "topUpHistory")} {showTopUps ? "▴" : "▾"}</button>
+      {showTopUps && <ul className="points-history">
+        {(topUps.data?.entries ?? []).map((entry) => <li key={entry.id}>
+          <span>{balanceReason(language, entry.reason)}{entry.note ? ` · ${entry.note}` : ""}<small>{dateOf(entry.createdAt)}</small></span>
+          <b className={entry.deltaCents > 0 ? "plus" : "minus"}>{entry.deltaCents > 0 ? `+${formatPrice(entry.deltaCents, language)}` : formatPrice(entry.deltaCents, language)}</b>
+        </li>)}
+        {topUps.data && topUps.data.entries.length === 0 && <li className="cart-hint">{g(language, "noTopUps")}</li>}
+      </ul>}
+    </section>}
+
+    {birthdayPerk && <section className="guest-section">
+      <h3>{g(language, "myBirthday")}</h3>
+      {customer.membership?.birthdayMonth
+        ? <p className="cart-hint">{g(language, "birthdayMonthNote", { percent: birthdayPerk.discountPercent })}</p>
+        : <p className="cart-hint">{g(language, "birthdayHint", { percent: birthdayPerk.discountPercent })}</p>}
+      {birthdayPerk.email && <p className="cart-hint">{g(language, "birthdayEmailNote")}</p>}
+      <div className="birthday-fields">
+        <label><span>{g(language, "birthMonth")}</span>
+          <select value={bMonth} onChange={(event) => setBMonth(Number(event.target.value))}>
+            <option value={0}>—</option>
+            {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => <option key={month} value={month}>{month}</option>)}
+          </select>
+        </label>
+        <label><span>{g(language, "birthDay")}</span>
+          <select value={bDay} onChange={(event) => setBDay(Number(event.target.value))}>
+            <option value={0}>—</option>
+            {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => <option key={day} value={day}>{day}</option>)}
+          </select>
+        </label>
+        <button type="button" className="secondary" disabled={!bMonth || !bDay || (saved?.month === bMonth && saved?.day === bDay)} onClick={() => void saveBirthday()}>{g(language, "birthdaySave")}</button>
+      </div>
     </section>}
 
     <div className="guest-actions">
