@@ -15,7 +15,7 @@ function report(overrides: Partial<ApiSalesReport> = {}): ApiSalesReport {
     totals: {
       sales: 2, stornos: 0, firstReceiptNo: 1, lastReceiptNo: 2,
       grossCents: 5000, vat: [{ percent: 10, grossCents: 5000, netCents: 4545, vatCents: 455 }],
-      payments: { cash: 3000, card: 2000, voucher: 0 }, vouchersSoldCents: 0,
+      payments: { cash: 3000, card: 2000, voucher: 0, balance: 0 }, vouchersSoldCents: 0,
       cashCents: 3000, receipts: 2, averageCents: 2500
     },
     days: [{ date: "2026-10-01", receipts: 2, grossCents: 5000 }],

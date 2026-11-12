@@ -97,8 +97,9 @@ export function fullReportRows(
   if ((totals.tipsCents ?? 0) !== 0) rows.push([t("reportTips"), euros(totals.tipsCents ?? 0)]);
   rows.push([]);
   rows.push([t("reportPayments")]);
-  for (const type of ["cash", "card", "voucher"] as const) {
-    rows.push([t(type === "cash" ? "reportCash" : type === "card" ? "reportCard" : "reportVoucher"), euros(totals.payments[type] ?? 0)]);
+  for (const type of ["cash", "card", "voucher", "balance"] as const) {
+    if (type === "balance" && (totals.payments.balance ?? 0) === 0) continue;
+    rows.push([t(type === "cash" ? "reportCash" : type === "card" ? "reportCard" : type === "voucher" ? "reportVoucher" : "reportBalance"), euros(totals.payments[type] ?? 0)]);
   }
   rows.push([]);
   rows.push([t("reportVat"), t("billNet"), t("billVat"), t("billGross")]);
