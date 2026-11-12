@@ -56,3 +56,9 @@ test("membershipStatus carries the level name and its discount", () => {
   assert.deepEqual(membershipStatus(100, tiers), { growthCents: 100, tier: null, discountPercent: 0 });
   assert.equal(membershipStatus(-5, tiers).growthCents, 0, "a negative growth never shows");
 });
+
+test("tier thresholds count lifetime top-ups, so they may exceed one top-up's 1000-euro cap", () => {
+  const tiers = normalizeMemberTiers({ enabled: true, tiers: [{ name: "Gold", thresholdCents: 1_999_900, discountPercent: 10 }] });
+  assert.equal(tiers.tiers[0].thresholdCents, 1_999_900);
+  assert.throws(() => normalizeMemberTiers({ enabled: true, tiers: [{ name: "X", thresholdCents: 100_000_001, discountPercent: 1 }] }));
+});

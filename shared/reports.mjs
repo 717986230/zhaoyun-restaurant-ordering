@@ -136,7 +136,7 @@ export const REPORT_RECEIPTS_SQL = "SELECT * FROM receipts WHERE created_at >= ?
  *  - totals:   { members, points, balanceCents } — counts across all members now.
  *  - newMembers:   [{ created_at }]            — accounts opened in the window.
  *  - balanceLedger:[{ customer_id, delta_cents, reason, created_at }]
- *  - pointsLedger: [{ customer_id, delta_cents, created_at }]
+ *  - pointsLedger: [{ customer_id, delta, created_at }]   (points, not cents)
  *  - topBalance / topPoints: already ordered and capped by SQL.
  */
 export function memberReport(data, range, timeZone) {
@@ -166,7 +166,7 @@ export function memberReport(data, range, timeZone) {
   let redeemed = 0;
   for (const row of data.pointsLedger ?? []) {
     if (!inDays(row.created_at)) continue;
-    const delta = row.delta_cents ?? 0;
+    const delta = row.delta ?? 0;
     if (delta > 0) earned += delta;
     else redeemed += -delta;
   }
@@ -181,7 +181,7 @@ export function memberReport(data, range, timeZone) {
     set.add(local(iso).date);
     daysByMember.set(customerId, set);
   };
-  for (const row of data.pointsLedger ?? []) if ((row.delta_cents ?? 0) > 0) note(row.customer_id, row.created_at);
+  for (const row of data.pointsLedger ?? []) if ((row.delta ?? 0) > 0) note(row.customer_id, row.created_at);
   for (const row of data.balanceLedger ?? []) if (row.reason === "spend") note(row.customer_id, row.created_at);
   let repeatBuyers = 0;
   for (const set of daysByMember.values()) if (set.size >= 2) repeatBuyers += 1;
@@ -203,7 +203,7 @@ export function memberReport(data, range, timeZone) {
 
 /** The member ledgers over the wide window, read for memberReport (store.mjs). */
 export const MEMBER_BALANCE_LEDGER_SQL = "SELECT customer_id, delta_cents, reason, created_at FROM balance_ledger WHERE created_at >= ? AND created_at < ?";
-export const MEMBER_POINTS_LEDGER_SQL = "SELECT customer_id, delta_cents, created_at FROM points_ledger WHERE created_at >= ? AND created_at < ?";
+export const MEMBER_POINTS_LEDGER_SQL = "SELECT customer_id, delta, created_at FROM points_ledger WHERE created_at >= ? AND created_at < ?";
 export const MEMBER_NEW_SQL = "SELECT created_at FROM customers WHERE created_at >= ? AND created_at < ?";
 export const MEMBER_TOP_BALANCE_SQL = "SELECT c.id, c.name, c.email, mb.balance_cents FROM member_balances mb JOIN customers c ON c.id = mb.customer_id WHERE mb.balance_cents > 0 ORDER BY mb.balance_cents DESC, c.created_at ASC LIMIT 10";
 export const MEMBER_TOP_POINTS_SQL = "SELECT id, name, email, points FROM customers WHERE points > 0 ORDER BY points DESC, created_at ASC LIMIT 10";

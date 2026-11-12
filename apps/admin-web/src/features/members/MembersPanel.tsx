@@ -132,9 +132,25 @@ function BirthdayPerkForm({ perk, onSave }: { perk: ApiBirthdayPerk; onSave: (va
     <p className="settings-hint">{t("birthdayPerkHint")}</p>
     <Toggle checked={draft.greetByEmail} label={t("birthdayGreetEmail")} onChange={(greetByEmail) => setDraft({ ...draft, greetByEmail })} />
     <p className="settings-hint">{t("birthdayGreetEmailHint")}</p>
-    <label><span>{t("birthdayPerkDiscount")}</span><input type="number" min={0} max={100} step={1} value={draft.discountPercent} onChange={(event) => setDraft({ ...draft, discountPercent: Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))) })} /></label>
+    <label><span>{t("birthdayPerkDiscount")}</span><WholeNumberInput max={100} value={draft.discountPercent} onChange={(discountPercent) => setDraft({ ...draft, discountPercent })} /></label>
     <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
   </form>;
+}
+
+/**
+ * Whole-number field for settings. A text field with the numeric keypad instead of
+ * type="number": no browser "must be ≤ max" bubble on every keystroke, no leading
+ * zeros ("02999"), and an empty field can be typed into. Values over max are clamped.
+ */
+function WholeNumberInput({ value, max, onChange }: { value: number; max: number; onChange: (value: number) => void }) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => { setText((current) => (current === "" && value === 0 ? current : String(value))); }, [value]);
+  return <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" value={text} onChange={(event) => {
+    const digits = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+    const next = digits ? Math.min(max, Number(digits)) : 0;
+    setText(digits ? String(next) : "");
+    onChange(next);
+  }} onBlur={() => setText(String(value))} />;
 }
 
 /**
@@ -154,8 +170,8 @@ function MemberTiersForm({ memberTiers, onSave }: { memberTiers: ApiMemberTiers;
     <p className="settings-hint">{t("memberTiersHint")}</p>
     <ul className="reward-rows">{draft.tiers.map((tier, index) => <li key={index}>
       <label><span>{t("memberTierName")}</span><input type="text" maxLength={40} value={tier.name} onChange={(event) => setTier(index, "name", event.target.value)} /></label>
-      <label><span>{t("memberTierThreshold")}</span><input type="number" min={0} max={1000} step={1} value={tier.thresholdCents / 100} onChange={(event) => setTier(index, "thresholdCents", Math.round(Number(event.target.value) * 100))} /></label>
-      <label><span>{t("memberTierDiscount")}</span><input type="number" min={0} max={100} step={1} value={tier.discountPercent} onChange={(event) => setTier(index, "discountPercent", Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
+      <label><span>{t("memberTierThreshold")}</span><WholeNumberInput max={1_000_000} value={tier.thresholdCents / 100} onChange={(euros) => setTier(index, "thresholdCents", euros * 100)} /></label>
+      <label><span>{t("memberTierDiscount")}</span><WholeNumberInput max={100} value={tier.discountPercent} onChange={(percent) => setTier(index, "discountPercent", percent)} /></label>
       <button type="button" className="ghost-action" aria-label={t("remove")} onClick={() => setDraft({ ...draft, tiers: draft.tiers.filter((_, at) => at !== index) })}>✕</button>
     </li>)}</ul>
     {draft.tiers.length < 8 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { name: "", thresholdCents: 10000, discountPercent: 5 }] })}>{t("memberTierAdd")}</button>}
@@ -176,8 +192,8 @@ function MembershipForm({ membership, onSave }: { membership: ApiMembership; onS
     <p className="settings-label">{t("membershipTiers")}</p>
     <p className="settings-hint">{t("membershipTiersHint")}</p>
     <ul className="reward-rows">{draft.tiers.map((tier, index) => <li key={index}>
-      <label><span>{t("membershipThreshold")}</span><input type="number" min={1} max={1000} step={1} value={tier.thresholdCents / 100} onChange={(event) => setTier(index, "thresholdCents", Math.round(Number(event.target.value) * 100))} /></label>
-      <label><span>{t("membershipBonus")}</span><input type="number" min={0} max={1000} step={1} value={tier.bonusCents / 100} onChange={(event) => setTier(index, "bonusCents", Math.round(Number(event.target.value) * 100))} /></label>
+      <label><span>{t("membershipThreshold")}</span><WholeNumberInput max={1000} value={tier.thresholdCents / 100} onChange={(euros) => setTier(index, "thresholdCents", euros * 100)} /></label>
+      <label><span>{t("membershipBonus")}</span><WholeNumberInput max={1000} value={tier.bonusCents / 100} onChange={(euros) => setTier(index, "bonusCents", euros * 100)} /></label>
       <button type="button" className="ghost-action" aria-label={t("remove")} onClick={() => setDraft({ ...draft, tiers: draft.tiers.filter((_, at) => at !== index) })}>✕</button>
     </li>)}</ul>
     {draft.tiers.length < 20 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { thresholdCents: 10000, bonusCents: 1000 }] })}>{t("membershipAddTier")}</button>}

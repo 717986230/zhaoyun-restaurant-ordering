@@ -48,9 +48,9 @@ test("points earned and redeemed split by the sign of the delta", () => {
   const data = {
     totals: { members: 3, points: 0, balanceCents: 0 },
     pointsLedger: [
-      { customer_id: "a", delta_cents: 50, created_at: "2026-06-01T10:00:00.000Z" },
-      { customer_id: "a", delta_cents: -20, created_at: "2026-06-01T11:00:00.000Z" },
-      { customer_id: "b", delta_cents: 30, created_at: "2026-06-01T12:00:00.000Z" }
+      { customer_id: "a", delta: 50, created_at: "2026-06-01T10:00:00.000Z" },
+      { customer_id: "a", delta: -20, created_at: "2026-06-01T11:00:00.000Z" },
+      { customer_id: "b", delta: 30, created_at: "2026-06-01T12:00:00.000Z" }
     ],
     balanceLedger: []
   };
@@ -71,7 +71,7 @@ test("repeat rate counts members active on two or more days", () => {
     ],
     pointsLedger: [
       // Same member, same day as a spend: still one active day, not two.
-      { customer_id: "loyal", delta_cents: 10, created_at: "2026-06-01T11:00:00.000Z" }
+      { customer_id: "loyal", delta: 10, created_at: "2026-06-01T11:00:00.000Z" }
     ]
   };
   const report = memberReport(data, wide, TZ);
