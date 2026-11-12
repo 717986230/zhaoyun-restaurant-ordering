@@ -468,7 +468,7 @@ test("the console says Admin, and switches its own language without touching the
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日菜品订单桌位预约外卖报表打印顾客设置跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日菜品订单桌位预约外卖报表打印顾客会员设置跳转");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
@@ -503,12 +503,12 @@ test("orders, tables and printers stay out of the way until ordering is switched
   appSettings.showOrdering = false;
   await page.reload();
   const nav = page.getByRole("navigation", { name: "管理模块" });
-  await expect(nav).toHaveText("今日菜品预约外卖顾客设置跳转");
+  await expect(nav).toHaveText("今日菜品预约外卖顾客会员设置跳转");
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("今日菜品订单桌位预约外卖报表打印顾客设置跳转");
+  await expect(nav).toHaveText("今日菜品订单桌位预约外卖报表打印顾客会员设置跳转");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
@@ -1334,4 +1334,33 @@ test("the dishes still without a photo are one tap away, and the tap goes once t
   await page.reload();
   await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator("#filterNoPhoto")).toHaveCount(0);
+});
+
+test("the photo field shows the current picture, the 待上传 gap, and the file just picked", async ({ page }) => {
+  const dish = (id, media) => ({
+    id, sku: `D${id}`, kind: "food", category: "MAIN", names: { zh: `菜 ${id}`, de: `Gericht ${id}`, en: `Dish ${id}` }, description: "",
+    price: 10, allergens: [], details: {}, appearance: { art: "#222", pattern: "ring" }, available: true, published: true, printStation: "kitchen", modifiers: [],
+    media: media ? [{ type: "image", url: "/media/have.jpg" }] : []
+  });
+  await page.unroute("**/api/admin/products");
+  await page.route("**/api/admin/products", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ products: [dish("1", true), dish("2", false)] }) }));
+  // A 1×1 PNG so the current-photo preview has something real to draw.
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC", "base64");
+  await page.route("**/media/have.jpg", (route) => route.fulfill({ status: 200, contentType: "image/png", body: png }));
+  await page.reload();
+  await page.getByRole("button", { name: "菜品", exact: true }).click();
+
+  // A dish with a photo shows it, and the field offers to replace it.
+  await page.locator(".product-row", { hasText: "菜 1" }).click();
+  const field = page.locator(".upload-zone");
+  await expect(field.locator(".upload-preview")).toHaveAttribute("src", /\/media\/have\.jpg/);
+  await expect(field).toContainText("点此更换照片");
+
+  // A dish with none shows the 待上传 gap; picking a file previews it at once.
+  await page.locator(".editor-back").click();
+  await page.locator(".product-row", { hasText: "菜 2" }).click();
+  await expect(field.locator(".upload-pending")).toHaveText("待上传");
+  await field.locator('input[name="media"]').setInputFiles({ name: "new.png", mimeType: "image/png", buffer: png });
+  await expect(field.locator(".upload-preview")).toHaveAttribute("src", /^blob:/);
+  await expect(field).toContainText("已选好");
 });
