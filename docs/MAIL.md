@@ -25,6 +25,7 @@
    npx wrangler secret put BREVO_API_KEY        # 第 4 步的密钥
    npx wrangler secret put BREVO_SENDER_EMAIL   # 第 3 步已验证的发件邮箱
    npx wrangler secret put BREVO_SENDER_NAME    # 发件人名称（可不填，默认用餐厅名）
+   npx wrangler secret put OWNER_ALERT_EMAIL    # 可选：系统出错时给店主发告警邮件的收件地址（见 docs/OPERATIONS.md 第 2 节）
    ```
 
    Node 服务器（自己托管的情况）用同名的环境变量。

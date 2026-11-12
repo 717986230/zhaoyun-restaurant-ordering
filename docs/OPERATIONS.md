@@ -44,6 +44,10 @@ Worker 自己的密钥用 `npx wrangler secret put ADMIN_TOKEN` 设置，至少 
   - 用请求编号一搜就能找到那次出错。服务器出错会写一行 JSON，包含 `level`、`requestId`、`method`、`path`、`error`。
 - **前端错误**：顾客手机、平板、管理台上的页面出错时，也会写进 Workers Logs，搜 `"client error"` 就能找到。
   每条记录包括哪个应用（menu、pos、admin）、错误信息、出错位置和页面路径。
+- **出错告警邮件（可选）**：系统遇到没预料到的错误（接口返回 500）时，可以自动给店主发一封告警邮件，不用一直盯着日志。
+  - 开启：先配好邮件（Brevo，见 `docs/MAIL.md`），再设一个收件地址：`npx wrangler secret put OWNER_ALERT_EMAIL`，填店主自己的邮箱。
+  - 不设 `OWNER_ALERT_EMAIL`、或没配 Brevo 时，和以前一样只写日志、不发邮件。
+  - 为了不被刷屏，同一台 Worker 实例 **10 分钟内最多发一封**；邮件里带出错的请求和编号，可直接拿去 Workers Logs 搜。
 - **打印**：管理台 → 打印，会显示每台打印机和打印桥是否在线；没打出来的单子也会显示在每台 POS 的桌台页顶部（见 `docs/PRINTING.md`）。
 
 ## 3. 备份
