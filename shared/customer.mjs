@@ -262,6 +262,45 @@ export function membershipStatus(growthCents, memberTiers) {
   return { growthCents: Math.max(0, growthCents | 0), tier: tier?.name ?? null, discountPercent: tier?.discountPercent ?? 0 };
 }
 
+/**
+ * 生日营销 (birthday perk) as the owner sets it (app_settings "birthdayPerk").
+ * Off until switched on. In their birthday month a member is offered
+ * `discountPercent` off at the till, through the same whole-bill discount a
+ * tier uses. A member enters only their birth month and day — never the year.
+ */
+export const BIRTHDAY_PERK_DEFAULTS = Object.freeze({ enabled: false, discountPercent: 0 });
+
+export function normalizeBirthdayPerk(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Birthday-perk settings must be an object");
+  const known = new Set(Object.keys(BIRTHDAY_PERK_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown birthday-perk setting ${key}`);
+  const merged = { ...BIRTHDAY_PERK_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Birthday perk enabled must be true or false");
+  const discountPercent = Number(merged.discountPercent);
+  if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("The birthday discount is 0 to 100 percent");
+  return { enabled: merged.enabled, discountPercent };
+}
+
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** A birthday a member gives — month and day only (29 Feb allowed). Throws on a bad date. */
+export function normalizeBirthday(input) {
+  const month = Number(input?.month);
+  const day = Number(input?.day);
+  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error("A birthday month is 1 to 12");
+  if (!Number.isInteger(day) || day < 1 || day > DAYS_IN_MONTH[month - 1]) throw new Error("That is not a day in the month");
+  return { month, day };
+}
+
+/** Whether `birthday` falls in month `month` (1–12): the window the perk is live. */
+export function isBirthdayMonth(birthday, month) {
+  return Boolean(birthday) && Number(birthday.month) === Number(month);
+}
+
+export const MEMBER_BIRTHDAY_SQL = "SELECT month, day FROM member_birthdays WHERE customer_id = ?";
+export const UPSERT_BIRTHDAY_SQL = "INSERT INTO member_birthdays (customer_id, month, day, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET month = excluded.month, day = excluded.day, updated_at = excluded.updated_at";
+export const DELETE_BIRTHDAY_SQL = "DELETE FROM member_birthdays WHERE customer_id = ?";
+
 /** A balance ledger line as a member sees it, and as the console lists it. */
 export function balanceEntryView(row) {
   return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, createdAt: row.created_at };

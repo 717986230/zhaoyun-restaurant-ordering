@@ -17,7 +17,7 @@ import { Value } from "@sinclair/typebox/value";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, EmailCodeBody, EmailVerifyBody, MailTestBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
-  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
+  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
@@ -584,6 +584,18 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
         // 会员储值: the guest's own balance history (read-only; top-ups happen at the counter).
         if (rest === "balance" && method === "GET") return json({ entries: await customers.balanceHistory(customer.id) });
+        // 生日营销: the member's own birthday (month and day only), to read or set.
+        if (rest === "birthday" && method === "GET") return json({ birthday: await customers.birthday(customer.id) });
+        if (rest === "birthday" && method === "POST") {
+          const { value, invalid } = await body(request, BirthdayBody);
+          if (invalid) return invalid;
+          if (value.clear) { await customers.clearBirthday(customer.id); return json({ birthday: null }); }
+          try {
+            return json({ birthday: await customers.setBirthday(customer.id, value) });
+          } catch (error) {
+            return fail(error.message, 400);
+          }
+        }
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
         if (rest === "reservations" && method === "GET") return json({ reservations: await store.reservations.forCustomer(customer.id) }, 200, { "cache-control": "no-store" });
