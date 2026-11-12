@@ -1,5 +1,30 @@
 # 测试报告
 
+## 2026-10-20 · 依赖升级（dependabot 生产组 #97、开发组 #96）
+
+合并了两组 dependabot 依赖升级：
+
+- **生产组 (#97)**：`fastify` 5.12.5→5.12.7（含安全补丁 GHSA-389g-gv7q-r4x8）、`@fastify/cors` 11.3.0→11.3.1、`@fastify/static` 10.1.4→10.1.6、`@fastify/websocket` 11.3.1→11.3.4、`@tanstack/react-query` 5.103.2→5.104.3、`react` / `react-dom` 19.3.0→19.3.1。
+- **开发组 (#96)**：`@playwright/test` 1.46→1.64、`vite` 8.3.1→8.3.4、`vitest` 5.0.2→5.0.3、`wrangler` 4.134→4.149、`@vitejs/plugin-react` 6.1.1→6.1.2、`@testing-library/react` 16.3.0→16.3.3、`jsdom` 30.0.1→30.1.2。
+
+合并后在 main 上复核：
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci`（锁文件与 package.json 一致性） | 通过 |
+| `npm run typecheck` | 通过 |
+| `npm run unit` | 132/132 通过 |
+| `npm run server:test` | 143/143 通过 |
+| `npm run build` | 通过 |
+| `npm audit --omit=dev`（运行时依赖） | 0 漏洞 |
+| `npm test`（Playwright 浏览器测试） | 各 PR 的 GitHub CI 三个分片全绿；本地沙箱因 Playwright 1.64 需新版浏览器二进制、环境不允许 `playwright install` 而跳过 |
+
+全量 `npm audit`（含开发依赖）由 **8 条降至 2 条**（1 high + 1 critical，均经 `@capacitor/cli` 的 `tar`，需 major 升级，属独立工程项）。
+
+`motion` 12→14 的大版本升级（PR #56）单列，待人工确认动画表现后再合。
+
+---
+
 日期：2026-09-02
 
 ## 本轮执行结果

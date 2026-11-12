@@ -55,21 +55,66 @@ const COPY = {
     lead: "你的邮箱验证码是：",
     expires: "验证码 {minutes} 分钟内有效。不是你本人操作的话，忽略这封邮件即可。",
     testSubject: "{restaurant}：测试邮件",
-    test: "邮件服务已经连通，顾客会收到这样的验证码邮件。"
+    test: "邮件服务已经连通，顾客会收到这样的验证码邮件。",
+    bookingConfirmedSubject: "{restaurant}：预约已确认 · {date} {time}",
+    bookingPendingSubject: "{restaurant}：预约已收到 · {date} {time}",
+    bookingConfirmedLead: "你的预约已确认：",
+    bookingPendingLead: "我们收到了你的预约，正在确认，确认后会再通知你：",
+    bookingDate: "日期：{date}",
+    bookingTime: "时间：{time}",
+    bookingParty: "人数：{party} 位",
+    bookingTable: "桌号：{table}",
+    bookingReference: "预约号：{reference}",
+    bookingManage: "查看或取消预约：{url}",
+    birthdaySubject: "{restaurant} 祝你生日快乐！",
+    birthdayLead: "{name}，祝你生日快乐！",
+    birthdayOffer: "整个生日月来店用餐，报手机号或邮箱给收银员，即享会员价 {percent}% off。",
+    birthdayPlain: "感谢你一直以来的支持，期待再见到你。",
+    birthdayStop: "不想再收到生日邮件？在账户里清除生日即可。"
   },
   de: {
     subject: "{restaurant} – Ihr Bestätigungscode: {code}",
     lead: "Ihr Bestätigungscode lautet:",
     expires: "Der Code ist {minutes} Minuten gültig. Wenn Sie das nicht angefordert haben, können Sie diese E-Mail ignorieren.",
     testSubject: "{restaurant}: Test-E-Mail",
-    test: "Der E-Mail-Versand funktioniert – so erhalten Gäste ihren Bestätigungscode."
+    test: "Der E-Mail-Versand funktioniert – so erhalten Gäste ihren Bestätigungscode.",
+    bookingConfirmedSubject: "{restaurant} – Reservierung bestätigt · {date} {time}",
+    bookingPendingSubject: "{restaurant} – Reservierung eingegangen · {date} {time}",
+    bookingConfirmedLead: "Ihre Reservierung ist bestätigt:",
+    bookingPendingLead: "Wir haben Ihre Reservierung erhalten und bestätigen sie in Kürze:",
+    bookingDate: "Datum: {date}",
+    bookingTime: "Uhrzeit: {time}",
+    bookingParty: "Personen: {party}",
+    bookingTable: "Tisch: {table}",
+    bookingReference: "Buchungsnr.: {reference}",
+    bookingManage: "Reservierung ansehen oder stornieren: {url}",
+    birthdaySubject: "{restaurant} – alles Gute zum Geburtstag!",
+    birthdayLead: "Liebe/r {name}, alles Gute zum Geburtstag!",
+    birthdayOffer: "Den ganzen Geburtstagsmonat erhalten Sie bei uns {percent}% Mitgliedspreis – einfach an der Kassa Ihre Nummer oder E-Mail nennen.",
+    birthdayPlain: "Danke für Ihre Treue – wir freuen uns auf Ihren nächsten Besuch.",
+    birthdayStop: "Keine Geburtstagsmails mehr? Löschen Sie Ihren Geburtstag im Konto."
   },
   en: {
     subject: "{restaurant} – your verification code: {code}",
     lead: "Your verification code is:",
     expires: "The code is valid for {minutes} minutes. If you did not ask for it, you can ignore this email.",
     testSubject: "{restaurant}: test email",
-    test: "Email is working – this is how guests receive their verification code."
+    test: "Email is working – this is how guests receive their verification code.",
+    bookingConfirmedSubject: "{restaurant} – booking confirmed · {date} {time}",
+    bookingPendingSubject: "{restaurant} – booking received · {date} {time}",
+    bookingConfirmedLead: "Your booking is confirmed:",
+    bookingPendingLead: "We have your booking and will confirm it shortly:",
+    bookingDate: "Date: {date}",
+    bookingTime: "Time: {time}",
+    bookingParty: "Party: {party}",
+    bookingTable: "Table: {table}",
+    bookingReference: "Reference: {reference}",
+    bookingManage: "View or cancel your booking: {url}",
+    birthdaySubject: "{restaurant} – happy birthday!",
+    birthdayLead: "Happy birthday, {name}!",
+    birthdayOffer: "All through your birthday month you get {percent}% member price with us – just give the cashier your number or email.",
+    birthdayPlain: "Thank you for being our guest – we look forward to seeing you again.",
+    birthdayStop: "No more birthday emails? Clear your birthday in your account."
   }
 };
 
@@ -94,9 +139,51 @@ export function codeMessage(code, { language = "de", restaurant = "", minutes = 
   };
 }
 
+/**
+ * The email a guest gets when they book online: confirmed at once, or received
+ * and awaiting the restaurant's confirmation, with the day, time, party, table
+ * (when one is set) and reference, and the link back to view or cancel it.
+ */
+export function bookingMessage(reservation, { language = "de", restaurant = "", manageUrl = "" } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const confirmed = reservation.status === "confirmed";
+  const values = { restaurant: restaurant || "Restaurant", date: reservation.date, time: reservation.time, party: reservation.party, table: reservation.table ?? "", reference: reservation.reference };
+  const lines = [
+    fill(copy.bookingDate, values),
+    fill(copy.bookingTime, values),
+    fill(copy.bookingParty, values),
+    ...(reservation.table ? [fill(copy.bookingTable, values)] : []),
+    fill(copy.bookingReference, values)
+  ];
+  const lead = fill(confirmed ? copy.bookingConfirmedLead : copy.bookingPendingLead, values);
+  const manage = manageUrl ? fill(copy.bookingManage, { url: manageUrl }) : "";
+  return {
+    subject: fill(confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject, values),
+    text: `${lead}\n\n${lines.join("\n")}\n${manage ? `\n${manage}\n` : ""}`,
+    html: `<p>${escapeHtml(lead)}</p><ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>${manage ? `<p><a href="${escapeHtml(manageUrl)}">${escapeHtml(fill(copy.bookingManage, { url: "" }).replace(/[:：]\s*$/, ""))}</a></p>` : ""}`
+  };
+}
+
 /** A message the owner sends themselves from the console, to see mail arrive. */
 export function testMessage({ language = "de", restaurant = "" } = {}) {
   const copy = COPY[language] ?? COPY.de;
   const values = { restaurant: restaurant || "Restaurant" };
   return { subject: fill(copy.testSubject, values), text: `${copy.test}\n`, html: `<p>${escapeHtml(copy.test)}</p>` };
+}
+
+/**
+ * 生日祝福邮件: the greeting a member gets on their birthday, with the birthday
+ * offer when there is one, and how to stop these mails (clear the birthday).
+ */
+export function birthdayMessage(name, { language = "de", restaurant = "", discountPercent = 0 } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const values = { restaurant: restaurant || "Restaurant", name: name || "", percent: discountPercent };
+  const lead = fill(copy.birthdayLead, values).replace(/^[,，\s]+|\s+(?=[,，!！])/g, "");
+  const body = discountPercent > 0 ? fill(copy.birthdayOffer, values) : copy.birthdayPlain;
+  const stop = copy.birthdayStop;
+  return {
+    subject: fill(copy.birthdaySubject, values),
+    text: `${lead}\n\n${body}\n\n${stop}\n`,
+    html: `<p style="font-size:20px">🎂 ${escapeHtml(lead)}</p><p>${escapeHtml(body)}</p><p style="color:#666;font-size:12px">${escapeHtml(stop)}</p>`
+  };
 }
