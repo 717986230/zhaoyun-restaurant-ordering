@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiBill, PaymentType } from "@zhaoyun/contracts";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
+import { TierChip } from "./TierChip";
 
 const HOLD_MS = 30_000;
 const PAY_KEYS: Record<PaymentType, "cash" | "card" | "voucher" | "balance"> = { cash: "cash", card: "card", voucher: "voucher", balance: "balance" };
-interface Payment { type: PaymentType; amount: string; tendered: string; voucherCode: string; balanceCents: number | null; tip: string; memberLogin: string; memberId: string; memberName: string }
+interface Payment { type: PaymentType; amount: string; tendered: string; voucherCode: string; balanceCents: number | null; tip: string; memberLogin: string; memberId: string; memberName: string; memberTierLevel: number }
 
 const toCents = (text: string) => Math.round(Number(String(text).replace(",", ".")) * 100) || 0;
 const toAmount = (cents: number) => (cents / 100).toFixed(2);
@@ -85,7 +86,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     setPicks(next ? {} : Object.fromEntries(lines.map((item) => [item.orderItemId, item.qty])));
   };
   const pick = (id: string, quantity: number, max: number) => setPicks((current) => ({ ...current, [id]: Math.max(0, Math.min(max, quantity)) }));
-  const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "" }]);
+  const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }]);
   const edit = (index: number, change: Partial<Payment>) => setPayments((current) => current.map((payment, at) => (at === index ? { ...payment, ...change } : payment)));
   /** Aufrunden: the tip that brings amount and tip to the next whole euro — again for the one after. */
   const roundUp = (index: number) => {
@@ -112,13 +113,13 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     if (!login) return;
     try {
       const { member } = await api.member(login);
-      edit(index, { memberId: member.id, memberName: member.name, balanceCents: member.balanceCents ?? 0 });
+      edit(index, { memberId: member.id, memberName: member.name, balanceCents: member.balanceCents ?? 0, memberTierLevel: member.membership?.tierLevel ?? 0 });
       // 会员价: a member's level earns a discount — offer it, but never below a
       // bigger one already set (a takeaway's, or one the waiter keyed in).
       const memberDiscount = member.membership?.discountPercent ?? 0;
       if (memberDiscount > 0) setDiscount((current) => Math.max(current, memberDiscount));
     } catch (error) {
-      edit(index, { memberId: "", memberName: "", balanceCents: null });
+      edit(index, { memberId: "", memberName: "", balanceCents: null, memberTierLevel: 0 });
       pos.failed(error);
     }
   }
@@ -193,8 +194,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
         {payment.type === "cash" && <label><span>{t("tendered")}</span><input inputMode="decimal" placeholder={toAmount(toCents(payment.amount) + toCents(payment.tip))} value={payment.tendered} onChange={(event) => edit(index, { tendered: event.target.value })} /></label>}
         {payment.type !== "voucher" && payment.type !== "balance" && <label className="pos-tip"><span>{t("tip")}</span><input inputMode="decimal" placeholder="0.00" value={payment.tip} onChange={(event) => edit(index, { tip: event.target.value })} /><button type="button" data-action="round-up" onClick={() => roundUp(index)}>{t("roundUp")}</button></label>}
         {payment.type === "voucher" && <label><span>{t("voucherCode")}</span><input value={payment.voucherCode} autoCapitalize="characters" onChange={(event) => edit(index, { voucherCode: event.target.value.toUpperCase(), balanceCents: null })} onBlur={() => void checkVoucher(index)} /></label>}
-        {payment.type === "balance" && <label><span>{t("memberLogin")}</span><input value={payment.memberLogin} inputMode="email" autoCapitalize="none" spellCheck={false} placeholder={t("memberLoginHint")} onChange={(event) => edit(index, { memberLogin: event.target.value, memberId: "", memberName: "", balanceCents: null })} onBlur={() => void checkMember(index)} /></label>}
-        {payment.type === "balance" && payment.memberName && <small>{payment.memberName}</small>}
+        {payment.type === "balance" && <label><span>{t("memberLogin")}</span><input value={payment.memberLogin} inputMode="email" autoCapitalize="none" spellCheck={false} placeholder={t("memberLoginHint")} onChange={(event) => edit(index, { memberLogin: event.target.value, memberId: "", memberName: "", balanceCents: null, memberTierLevel: 0 })} onBlur={() => void checkMember(index)} /></label>}
+        {payment.type === "balance" && payment.memberName && <small>{payment.memberTierLevel > 0 && <TierChip level={payment.memberTierLevel} t={t} />} {payment.memberName}</small>}
         {payment.balanceCents !== null && <small>{t("balance", { amount: money(payment.balanceCents) })}</small>}
         {payment.type === "balance" && payment.balanceCents !== null && toCents(payment.amount) > payment.balanceCents && <small className="pos-error">{t("balanceShort")}</small>}
         <button type="button" aria-label={t("remove")} onClick={() => setPayments((current) => current.filter((_, at) => at !== index))}>✕</button>

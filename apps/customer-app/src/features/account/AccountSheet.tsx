@@ -3,13 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import type { ApiBirthday, ApiMenuSettings } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import type { Product } from "@zhaoyun/domain";
+import { memberTierVisual } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
-import { balanceReason, g, pointsReason } from "../../app/guest-i18n";
+import { balanceReason, g, pointsReason, tierRank } from "../../app/guest-i18n";
 import { formatPrice, productName, t } from "../../app/i18n";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import type { OrderingState } from "../../app/ordering";
 import { Sheet } from "../../components/Sheet";
 import type { CustomerAccount } from "./useCustomer";
+import { MemberBadge } from "./MemberBadge";
+import { useTierEntry } from "./useTierEntry";
 
 interface Props {
   state: CustomerState;
@@ -166,13 +169,35 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
     dispatch({ type: "sheet", sheet: "cart" });
   }
 
-  return <div className="guest-account">
+  const tierLevel = customer.membership?.tierLevel ?? 0;
+  const visual = memberTierVisual(tierLevel);
+  const { entering, muted, toggleMuted } = useTierEntry(visual?.theme ?? null);
+
+  return <div
+    className={`guest-account${visual ? " member-themed" : ""}${visual?.skin ? ` tier-skin-${visual.skin}` : ""}${entering ? " tier-entering" : ""}`}
+    data-tier-theme={visual?.theme}
+  >
+    {visual && <div className="member-crest" data-tier-theme={visual.theme}>
+      <div className="member-crest-art">
+        <MemberBadge level={tierLevel} rank={tierRank(language, visual.theme)} size="lg" animate={entering} />
+      </div>
+      <div className="member-crest-text">
+        <span className="member-crest-rank">{tierRank(language, visual.theme)}</span>
+        <strong className="member-crest-name">{customer.membership?.tier}</strong>
+        <span className="member-crest-meta">
+          {customer.membership && customer.membership.discountPercent > 0 && <em>{g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}</em>}
+          <small>{g(language, "memberGrowth", { amount: formatPrice(customer.membership?.growthCents ?? 0, language) })}</small>
+        </span>
+        {visual.skin && <span className="member-crest-skin">{g(language, visual.skin === "gilded" ? "exclusiveGilded" : "exclusiveDark")}</span>}
+        <button type="button" className="member-mute" onClick={toggleMuted} aria-pressed={!muted}>{muted ? "🔕" : "🔔"} {g(language, muted ? "soundOff" : "soundOn")}</button>
+      </div>
+    </div>}
     {account.signupBonus > 0 && <p className="signup-bonus" id="signupBonusGot" role="status">{g(language, "signupBonusGot", { n: account.signupBonus })}</p>}
     <div className="guest-card">
       <div>
         <strong>{g(language, "welcome", { name: customer.name || customer.email.split("@")[0] || customer.email })}</strong>
         <small>{customer.email}</small>
-        {customer.membership?.tier && <small className="member-tier">{g(language, "myTier")}: {customer.membership.tier}{customer.membership.discountPercent > 0 ? ` · ${g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}` : ""}</small>}
+        {customer.membership?.tier && !visual && <small className="member-tier">{g(language, "myTier")}: {customer.membership.tier}{customer.membership.discountPercent > 0 ? ` · ${g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}` : ""}</small>}
       </div>
       {loyalty && <div className="points-balance" aria-label={g(language, "points")}><b>{customer.points}</b><small>{g(language, "points")}</small></div>}
     </div>

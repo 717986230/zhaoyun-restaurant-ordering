@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi, CustomerDetail } from "@zhaoyun/api-client";
 import type { ApiBirthdayPerk, ApiCustomer, ApiMemberReport, ApiMembership, ApiMemberTiers, ApiSettings, BalanceReason } from "@zhaoyun/contracts";
+import { TierChip } from "./TierChip";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { Section, Toggle } from "../settings/SettingsPanel";
@@ -221,8 +222,14 @@ function MemberList({ api, notify, failed }: { api: AdminApi; notify: (message: 
   }
   /** 会员储值: the manager adds to or takes from a member's balance by hand (euros, + or −), with a note. */
   async function adjustBalance(customer: ApiCustomer) {
-    const amount = Number(window.prompt(t("adjustBalancePrompt", { email: customer.email }))?.trim().replace(",", "."));
-    if (!Number.isFinite(amount) || !amount) return;
+    const raw = window.prompt(t("adjustBalancePrompt", { email: customer.email }));
+    if (raw === null) return; // cancelled
+    const amount = Number(raw.trim().replace(",", "."));
+    const cents = Math.round(amount * 100);
+    // Mirror the server's rules here so the manager sees why, in their language,
+    // instead of the raw refusal (equal to 0 vs. over the €10,000 single-change cap).
+    if (!Number.isFinite(amount) || cents === 0) { failed(new Error(t("balanceAmountInvalid"))); return; }
+    if (Math.abs(cents) > 1_000_000) { failed(new Error(t("balanceAmountTooLarge"))); return; }
     const note = window.prompt(t("adjustNotePrompt"))?.trim();
     if (!note) return;
     try {
@@ -230,7 +237,13 @@ function MemberList({ api, notify, failed }: { api: AdminApi; notify: (message: 
       notify(t("balanceAdjusted"));
       await load(query);
       if (open?.customer.id === customer.id) setOpen(await api.customer(customer.id).catch(() => null));
-    } catch (error) { failed(error); }
+    } catch (error) {
+      // Defence in depth: translate the two known server refusals if they slip through.
+      const code = (error as { code?: string } | null)?.code;
+      if (code === "BALANCE_AMOUNT_ZERO") failed(new Error(t("balanceAmountInvalid")));
+      else if (code === "BALANCE_AMOUNT_RANGE") failed(new Error(t("balanceAmountTooLarge")));
+      else failed(error);
+    }
   }
 
   return <div className="customer-list">
@@ -242,7 +255,7 @@ function MemberList({ api, notify, failed }: { api: AdminApi; notify: (message: 
         <button type="button" className="ghost-action" onClick={() => void adjustBalance(customer)}>{t("adjustBalance")}</button>
       </span>
       {open?.customer.id === customer.id && <div className="customer-history">
-        {open.customer.membership?.tier && <small className="member-tier-line">{t("memberTierLabel", { tier: open.customer.membership.tier })}{open.customer.membership.discountPercent > 0 ? ` · ${t("memberPriceOff", { percent: String(open.customer.membership.discountPercent) })}` : ""} · {t("memberGrowthLabel", { amount: formatMoney(open.customer.membership.growthCents, language) })}</small>}
+        {open.customer.membership?.tier && <small className="member-tier-line">{(open.customer.membership.tierLevel ?? 0) > 0 && <TierChip level={open.customer.membership.tierLevel ?? 0} />} {t("memberTierLabel", { tier: open.customer.membership.tier })}{open.customer.membership.discountPercent > 0 ? ` · ${t("memberPriceOff", { percent: String(open.customer.membership.discountPercent) })}` : ""} · {t("memberGrowthLabel", { amount: formatMoney(open.customer.membership.growthCents, language) })}</small>}
         {open.customer.membership?.birthday && <small className="member-tier-line">{t("memberBirthdayLabel", { date: `${open.customer.membership.birthday.month}/${open.customer.membership.birthday.day}` })}{open.customer.membership.birthdayMonth ? " 🎂" : ""}</small>}
         <small>{t("balanceHistory", { amount: formatMoney(open.customer.balanceCents ?? 0, language) })}</small>
         {open.balance.length === 0 ? <p className="settings-hint">{t("membersNoLedger")}</p> : <ul>{open.balance.map((entry) => <li key={entry.id}>
