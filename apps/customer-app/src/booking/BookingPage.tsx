@@ -208,15 +208,18 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
               <BookingForm language={language} info={info} customer={customer} recent={recent} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />
             </>}
 
-    {/* The guest's other bookings and their account: two round buttons, raised off the bottom corner. */}
-    <nav className="bk-dock" aria-label={b(language, "account")}>
+    {/* The guest's other bookings and their account: two round buttons, raised
+        off the bottom corner — only once signed in. Signed out, both buttons
+        only lead to "sign in to see", which the form on the page already is,
+        and they would sit over its password field and the sign-in button. */}
+    {customer && <nav className="bk-dock" aria-label={b(language, "account")}>
       <button type="button" id="bookingDockBookings" aria-haspopup="dialog" aria-label={b(language, "myBookings")} title={b(language, "myBookings")} onClick={() => setSheet("bookings")}>
-        <CalendarIcon />{customer && others.length ? <b className="bk-dock-count">{others.length}</b> : null}
+        <CalendarIcon />{others.length ? <b className="bk-dock-count">{others.length}</b> : null}
       </button>
       <button type="button" id="bookingDockAccount" aria-haspopup="dialog" aria-label={b(language, "account")} title={b(language, "account")} onClick={() => setSheet("account")}>
         <PersonIcon />
       </button>
-    </nav>
+    </nav>}
   </div>
   {/* A second pane of glass over the first, outside it so it covers the whole screen. */}
   {createPortal(<AnimatePresence>

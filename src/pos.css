@@ -231,12 +231,25 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-dishes button:has(.pos-dish-count) .pos-stock-left { top: 28px; }
 .pos-soldout-mode.on { border-color: var(--p-warn); background: var(--p-warn-wash); color: var(--p-warn); font-weight: 700; }
 
-.pos-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.55); }
+.pos-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.55); }
 .pos-modal .pos-card { width: min(520px, 100%); max-height: 90vh; overflow-y: auto; }
 .pos-modal fieldset { margin: 0; padding: 0; border: 0; }
 .pos-modal legend { margin-bottom: 6px; font-weight: 700; }
 .pos-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .pos-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.pos-move { display: grid; gap: 12px; }
+.pos-move-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; max-height: 46vh; overflow-y: auto; }
+.pos-move-grid button { min-height: 56px; font-size: 20px; font-weight: 700; }
+.pos-move-other { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.pos-move-other input { min-height: 48px; }
+.pos-move .pos-modal-actions { grid-template-columns: 1fr; }
+.pos-move-grid button.pos-seat-booked { display: grid; gap: 2px; border-color: var(--p-accent); color: var(--p-accent); }
+.pos-move-grid button.pos-seat-booked small { font-size: 11px; font-weight: 600; }
+
+.pos-stock-form { display: grid; gap: 12px; }
+.pos-stock-form input { min-height: 52px; font-size: 22px; text-align: center; }
+.pos-stock-form .pos-primary { min-height: 52px; font-size: 18px; }
 
 .pos-pay-screen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
 .pos-pay-lines { display: grid; gap: 10px; min-width: 0; }

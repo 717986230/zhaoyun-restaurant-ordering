@@ -142,8 +142,10 @@ test("每日限量 on the POS: two left today, sold out at the count; the kitche
   // "Two left today": the 限量 mode, a tap on the dish, the number.
   const tile = page.locator(`.pos-dishes button[data-sku="${dish.sku}"]`);
   await page.getByRole("button", { name: "限量", exact: true }).click();
-  page.once("dialog", (dialog) => dialog.accept("2"));
   await tile.click();
+  const stockForm = page.locator(".pos-stock-form");
+  await stockForm.locator("input").fill("2");
+  await stockForm.getByRole("button", { name: "保存" }).click();
   await expect(tile.locator(".pos-stock-left")).toHaveText("剩 2");
   await page.getByRole("button", { name: /^完成（点菜品设/ }).click();
 
