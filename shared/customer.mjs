@@ -210,6 +210,58 @@ export function bonusForTopUp(membership, amountCents) {
   return bonus;
 }
 
+/** At most this many membership levels, and a level's name is at most this long. */
+export const MAX_MEMBER_TIERS = 8;
+const MAX_TIER_NAME = 40;
+
+/**
+ * 会员等级 (member levels) as the owner sets them (app_settings "memberTiers").
+ * Off until switched on. A level is reached by累计充值 (lifetime top-up): the
+ * member sits at the highest level whose threshold their top-ups have passed,
+ * and that level's `discountPercent` is the 会员价 the counter offers them —
+ * applied through the till's ordinary discount, so the fiscal record is
+ * unchanged. The level is derived, never stored: it follows the top-ups.
+ */
+export const MEMBER_TIERS_DEFAULTS = Object.freeze({ enabled: false, tiers: [] });
+
+export function normalizeMemberTiers(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Member-tier settings must be an object");
+  const known = new Set(Object.keys(MEMBER_TIERS_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown member-tier setting ${key}`);
+  const merged = { ...MEMBER_TIERS_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Member tiers enabled must be true or false");
+  if (!Array.isArray(merged.tiers) || merged.tiers.length > MAX_MEMBER_TIERS) throw new Error(`At most ${MAX_MEMBER_TIERS} member tiers`);
+  const seen = new Set();
+  const tiers = merged.tiers.map((tier) => {
+    const name = String(tier?.name ?? "").trim();
+    const thresholdCents = Number(tier?.thresholdCents);
+    const discountPercent = Number(tier?.discountPercent);
+    if (!name || name.length > MAX_TIER_NAME) throw new Error("A member tier has a name");
+    if (!Number.isInteger(thresholdCents) || thresholdCents < 0 || thresholdCents > MAX_TOPUP_CENTS) throw new Error("A tier's threshold is 0 cent to 1000 euros");
+    if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("A tier's discount is 0 to 100 percent");
+    if (seen.has(thresholdCents)) throw new Error("A threshold is a tier once");
+    seen.add(thresholdCents);
+    return { name, thresholdCents, discountPercent };
+  }).sort((left, right) => left.thresholdCents - right.thresholdCents);
+  return { enabled: merged.enabled, tiers };
+}
+
+/** The level a member of `growthCents` lifetime top-up sits at: the highest
+ *  threshold they have passed, or null when tiers are off or none is reached. */
+export function memberTierFor(growthCents, memberTiers) {
+  if (!memberTiers?.enabled || !Array.isArray(memberTiers.tiers)) return null;
+  let best = null;
+  for (const tier of memberTiers.tiers) if (growthCents >= tier.thresholdCents && (!best || tier.thresholdCents >= best.thresholdCents)) best = tier;
+  return best ? { name: best.name, thresholdCents: best.thresholdCents, discountPercent: best.discountPercent } : null;
+}
+
+/** A member's standing to show beside their account: how much they have topped
+ *  up over time, their level now, and the discount that level earns. */
+export function membershipStatus(growthCents, memberTiers) {
+  const tier = memberTierFor(growthCents, memberTiers);
+  return { growthCents: Math.max(0, growthCents | 0), tier: tier?.name ?? null, discountPercent: tier?.discountPercent ?? 0 };
+}
+
 /** A balance ledger line as a member sees it, and as the console lists it. */
 export function balanceEntryView(row) {
   return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, createdAt: row.created_at };
@@ -288,6 +340,8 @@ export const INSERT_POINTS_SQL = "INSERT INTO points_ledger (id, customer_id, de
 export const CHANGE_POINTS_SQL = "UPDATE customers SET points = points + ?, updated_at = ? WHERE id = ?";
 
 export const BALANCE_HISTORY_SQL = "SELECT * FROM balance_ledger WHERE customer_id = ? ORDER BY created_at DESC, id DESC LIMIT ?";
+/** 累计充值 (lifetime top-up principal): what a member has paid in over time, the basis for their 会员等级. Read-only. */
+export const MEMBER_GROWTH_SQL = "SELECT COALESCE(SUM(delta_cents), 0) AS growth_cents FROM balance_ledger WHERE customer_id = ? AND reason = 'topup'";
 export const INSERT_BALANCE_SQL = "INSERT INTO balance_ledger (id, customer_id, delta_cents, reason, ref, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
 /** A member's balance row, made the first time they have one (starts at zero). Parameters: customer id, at. */
 export const ENSURE_BALANCE_SQL = "INSERT OR IGNORE INTO member_balances (customer_id, balance_cents, updated_at) VALUES (?, 0, ?)";

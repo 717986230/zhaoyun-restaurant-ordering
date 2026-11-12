@@ -113,6 +113,10 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     try {
       const { member } = await api.member(login);
       edit(index, { memberId: member.id, memberName: member.name, balanceCents: member.balanceCents ?? 0 });
+      // 会员价: a member's level earns a discount — offer it, but never below a
+      // bigger one already set (a takeaway's, or one the waiter keyed in).
+      const memberDiscount = member.membership?.discountPercent ?? 0;
+      if (memberDiscount > 0) setDiscount((current) => Math.max(current, memberDiscount));
     } catch (error) {
       edit(index, { memberId: "", memberName: "", balanceCents: null });
       pos.failed(error);

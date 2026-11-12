@@ -48,7 +48,10 @@ export type GuestOrderRefusal =
 /** A guest's own account (shared/customer.mjs). */
 /** `emailVerified`: the address, as it is now, was proved by a code (shared/email-verify.mjs). */
 /** A guest's account. Signed up by mobile number: `phone` is set, and `email` holds the same number (how they sign in). */
-export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string; balanceCents?: number }
+export interface ApiCustomer { id: string; email: string; name: string; points: number; createdAt: string; emailVerified?: boolean; phone?: string; balanceCents?: number; membership?: ApiMembershipStatus }
+
+/** 会员等级: a member's standing — lifetime top-up, the level it reaches, and the 会员价 discount that level earns (shared/customer.mjs, membershipStatus). */
+export interface ApiMembershipStatus { growthCents: number; tier: string | null; discountPercent: number }
 /** `signupBonus`: signed up from a table's code, and the points for it given. */
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer; signupBonus?: boolean }
 /** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */
@@ -124,6 +127,13 @@ export interface ApiMembership {
   enabled: boolean;
   /** Sorted ascending by threshold; a top-up takes the most generous tier at or below its amount. */
   tiers: Array<{ thresholdCents: number; bonusCents: number }>;
+}
+
+/** 会员等级 + 会员价: levels reached by lifetime top-up, each giving a counter discount (shared/customer.mjs). */
+export interface ApiMemberTiers {
+  enabled: boolean;
+  /** Sorted ascending by threshold; a member sits at the highest level their top-ups have passed. */
+  tiers: Array<{ name: string; thresholdCents: number; discountPercent: number }>;
 }
 
 /** A table open for its guests' phones (开台). */
@@ -494,6 +504,7 @@ export interface ApiSettings {
   loyalty: ApiLoyalty;
   /** 会员储值: whether top-ups are on, and the bonus tiers (shared/customer.mjs). */
   membership: ApiMembership;
+  memberTiers: ApiMemberTiers;
   /** Online table bookings and their rules (shared/reservations.mjs). */
   reservations: ApiReservationSettings;
   /** The delivery platforms: which are on, and how their orders come in (shared/delivery.mjs). */

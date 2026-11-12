@@ -3,7 +3,7 @@ import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiMemberReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
-  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiBalanceEntry, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
+  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiMemberTiers, ApiBalanceEntry, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
   ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand
 } from "@zhaoyun/contracts";
@@ -78,6 +78,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     guestOrdering: { ...GUEST_ORDERING_DEFAULTS, hours: [] },
     loyalty: { ...LOYALTY_DEFAULTS, rewards: [] },
     membership: { ...MEMBERSHIP_DEFAULTS, tiers: [] },
+    memberTiers: { ...MEMBER_TIERS_DEFAULTS, tiers: [] },
     reservations: { ...RESERVATION_DEFAULTS, hours: RESERVATION_DEFAULTS.hours.map((range) => ({ ...range, days: [...range.days] })), closedDates: [], tables: [] },
     delivery: { lieferando: { ...DELIVERY_PLATFORM_DEFAULTS }, foodora: { ...DELIVERY_PLATFORM_DEFAULTS } },
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
@@ -92,6 +93,8 @@ export const GUEST_ORDERING_DEFAULTS: ApiGuestOrdering = {
 export const LOYALTY_DEFAULTS: ApiLoyalty = { enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 };
 /** shared/customer.mjs, MEMBERSHIP_DEFAULTS. */
 export const MEMBERSHIP_DEFAULTS: ApiMembership = { enabled: false, tiers: [] };
+/** shared/customer.mjs, MEMBER_TIERS_DEFAULTS. */
+export const MEMBER_TIERS_DEFAULTS: ApiMemberTiers = { enabled: false, tiers: [] };
 /** shared/reservations.mjs, RESERVATION_DEFAULTS. */
 export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   enabled: false,
