@@ -59,7 +59,7 @@ export interface ApiBirthday { month: number; day: number }
  * their birthday month, the birthday perk's), their birthday, and whether this
  * is their birthday month (shared/customer.mjs, membershipStatus).
  */
-export interface ApiMembershipStatus { growthCents: number; tier: string | null; discountPercent: number; birthdayMonth?: boolean; birthday?: ApiBirthday | null }
+export interface ApiMembershipStatus { growthCents: number; tier: string | null; tierLevel?: number; tierCount?: number; discountPercent: number; birthdayMonth?: boolean; birthday?: ApiBirthday | null }
 /** `signupBonus`: signed up from a table's code, and the points for it given. */
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer; signupBonus?: boolean }
 /** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */

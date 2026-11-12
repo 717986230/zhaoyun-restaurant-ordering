@@ -249,19 +249,33 @@ export function normalizeMemberTiers(value) {
 }
 
 /** The level a member of `growthCents` lifetime top-up sits at: the highest
- *  threshold they have passed, or null when tiers are off or none is reached. */
+ *  threshold they have passed, or null when tiers are off or none is reached.
+ *  `level` is the tier's rank from the bottom (1 = lowest configured tier), and
+ *  `count` how many tiers there are — the badge and the member theme follow the
+ *  level, so 5+ earns 暗黑龙王 and 7+ 鎏金龙王 whatever the owner named them. */
 export function memberTierFor(growthCents, memberTiers) {
-  if (!memberTiers?.enabled || !Array.isArray(memberTiers.tiers)) return null;
+  if (!memberTiers?.enabled || !Array.isArray(memberTiers.tiers) || memberTiers.tiers.length === 0) return null;
+  const ranked = [...memberTiers.tiers].sort((left, right) => left.thresholdCents - right.thresholdCents);
   let best = null;
-  for (const tier of memberTiers.tiers) if (growthCents >= tier.thresholdCents && (!best || tier.thresholdCents >= best.thresholdCents)) best = tier;
-  return best ? { name: best.name, thresholdCents: best.thresholdCents, discountPercent: best.discountPercent } : null;
+  let level = 0;
+  ranked.forEach((tier, index) => {
+    if (growthCents >= tier.thresholdCents) { best = tier; level = index + 1; }
+  });
+  return best ? { name: best.name, thresholdCents: best.thresholdCents, discountPercent: best.discountPercent, level, count: ranked.length } : null;
 }
 
 /** A member's standing to show beside their account: how much they have topped
- *  up over time, their level now, and the discount that level earns. */
+ *  up over time, their level now, the rank of that level, and the discount it
+ *  earns. `tierLevel`/`tierCount` are 0 when below every tier or tiers are off. */
 export function membershipStatus(growthCents, memberTiers) {
   const tier = memberTierFor(growthCents, memberTiers);
-  return { growthCents: Math.max(0, growthCents | 0), tier: tier?.name ?? null, discountPercent: tier?.discountPercent ?? 0 };
+  return {
+    growthCents: Math.max(0, growthCents | 0),
+    tier: tier?.name ?? null,
+    tierLevel: tier?.level ?? 0,
+    tierCount: tier?.count ?? (memberTiers?.enabled && Array.isArray(memberTiers.tiers) ? memberTiers.tiers.length : 0),
+    discountPercent: tier?.discountPercent ?? 0
+  };
 }
 
 /**
@@ -333,10 +347,12 @@ export function balanceEntryView(row) {
   return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, operator: row.operator ?? "", createdAt: row.created_at };
 }
 
-/** A manager's change of a member's balance: cents, not zero, and a note. */
+/** A manager's change of a member's balance: cents, not zero, within range, and
+ *  a note. The two refusals are told apart so the till can show the right one. */
 export function normalizeBalanceAdjustment(input) {
   const deltaCents = Math.round(Number(input?.amount) * 100);
-  if (!Number.isInteger(deltaCents) || deltaCents === 0 || Math.abs(deltaCents) > MAX_BALANCE_CENTS) throw new Error("A change of balance is an amount, not zero");
+  if (!Number.isInteger(deltaCents) || deltaCents === 0) { const error = new Error("A change of balance is an amount, not zero"); error.code = "BALANCE_AMOUNT_ZERO"; throw error; }
+  if (Math.abs(deltaCents) > MAX_BALANCE_CENTS) { const error = new Error("A change of balance is at most 10000 euros"); error.code = "BALANCE_AMOUNT_RANGE"; throw error; }
   const note = String(input?.note ?? "").trim().replace(/\s+/g, " ");
   if (!note || note.length > 120) throw new Error("Say why the balance changes (1–120 characters)");
   return { deltaCents, note };

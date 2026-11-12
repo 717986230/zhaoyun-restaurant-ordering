@@ -1,0 +1,210 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   会员龙纹徽章与专属界面 (member dragon badge + exclusive member themes)
+   The badge is one SVG recoloured by [data-tier-theme]; the metal warms as the
+   level climbs. Level 5+ earns the 暗黑龙王 skin, level 7+ the 鎏金龙王 glass
+   skin. Entry reveal + sheen honour prefers-reduced-motion below.
+   ───────────────────────────────────────────────────────────────────────── */
+.member-badge {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  isolation: isolate;
+}
+.member-badge svg { display: block; width: 100%; height: 100%; }
+.member-badge-sm { width: 34px; height: 34px; }
+.member-badge-md { width: 52px; height: 52px; }
+.member-badge-lg { width: 78px; height: 78px; }
+.member-badge-glyph {
+  font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", "Noto Serif CJK SC", Georgia, serif;
+  font-weight: 700;
+  font-size: 54px;
+  letter-spacing: 0;
+}
+.member-badge-numeral {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+.member-badge .sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* the diagonal foil sheen that sweeps the medallion */
+.member-badge-sheen {
+  position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: linear-gradient(120deg, transparent 38%, rgba(255, 255, 255, 0.55) 50%, transparent 62%);
+  background-size: 260% 260%; background-position: 140% 0; opacity: 0; z-index: 2;
+  mix-blend-mode: screen;
+}
+
+/* ── tier palettes ───────────────────────────────────────────────────────── */
+[data-tier-theme="bronze"] {
+  --badge-ring: #b07a46; --badge-disc-1: #3c2c1e; --badge-disc-2: #170f08;
+  --badge-foil-1: #ecbd85; --badge-foil-2: #c07f44; --badge-plate: #241810;
+  --tier-glow: rgba(199, 136, 74, 0.5);
+}
+[data-tier-theme="silver"] {
+  --badge-ring: #9faab3; --badge-disc-1: #2d343a; --badge-disc-2: #121820;
+  --badge-foil-1: #eef4f8; --badge-foil-2: #aab7c1; --badge-plate: #1b2228;
+  --tier-glow: rgba(176, 191, 204, 0.5);
+}
+[data-tier-theme="gold"] {
+  --badge-ring: #cda631; --badge-disc-1: #3b3012; --badge-disc-2: #1a1304;
+  --badge-foil-1: #ffe9a6; --badge-foil-2: #d6af37; --badge-plate: #241b08;
+  --tier-glow: rgba(214, 175, 55, 0.55);
+}
+[data-tier-theme="platinum"] {
+  --badge-ring: #c3ccd3; --badge-disc-1: #2f3a40; --badge-disc-2: #121a1f;
+  --badge-foil-1: #f6fafc; --badge-foil-2: #bcccd4; --badge-plate: #19222a;
+  --tier-glow: rgba(206, 224, 232, 0.55);
+}
+[data-tier-theme="dark"] {
+  --badge-ring: #8f2740; --badge-disc-1: #1c0810; --badge-disc-2: #050109;
+  --badge-foil-1: #ff6f8e; --badge-foil-2: #b01f45; --badge-plate: #16060d;
+  --tier-glow: rgba(214, 41, 85, 0.6);
+}
+[data-tier-theme="gilded"] {
+  --badge-ring: #e9c45b; --badge-disc-1: #403213; --badge-disc-2: #180f02;
+  --badge-foil-1: #fff3c2; --badge-foil-2: #e4b73a; --badge-plate: rgba(40, 28, 6, 0.65);
+  --tier-glow: rgba(234, 194, 86, 0.65);
+}
+
+/* ── the crest: badge + level text at the top of the account ─────────────── */
+.member-crest {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 18px 16px; margin-bottom: 14px; border-radius: 16px;
+  position: relative; overflow: hidden;
+  border: 1px solid var(--badge-ring);
+  background:
+    radial-gradient(130% 120% at 18% 0%, color-mix(in srgb, var(--tier-glow) 34%, transparent), transparent 60%),
+    linear-gradient(150deg, var(--badge-disc-1), var(--badge-disc-2) 85%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.member-crest-art { flex: none; filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--tier-glow) 60%, transparent)); }
+.member-crest-text { display: grid; gap: 3px; min-width: 0; }
+.member-crest-rank {
+  font: 700 12px/1.2 "Songti SC", "STSong", Georgia, serif;
+  letter-spacing: 3px; text-transform: none;
+  color: var(--badge-foil-1);
+}
+.member-crest-name {
+  font: 700 22px/1.1 Georgia, "Songti SC", serif;
+  color: var(--porcelain); overflow-wrap: anywhere;
+  background: linear-gradient(120deg, var(--badge-foil-1), var(--badge-foil-2), var(--badge-foil-1));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.member-crest-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.member-crest-meta em { font-style: normal; font-weight: 700; color: var(--badge-foil-1); font-size: 13px; }
+.member-crest-meta small { color: var(--muted); font-size: 12px; }
+.member-crest-skin {
+  justify-self: start; margin-top: 4px; padding: 3px 10px; border-radius: 999px;
+  font: 700 11px/1 "Songti SC", Georgia, serif; letter-spacing: 1.5px;
+  color: var(--badge-disc-2);
+  background: linear-gradient(120deg, var(--badge-foil-1), var(--badge-foil-2));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--tier-glow) 70%, transparent);
+}
+.member-mute {
+  justify-self: start; margin-top: 6px; padding: 4px 10px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); color: var(--ink-2);
+  font-size: 11.5px; cursor: pointer;
+}
+.member-mute:hover { border-color: var(--badge-ring); color: var(--badge-foil-1); }
+
+/* ── 暗黑龙王 — the level-5+ exclusive skin ──────────────────────────────── */
+.guest-account.tier-skin-dark {
+  padding: 4px; border-radius: 18px;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(214, 41, 85, 0.14), transparent 55%),
+    radial-gradient(90% 60% at 100% 110%, rgba(88, 28, 135, 0.16), transparent 60%),
+    linear-gradient(180deg, #0a0307, #06030a);
+}
+.guest-account.tier-skin-dark .guest-section,
+.guest-account.tier-skin-dark .guest-card {
+  border-color: rgba(214, 41, 85, 0.22);
+  background: linear-gradient(160deg, rgba(28, 8, 16, 0.6), rgba(6, 3, 10, 0.6));
+}
+.guest-account.tier-skin-dark .points-balance b { color: #ff8aa3; }
+.guest-account.tier-skin-dark h3 { color: #f0c6d0; }
+
+/* ── 鎏金龙王 — the level-7+ gilded glass skin ──────────────────────────── */
+.guest-account.tier-skin-gilded {
+  padding: 4px; border-radius: 18px;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(234, 194, 86, 0.2), transparent 55%),
+    linear-gradient(180deg, rgba(26, 18, 4, 0.9), rgba(10, 7, 2, 0.96));
+}
+.guest-account.tier-skin-gilded .guest-section,
+.guest-account.tier-skin-gilded .guest-card,
+.guest-account.tier-skin-gilded .member-crest {
+  border: 1px solid rgba(233, 196, 91, 0.38);
+  background: linear-gradient(150deg, rgba(60, 48, 20, 0.34), rgba(20, 14, 4, 0.3));
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 200, 0.16), 0 18px 44px rgba(0, 0, 0, 0.5);
+}
+.guest-account.tier-skin-gilded h3,
+.guest-account.tier-skin-gilded .points-balance b { color: #f3dd9a; }
+.guest-account.tier-skin-gilded .member-badge-sheen { animation: badge-sheen 3.6s ease-in-out 1.2s infinite; opacity: 0; }
+
+/* ── entry reveal ────────────────────────────────────────────────────────── */
+.member-crest { animation: crest-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.tier-entering .member-crest { animation: crest-reveal 1200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.tier-entering .member-crest-skin { animation: crest-tag-in 900ms ease 500ms both; }
+.member-badge.is-animating .member-badge-sheen { animation: badge-sheen 1500ms ease 260ms 1; }
+.member-badge.is-animating svg { animation: badge-reveal 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes crest-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes crest-reveal {
+  0% { opacity: 0; transform: translateY(18px) scale(0.96); box-shadow: 0 0 0 rgba(0,0,0,0); }
+  45% { box-shadow: 0 0 46px color-mix(in srgb, var(--tier-glow) 85%, transparent); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes badge-reveal {
+  0% { opacity: 0; transform: scale(0.4) rotate(-26deg); }
+  60% { transform: scale(1.08) rotate(4deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes badge-sheen {
+  0% { background-position: 140% 0; opacity: 0; }
+  20% { opacity: 1; }
+  100% { background-position: -40% 0; opacity: 0; }
+}
+@keyframes crest-tag-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .member-crest,
+  .tier-entering .member-crest,
+  .tier-entering .member-crest-skin,
+  .member-badge.is-animating svg,
+  .member-badge.is-animating .member-badge-sheen,
+  .guest-account.tier-skin-gilded .member-badge-sheen { animation: none; }
+  .member-badge-sheen { opacity: 0; }
+}
+
+/* ── compact chip for the admin console & till member cards ──────────────── */
+.tier-chip {
+  display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  padding: 2px 9px 2px 3px; border-radius: 999px;
+  border: 1px solid var(--badge-ring, #888);
+  background: linear-gradient(140deg, var(--badge-disc-1, #2a2a2a), var(--badge-disc-2, #141414));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  line-height: 1;
+}
+.tier-chip-coin {
+  width: 20px; height: 20px; border-radius: 50%; flex: none;
+  display: inline-grid; place-items: center;
+  font: 700 12px/1 "Songti SC", "STSong", "SimSun", Georgia, serif;
+  color: var(--badge-foil-1, #eee);
+  border: 1px solid var(--badge-ring, #888);
+  background: radial-gradient(circle at 50% 35%, var(--badge-foil-2, #999), var(--badge-disc-2, #111));
+}
+.tier-chip-text {
+  font: 700 11px/1 "Songti SC", Georgia, serif; letter-spacing: 1px;
+  color: var(--badge-foil-1, #eee); white-space: nowrap;
+}
+.tier-chip-num {
+  font: 600 10px/1 Georgia, serif; color: var(--badge-foil-2, #bbb); opacity: 0.9;
+}

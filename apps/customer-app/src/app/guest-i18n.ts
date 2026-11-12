@@ -1,4 +1,5 @@
 import type { ApiOrder, BalanceReason, GuestOrderRefusal, PointsKind, PointsReason } from "@zhaoyun/contracts";
+import type { MemberTierTheme } from "@zhaoyun/domain";
 import type { Language } from "./i18n";
 
 /**
@@ -19,6 +20,8 @@ const copy = {
     points: "积分", pointsLead: "每消费 €1 得 {n} 积分，结账后到账", rewards: "积分兑换", redeem: "兑换", notEnoughPoints: "积分不够", rewardAdded: "已加入购物车：{name}（{points} 积分）",
     pointsHistory: "积分记录", reasonEarn: "消费获得", reasonReverse: "退款扣回", reasonRedeem: "兑换", reasonRefund: "取消退回", reasonAdjust: "餐厅调整", reasonWelcome: "首次到店赠送", reasonNoShow: "预约未到扣除", reasonNoShowBack: "预约未到退回", reasonSignup: "注册赠送", reasonBooking: "预约", reasonBookingBack: "取消预约退回",
     myTier: "会员等级", memberPriceOff: "会员价 {percent}% off",
+    rankBronze: "青铜龙纹", rankSilver: "白银龙纹", rankGold: "黄金龙纹", rankPlatinum: "铂金龙鳞", rankDark: "暗黑龙王", rankGilded: "鎏金龙王",
+    memberGrowth: "累计充值 {amount}", exclusiveDark: "暗黑龙王 · 专属界面", exclusiveGilded: "鎏金龙王 · 玻璃界面", soundOn: "入场音效：开", soundOff: "入场音效：关",
     myBirthday: "我的生日", birthMonth: "月", birthDay: "日", birthdaySave: "保存", birthdaySaved: "生日已保存", birthdayEmailNote: "生日当天会给你发一封祝福邮件，清除生日即可停止。",
     birthdayHint: "填写生日（月/日，不含年份），生日月享会员价 {percent}% off", birthdayMonthNote: "🎂 生日月快乐！本月享会员价 {percent}% off",
     myBalance: "我的余额", topUpHistory: "储值记录", topUpAtCounter: "充值请到店内收银台（现金 / 刷卡）", noTopUps: "还没有储值记录", balTopup: "充值", balBonus: "赠送", balSpend: "消费", balRefund: "退回", balAdjust: "餐厅调整", balReverse: "充值撤销",
@@ -54,6 +57,8 @@ const copy = {
     points: "Punkte", pointsLead: "{n} Punkte pro € 1, gutgeschrieben nach dem Bezahlen", rewards: "Prämien", redeem: "Einlösen", notEnoughPoints: "Zu wenig Punkte", rewardAdded: "Im Warenkorb: {name} ({points} Punkte)",
     pointsHistory: "Punkteverlauf", reasonEarn: "Gesammelt", reasonReverse: "Storniert", reasonRedeem: "Eingelöst", reasonRefund: "Zurückgebucht", reasonAdjust: "Vom Restaurant", reasonWelcome: "Erster Besuch", reasonNoShow: "Reservierung versäumt", reasonNoShowBack: "Versäumt, zurückgebucht", reasonSignup: "Registrierung", reasonBooking: "Reservierung", reasonBookingBack: "Reservierung storniert",
     myTier: "Mitgliedsstufe", memberPriceOff: "Mitgliedspreis {percent}% Rabatt",
+    rankBronze: "Bronze-Drache", rankSilver: "Silber-Drache", rankGold: "Gold-Drache", rankPlatinum: "Platin-Drache", rankDark: "Schwarzer Drachenkönig", rankGilded: "Goldener Drachenkönig",
+    memberGrowth: "Aufgeladen gesamt {amount}", exclusiveDark: "Schwarzer Drachenkönig · Eigenes Design", exclusiveGilded: "Goldener Drachenkönig · Glas-Design", soundOn: "Eintrittston: an", soundOff: "Eintrittston: aus",
     myBirthday: "Mein Geburtstag", birthMonth: "Monat", birthDay: "Tag", birthdaySave: "Speichern", birthdaySaved: "Geburtstag gespeichert", birthdayEmailNote: "Am Geburtstag schicken wir Ihnen eine Glückwunsch-E-Mail; Geburtstag löschen beendet das.",
     birthdayHint: "Geburtstag eintragen (Monat/Tag, ohne Jahr) — im Geburtstagsmonat {percent}% Mitgliedspreis", birthdayMonthNote: "🎂 Alles Gute! Diesen Monat {percent}% Mitgliedspreis",
     myBalance: "Mein Guthaben", topUpHistory: "Guthaben-Verlauf", topUpAtCounter: "Aufladen an der Kassa im Lokal (bar / Karte)", noTopUps: "Noch kein Guthaben-Verlauf", balTopup: "Aufladung", balBonus: "Bonus", balSpend: "Ausgegeben", balRefund: "Rückerstattung", balAdjust: "Vom Restaurant", balReverse: "Aufladung storniert",
@@ -89,6 +94,8 @@ const copy = {
     points: "Points", pointsLead: "{n} points per €1, credited once paid", rewards: "Rewards", redeem: "Redeem", notEnoughPoints: "Not enough points", rewardAdded: "In your cart: {name} ({points} points)",
     pointsHistory: "Points history", reasonEarn: "Earned", reasonReverse: "Refunded receipt", reasonRedeem: "Redeemed", reasonRefund: "Returned", reasonAdjust: "By the restaurant", reasonWelcome: "First visit", reasonNoShow: "Booking missed", reasonNoShowBack: "Booking missed, given back", reasonSignup: "Signed up", reasonBooking: "Booking", reasonBookingBack: "Booking cancelled",
     myTier: "Member tier", memberPriceOff: "member price {percent}% off",
+    rankBronze: "Bronze Dragon", rankSilver: "Silver Dragon", rankGold: "Gold Dragon", rankPlatinum: "Platinum Dragon", rankDark: "Dark Dragon King", rankGilded: "Gilded Dragon King",
+    memberGrowth: "Topped up {amount} in all", exclusiveDark: "Dark Dragon King · exclusive theme", exclusiveGilded: "Gilded Dragon King · glass theme", soundOn: "Entry sound: on", soundOff: "Entry sound: off",
     myBirthday: "My birthday", birthMonth: "Month", birthDay: "Day", birthdaySave: "Save", birthdaySaved: "Birthday saved", birthdayEmailNote: "We will send you a greeting email on your birthday; clearing your birthday stops it.",
     birthdayHint: "Add your birthday (month/day, no year) for {percent}% member price in your birthday month", birthdayMonthNote: "🎂 Happy birthday month! {percent}% member price this month",
     myBalance: "My balance", topUpHistory: "Stored-value history", topUpAtCounter: "Top up at the counter in the restaurant (cash / card)", noTopUps: "No stored-value history yet", balTopup: "Top-up", balBonus: "Bonus", balSpend: "Spent", balRefund: "Refund", balAdjust: "By the restaurant", balReverse: "Top-up reversed",
@@ -124,6 +131,14 @@ export function g(language: Language, key: GuestKey, values: Record<string, stri
 export function refusal(language: Language, code: string | undefined, values: Record<string, string | number> = {}): string | null {
   const text = code ? (copy[language].refused as Record<string, string>)[code] : undefined;
   return text ? text.replace(/\{(\w+)\}/g, (match, name: string) => (values[name] === undefined ? match : String(values[name]))) : null;
+}
+
+const RANK: Record<MemberTierTheme, GuestKey> = {
+  bronze: "rankBronze", silver: "rankSilver", gold: "rankGold", platinum: "rankPlatinum", dark: "rankDark", gilded: "rankGilded"
+};
+/** The 龙王称号 for a badge's theme, in the guest's language. */
+export function tierRank(language: Language, theme: MemberTierTheme): string {
+  return g(language, RANK[theme]);
 }
 
 const STATUS: Record<ApiOrder["status"], GuestKey> = {

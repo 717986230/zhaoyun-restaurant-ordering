@@ -42,18 +42,21 @@ test("memberTierFor picks the highest threshold passed", () => {
   assert.equal(memberTierFor(49999, tiers)?.name, "银卡");
   assert.equal(memberTierFor(50000, tiers)?.name, "金卡");
   assert.equal(memberTierFor(999999, tiers)?.name, "金卡");
+  assert.equal(memberTierFor(10000, tiers)?.level, 1, "银卡 is level 1");
+  assert.equal(memberTierFor(50000, tiers)?.level, 2, "金卡 is level 2");
+  assert.equal(memberTierFor(50000, tiers)?.count, 2, "two tiers configured");
 });
 
 test("tiers off means no tier, whatever the top-up", () => {
   const off = normalizeMemberTiers({ enabled: false, tiers: [{ name: "金卡", thresholdCents: 0, discountPercent: 10 }] });
   assert.equal(memberTierFor(1000000, off), null);
-  assert.deepEqual(membershipStatus(1000000, off), { growthCents: 1000000, tier: null, discountPercent: 0 });
+  assert.deepEqual(membershipStatus(1000000, off), { growthCents: 1000000, tier: null, tierLevel: 0, tierCount: 0, discountPercent: 0 });
 });
 
 test("membershipStatus carries the level name and its discount", () => {
   const tiers = normalizeMemberTiers({ enabled: true, tiers: [{ name: "金卡", thresholdCents: 50000, discountPercent: 12 }] });
-  assert.deepEqual(membershipStatus(60000, tiers), { growthCents: 60000, tier: "金卡", discountPercent: 12 });
-  assert.deepEqual(membershipStatus(100, tiers), { growthCents: 100, tier: null, discountPercent: 0 });
+  assert.deepEqual(membershipStatus(60000, tiers), { growthCents: 60000, tier: "金卡", tierLevel: 1, tierCount: 1, discountPercent: 12 });
+  assert.deepEqual(membershipStatus(100, tiers), { growthCents: 100, tier: null, tierLevel: 0, tierCount: 1, discountPercent: 0 });
   assert.equal(membershipStatus(-5, tiers).growthCents, 0, "a negative growth never shows");
 });
 
