@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import { ALLERGENS } from "../../../../../src/allergens.js";
+import { TAG_COLORS } from "../../../../../src/tag-colors.js";
 import type { BundleItem, ModifierGroup, Product, ProductMedia, VatPercent } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
@@ -16,6 +17,8 @@ interface Props {
   onEdit: (product: Product | null) => void;
   /** `dailyLimit` only when it changed (每日限量): portions a day, or null for no limit. */
   onSave: (input: AdminProductInput, id: string | null, media: File | null, dailyLimit?: number | null) => Promise<boolean>;
+  /** One change (改价 / 上架 / 有货) resent for several dishes at once. */
+  onBulkSave: (updates: Array<{ id: string; input: AdminProductInput }>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onDuplicate: (id: string) => Promise<void>;
@@ -178,6 +181,35 @@ function MediaField({ current, mediaUrl }: { current: ProductMedia | null; media
   </label>;
 }
 
+/** The new price in cents after a bulk change — a fixed euro delta or a
+ *  percentage — never below zero, rounded to the cent. */
+export function nextPriceCents(currentCents: number, mode: "fixed" | "percent", value: number): number {
+  const next = mode === "fixed" ? currentCents + Math.round(value * 100) : currentCents * (1 + value / 100);
+  return Math.max(0, Math.round(next));
+}
+
+/** A dish as the admin PUT wants it, so a bulk change resends everything
+ *  unchanged but the one field it touches (the backend merges onto the row). */
+function productToInput(product: Product): AdminProductInput {
+  return {
+    sku: product.sku,
+    kind: product.kind,
+    category: product.category,
+    names: { ...product.names },
+    description: product.description,
+    price: product.priceCents / 100,
+    details: { ...product.details },
+    allergens: [...product.allergens],
+    vatPercent: product.vatPercent,
+    printStation: product.printStation,
+    available: product.available,
+    published: product.published,
+    tagColor: product.tagColor ?? null,
+    modifiers: product.modifiers ?? [],
+    bundleItems: product.bundleItems ?? []
+  };
+}
+
 export function CatalogPanel(props: Props) {
   const { t, language } = useI18n();
   // On a phone the list and the form cannot both be on screen, so the list
@@ -185,6 +217,12 @@ export function CatalogPanel(props: Props) {
   // this is ignored.
   const [editorOpen, setEditorOpen] = useState(false);
   const [formError, setFormError] = useState("");
+  // 批量: select several dishes and change price / 上架 / 有货 in one go.
+  const [batchMode, setBatchMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [priceMode, setPriceMode] = useState<"fixed" | "percent">("fixed");
+  const [priceValue, setPriceValue] = useState("");
+  const [batchError, setBatchError] = useState("");
   const productIndex = useMemo(() => new Map(props.products.map((item) => [item.id, item])), [props.products]);
   // A set shows its dishes' pictures, so only a dish of its own can be missing one.
   const missingPhoto = (product: Product) => !product.bundleItems?.length && !product.media.length;
@@ -200,6 +238,46 @@ export function CatalogPanel(props: Props) {
     props.onEdit(product);
     setFormError("");
     setEditorOpen(true);
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function leaveBatch() {
+    setBatchMode(false);
+    setSelected(new Set());
+    setBatchError("");
+    setPriceValue("");
+  }
+
+  /** The dishes a bulk change will touch: the selected ones still on screen. */
+  function selectedUpdates(apply: (input: AdminProductInput, product: Product) => void) {
+    return [...selected].flatMap((id) => {
+      const product = productIndex.get(id);
+      if (!product) return [];
+      const input = productToInput(product);
+      apply(input, product);
+      return [{ id, input }];
+    });
+  }
+
+  function applyBulkFlag(field: "published" | "available", value: boolean) {
+    if (!selected.size || !window.confirm(t("batchConfirm", { n: selected.size }))) return;
+    setBatchError("");
+    void props.onBulkSave(selectedUpdates((input) => { input[field] = value; }));
+  }
+
+  function applyBulkPrice() {
+    const value = Number(priceValue);
+    if (!priceValue.trim() || !Number.isFinite(value) || value === 0) { setBatchError(t("batchPriceInvalid")); return; }
+    if (!selected.size || !window.confirm(t("batchConfirm", { n: selected.size }))) return;
+    setBatchError("");
+    void props.onBulkSave(selectedUpdates((input, product) => { input.price = nextPriceCents(product.priceCents, priceMode, value) / 100; })).then(() => setPriceValue(""));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -229,7 +307,8 @@ export function CatalogPanel(props: Props) {
       bundleItems: readBundleItems(data),
       printStation: readText(data, "printStation") as AdminProductInput["printStation"],
       available: data.get("available") === "on",
-      published: data.get("published") === "on"
+      published: data.get("published") === "on",
+      tagColor: readText(data, "tagColor")
     };
     const mediaInput = formElement.elements.namedItem("media") as HTMLInputElement;
     // 每日限量: empty is as many as ordered; saved on its own, and only when it changed.
@@ -271,6 +350,11 @@ export function CatalogPanel(props: Props) {
       <label><span>{t("fieldIngredients")}</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
       <div className="field-grid three"><label><span>{t("fieldTime")}</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>{t("fieldPortion")}</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>{t("fieldLevel")}</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
       <fieldset className="allergen-picker"><legend>{t("fieldAllergens")}</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {language === "zh" ? allergen.zh : allergen.de}</span></label>)}</fieldset>
+      <fieldset className="tag-colour-picker"><legend>{t("fieldTagColour")}</legend>
+        <label className="tag-colour-none"><input type="radio" name="tagColor" value="" defaultChecked={!product?.tagColor} /><span>{t("tagColourNone")}</span></label>
+        {TAG_COLORS.map((colour) => <label key={colour} className="tag-colour-swatch" style={{ "--swatch": colour } as CSSProperties}>
+          <input type="radio" name="tagColor" value={colour} defaultChecked={product?.tagColor === colour} /><span aria-hidden="true" /></label>)}
+      </fieldset>
       <MediaField current={product?.media?.[0] ?? null} mediaUrl={props.mediaUrl} />
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
       <label className="daily-limit"><span>{t("fieldDailyLimit")}</span><input name="dailyLimit" id="dailyLimit" type="number" min="1" max="9999" step="1" inputMode="numeric" defaultValue={product?.dailyLimit ?? ""} placeholder={t("dailyLimitNone")} />
@@ -299,14 +383,38 @@ export function CatalogPanel(props: Props) {
         <div><h1>{t("catalogTitle")}</h1><p>{t("catalogCount", { count: props.products.length })}</p></div>
         <div className="list-head-actions">
           <button className="icon-action" onClick={() => void props.onRefresh()} title={t("refresh")} aria-label={t("refresh")}>↻</button>
+          <button className={`ghost-action batch-toggle ${batchMode ? "on" : ""}`} aria-pressed={batchMode} onClick={() => batchMode ? leaveBatch() : setBatchMode(true)}>☑ {t(batchMode ? "batchExit" : "batchMode")}</button>
           <button className="primary-action" onClick={() => open(null)}>＋ {t("catalogNew")}</button>
         </div>
       </header>
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}
         {/* Only while some dish has no picture: the guests see a drawn mark in its place. */}
         {(missingCount > 0 || props.filter === "nophoto") && <button id="filterNoPhoto" className={props.filter === "nophoto" ? "active" : ""} onClick={() => props.onFilter("nophoto")}>{t("filterNoPhoto", { count: missingCount })}</button>}</div>
+      {batchMode && <div className="batch-bar">
+        <div className="batch-select">
+          <span className="batch-count">{t("batchSelected", { n: selected.size })}</span>
+          <button type="button" className="ghost-action" onClick={() => setSelected(new Set(rows.map((row) => row.id)))}>{t("batchSelectAll")}</button>
+          <button type="button" className="ghost-action" onClick={() => setSelected(new Set())}>{t("batchClear")}</button>
+        </div>
+        <div className="batch-price">
+          <select value={priceMode} onChange={(event) => setPriceMode(event.target.value as "fixed" | "percent")} aria-label={t("batchPriceApply")}>
+            <option value="fixed">{t("batchPriceFixed")}</option>
+            <option value="percent">{t("batchPricePercent")}</option>
+          </select>
+          <input type="number" step="0.01" inputMode="decimal" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder={t("batchPricePlaceholder")} aria-label={t("batchPriceApply")} />
+          <button type="button" className="ghost-action" disabled={!selected.size} onClick={applyBulkPrice}>{t("batchPriceApply")}</button>
+        </div>
+        <div className="batch-flags">
+          <button type="button" className="ghost-action" disabled={!selected.size} onClick={() => applyBulkFlag("published", true)}>{t("batchPublishOn")}</button>
+          <button type="button" className="ghost-action" disabled={!selected.size} onClick={() => applyBulkFlag("published", false)}>{t("batchPublishOff")}</button>
+          <button type="button" className="ghost-action" disabled={!selected.size} onClick={() => applyBulkFlag("available", true)}>{t("batchAvailableOn")}</button>
+          <button type="button" className="ghost-action" disabled={!selected.size} onClick={() => applyBulkFlag("available", false)}>{t("batchAvailableOff")}</button>
+        </div>
+        {batchError && <p className="form-error" role="alert">{batchError}</p>}
+      </div>}
       <div className="product-list">{rows.length ? rows.map((row) => {
-        return <button className={`product-row ${product?.id === row.id ? "selected" : ""}`} key={row.id} onClick={() => open(row)}><ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}{row.leftToday === 0 && <em className="draft-mark">{t("stockOutToday")}</em>}{row.leftToday ? <em className="draft-mark">{t("stockLeftToday", { n: row.leftToday })}</em> : null}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
+        const picked = selected.has(row.id);
+        return <button className={`product-row ${product?.id === row.id ? "selected" : ""} ${batchMode ? "batch-row" : ""} ${picked ? "batch-picked" : ""}`} key={row.id} aria-pressed={batchMode ? picked : undefined} onClick={() => batchMode ? toggleSelect(row.id) : open(row)}>{batchMode && <span className="batch-check" aria-hidden="true">{picked ? "☑" : "☐"}</span>}<ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}{row.leftToday === 0 && <em className="draft-mark">{t("stockOutToday")}</em>}{row.leftToday ? <em className="draft-mark">{t("stockLeftToday", { n: row.leftToday })}</em> : null}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
     </section>
   </div></section>;

@@ -65,7 +65,12 @@ const COPY = {
     bookingParty: "人数：{party} 位",
     bookingTable: "桌号：{table}",
     bookingReference: "预约号：{reference}",
-    bookingManage: "查看或取消预约：{url}"
+    bookingManage: "查看或取消预约：{url}",
+    birthdaySubject: "{restaurant} 祝你生日快乐！",
+    birthdayLead: "{name}，祝你生日快乐！",
+    birthdayOffer: "整个生日月来店用餐，报手机号或邮箱给收银员，即享会员价 {percent}% off。",
+    birthdayPlain: "感谢你一直以来的支持，期待再见到你。",
+    birthdayStop: "不想再收到生日邮件？在账户里清除生日即可。"
   },
   de: {
     subject: "{restaurant} – Ihr Bestätigungscode: {code}",
@@ -82,7 +87,12 @@ const COPY = {
     bookingParty: "Personen: {party}",
     bookingTable: "Tisch: {table}",
     bookingReference: "Buchungsnr.: {reference}",
-    bookingManage: "Reservierung ansehen oder stornieren: {url}"
+    bookingManage: "Reservierung ansehen oder stornieren: {url}",
+    birthdaySubject: "{restaurant} – alles Gute zum Geburtstag!",
+    birthdayLead: "Liebe/r {name}, alles Gute zum Geburtstag!",
+    birthdayOffer: "Den ganzen Geburtstagsmonat erhalten Sie bei uns {percent}% Mitgliedspreis – einfach an der Kassa Ihre Nummer oder E-Mail nennen.",
+    birthdayPlain: "Danke für Ihre Treue – wir freuen uns auf Ihren nächsten Besuch.",
+    birthdayStop: "Keine Geburtstagsmails mehr? Löschen Sie Ihren Geburtstag im Konto."
   },
   en: {
     subject: "{restaurant} – your verification code: {code}",
@@ -99,7 +109,12 @@ const COPY = {
     bookingParty: "Party: {party}",
     bookingTable: "Table: {table}",
     bookingReference: "Reference: {reference}",
-    bookingManage: "View or cancel your booking: {url}"
+    bookingManage: "View or cancel your booking: {url}",
+    birthdaySubject: "{restaurant} – happy birthday!",
+    birthdayLead: "Happy birthday, {name}!",
+    birthdayOffer: "All through your birthday month you get {percent}% member price with us – just give the cashier your number or email.",
+    birthdayPlain: "Thank you for being our guest – we look forward to seeing you again.",
+    birthdayStop: "No more birthday emails? Clear your birthday in your account."
   }
 };
 
@@ -178,5 +193,22 @@ export function alertMessage({ restaurant = "", method = "", path = "", requestI
     subject: `${name}：系统出错提醒 / Systemfehler / system error`,
     text: `${zh}\n\n${de}\n\n${en}\n\n${facts.join("\n")}\n`,
     html: `<p>${escapeHtml(zh)}</p><p>${escapeHtml(de)}</p><p>${escapeHtml(en)}</p><ul>${facts.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+  };
+}
+
+/**
+ * 生日祝福邮件: the greeting a member gets on their birthday, with the birthday
+ * offer when there is one, and how to stop these mails (clear the birthday).
+ */
+export function birthdayMessage(name, { language = "de", restaurant = "", discountPercent = 0 } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const values = { restaurant: restaurant || "Restaurant", name: name || "", percent: discountPercent };
+  const lead = fill(copy.birthdayLead, values).replace(/^[,，\s]+|\s+(?=[,，!！])/g, "");
+  const body = discountPercent > 0 ? fill(copy.birthdayOffer, values) : copy.birthdayPlain;
+  const stop = copy.birthdayStop;
+  return {
+    subject: fill(copy.birthdaySubject, values),
+    text: `${lead}\n\n${body}\n\n${stop}\n`,
+    html: `<p style="font-size:20px">🎂 ${escapeHtml(lead)}</p><p>${escapeHtml(body)}</p><p style="color:#666;font-size:12px">${escapeHtml(stop)}</p>`
   };
 }
