@@ -133,21 +133,13 @@ async function changeBooking(pos: Pos, booking: ApiReservation, command: Reserva
   }
 }
 
-/** A booking seated at the table the waiter gives; the table, or null when not seated. */
-async function seatBooking(pos: Pos, booking: ApiReservation, onDone: () => void): Promise<string | null> {
-  const table = window.prompt(pos.t("bookingTablePrompt", { name: booking.name, party: booking.party }), booking.table ?? "");
-  if (table === null) return null;
-  const chosen = table.trim().toUpperCase();
-  return (await changeBooking(pos, booking, { status: "seated", table: chosen }, onDone)) ? chosen : null;
-}
-
 /**
  * A code read at the door. A booking's: today's booking with that number is
- * seated — at the table they picked, or at the one the waiter gives them. A
- * member's: their first visit's points, if they never had them, so they can
- * book from then on.
+ * seated — at the table they picked straight away, or, with no table yet, the
+ * waiter is shown the free tables to seat them at (`onNeedTable`). A member's:
+ * their first visit's points, if they never had them, so they can book from then on.
  */
-async function scanned(pos: Pos, code: Scanned, bookings: ApiReservation[], onDone: () => void) {
+async function scanned(pos: Pos, code: Scanned, bookings: ApiReservation[], onDone: () => void, onNeedTable: (booking: ApiReservation) => void) {
   const { t } = pos;
   if (code.kind === "member") {
     try {
@@ -167,18 +159,20 @@ async function scanned(pos: Pos, code: Scanned, bookings: ApiReservation[], onDo
   if (!booking) return pos.notify(t("scanNotToday", { reference }), "error");
   if (booking.status === "seated") return pos.notify(t("scanAlready", { name: booking.name }), "error");
   if (booking.status !== "confirmed" && booking.status !== "pending") return pos.notify(t("scanCancelled", { reference }), "error");
-  const table = booking.table
-    ? ((await changeBooking(pos, booking, { status: "seated", table: booking.table }, onDone)) ? booking.table : null)
-    : await seatBooking(pos, booking, onDone);
-  if (table === null) return;
-  pos.notify(table ? t("checkedIn", { name: booking.name, party: booking.party, table: t("table", { table }) }) : t("checkedInNoTable", { name: booking.name, party: booking.party }));
+  if (booking.table) {
+    if (await changeBooking(pos, booking, { status: "seated", table: booking.table }, onDone)) {
+      pos.notify(t("checkedIn", { name: booking.name, party: booking.party, table: t("table", { table: booking.table }) }));
+    }
+    return;
+  }
+  onNeedTable(booking);
 }
 
 /**
  * Today's bookings still to come or at the table: who, how many, when, and
  * where they sit. Seating one asks for the table; the console has the rest.
  */
-function TodayBookings({ pos, bookings, onDone }: { pos: Pos; bookings: ApiReservation[]; onDone: () => void }) {
+function TodayBookings({ pos, bookings, onDone, onSeat }: { pos: Pos; bookings: ApiReservation[]; onDone: () => void; onSeat: (booking: ApiReservation) => void }) {
   const { t } = pos;
   if (!bookings.length) return null;
   const change = (booking: ApiReservation, command: ReservationUpdateCommand) => changeBooking(pos, booking, command, onDone);
@@ -194,11 +188,44 @@ function TodayBookings({ pos, bookings, onDone }: { pos: Pos; bookings: ApiReser
       {booking.status === "seated"
         ? <button type="button" onClick={() => void change(booking, { status: "completed" })}>{t("bookingFinish")}</button>
         : <>
-          <button type="button" onClick={() => void seatBooking(pos, booking, onDone)}>{t("bookingSeat")}</button>
+          <button type="button" onClick={() => onSeat(booking)}>{t("bookingSeat")}</button>
           <button type="button" className="pos-quiet" onClick={() => void change(booking, { status: "no_show" })}>{t("bookingNoShow")}</button>
         </>}
     </li>)}</ul>
   </details>;
+}
+
+/**
+ * 安排桌号: where to seat a booking — the free tables to tap (the one they
+ * booked, if any and still free, is marked and first), instead of typing a
+ * number blind. "Seat now" seats them with the table left for later.
+ */
+function SeatDialog({ pos, booking, tables, onSeat, onCancel }: { pos: Pos; booking: ApiReservation; tables: TableOverview[]; onSeat: (table: string) => void; onCancel: () => void }) {
+  const { t } = pos;
+  const [other, setOther] = useState("");
+  const booked = booking.table ? booking.table.toUpperCase() : "";
+  const room = tables.filter((entry) => !TAKEAWAY.test(entry.table));
+  const free = room.filter((entry) => entry.state === "free");
+  // The booked table first (if still free), then the rest of the free tables.
+  const ordered = [...free.filter((entry) => entry.table.toUpperCase() === booked), ...free.filter((entry) => entry.table.toUpperCase() !== booked)];
+  return <div className="pos-modal" role="dialog" aria-label={t("seatTitle", { name: booking.name, party: booking.party })}>
+    <div className="pos-card pos-move">
+      <h2>{t("seatTitle", { name: booking.name, party: booking.party })}</h2>
+      {ordered.length
+        ? <div className="pos-move-grid">{ordered.map((entry) => <button key={entry.table} type="button" className={entry.table.toUpperCase() === booked ? "pos-seat-booked" : ""} onClick={() => onSeat(entry.table)}>
+          {entry.table}{entry.table.toUpperCase() === booked && <small>{t("seatBooked")}</small>}
+        </button>)}</div>
+        : <p className="pos-muted">{t("moveNoFree")}</p>}
+      <form className="pos-move-other" onSubmit={(event) => { event.preventDefault(); if (other.trim()) onSeat(other); }}>
+        <input value={other} maxLength={8} autoCapitalize="characters" placeholder={t("moveOther")} aria-label={t("moveOther")} onChange={(event) => setOther(event.target.value)} />
+        <button type="submit" disabled={!other.trim()}>{t("bookingSeat")}</button>
+      </form>
+      <div className="pos-modal-actions">
+        <button type="button" onClick={onCancel}>{t("cancel")}</button>
+        <button type="button" onClick={() => onSeat("")}>{t("seatNoTable")}</button>
+      </div>
+    </div>
+  </div>;
 }
 
 /** The room: every table and what is open on it, and the takeaways waiting. */
@@ -211,6 +238,8 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const [delivery, setDelivery] = useState<ApiDeliveryOrder[]>([]);
   // The camera at the door: a booking's code or a member's.
   const [scanning, setScanning] = useState(false);
+  // A booking being seated: the free-table picker is open for it.
+  const [seating, setSeating] = useState<ApiReservation | null>(null);
   // This device: the tables it has open are its own, every other device's are locked to it.
   const [deviceId, setDeviceId] = useState("");
 
@@ -250,6 +279,17 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
     } catch (error) { pos.failed(error); }
   }
 
+  /** Seat the booking at the chosen table (empty = seat now, table later). */
+  async function doSeat(booking: ApiReservation, table: string) {
+    const chosen = table.trim().toUpperCase();
+    if (await changeBooking(pos, booking, { status: "seated", table: chosen }, () => void load())) {
+      pos.notify(chosen
+        ? t("checkedIn", { name: booking.name, party: booking.party, table: t("table", { table: chosen }) })
+        : t("checkedInNoTable", { name: booking.name, party: booking.party }));
+    }
+    setSeating(null);
+  }
+
   function openTyped(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const table = String(new FormData(event.currentTarget).get("table") || "").trim().toUpperCase();
@@ -278,7 +318,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
     <FailedPrints pos={pos} />
     <ServiceCalls pos={pos} requests={requests} onDone={() => void load()} />
     <DeliveryOrders pos={pos} orders={delivery} onDone={() => void load()} />
-    <TodayBookings pos={pos} bookings={bookings} onDone={() => void load()} />
+    <TodayBookings pos={pos} bookings={bookings} onDone={() => void load()} onSeat={setSeating} />
     <div className="pos-floor-bar">
       <form onSubmit={openTyped} className="pos-open-table">
         <input name="table" placeholder={t("openTable")} aria-label={t("openTable")} maxLength={8} autoCapitalize="characters" />
@@ -288,7 +328,8 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       <button type="button" className="pos-topup-open" onClick={() => go({ name: "topup" })}>{t("topUp")}</button>
       <button type="button" className="pos-primary" onClick={() => void newTakeaway()}>{t("newTakeaway")}</button>
     </div>
-    {scanning && <BookingScanner pos={pos} bookings={bookings} onFound={(code) => { setScanning(false); void scanned(pos, code, bookings, () => void load()); }} onClose={() => setScanning(false)} />}
+    {scanning && <BookingScanner pos={pos} bookings={bookings} onFound={(code) => { setScanning(false); void scanned(pos, code, bookings, () => void load(), setSeating); }} onClose={() => setScanning(false)} />}
+    {seating && <SeatDialog pos={pos} booking={seating} tables={tables} onCancel={() => setSeating(null)} onSeat={(table) => void doSeat(seating, table)} />}
     <h2>{t("tables")}</h2>
     <div className="pos-table-grid">{room.map(tile)}</div>
     {takeaways.length > 0 && <>
