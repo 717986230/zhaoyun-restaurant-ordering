@@ -125,7 +125,10 @@ test("admin workspace loads catalog and printer modules", async ({ page }) => {
   await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-list")).toContainText("黑椒牛柳");
   await page.locator(".product-row").click({ force: true });
-  await expect(page.locator('textarea[name="modifiers"]')).toHaveValue(/"spice"/);
+  // 口味/规格 is now a visual editor: the dish's existing group loads into it,
+  // and the hidden field it keeps in sync is what the form still submits.
+  await expect(page.locator('input[name="modifiers"]')).toHaveValue(/"spice"/);
+  await expect(page.locator(".modifier-group .modifier-names input").first()).toHaveValue("辣度");
   await page.getByRole("button", { name: "打印", exact: true }).click();
   await expect(page.locator(".printer-list")).toContainText("厨房打印机");
   // Searching the room and test prints need the Android shell; a browser has

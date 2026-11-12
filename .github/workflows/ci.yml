@@ -107,10 +107,20 @@ jobs:
           done
           exit 1
 
-      # The system libraries the browsers need, from apt, whether or not they came from the cache.
+      # The system libraries the browsers need, from apt, whether or not they
+      # came from the cache. The Azure apt mirror stalls on the odd package,
+      # and a single run past six minutes failed the whole shard before a test
+      # ran; so, like the download above, each attempt is given room and tried
+      # again, refreshing the package lists between tries.
       - name: Install the browsers' system libraries
-        timeout-minutes: 6
-        run: npx playwright install-deps chromium webkit
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do
+            if npx playwright install-deps chromium webkit; then exit 0; fi
+            echo "::warning::apt stalled installing browser libraries (attempt $attempt of 3)"
+            sudo apt-get update || true
+          done
+          exit 1
 
       - name: Responsive end-to-end tests
         run: npx playwright test --shard=${{ matrix.shard }}/3

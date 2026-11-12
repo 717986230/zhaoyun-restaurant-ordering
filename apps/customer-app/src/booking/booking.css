@@ -1402,6 +1402,17 @@ html.bk-root body {
   font-weight: 600;
 }
 
+/* Add-to-calendar sits among the booking's actions; its icon rides with the label. */
+.bk-add-cal {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.bk-add-cal svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
 /* ---------------------------------------------------------------------------
    Picking when to come (2026-10): a count, a calendar, then the times. The
    day was a dropdown and the time another; a calendar reads as a calendar and

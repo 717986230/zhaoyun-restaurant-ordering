@@ -68,7 +68,12 @@ function buildApi(env, ctx) {
     // The delivery platforms' secrets (wrangler secret put LIEFERANDO_WEBHOOK_SECRET, …; docs/DELIVERY.md).
     delivery: deliveryConfig(env),
     // Email for the guests' codes (wrangler secret put BREVO_API_KEY, …; docs/MAIL.md).
-    mail: mailConfig(env)
+    mail: mailConfig(env),
+    // Where an unplanned-error alert goes (wrangler secret put OWNER_ALERT_EMAIL;
+    // needs Brevo configured too). Unset: errors are logged only, not emailed.
+    ownerAlertEmail: env.OWNER_ALERT_EMAIL || null,
+    // Let the alert's send outlive the response the way the live channel does.
+    defer: (task) => ctx?.waitUntil(Promise.resolve(task).catch(() => {}))
   });
   return { store, api };
 }

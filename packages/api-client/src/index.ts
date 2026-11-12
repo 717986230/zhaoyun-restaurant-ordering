@@ -143,6 +143,8 @@ export interface AdminProductInput {
   printStation: "kitchen" | "bar" | "sushi" | "front";
   available: boolean;
   published: boolean;
+  /** Where the dish sits in the menu; lower shows first (shared/products.mjs). */
+  sortOrder?: number;
   /** 颜色标签: a palette colour (src/tag-colors.js) or null/"" to follow the category colour. */
   tagColor?: string | null;
   modifiers?: ModifierGroup[];

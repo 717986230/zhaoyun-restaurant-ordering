@@ -150,6 +150,97 @@ function BundleFieldset({ product, products, mediaUrl }: { product: Product | nu
   </fieldset>;
 }
 
+/** A short, stable-enough id for a group or option the owner just added. */
+function freshId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
+}
+
+/**
+ * The dish's 口味/规格 options (辣度、加料、大小份…), edited visually instead of
+ * as raw JSON: add groups, name each in three languages, pick single- or
+ * multi-select, and add priced options (加价 shown in euros, stored as cents).
+ * Kept in sync with a hidden input named "modifiers" so the form's `submit`
+ * reads it exactly as the old textarea did; a foldaway JSON box stays as an
+ * advanced import path. Remounts (state resets) with the form via its `key`,
+ * like BundleFieldset.
+ */
+export function ModifierFieldset({ product }: { product: Product | null }) {
+  const { t } = useI18n();
+  const [groups, setGroups] = useState<ModifierGroup[]>(() =>
+    (product?.modifiers ?? []).map((group) => ({ ...group, names: { ...group.names }, options: group.options.map((option) => ({ ...option, names: { ...option.names } })) })));
+  const [jsonDraft, setJsonDraft] = useState("");
+  const [jsonError, setJsonError] = useState("");
+
+  const addGroup = () => setGroups((current) => [...current, { id: freshId("grp"), names: { zh: "", de: "", en: "" }, selection: "single", options: [] }]);
+  const removeGroup = (id: string) => setGroups((current) => current.filter((group) => group.id !== id));
+  const setSelection = (id: string, selection: ModifierGroup["selection"]) => setGroups((current) => current.map((group) => {
+    if (group.id !== id) return group;
+    // Leaving multi for single drops any max — a single group can only ever take one.
+    const { max: _max, ...rest } = group;
+    return selection === "single" ? { ...rest, selection } : { ...group, selection };
+  }));
+  const setRequired = (id: string, required: boolean) => setGroups((current) => current.map((group) => group.id === id ? { ...group, min: required ? Math.max(1, group.min ?? 1) : 0 } : group));
+  const setMax = (id: string, value: string) => setGroups((current) => current.map((group) => group.id === id ? { ...group, max: Math.max(0, Math.trunc(Number(value) || 0)) } : group));
+  const setGroupName = (id: string, lang: "zh" | "de" | "en", value: string) => setGroups((current) => current.map((group) => group.id === id ? { ...group, names: { ...group.names, [lang]: value } } : group));
+  const addOption = (groupId: string) => setGroups((current) => current.map((group) => group.id === groupId ? { ...group, options: [...group.options, { id: freshId("opt"), names: { zh: "", de: "", en: "" }, priceCents: 0 }] } : group));
+  const removeOption = (groupId: string, optionId: string) => setGroups((current) => current.map((group) => group.id === groupId ? { ...group, options: group.options.filter((option) => option.id !== optionId) } : group));
+  const setOptionName = (groupId: string, optionId: string, lang: "zh" | "de" | "en", value: string) => setGroups((current) => current.map((group) => group.id === groupId ? { ...group, options: group.options.map((option) => option.id === optionId ? { ...option, names: { ...option.names, [lang]: value } } : option) } : group));
+  const setOptionPrice = (groupId: string, optionId: string, euros: string) => setGroups((current) => current.map((group) => group.id === groupId ? { ...group, options: group.options.map((option) => option.id === optionId ? { ...option, priceCents: Math.max(0, Math.round((Number(euros) || 0) * 100)) } : option) } : group));
+
+  const applyJson = () => {
+    let parsed: unknown;
+    try { parsed = JSON.parse(jsonDraft); } catch { setJsonError(t("modifierJsonInvalid")); return; }
+    if (!Array.isArray(parsed) || !parsed.every(isModifierGroup)) { setJsonError(t("modifiersInvalid")); return; }
+    setJsonError("");
+    setGroups(parsed as ModifierGroup[]);
+  };
+
+  return <fieldset className="modifier-picker">
+    <legend>{t("modifierLegend")}</legend>
+    {/* The single source of truth the form submits, kept as the old textarea's name. */}
+    <input type="hidden" name="modifiers" value={JSON.stringify(groups)} readOnly />
+    {groups.length
+      ? <ul className="modifier-groups">{groups.map((group) => <li key={group.id} className="modifier-group">
+        <div className="modifier-group-head">
+          <div className="modifier-names">
+            <input value={group.names.zh} onChange={(event) => setGroupName(group.id, "zh", event.target.value)} placeholder={t("modifierGroupNamePlaceholder")} aria-label="中文" />
+            <input value={group.names.de} onChange={(event) => setGroupName(group.id, "de", event.target.value)} placeholder="Deutsch" aria-label="Deutsch" />
+            <input value={group.names.en} onChange={(event) => setGroupName(group.id, "en", event.target.value)} placeholder="English" aria-label="English" />
+          </div>
+          <div className="modifier-group-tools">
+            <div className="modifier-selection">{(["single", "multi"] as const).map((selection) => <label key={selection}>
+              <input type="radio" name={`sel-${group.id}`} checked={group.selection === selection} onChange={() => setSelection(group.id, selection)} />
+              <span>{t(selection === "single" ? "modifierSingle" : "modifierMulti")}</span>
+            </label>)}</div>
+            <button type="button" className="modifier-remove" onClick={() => removeGroup(group.id)} aria-label={t("modifierGroupRemove")} title={t("modifierGroupRemove")}>✕</button>
+          </div>
+        </div>
+        <div className="modifier-limits">
+          <label className="modifier-required"><input type="checkbox" checked={(group.min ?? 0) > 0} onChange={(event) => setRequired(group.id, event.target.checked)} /><span>{t("modifierRequired")}</span></label>
+          {group.selection === "multi" && <label className="modifier-max"><span>{t("modifierMax")}</span><input type="number" min="0" step="1" inputMode="numeric" value={group.max ? group.max : ""} onChange={(event) => setMax(group.id, event.target.value)} placeholder={t("modifierMaxNone")} /></label>}
+        </div>
+        {group.options.length
+          ? <ul className="modifier-options">{group.options.map((option) => <li key={option.id}>
+            <input value={option.names.zh} onChange={(event) => setOptionName(group.id, option.id, "zh", event.target.value)} placeholder={t("modifierOptionNamePlaceholder")} aria-label="中文" />
+            <input value={option.names.de} onChange={(event) => setOptionName(group.id, option.id, "de", event.target.value)} placeholder="Deutsch" aria-label="Deutsch" />
+            <input value={option.names.en} onChange={(event) => setOptionName(group.id, option.id, "en", event.target.value)} placeholder="English" aria-label="English" />
+            <label className="modifier-price"><span>{t("modifierOptionPrice")}</span><input type="number" min="0" step="0.01" inputMode="decimal" value={option.priceCents ? option.priceCents / 100 : ""} onChange={(event) => setOptionPrice(group.id, option.id, event.target.value)} placeholder="0.00" /></label>
+            <button type="button" className="modifier-remove" onClick={() => removeOption(group.id, option.id)} aria-label={t("modifierOptionRemove")} title={t("modifierOptionRemove")}>✕</button>
+          </li>)}</ul>
+          : <p className="modifier-empty">{t("modifierOptionsNone")}</p>}
+        <button type="button" className="ghost-action modifier-add-option" onClick={() => addOption(group.id)}>{t("modifierOptionAdd")}</button>
+      </li>)}</ul>
+      : <p className="modifier-empty">{t("modifierNone")}</p>}
+    <button type="button" className="ghost-action modifier-add-group" onClick={addGroup}>{t("modifierGroupAdd")}</button>
+    <details className="modifier-json" onToggle={(event) => { if ((event.target as HTMLDetailsElement).open) { setJsonDraft(JSON.stringify(groups, null, 2)); setJsonError(""); } }}>
+      <summary>{t("modifierJsonToggle")}</summary>
+      <textarea rows={8} spellCheck={false} value={jsonDraft} onChange={(event) => setJsonDraft(event.target.value)} />
+      {jsonError && <p className="form-error" role="alert">{jsonError}</p>}
+      <button type="button" className="ghost-action" onClick={applyJson}>{t("modifierJsonApply")}</button>
+    </details>
+  </fieldset>;
+}
+
 /**
  * The dish's picture, with the file field: the photo (or video) on the dish
  * now, the one just picked the moment it is chosen, or "待上传" when there is
@@ -204,6 +295,7 @@ function productToInput(product: Product): AdminProductInput {
     printStation: product.printStation,
     available: product.available,
     published: product.published,
+    ...(product.sortOrder === undefined ? {} : { sortOrder: product.sortOrder }),
     tagColor: product.tagColor ?? null,
     modifiers: product.modifiers ?? [],
     bundleItems: product.bundleItems ?? []
@@ -223,6 +315,11 @@ export function CatalogPanel(props: Props) {
   const [priceMode, setPriceMode] = useState<"fixed" | "percent">("fixed");
   const [priceValue, setPriceValue] = useState("");
   const [batchError, setBatchError] = useState("");
+  // 排序: drag or ↑↓ a working copy of the whole catalogue, then save sortOrder.
+  const [sortMode, setSortMode] = useState(false);
+  const [order, setOrder] = useState<Product[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [sortError, setSortError] = useState("");
   const productIndex = useMemo(() => new Map(props.products.map((item) => [item.id, item])), [props.products]);
   // A set shows its dishes' pictures, so only a dish of its own can be missing one.
   const missingPhoto = (product: Product) => !product.bundleItems?.length && !product.media.length;
@@ -278,6 +375,46 @@ export function CatalogPanel(props: Props) {
     if (!selected.size || !window.confirm(t("batchConfirm", { n: selected.size }))) return;
     setBatchError("");
     void props.onBulkSave(selectedUpdates((input, product) => { input.price = nextPriceCents(product.priceCents, priceMode, value) / 100; })).then(() => setPriceValue(""));
+  }
+
+  function enterSort() {
+    setBatchMode(false);
+    setSelected(new Set());
+    setOrder([...props.products]);
+    setDragIndex(null);
+    setSortError("");
+    setSortMode(true);
+  }
+
+  /** Move the dish at `index` by `delta` places (−1 up, +1 down). */
+  function moveDish(index: number, delta: number) {
+    setOrder((current) => {
+      const target = index + delta;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next;
+    });
+  }
+
+  /** Drop the dragged dish before the one at `index`. */
+  function dropOnto(index: number) {
+    setOrder((current) => {
+      if (dragIndex === null || dragIndex === index) return current;
+      const next = [...current];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(index, 0, moved!);
+      return next;
+    });
+    setDragIndex(null);
+  }
+
+  /** Save only the dishes whose place actually changed, as their new sortOrder. */
+  function saveOrder() {
+    const updates = order.flatMap((dish, index) => dish.sortOrder === index ? [] : [{ id: dish.id, input: { ...productToInput(dish), sortOrder: index } }]);
+    if (!updates.length) { setSortError(t("sortUnchanged")); return; }
+    setSortError("");
+    void props.onBulkSave(updates).then(() => setSortMode(false));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -359,16 +496,16 @@ export function CatalogPanel(props: Props) {
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
       <label className="daily-limit"><span>{t("fieldDailyLimit")}</span><input name="dailyLimit" id="dailyLimit" type="number" min="1" max="9999" step="1" inputMode="numeric" defaultValue={product?.dailyLimit ?? ""} placeholder={t("dailyLimitNone")} />
         {product?.leftToday !== undefined && product?.leftToday !== null ? <small className="settings-hint">{t("dailyLimitToday", { n: product.leftToday })}</small> : null}</label>
+      <ModifierFieldset product={product} />
       <BundleFieldset product={product} products={props.products} mediaUrl={props.mediaUrl} />
-      {/* What a restaurant rarely touches: numbering, printing, tax and the raw
-          option groups. Folded away so the form is the dish, not the plumbing. */}
+      {/* What a restaurant rarely touches: numbering, printing and tax. Folded
+          away so the form is the dish, not the plumbing. */}
       <details className="form-advanced">
         <summary>{t("advanced")}</summary>
         <div className="field-grid three">
           <label><span>{t("fieldSku")}</span><input name="sku" defaultValue={product?.sku ?? ""} placeholder={t("fieldSkuHint")} /></label>
           <label><span>{t("fieldStation")}</span><select name="printStation" defaultValue={product?.printStation ?? "kitchen"}>{stationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>
-        <label><span>{t("fieldModifiers")}</span><textarea name="modifiers" rows={8} spellCheck={false} defaultValue={JSON.stringify(product?.modifiers ?? [], null, 2)} placeholder={'[{"id":"spice","names":{"zh":"辣度","de":"Scharf","en":"Spice"},"selection":"single","options":[]}]'} /><small>{t("fieldModifiersHint")}</small></label>
       </details>
       {product && <button type="button" className="danger-action" onClick={() => { if (window.confirm(t("confirmDelete"))) void props.onDelete(product.id).then(() => setEditorOpen(false)); }}>{t("deleteProduct")}</button>}
       {/* Save stays in reach at the foot of the form, however long a set's
@@ -383,10 +520,34 @@ export function CatalogPanel(props: Props) {
         <div><h1>{t("catalogTitle")}</h1><p>{t("catalogCount", { count: props.products.length })}</p></div>
         <div className="list-head-actions">
           <button className="icon-action" onClick={() => void props.onRefresh()} title={t("refresh")} aria-label={t("refresh")}>↻</button>
-          <button className={`ghost-action batch-toggle ${batchMode ? "on" : ""}`} aria-pressed={batchMode} onClick={() => batchMode ? leaveBatch() : setBatchMode(true)}>☑ {t(batchMode ? "batchExit" : "batchMode")}</button>
-          <button className="primary-action" onClick={() => open(null)}>＋ {t("catalogNew")}</button>
+          {!sortMode && <button className={`ghost-action batch-toggle ${batchMode ? "on" : ""}`} aria-pressed={batchMode} onClick={() => batchMode ? leaveBatch() : setBatchMode(true)}>☑ {t(batchMode ? "batchExit" : "batchMode")}</button>}
+          {!batchMode && <button className={`ghost-action sort-toggle ${sortMode ? "on" : ""}`} aria-pressed={sortMode} onClick={() => { if (sortMode) { setSortMode(false); setSortError(""); } else enterSort(); }}>⇅ {t(sortMode ? "sortExit" : "sortMode")}</button>}
+          {!sortMode && !batchMode && <button className="primary-action" onClick={() => open(null)}>＋ {t("catalogNew")}</button>}
         </div>
       </header>
+      {sortMode ? <div className="sort-pane">
+        <div className="sort-bar">
+          <p className="sort-hint">{t("sortHint")}</p>
+          <button type="button" className="primary-action" onClick={saveOrder}>{t("sortSave")}</button>
+        </div>
+        {sortError && <p className="form-error" role="alert">{sortError}</p>}
+        <ul className="sort-list">{order.map((dish, index) => <li
+          key={dish.id}
+          className={`sort-row ${dragIndex === index ? "dragging" : ""}`}
+          draggable
+          onDragStart={() => setDragIndex(index)}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={() => dropOnto(index)}
+          onDragEnd={() => setDragIndex(null)}>
+          <span className="sort-handle" aria-hidden="true" title={t("sortDrag")}>⣿</span>
+          <ProductThumb product={dish} byId={productIndex} mediaUrl={props.mediaUrl} />
+          <span className="product-copy"><b>{nameIn(dish, language)}</b><small>{dish.sku} · {dish.category}</small></span>
+          <span className="sort-moves">
+            <button type="button" className="icon-action" disabled={index === 0} onClick={() => moveDish(index, -1)} aria-label={t("sortUp")} title={t("sortUp")}>↑</button>
+            <button type="button" className="icon-action" disabled={index === order.length - 1} onClick={() => moveDish(index, 1)} aria-label={t("sortDown")} title={t("sortDown")}>↓</button>
+          </span>
+        </li>)}</ul>
+      </div> : <>
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}
         {/* Only while some dish has no picture: the guests see a drawn mark in its place. */}
         {(missingCount > 0 || props.filter === "nophoto") && <button id="filterNoPhoto" className={props.filter === "nophoto" ? "active" : ""} onClick={() => props.onFilter("nophoto")}>{t("filterNoPhoto", { count: missingCount })}</button>}</div>
@@ -416,6 +577,7 @@ export function CatalogPanel(props: Props) {
         const picked = selected.has(row.id);
         return <button className={`product-row ${product?.id === row.id ? "selected" : ""} ${batchMode ? "batch-row" : ""} ${picked ? "batch-picked" : ""}`} key={row.id} aria-pressed={batchMode ? picked : undefined} onClick={() => batchMode ? toggleSelect(row.id) : open(row)}>{batchMode && <span className="batch-check" aria-hidden="true">{picked ? "☑" : "☐"}</span>}<ProductThumb product={row} byId={productIndex} mediaUrl={props.mediaUrl} /><span className="product-copy"><b>{props.featuredIds.includes(row.id) && <em className="feature-mark" title={t("featuredOn")}>✦</em>}{nameIn(row, language)}{!row.published && <em className="draft-mark">{t("draft")}</em>}{row.leftToday === 0 && <em className="draft-mark">{t("stockOutToday")}</em>}{row.leftToday ? <em className="draft-mark">{t("stockLeftToday", { n: row.leftToday })}</em> : null}</b><small>{row.sku} · {row.category}{row.modifiers?.length ? ` · ${t("modifierCount", { count: row.modifiers.length })}` : ""}{row.bundleItems?.length ? ` · ${t("bundleCount", { count: row.bundleItems.length })}` : ""}</small></span><span className="product-kind">{kindLabels[row.kind]}</span><span className={`vat-badge vat-${row.bundleItems?.length ? "set" : row.vatPercent}`} title={t("fieldVat")}>{row.bundleItems?.length ? t("vatSplitShort") : `${row.vatPercent}%`}</span><strong>{formatMoney(row.priceCents, language)}</strong><i className={row.published && row.available ? "live" : ""} /></button>;
       }) : <div className="admin-empty">{t("catalogEmpty")}</div>}</div>
+      </>}
     </section>
   </div></section>;
 }
