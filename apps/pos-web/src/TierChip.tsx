@@ -12,9 +12,8 @@ export function TierChip({ level, t }: { level: number; t: PosTranslate }) {
   if (!theme) return null;
   return (
     <span className="tier-chip" data-tier-theme={theme} title={t(RANK_KEY[theme])}>
-      <span className="tier-chip-coin" aria-hidden="true">龙</span>
+      <span className="tier-chip-coin" aria-hidden="true">{tierNumeral(level)}</span>
       <span className="tier-chip-text">{t(RANK_KEY[theme])}</span>
-      <span className="tier-chip-num" aria-hidden="true">{tierNumeral(level)}</span>
     </span>
   );
 }

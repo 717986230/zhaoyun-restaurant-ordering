@@ -179,7 +179,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
   >
     {visual && <div className="member-crest" data-tier-theme={visual.theme}>
       <div className="member-crest-art">
-        <MemberBadge level={tierLevel} rank={tierRank(language, visual.theme)} size="lg" animate={entering} />
+        <MemberBadge level={tierLevel} rank={tierRank(language, visual.theme)} size="lg" animate={entering} initial={customer.name || customer.email} />
       </div>
       <div className="member-crest-text">
         <span className="member-crest-rank">{tierRank(language, visual.theme)}</span>
