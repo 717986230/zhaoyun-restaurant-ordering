@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import type { ApiBill } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
 import { ApiError } from "@zhaoyun/api-client";
+import { TAG_COLORS } from "../../../src/tag-colors.js";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 
@@ -33,6 +34,13 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // 限量: tapping a dish asks how many portions are left today instead of adding it.
   const [stockMode, setStockMode] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 转桌: the destination picker — free tables to tap, instead of typing a number blind.
+  const [moving, setMoving] = useState(false);
+  // 限量: the dish whose "how many left today" is being set.
+  const [stockFor, setStockFor] = useState<Product | null>(null);
+  // On a phone the ticket is a bottom sheet: collapsed to a summary bar while
+  // the dishes fill the screen, tapped up to see and change the whole order.
+  const [sheetOpen, setSheetOpen] = useState(false);
   // One id per batch sent: a retried tap is the same order, not a second one.
   const requestId = useRef(crypto.randomUUID());
 
@@ -56,6 +64,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
 
   const menu = useMemo(() => pos.products.filter((product) => product.published), [pos.products]);
   const categories = useMemo(() => [...new Set(menu.map((product) => product.category))], [menu]);
+  // A stable, distinct colour per category (by its order on the menu), so a
+  // waiter tells categories apart at a glance: the chip's dot and the dish's stripe.
+  const catColor = useCallback((entry: string) => TAG_COLORS[Math.max(0, categories.indexOf(entry)) % TAG_COLORS.length]!, [categories]);
   const shown = useMemo(() => {
     const text = query.trim().toLowerCase();
     return menu.filter((product) => (!category || product.category === category)
@@ -77,12 +88,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     return product.modifiers?.length ? setChoosing(product) : add(product);
   };
 
-  /** "How many are left today?": a number, or nothing for no limit today. */
-  async function askStock(product: Product) {
-    const answer = window.prompt(t("stockPrompt", { name: name(product) }), product.leftToday === null || product.leftToday === undefined ? "" : String(product.leftToday));
-    if (answer === null) return;
-    const trimmed = answer.trim();
-    const leftToday = trimmed === "" ? null : Number(trimmed);
+  /** "How many are left today?": a number, or null for no limit today. */
+  async function askStock(product: Product, leftToday: number | null) {
+    setStockFor(null);
     if (leftToday !== null && (!Number.isInteger(leftToday) || leftToday < 0 || leftToday > 9999)) return pos.notify(t("stockInvalid"), "error");
     try {
       await api.setStock(product.id, { leftToday });
@@ -126,21 +134,25 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
 
   async function send() {
     if (!cart.length) return;
+    const count = cart.reduce((sum, line) => sum + line.quantity, 0);
+    const command = {
+      clientRequestId: requestId.current,
+      table,
+      note: note.trim(),
+      items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}) }))
+    };
+    const limited = cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined);
     setBusy(true);
     try {
-      await api.order({
-        clientRequestId: requestId.current,
-        table,
-        note: note.trim(),
-        items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}) }))
-      });
-      pos.notify(t("sentToKitchen", { count: cart.reduce((sum, line) => sum + line.quantity, 0) }));
+      await api.order(command);
+      pos.notify(t("sentToKitchen", { count }));
       requestId.current = crypto.randomUUID();
       setCart([]);
       setNote("");
+      setSheetOpen(false);
       await loadBill();
       // The counts of limited dishes went down.
-      if (cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined)) pos.refreshMenu();
+      if (limited) pos.refreshMenu();
     } catch (error) {
       if (error instanceof ApiError && error.code === "SOLD_OUT") {
         // Another table was quicker: say which dish and how many there still are, and show the new counts.
@@ -148,6 +160,18 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         const left = Number(error.details.left ?? 0);
         pos.notify(left ? t("stockShort", { name: dish ? name(dish) : String(error.details.sku), left }) : t("stockOutNote", { name: dish ? name(dish) : String(error.details.sku) }), "error");
         pos.refreshMenu();
+      } else if (!(error instanceof ApiError)) {
+        // The server was never reached (the Wi-Fi dropped): keep the order on
+        // this device and let it send itself once the network is back, rather
+        // than lose it. It carries the same clientRequestId, so it cannot fire
+        // twice even if the first attempt had in fact landed.
+        pos.queueOffline(command, count);
+        pos.notify(t("queuedOffline", { count }));
+        requestId.current = crypto.randomUUID();
+        setCart([]);
+        setNote("");
+        setSheetOpen(false);
+        if (limited) pos.refreshMenu();
       } else pos.failed(error);
     } finally {
       setBusy(false);
@@ -165,21 +189,32 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       pos.notify(t(session ? "guestOrderingOpened" : "guestOrderingClosed", { table }));
     } catch (error) { pos.failed(error); }
   }
-  async function move() {
-    const to = window.prompt(t("moveTo"))?.trim().toUpperCase();
-    if (!to) return;
+  async function move(to: string) {
+    const target = to.trim().toUpperCase();
+    if (!target) return;
+    setMoving(false);
     try {
-      await api.move(table, to);
-      pos.notify(t("moved", { to }));
+      await api.move(table, target);
+      pos.notify(t("moved", { to: target }));
       go({ name: "floor" });
     } catch (error) { pos.failed(error); }
   }
 
   const cartCents = cart.reduce((sum, line) => sum + (line.product.priceCents + line.modifiers.reduce((part, modifier) => part + modifier.priceCents, 0)) * line.quantity, 0);
   const sentCents = Math.round((bill?.total ?? 0) * 100);
+  const newCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+  // 已点份数: how many of each dish are already in the (unsent) order, summed
+  // across its modifier variants — shown as a red badge on the dish so the
+  // waiter sees a repeat before sending to the kitchen.
+  const cartCountById = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const line of cart) counts.set(line.product.id, (counts.get(line.product.id) ?? 0) + line.quantity);
+    return counts;
+  }, [cart]);
 
-  return <section className="pos-order">
-    <aside className="pos-ticket">
+  return <section className={`pos-order ${sheetOpen ? "sheet-open" : ""}`}>
+    {sheetOpen && <div className="pos-sheet-scrim" onClick={() => setSheetOpen(false)} />}
+    <aside className={`pos-ticket ${sheetOpen ? "open" : ""}`}>
       <div className="pos-ticket-head">
         <button type="button" onClick={() => leave({ name: "floor" })}>← {t("back")}</button>
         <h1>{pickupNo ? t("pickupNo", { no: pickupNo }) : t("table", { table })}</h1>
@@ -204,13 +239,26 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         <button type="button" className="pos-primary" disabled={!cart.length || busy} onClick={() => void send()}>{t("sendKitchen")}</button>
         <button type="button" disabled={!bill?.items.length} onClick={() => void printBill()}>{t("printBill")}</button>
         <button type="button" className="pos-pay" disabled={!bill?.items.length} onClick={() => leave({ name: "pay", table })}>{t("pay")}</button>
-        {!pickupNo && <button type="button" disabled={!bill?.items.length} onClick={() => void move()}>{t("moveTable")}</button>}
+        {!pickupNo && <button type="button" disabled={!bill?.items.length} onClick={() => setMoving(true)}>{t("moveTable")}</button>}
         {!pickupNo && !/^TA-/i.test(table) && <button type="button" className={orderingUntil ? "pos-on" : ""} onClick={() => void toggleGuestOrdering()}>
           {orderingUntil ? t("guestOrderingClose") : t("guestOrderingOpen")}
         </button>}
       </div>
       {orderingUntil && <p className="pos-muted pos-guest-ordering">{t("guestOrderingOn", { time: new Date(orderingUntil).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) })}</p>}
     </aside>
+
+    <div className="pos-sheet-bar">
+      <button type="button" className="pos-sheet-toggle" aria-expanded={sheetOpen}
+        aria-label={sheetOpen ? t("hideOrder") : t("showOrder")} onClick={() => setSheetOpen((open) => !open)}>
+        <span className="pos-sheet-grip" aria-hidden="true" />
+        <span className="pos-sheet-title">{pickupNo ? t("pickupNo", { no: pickupNo }) : t("table", { table })}</span>
+        <span className="pos-sheet-sum">
+          <span>{newCount ? t("sheetItems", { count: newCount }) : t("sent")}</span>
+          <b>{money(newCount ? cartCents : sentCents)}</b>
+        </span>
+      </button>
+      <button type="button" className="pos-primary pos-sheet-send" disabled={!cart.length || busy} onClick={() => void send()}>{t("sendKitchen")}</button>
+    </div>
 
     <div className="pos-menu">
       <form className="pos-number" onSubmit={byNumber}>
@@ -222,22 +270,29 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       </div>
       <nav className="pos-categories">
         <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
-        {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>{entry}</button>)}
+        {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>
+          <span className="pos-cat-dot" aria-hidden="true" style={{ background: catColor(entry) }} />{entry}
+        </button>)}
       </nav>
       <div className={`pos-dishes ${soldOutMode || stockMode ? "choosing-soldout" : ""}`}>{shown.map((product) => {
         const left = product.leftToday ?? null;
         const out = !product.available || left === 0;
+        const inCart = cartCountById.get(product.id) ?? 0;
         return <button key={product.id} type="button" data-sku={product.sku}
+          style={{ "--tag": product.tagColor || catColor(product.category) } as CSSProperties}
           className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
-          onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? askStock(product) : pick(product))}>
+          onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? setStockFor(product) : pick(product))}>
           <small>{product.sku}</small>
           <b>{name(product)}</b>
           <span>{!product.available ? t("soldOut") : left === 0 ? t("stockOut") : money(product.priceCents)}</span>
           {left !== null && left > 0 && <em className="pos-stock-left" data-left={left}>{t("stockLeft", { n: left })}</em>}
+          {inCart > 0 && <em className="pos-dish-count" aria-label={t("inCart", { n: inCart })}>{inCart}</em>}
         </button>;
       })}</div>
     </div>
 
+    {moving && <MoveDialog pos={pos} from={table} onCancel={() => setMoving(false)} onMove={(to) => void move(to)} />}
+    {stockFor && <StockDialog pos={pos} product={stockFor} onCancel={() => setStockFor(null)} onSet={(leftToday) => void askStock(stockFor, leftToday)} />}
     {voiding && <VoidDialog pos={pos} item={voiding} onCancel={() => setVoiding(null)} onVoid={(quantity, reason) => void voidLine(voiding, quantity, reason)} />}
     {choosing && <ModifierPicker pos={pos} product={choosing} onCancel={() => setChoosing(null)} onAdd={(modifiers) => { add(choosing, modifiers); setChoosing(null); }} />}
   </section>;
@@ -263,6 +318,57 @@ function VoidDialog({ pos, item, onVoid, onCancel }: { pos: Pos; item: ApiBill["
         <button type="button" onClick={onCancel}>{t("cancel")}</button>
         <button type="submit" className="pos-primary pos-danger" disabled={!reason.trim()}>{t("voidConfirm")}</button>
       </div>
+    </form>
+  </div>;
+}
+
+/**
+ * 转桌: where to move the open table. The free tables are laid out to tap — no
+ * typing a number blind during service — with a text box for anything else
+ * (a table not shown, or merging onto one in use).
+ */
+function MoveDialog({ pos, from, onMove, onCancel }: { pos: Pos; from: string; onMove: (to: string) => void; onCancel: () => void }) {
+  const { t } = pos;
+  const [tables, setTables] = useState<{ table: string; state: string; total: number }[] | null>(null);
+  const [other, setOther] = useState("");
+  useEffect(() => {
+    api.floor().then((floor) => setTables(floor.tables)).catch(() => setTables([]));
+  }, []);
+  const up = from.toUpperCase();
+  const room = (tables ?? []).filter((entry) => !/^TA-/i.test(entry.table) && entry.table.toUpperCase() !== up);
+  const free = room.filter((entry) => entry.state === "free");
+  return <div className="pos-modal" role="dialog" aria-label={t("moveTitle", { from })}>
+    <div className="pos-card pos-move">
+      <h2>{t("moveTitle", { from })}</h2>
+      {tables === null ? <p className="pos-muted">{t("moveLoading")}</p>
+        : free.length ? <div className="pos-move-grid">{free.map((entry) => <button key={entry.table} type="button" onClick={() => onMove(entry.table)}>{entry.table}</button>)}</div>
+          : <p className="pos-muted">{t("moveNoFree")}</p>}
+      <form className="pos-move-other" onSubmit={(event) => { event.preventDefault(); if (other.trim()) onMove(other); }}>
+        <input value={other} maxLength={8} autoCapitalize="characters" placeholder={t("moveOther")} aria-label={t("moveOther")} onChange={(event) => setOther(event.target.value)} />
+        <button type="submit" disabled={!other.trim()}>{t("moveGo")}</button>
+      </form>
+      <div className="pos-modal-actions">
+        <button type="button" onClick={onCancel}>{t("cancel")}</button>
+      </div>
+    </div>
+  </div>;
+}
+
+/** 限量: how many portions of a dish are left today — a number, or "no limit". */
+function StockDialog({ pos, product, onSet, onCancel }: { pos: Pos; product: Product; onSet: (leftToday: number | null) => void; onCancel: () => void }) {
+  const { t, language } = pos;
+  const current = product.leftToday === null || product.leftToday === undefined ? "" : String(product.leftToday);
+  const [value, setValue] = useState(current);
+  const name = product.names[language] || product.names.zh || product.names.de;
+  return <div className="pos-modal" role="dialog" aria-label={t("stockMode")}>
+    <form className="pos-card pos-stock-form" onSubmit={(event) => { event.preventDefault(); const text = value.trim(); onSet(text === "" ? null : Number(text)); }}>
+      <h2>{t("stockTitle", { name })}</h2>
+      <input inputMode="numeric" autoFocus value={value} maxLength={4} placeholder={t("stockUnlimited")} aria-label={t("stockTitle", { name })} onChange={(event) => setValue(event.target.value.replace(/[^0-9]/g, ""))} />
+      <div className="pos-modal-actions">
+        <button type="button" onClick={onCancel}>{t("cancel")}</button>
+        <button type="button" onClick={() => onSet(null)}>{t("stockNoLimit")}</button>
+      </div>
+      <button type="submit" className="pos-primary">{t("stockSave")}</button>
     </form>
   </div>;
 }

@@ -27,6 +27,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -169,6 +170,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -311,6 +313,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -454,6 +457,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -597,6 +601,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -681,6 +686,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -766,6 +772,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -850,6 +857,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -934,6 +942,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -1017,6 +1026,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -1100,6 +1110,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -1183,6 +1194,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -1266,6 +1278,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -1349,6 +1362,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1393,6 +1407,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1437,6 +1452,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1481,6 +1497,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1524,6 +1541,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1567,6 +1585,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1610,6 +1629,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1653,6 +1673,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1694,6 +1715,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1737,6 +1759,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1780,6 +1803,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1823,6 +1847,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1867,6 +1892,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1911,6 +1937,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1954,6 +1981,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -1997,6 +2025,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2040,6 +2069,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2083,6 +2113,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2127,6 +2158,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2171,6 +2203,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2216,6 +2249,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2262,6 +2296,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2306,6 +2341,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2350,6 +2386,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2395,6 +2432,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2439,6 +2477,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2483,6 +2522,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2527,6 +2567,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2572,6 +2613,7 @@
       "art": "linear-gradient(135deg,#33403f,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -2618,6 +2660,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -2698,6 +2741,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -2780,6 +2824,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -2865,6 +2910,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -2947,6 +2993,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3030,6 +3077,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3113,6 +3161,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3198,6 +3247,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3280,6 +3330,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3362,6 +3413,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3446,6 +3498,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3530,6 +3583,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3615,6 +3669,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3699,6 +3754,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3783,6 +3839,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3865,6 +3922,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -3949,6 +4007,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4034,6 +4093,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4118,6 +4178,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4202,6 +4263,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4286,6 +4348,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4370,6 +4433,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4456,6 +4520,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4539,6 +4604,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4622,6 +4688,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4705,6 +4772,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4788,6 +4856,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4873,6 +4942,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -4956,6 +5026,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -5041,6 +5112,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -5123,6 +5195,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -5205,6 +5278,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -5290,6 +5364,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -5374,6 +5449,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -5516,6 +5592,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -5658,6 +5735,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -5800,6 +5878,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -5943,6 +6022,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "extras",
@@ -6081,6 +6161,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -6164,6 +6245,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -6247,6 +6329,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -6331,6 +6414,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -6414,6 +6498,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [
       {
         "id": "exclusions",
@@ -6494,6 +6579,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6535,6 +6621,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6576,6 +6663,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6617,6 +6705,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6658,6 +6747,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6699,6 +6789,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6740,6 +6831,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6783,6 +6875,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6826,6 +6919,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6869,6 +6963,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6912,6 +7007,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6955,6 +7051,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -6998,6 +7095,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7041,6 +7139,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7084,6 +7183,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7127,6 +7227,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7170,6 +7271,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7211,6 +7313,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7254,6 +7357,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7297,6 +7401,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7340,6 +7445,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7381,6 +7487,7 @@
       "art": "linear-gradient(135deg,#2f3742,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [],
     "available": true,
@@ -7426,6 +7533,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [
       {
@@ -7481,6 +7589,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [
       {
@@ -7536,6 +7645,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [
       {
@@ -7589,6 +7699,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [
       {
@@ -7645,6 +7756,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [
       {
@@ -7710,6 +7822,7 @@
       "art": "linear-gradient(135deg,#2d3a35,#121416 78%)",
       "pattern": "lines"
     },
+    "tagColor": null,
     "modifiers": [],
     "bundleItems": [
       {

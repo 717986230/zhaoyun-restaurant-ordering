@@ -18,7 +18,7 @@ import { createStore, PRODUCT_INSERT_SQL, productInsertParams } from "../shared/
  * d1:migrations): a new table goes here and, for a D1 already deployed, into
  * a hand-written migration of its own.
  */
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 11;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 
 export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS } = {}) {
@@ -49,6 +49,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       ingredients TEXT NOT NULL DEFAULT '',
       art TEXT NOT NULL DEFAULT '',
       pattern TEXT NOT NULL DEFAULT 'lines',
+      tag_color TEXT NOT NULL DEFAULT '',
       available INTEGER NOT NULL DEFAULT 1,
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
@@ -408,6 +409,61 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- A member's stored value (会员储值): the running balance, and the ledger
+    -- it is the sum of — money put in, the house's bonus, bills settled from
+    -- it, refunds and the manager's hand-changes. A table of its own rather
+    -- than a column on customers, because that is what a deployed D1 can be
+    -- given safely. The balance may never go below zero, so two bills spending
+    -- the same balance cannot both be written. See migrations/0069_member_balance.sql.
+    CREATE TABLE IF NOT EXISTS member_balances (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      balance_cents INTEGER NOT NULL DEFAULT 0 CHECK (balance_cents >= 0),
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS balance_ledger (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      delta_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL CHECK (reason IN ('topup','bonus','spend','refund','adjust','reverse')),
+      ref TEXT,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    -- Who booked each balance change (会员储值操作人): keyed by the ledger
+    -- entry's id. A table of its own, not a column on balance_ledger, because a
+    -- deployed D1 can be given a new table safely but not a new column (SQLite
+    -- has no ADD COLUMN IF NOT EXISTS, and 0001 is regenerated from this schema
+    -- so a later ADD COLUMN would collide on a fresh deploy). A top-up and a
+    -- manager's hand-adjust record their operator here, so a member's ledger is
+    -- a full audit trail. See migrations/0072_balance_operator.sql.
+    CREATE TABLE IF NOT EXISTS balance_operators (
+      ledger_id TEXT PRIMARY KEY,
+      operator TEXT NOT NULL DEFAULT ''
+    );
+
+    -- 会员生日 (生日营销, shared/customer.mjs): the member's birthday as a month
+    -- and day only — never the year, so no age or full date of birth is kept.
+    -- A table of its own, like the balances, because a deployed D1 takes a new
+    -- table safely but not a new column. See migrations/0070_member_birthday.sql.
+    CREATE TABLE IF NOT EXISTS member_birthdays (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+      day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
+      updated_at TEXT NOT NULL
+    );
+
+    -- 生日祝福邮件: one greeting a member a year, claimed before it is sent, so
+    -- two runs (or two Worker isolates) never mail the same member twice.
+    -- See migrations/0071_birthday_greetings.sql.
+    CREATE TABLE IF NOT EXISTS birthday_greetings (
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (customer_id, year)
+    );
+
     -- A guest's own order from the menu (shared/ordering.mjs): at the table or
     -- for pickup, by whom when signed in, and the points it spent.
     CREATE TABLE IF NOT EXISTS guest_orders (
@@ -607,6 +663,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_customer_sessions_expiry ON customer_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_points_ledger_customer ON points_ledger(customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_points_ledger_ref ON points_ledger(ref, reason);
+    CREATE INDEX IF NOT EXISTS idx_balance_ledger_customer ON balance_ledger(customer_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_balance_ledger_ref ON balance_ledger(ref, reason);
     CREATE INDEX IF NOT EXISTS idx_guest_orders_table ON guest_orders(table_no, created_at);
     CREATE INDEX IF NOT EXISTS idx_guest_orders_customer ON guest_orders(customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
@@ -626,7 +684,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE order_items ADD COLUMN vat_percent INTEGER NOT NULL DEFAULT 10",
     "ALTER TABLE orders ADD COLUMN billed_at TEXT",
     "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
-    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'"
+    "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE products ADD COLUMN tag_color TEXT NOT NULL DEFAULT ''"
   ]) {
     try {
       db.exec(statement);

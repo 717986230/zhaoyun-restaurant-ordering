@@ -36,10 +36,39 @@ import { checkMobile } from "./phone.mjs";
 export const CUSTOMER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const POINTS_REASONS = ["earn", "reverse", "redeem", "refund", "adjust"];
 
+/**
+ * The stored value a member keeps in the house (会员储值 / Guthaben). Its own
+ * ledger (balance_ledger) and a balance (customers.balance_cents) written
+ * together, the way points are, with a CHECK of its own (balance_cents >= 0)
+ * so two bills spending the same balance at once cannot both succeed.
+ *
+ * In Austria a top-up is the sale of a multi-purpose voucher (Mehrzweck-
+ * gutschein): the money is taken at 0% and no tax is due until it is spent on
+ * food or drink — exactly as a value voucher (shared/register.mjs, planCheckout).
+ * So a top-up is a receipt of its own with a 0% line, paid cash or card, and
+ * `balance` is a way to pay a later bill, beside cash, card and voucher.
+ *
+ *  - topup:   the money a member puts in, on a top-up receipt;
+ *  - bonus:   what the house adds on top (充值赠送), not paid for and not taxed;
+ *  - spend:   a bill settled from the balance (a `balance` payment);
+ *  - refund:  that bill cancelled (storno), the balance given back;
+ *  - reverse: a top-up cancelled (storno), the money and bonus taken back;
+ *  - adjust:  the manager, by hand, with a note.
+ */
+export const BALANCE_REASONS = ["topup", "bonus", "spend", "refund", "adjust", "reverse"];
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_MAX = 40;
 const MAX_REWARDS = 30;
 const MAX_POINTS = 1_000_000;
+/** A single top-up is at most this much, as a value voucher is (shared/register.mjs). */
+export const MAX_TOPUP_CENTS = 100_000;
+/** Member tiers count lifetime top-ups, which add up far past one top-up's cap. */
+export const MAX_TIER_THRESHOLD_CENTS = 100_000_000;
+/** A manager's hand-change of a balance is at most this much either way. */
+const MAX_BALANCE_CENTS = 1_000_000;
+/** At most this many top-up tiers, and a tier's bonus is at most a whole top-up. */
+const MAX_TOPUP_TIERS = 20;
 
 /** An email, compared without case. */
 export function normalizeEmail(value) {
@@ -81,7 +110,7 @@ export function normalizeCustomerRegistration(input) {
 /** A guest as they see themselves, and as the console lists them: never the hash. */
 export function customerView(row) {
   return row ? {
-    id: row.id, email: row.email, name: row.name, points: row.points, createdAt: row.created_at,
+    id: row.id, email: row.email, name: row.name, points: row.points, balanceCents: row.balance_cents ?? 0, createdAt: row.created_at,
     // Signed up with a mobile number: `email` is that number too, for the lists that show who it is.
     ...(isPhoneLogin(row.email) ? { phone: row.email } : {}),
     ...(row.email_verified !== undefined ? { emailVerified: Boolean(row.email_verified) } : {})
@@ -115,7 +144,7 @@ export function pointsKind(id) {
  * a mug) and what each costs in points; a reward is ordered like a dish and
  * costs nothing but its points and any priced options.
  */
-export const LOYALTY_DEFAULTS = Object.freeze({ enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 });
+export const LOYALTY_DEFAULTS = Object.freeze({ enabled: false, pointsPerEuro: 1, eurosPerPoint: 10, topUpPoints: true, rewards: [], maxRewardsPerOrder: 1 });
 
 export function normalizeLoyalty(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Loyalty settings must be an object");
@@ -125,6 +154,10 @@ export function normalizeLoyalty(value) {
   if (typeof merged.enabled !== "boolean") throw new Error("Loyalty enabled must be true or false");
   const pointsPerEuro = Number(merged.pointsPerEuro);
   if (!Number.isInteger(pointsPerEuro) || pointsPerEuro < 0 || pointsPerEuro > 100) throw new Error("Points per euro is a whole number from 0 to 100");
+  // The rate is pointsPerEuro points for every eurosPerPoint euros (默认每 10 欧元 1 积分).
+  const eurosPerPoint = Number(merged.eurosPerPoint);
+  if (!Number.isInteger(eurosPerPoint) || eurosPerPoint < 1 || eurosPerPoint > 1000) throw new Error("Euros per point is a whole number from 1 to 1000");
+  if (typeof merged.topUpPoints !== "boolean") throw new Error("Top-up points must be true or false");
   const maxRewardsPerOrder = Number(merged.maxRewardsPerOrder);
   if (!Number.isInteger(maxRewardsPerOrder) || maxRewardsPerOrder < 1 || maxRewardsPerOrder > 10) throw new Error("Rewards per order is 1 to 10");
   if (!Array.isArray(merged.rewards) || merged.rewards.length > MAX_REWARDS) throw new Error(`At most ${MAX_REWARDS} rewards`);
@@ -138,12 +171,206 @@ export function normalizeLoyalty(value) {
     seen.add(productId);
     return { productId, points };
   });
-  return { enabled: merged.enabled, pointsPerEuro, rewards, maxRewardsPerOrder };
+  return { enabled: merged.enabled, pointsPerEuro, eurosPerPoint, topUpPoints: merged.topUpPoints, rewards, maxRewardsPerOrder };
 }
 
 /** The rewards a guest may order now: dish id → points, or null when the programme is off. */
 export function rewardPrices(loyalty) {
   return loyalty?.enabled ? new Map(loyalty.rewards.map((reward) => [reward.productId, reward.points])) : null;
+}
+
+/**
+ * The membership top-up programme as the owner sets it (app_settings
+ * "membership"). Off until switched on. `tiers` give a bonus for a top-up of
+ * at least so much (充 100 送 10): the most generous tier a top-up reaches is
+ * the one that applies, so they are kept sorted and the amounts are whole
+ * cents. The bonus is the house's gift, not money the member pays.
+ */
+export const MEMBERSHIP_DEFAULTS = Object.freeze({ enabled: false, tiers: [] });
+
+export function normalizeMembership(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Membership settings must be an object");
+  const known = new Set(Object.keys(MEMBERSHIP_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown membership setting ${key}`);
+  const merged = { ...MEMBERSHIP_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Membership enabled must be true or false");
+  if (!Array.isArray(merged.tiers) || merged.tiers.length > MAX_TOPUP_TIERS) throw new Error(`At most ${MAX_TOPUP_TIERS} top-up tiers`);
+  const seen = new Set();
+  const tiers = merged.tiers.map((tier) => {
+    const thresholdCents = Number(tier?.thresholdCents);
+    const bonusCents = Number(tier?.bonusCents);
+    if (!Number.isInteger(thresholdCents) || thresholdCents < 1 || thresholdCents > MAX_TOPUP_CENTS) throw new Error("A tier's top-up is 1 cent to 1000 euros");
+    if (!Number.isInteger(bonusCents) || bonusCents < 0 || bonusCents > MAX_TOPUP_CENTS) throw new Error("A tier's bonus is 0 to 1000 euros");
+    if (seen.has(thresholdCents)) throw new Error("A top-up amount is a tier once");
+    seen.add(thresholdCents);
+    return { thresholdCents, bonusCents };
+  }).sort((left, right) => left.thresholdCents - right.thresholdCents);
+  return { enabled: merged.enabled, tiers };
+}
+
+/** The bonus a top-up of `amountCents` earns: the most generous tier it reaches, or none. */
+export function bonusForTopUp(membership, amountCents) {
+  if (!membership?.enabled || !Array.isArray(membership.tiers)) return 0;
+  let bonus = 0;
+  for (const tier of membership.tiers) if (amountCents >= tier.thresholdCents) bonus = tier.bonusCents;
+  return bonus;
+}
+
+/** At most this many membership levels, and a level's name is at most this long. */
+export const MAX_MEMBER_TIERS = 8;
+const MAX_TIER_NAME = 40;
+
+/**
+ * 会员等级 (member levels) as the owner sets them (app_settings "memberTiers").
+ * Off until switched on. A level is reached by累计充值 (lifetime top-up): the
+ * member sits at the highest level whose threshold their top-ups have passed,
+ * and that level's `discountPercent` is the 会员价 the counter offers them —
+ * applied through the till's ordinary discount, so the fiscal record is
+ * unchanged. The level is derived, never stored: it follows the top-ups.
+ */
+export const MEMBER_TIERS_DEFAULTS = Object.freeze({ enabled: false, tiers: [] });
+
+export function normalizeMemberTiers(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Member-tier settings must be an object");
+  const known = new Set(Object.keys(MEMBER_TIERS_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown member-tier setting ${key}`);
+  const merged = { ...MEMBER_TIERS_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Member tiers enabled must be true or false");
+  if (!Array.isArray(merged.tiers) || merged.tiers.length > MAX_MEMBER_TIERS) throw new Error(`At most ${MAX_MEMBER_TIERS} member tiers`);
+  const seen = new Set();
+  const tiers = merged.tiers.map((tier) => {
+    const name = String(tier?.name ?? "").trim();
+    const thresholdCents = Number(tier?.thresholdCents);
+    const discountPercent = Number(tier?.discountPercent);
+    if (!name || name.length > MAX_TIER_NAME) throw new Error("A member tier has a name");
+    if (!Number.isInteger(thresholdCents) || thresholdCents < 0 || thresholdCents > MAX_TIER_THRESHOLD_CENTS) throw new Error("A tier's threshold is 0 to 1000000 euros");
+    if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("A tier's discount is 0 to 100 percent");
+    if (seen.has(thresholdCents)) throw new Error("A threshold is a tier once");
+    seen.add(thresholdCents);
+    return { name, thresholdCents, discountPercent };
+  }).sort((left, right) => left.thresholdCents - right.thresholdCents);
+  return { enabled: merged.enabled, tiers };
+}
+
+/** The level a member of `growthCents` lifetime top-up sits at: the highest
+ *  threshold they have passed, or null when tiers are off or none is reached.
+ *  `level` is the tier's rank from the bottom (1 = lowest configured tier), and
+ *  `count` how many tiers there are — the badge and the member theme follow the
+ *  level, so 5+ earns 暗黑龙王 and 7+ 鎏金龙王 whatever the owner named them. */
+export function memberTierFor(growthCents, memberTiers) {
+  if (!memberTiers?.enabled || !Array.isArray(memberTiers.tiers) || memberTiers.tiers.length === 0) return null;
+  const ranked = [...memberTiers.tiers].sort((left, right) => left.thresholdCents - right.thresholdCents);
+  let best = null;
+  let level = 0;
+  ranked.forEach((tier, index) => {
+    if (growthCents >= tier.thresholdCents) { best = tier; level = index + 1; }
+  });
+  return best ? { name: best.name, thresholdCents: best.thresholdCents, discountPercent: best.discountPercent, level, count: ranked.length } : null;
+}
+
+/** A member's standing to show beside their account: how much they have topped
+ *  up over time, their level now, the rank of that level, and the discount it
+ *  earns. `tierLevel`/`tierCount` are 0 when below every tier or tiers are off. */
+export function membershipStatus(growthCents, memberTiers) {
+  const tier = memberTierFor(growthCents, memberTiers);
+  return {
+    growthCents: Math.max(0, growthCents | 0),
+    tier: tier?.name ?? null,
+    tierLevel: tier?.level ?? 0,
+    tierCount: tier?.count ?? (memberTiers?.enabled && Array.isArray(memberTiers.tiers) ? memberTiers.tiers.length : 0),
+    discountPercent: tier?.discountPercent ?? 0
+  };
+}
+
+/**
+ * 生日营销 (birthday perk) as the owner sets it (app_settings "birthdayPerk").
+ * Off until switched on. In their birthday month a member is offered
+ * `discountPercent` off at the till, through the same whole-bill discount a
+ * tier uses. A member enters only their birth month and day — never the year.
+ */
+export const BIRTHDAY_PERK_DEFAULTS = Object.freeze({ enabled: false, discountPercent: 0, greetByEmail: false });
+
+export function normalizeBirthdayPerk(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Birthday-perk settings must be an object");
+  const known = new Set(Object.keys(BIRTHDAY_PERK_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown birthday-perk setting ${key}`);
+  const merged = { ...BIRTHDAY_PERK_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Birthday perk enabled must be true or false");
+  const discountPercent = Number(merged.discountPercent);
+  if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("The birthday discount is 0 to 100 percent");
+  if (typeof merged.greetByEmail !== "boolean") throw new Error("Birthday greeting email must be true or false");
+  return { enabled: merged.enabled, discountPercent, greetByEmail: merged.greetByEmail };
+}
+
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** A birthday a member gives — month and day only (29 Feb allowed). Throws on a bad date. */
+export function normalizeBirthday(input) {
+  const month = Number(input?.month);
+  const day = Number(input?.day);
+  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error("A birthday month is 1 to 12");
+  if (!Number.isInteger(day) || day < 1 || day > DAYS_IN_MONTH[month - 1]) throw new Error("That is not a day in the month");
+  return { month, day };
+}
+
+/** Whether `birthday` falls in month `month` (1–12): the window the perk is live. */
+export function isBirthdayMonth(birthday, month) {
+  return Boolean(birthday) && Number(birthday.month) === Number(month);
+}
+
+/**
+ * 生日祝福邮件: the birthdays a greeting is due for on `date` (the restaurant's
+ * own calendar day, { year, month, day }). A 29 February birthday is greeted on
+ * 28 February in a year that has no 29th, so nobody is skipped for three years.
+ */
+export function birthdayDaysFor(date) {
+  const { year, month, day } = date;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return month === 2 && day === 28 && !leap ? [28, 29] : [day];
+}
+
+/** The restaurant's calendar day and hour now, in its own time zone. */
+export function localDayIn(timeZone, at = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: timeZone || "UTC", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" })
+    .formatToParts(at).map((part) => [part.type, part.value]));
+  return { year: Number(parts.year), month: Number(parts.month), day: Number(parts.day), hour: Number(parts.hour) };
+}
+
+/** Members whose birthday is on one of the days, with an address to write to, not yet greeted this year. */
+export const BIRTHDAYS_DUE_SQL = "SELECT c.id, c.email, c.name FROM member_birthdays b JOIN customers c ON c.id = b.customer_id WHERE b.month = ? AND b.day IN (?, ?) AND NOT EXISTS (SELECT 1 FROM birthday_greetings g WHERE g.customer_id = c.id AND g.year = ?) ORDER BY c.created_at LIMIT ?";
+/** Claimed before the mail goes out: 1 change when this run has it, 0 when another already did. */
+export const CLAIM_GREETING_SQL = "INSERT OR IGNORE INTO birthday_greetings (customer_id, year, sent_at) VALUES (?, ?, ?)";
+export const RELEASE_GREETING_SQL = "DELETE FROM birthday_greetings WHERE customer_id = ? AND year = ?";
+
+export const MEMBER_BIRTHDAY_SQL = "SELECT month, day FROM member_birthdays WHERE customer_id = ?";
+export const UPSERT_BIRTHDAY_SQL = "INSERT INTO member_birthdays (customer_id, month, day, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET month = excluded.month, day = excluded.day, updated_at = excluded.updated_at";
+export const DELETE_BIRTHDAY_SQL = "DELETE FROM member_birthdays WHERE customer_id = ?";
+
+/** A balance ledger line as a member sees it, and as the console lists it. */
+export function balanceEntryView(row) {
+  return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, operator: row.operator ?? "", createdAt: row.created_at };
+}
+
+/** A manager's change of a member's balance: cents, not zero, within range, and
+ *  a note. The two refusals are told apart so the till can show the right one. */
+export function normalizeBalanceAdjustment(input) {
+  const deltaCents = Math.round(Number(input?.amount) * 100);
+  if (!Number.isInteger(deltaCents) || deltaCents === 0) { const error = new Error("A change of balance is an amount, not zero"); error.code = "BALANCE_AMOUNT_ZERO"; throw error; }
+  if (Math.abs(deltaCents) > MAX_BALANCE_CENTS) { const error = new Error("A change of balance is at most 10000 euros"); error.code = "BALANCE_AMOUNT_RANGE"; throw error; }
+  const note = String(input?.note ?? "").trim().replace(/\s+/g, " ");
+  if (!note || note.length > 120) throw new Error("Say why the balance changes (1–120 characters)");
+  return { deltaCents, note };
+}
+
+/**
+ * Why a counter top-up is being booked (收银台充值原因): required and capped,
+ * so a free credit can't be slipped in with no trace. Server-enforced, not
+ * only asked for in the till UI.
+ */
+export function normalizeTopUpReason(input) {
+  const reason = String(input ?? "").trim().replace(/\s+/g, " ");
+  if (!reason || reason.length > 120) throw new Error("Say why the top-up is booked (1–120 characters)");
+  return reason;
 }
 
 /** A manager's change of a guest's points: a whole number, not zero, and a note. */
@@ -163,8 +390,10 @@ export function isOverdrawn(error) {
 /** Whether the account's address, as it is now, was proved by a code (shared/email-verify.mjs). */
 const EMAIL_VERIFIED_COLUMN = `(SELECT 1 FROM customer_verified_emails AS verified
     WHERE verified.customer_id = customers.id AND verified.email = customers.email) AS email_verified`;
-export const CUSTOMER_BY_EMAIL_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN} FROM customers WHERE email = ?`;
-export const CUSTOMER_BY_ID_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN} FROM customers WHERE id = ?`;
+/** The member's stored value, read beside the account (shared/customer.mjs). Zero when they have no row yet. */
+const BALANCE_COLUMN = `COALESCE((SELECT balance_cents FROM member_balances WHERE member_balances.customer_id = customers.id), 0) AS balance_cents`;
+export const CUSTOMER_BY_EMAIL_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE email = ?`;
+export const CUSTOMER_BY_ID_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE id = ?`;
 export const INSERT_CUSTOMER_SQL = `INSERT INTO customers (id, email, name, password_hash, password_salt, password_iterations, points, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`;
 export const UPDATE_CUSTOMER_SQL = "UPDATE customers SET name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = ? WHERE id = ?";
@@ -175,6 +404,10 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   `UPDATE reservations SET customer_id = NULL, name = '', phone = '', email = '', notes = '', token_hash = NULL,
      status = CASE WHEN status IN ('pending', 'confirmed') THEN 'cancelled' ELSE status END WHERE customer_id = ?`,
   "DELETE FROM points_ledger WHERE customer_id = ?",
+  // Their balance goes with them (GDPR erasure): any money left is written off, not kept.
+  "DELETE FROM balance_operators WHERE ledger_id IN (SELECT id FROM balance_ledger WHERE customer_id = ?)",
+  "DELETE FROM balance_ledger WHERE customer_id = ?",
+  "DELETE FROM member_balances WHERE customer_id = ?",
   "DELETE FROM customer_favorites WHERE customer_id = ?",
   "DELETE FROM customer_sessions WHERE customer_id = ?",
   "DELETE FROM email_codes WHERE customer_id = ?",
@@ -182,12 +415,12 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   "DELETE FROM customers WHERE id = ?"
 ];
 /** The console's list: newest first, or those whose email or name holds the search. */
-export const SEARCH_CUSTOMERS_SQL = `SELECT * FROM customers
+export const SEARCH_CUSTOMERS_SQL = `SELECT customers.*, ${BALANCE_COLUMN} FROM customers
   WHERE (? = '' OR email LIKE '%' || ? || '%' OR name LIKE '%' || ? || '%')
   ORDER BY created_at DESC LIMIT ?`;
 
 export const INSERT_CUSTOMER_SESSION_SQL = "INSERT INTO customer_sessions (token_hash, customer_id, expires_at, created_at) VALUES (?, ?, ?, ?)";
-export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*, ${EMAIL_VERIFIED_COLUMN}
+export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN}
   FROM customer_sessions JOIN customers ON customers.id = customer_sessions.customer_id
   WHERE customer_sessions.token_hash = ?`;
 export const DELETE_CUSTOMER_SESSION_SQL = "DELETE FROM customer_sessions WHERE token_hash = ?";
@@ -204,21 +437,54 @@ export const INSERT_POINTS_SQL = "INSERT INTO points_ledger (id, customer_id, de
 /** Fails the write (CHECK points >= 0) when the guest has fewer points than it takes. */
 export const CHANGE_POINTS_SQL = "UPDATE customers SET points = points + ?, updated_at = ? WHERE id = ?";
 
+export const BALANCE_HISTORY_SQL = `SELECT balance_ledger.*, COALESCE(balance_operators.operator, '') AS operator
+  FROM balance_ledger LEFT JOIN balance_operators ON balance_operators.ledger_id = balance_ledger.id
+  WHERE customer_id = ? ORDER BY created_at DESC, balance_ledger.id DESC LIMIT ?`;
+/** 累计充值 (lifetime top-up principal): what a member has paid in over time, the basis for their 会员等级. Read-only. */
+/** 成长值: money a member has put in — top-ups, less cancelled ones, plus the manager's hand changes (credit given or taken at the counter). Bonus and spending do not count. */
+export const MEMBER_GROWTH_SQL = "SELECT COALESCE(SUM(delta_cents), 0) AS growth_cents FROM balance_ledger WHERE customer_id = ? AND reason IN ('topup', 'reverse', 'adjust')";
+export const INSERT_BALANCE_SQL = "INSERT INTO balance_ledger (id, customer_id, delta_cents, reason, ref, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+/** Who booked a ledger entry (会员储值操作人), keyed by the entry's id. Written only when the operator is known. */
+export const INSERT_OPERATOR_SQL = "INSERT INTO balance_operators (ledger_id, operator) VALUES (?, ?)";
+/** The operator-insert for a ledger line, or nothing when the operator is unknown (automated writes). */
+function operatorStatements(ledgerId, operator) {
+  return operator ? [[INSERT_OPERATOR_SQL, [ledgerId, String(operator)]]] : [];
+}
+/** A member's balance row, made the first time they have one (starts at zero). Parameters: customer id, at. */
+export const ENSURE_BALANCE_SQL = "INSERT OR IGNORE INTO member_balances (customer_id, balance_cents, updated_at) VALUES (?, 0, ?)";
+/**
+ * Moves a member's balance by `delta`. Run after ENSURE_BALANCE_SQL in the
+ * same batch, so the row is there. Fails the write (CHECK balance_cents >= 0)
+ * when a spend or a take-back would leave less than nothing — a top-up
+ * already spent cannot be reversed, and a bill cannot spend what is not there.
+ * Parameters: delta, at, customer id.
+ */
+export const CHANGE_BALANCE_SQL = "UPDATE member_balances SET balance_cents = balance_cents + ?, updated_at = ? WHERE customer_id = ?";
+
+/** Makes the member's row if need be, then moves it: the pair every balance change runs. */
+export function changeBalanceStatements(memberId, delta, at) {
+  return [
+    [ENSURE_BALANCE_SQL, [memberId, at]],
+    [CHANGE_BALANCE_SQL, [delta, at, memberId]]
+  ];
+}
+
 /**
  * Points for a paid receipt, run after its receipt_items in the same
  * transaction or batch: per signed-in guest whose order lines it paid, the
- * dish prices of those lines × pointsPerEuro, whole points, rounded down.
- * Parameters: pointsPerEuro, at, receipt id, pointsPerEuro.
+ * dish prices of those lines × numerator / denominator (cents → points, see
+ * earnPointsStatements), whole points, rounded down — integer maths throughout.
+ * Parameters: numerator, denominator, at, receipt id, numerator, denominator.
  */
 export const EARN_POINTS_SQL = `INSERT INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at)
   SELECT 'earn-' || receipt_items.receipt_id || '-' || guest_orders.customer_id, guest_orders.customer_id,
-    CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / 100 AS INTEGER), 'earn', receipt_items.receipt_id, '', ?
+    CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / ? AS INTEGER), 'earn', receipt_items.receipt_id, '', ?
   FROM receipt_items
   JOIN order_items ON order_items.id = receipt_items.order_item_id
   JOIN guest_orders ON guest_orders.order_id = order_items.order_id
   WHERE receipt_items.receipt_id = ? AND guest_orders.customer_id IS NOT NULL
   GROUP BY guest_orders.customer_id
-  HAVING CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / 100 AS INTEGER) > 0`;
+  HAVING CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / ? AS INTEGER) > 0`;
 /** The ledger lines of one kind for one receipt or order, added to each guest's balance (applyPointsParams). */
 export const APPLY_POINTS_SQL = `UPDATE customers SET
   points = points + (SELECT SUM(delta) FROM points_ledger WHERE points_ledger.customer_id = customers.id AND points_ledger.ref = ? AND points_ledger.reason = ?),
@@ -300,11 +566,41 @@ export function redeemPointsStatements(orderId, customerId, points, at) {
   ];
 }
 
-/** A receipt issued: the points its guests earned, while the programme is on. */
-export function earnPointsStatements(receiptId, loyalty, at) {
+/** Whole points for `cents` at the programme's rate: pointsPerEuro per eurosPerPoint euros. */
+export function pointsFor(cents, loyalty) {
+  if (!loyalty?.enabled || !loyalty.pointsPerEuro || cents <= 0) return 0;
+  return Math.floor((cents * loyalty.pointsPerEuro) / (100 * (loyalty.eurosPerPoint || 1)));
+}
+
+/**
+ * A receipt issued: the points its guests earned, while the programme is on.
+ * When top-ups earn points (充值送积分), the part of the bill paid from stored
+ * value earns nothing again — it was counted when it was topped up — so the
+ * earn is scaled by the share paid in cash, card or voucher.
+ */
+export function earnPointsStatements(receiptId, loyalty, at, { totalCents = 0, balanceCents = 0 } = {}) {
   if (!loyalty?.enabled || !loyalty.pointsPerEuro) return [];
+  let numerator = loyalty.pointsPerEuro;
+  let denominator = 100 * (loyalty.eurosPerPoint || 1);
+  if (loyalty.topUpPoints && balanceCents > 0 && totalCents > 0) {
+    const paidOtherwise = Math.max(0, totalCents - balanceCents);
+    if (paidOtherwise === 0) return [];
+    numerator *= paidOtherwise;
+    denominator *= totalCents;
+  }
   return [
-    [EARN_POINTS_SQL, [loyalty.pointsPerEuro, at, receiptId, loyalty.pointsPerEuro]],
+    [EARN_POINTS_SQL, [numerator, denominator, at, receiptId, numerator, denominator]],
+    [APPLY_POINTS_SQL, applyPointsParams(receiptId, "earn", at)]
+  ];
+}
+
+/** 充值送积分: a top-up's money (not the house's bonus) earns points at the programme's rate. */
+export function topUpPointsStatements(memberId, principalCents, receiptId, loyalty, at) {
+  if (!loyalty?.topUpPoints) return [];
+  const points = pointsFor(principalCents, loyalty);
+  if (!points) return [];
+  return [
+    [INSERT_POINTS_SQL, [`earn-${receiptId}-${memberId}`, memberId, points, "earn", receiptId, "", at]],
     [APPLY_POINTS_SQL, applyPointsParams(receiptId, "earn", at)]
   ];
 }
@@ -383,4 +679,52 @@ export function refundPointsStatements(orderId, at) {
     [REFUND_POINTS_SQL, [at, orderId]],
     [APPLY_POINTS_SQL, applyPointsParams(orderId, "refund", at)]
   ];
+}
+
+// ——— Stored value: what a top-up, a bill or a storno adds to its own batch.
+
+/**
+ * A top-up receipt: the money in, and the house's bonus on top, added to the
+ * member's balance. `note` is why it was booked (收银台充值原因, required at
+ * the till) and `operator` who booked it, so the credit is never untraceable.
+ */
+export function topUpBalanceStatements(memberId, principalCents, bonusCents, receiptId, at, note = "", operator = "") {
+  const statements = [
+    [INSERT_BALANCE_SQL, [`topup-${receiptId}`, memberId, principalCents, "topup", receiptId, note, at]],
+    ...operatorStatements(`topup-${receiptId}`, operator),
+    ...changeBalanceStatements(memberId, principalCents, at)
+  ];
+  if (bonusCents) statements.push(
+    [INSERT_BALANCE_SQL, [`bonus-${receiptId}`, memberId, bonusCents, "bonus", receiptId, "", at]],
+    ...operatorStatements(`bonus-${receiptId}`, operator),
+    ...changeBalanceStatements(memberId, bonusCents, at)
+  );
+  return statements;
+}
+
+/** A bill settled from balances: each member's share taken, or the batch refused (CHECK >= 0). */
+export function spendBalanceStatements(receiptId, debits, at, operator = "") {
+  return debits.flatMap((debit, index) => [
+    [INSERT_BALANCE_SQL, [`spend-${receiptId}-${index}`, debit.memberId, -debit.amountCents, "spend", receiptId, "", at]],
+    ...operatorStatements(`spend-${receiptId}-${index}`, operator),
+    ...changeBalanceStatements(debit.memberId, -debit.amountCents, at)
+  ]);
+}
+
+/** That bill cancelled: each member's share given back. */
+export function refundBalanceStatements(stornoId, refunds, at, operator = "") {
+  return refunds.flatMap((refund, index) => [
+    [INSERT_BALANCE_SQL, [`refund-${stornoId}-${index}`, refund.memberId, refund.amountCents, "refund", stornoId, "", at]],
+    ...operatorStatements(`refund-${stornoId}-${index}`, operator),
+    ...changeBalanceStatements(refund.memberId, refund.amountCents, at)
+  ]);
+}
+
+/** A top-up cancelled: the money and its bonus taken back, or the batch refused if already spent. */
+export function reverseBalanceStatements(stornoId, reversals, at, operator = "") {
+  return reversals.flatMap((reversal, index) => [
+    [INSERT_BALANCE_SQL, [`reverse-${stornoId}-${index}`, reversal.memberId, -reversal.amountCents, "reverse", stornoId, "", at]],
+    ...operatorStatements(`reverse-${stornoId}-${index}`, operator),
+    ...changeBalanceStatements(reversal.memberId, -reversal.amountCents, at)
+  ]);
 }
