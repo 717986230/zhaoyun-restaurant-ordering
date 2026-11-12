@@ -47,7 +47,7 @@ import {
 } from "./account.mjs";
 import {
   customerView, earnPointsStatements, isOverdrawn, refundBalanceStatements, refundPointsStatements, reverseBalanceStatements,
-  reversePointsStatements, spendBalanceStatements, topUpBalanceStatements, welcomePointsStatements
+  reversePointsStatements, spendBalanceStatements, topUpBalanceStatements, topUpPointsStatements, welcomePointsStatements
 } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
 import { createDeliveryStore } from "./delivery-store.mjs";
@@ -568,7 +568,7 @@ export function createStore(driver) {
           ...(closePaidTableStatements(table))
         ] : []),
         // Points for the signed-in guests whose orders this paid (shared/customer.mjs).
-        ...(earnPointsStatements(plan.receipt.id, settings.loyalty, at)),
+        ...(earnPointsStatements(plan.receipt.id, settings.loyalty, at, { totalCents: plan.receipt.totalCents, balanceCents: plan.balanceDebits.reduce((sum, debit) => sum + debit.amountCents, 0) })),
         // A member's first paid visit: the bonus that lets them book (shared/reservations.mjs).
         ...(welcomePointsStatements(plan.receipt.id, settings.reservations?.enabled ? settings.reservations.welcomePoints : 0, at)),
         printStatement(receiptPrintPayload(view, settings), at),
@@ -647,6 +647,8 @@ export function createStore(driver) {
       const statements = [
         sql(INSERT_RECEIPT_SQL, ...receiptRow(plan.receipt)),
         ...(topUpBalanceStatements(plan.credit.memberId, plan.credit.principalCents, plan.credit.bonusCents, plan.receipt.id, at, plan.credit.reason, plan.credit.operator)),
+        // 充值送积分: the money put in earns points at the programme's rate (shared/customer.mjs).
+        ...(topUpPointsStatements(plan.credit.memberId, plan.credit.principalCents, plan.receipt.id, settings.loyalty, at)),
         printStatement(receiptPrintPayload(view, settings), at),
         await journalStatement(last, "receipt.issued", plan.receipt.id, view, at)
       ];

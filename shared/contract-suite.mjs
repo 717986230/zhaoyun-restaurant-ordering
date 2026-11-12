@@ -1166,6 +1166,61 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await call("PUT", "/api/admin/settings", { admin: true, body: { membership: { enabled: false, tiers: [] }, customerAccounts: false } });
     }],
 
+    ["充值送积分 at 10 euros a point, no double points on a balance-paid bill, and a hand-credited member reaching their tier", async () => {
+      const staff = { role: "staff" };
+      const topUp = (body) => call("POST", "/api/admin/topup", { ...staff, body: { reason: "现金充值", ...body } });
+      const pointsOf = async (id) => (await call("GET", `/api/admin/customers/${id}`, { role: "manager" })).json.customer.points;
+      await call("PUT", "/api/admin/settings", { admin: true, body: {
+        customerAccounts: true,
+        membership: { enabled: true, tiers: [] },
+        loyalty: { enabled: true, pointsPerEuro: 1, eurosPerPoint: 10, topUpPoints: true, rewards: [], maxRewardsPerOrder: 1 },
+        memberTiers: { enabled: true, tiers: [{ name: "Silber", thresholdCents: 10000, discountPercent: 0 }, { name: "Gold", thresholdCents: 1000000, discountPercent: 0 }] }
+      } });
+      const member = (await call("POST", "/api/customer/register", { body: { email: "+43 660 1234321", name: "Punkte Gast", password: "points-at-ten-1" } })).json.customer;
+
+      // 105 euros put in: 10 points (one per full 10 euros), credited at once.
+      const start = await pointsOf(member.id);
+      const paidIn = await topUp({ memberId: member.id, amount: 105, payments: [{ type: "cash", amount: 105 }] });
+      assert.equal(paidIn.status, 201, JSON.stringify(paidIn.json));
+      assert.equal(await pointsOf(member.id), start + 10, "a top-up earns points at 10 euros a point");
+
+      // A bill paid wholly from that balance earns nothing again.
+      const dish = (await call("POST", "/api/admin/products", { admin: true, body: { names: { zh: "PT", de: "PT", en: "PT" }, sku: "PT-1", kind: "food", category: "PTTEST", price: 50, printStation: "kitchen", published: true, available: true } })).json.product;
+      const token = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "P1" } })).json.table.token;
+      const memberToken = (await call("POST", "/api/customer/sign-in", { body: { email: "+43 660 1234321", password: "points-at-ten-1" } })).json.token;
+      assert.ok(memberToken, "the member signs in");
+      const placed = await call("POST", "/api/orders", { tableToken: token, customerToken: memberToken, body: { clientRequestId: "pt-order-1", table: "P1", note: "", items: [{ id: dish.id, qty: 1 }] } });
+      assert.equal(placed.status, 201, JSON.stringify(placed.json));
+      const line = (await call("GET", "/api/admin/tables/P1/bill", staff)).json.bill.items[0];
+      const bill = await call("POST", "/api/admin/checkout", { ...staff, body: { table: "P1", items: [{ orderItemId: line.orderItemId, quantity: 1 }], payments: [{ type: "balance", amount: 50, memberId: member.id }] } });
+      assert.equal(bill.status, 201, JSON.stringify(bill.json));
+      const ledger = (await call("GET", "/api/customer/points", { customerToken: memberToken })).json.entries;
+      assert.ok(!ledger.some((entry) => entry.reason === "earn" && entry.ref === bill.json.receipt.id), "stored value already earned its points when it was topped up");
+      const settled = await pointsOf(member.id);
+
+      // The top-up cancelled: its points come back out.
+      const again = await topUp({ memberId: member.id, amount: 30, payments: [{ type: "card", amount: 30 }] });
+      assert.equal(await pointsOf(member.id), settled + 3);
+      assert.equal((await call("POST", `/api/admin/receipts/${again.json.receipt.id}/storno`, { role: "manager", body: { reason: "mistake" } })).status, 201);
+      assert.equal(await pointsOf(member.id), settled, "a cancelled top-up takes its points back");
+
+      // 成长值 counts what the house credits by hand too: 105 put in, then a big
+      // credit at the counter lifts the member to the top tier.
+      const before = (await call("GET", `/api/admin/customers/${member.id}`, { role: "manager" })).json.customer.membership;
+      assert.equal(before.tierLevel, 1);
+      assert.equal(before.tier, "Silber");
+      await call("POST", `/api/admin/customers/${member.id}/balance`, { role: "manager", body: { amount: 9999, note: "VIP" } });
+      const after = (await call("GET", `/api/admin/customers/${member.id}`, { role: "manager" })).json.customer.membership;
+      assert.equal(after.tier, "Gold");
+      assert.equal(after.tierLevel, 2);
+      assert.equal(after.tierCount, 2);
+
+      await call("DELETE", "/api/admin/tables/P1", { admin: true });
+      await call("DELETE", `/api/admin/products/${dish.id}`, { admin: true });
+      await call("DELETE", `/api/admin/customers/${member.id}`, { role: "manager" });
+      await call("PUT", "/api/admin/settings", { admin: true, body: { membership: { enabled: false, tiers: [] }, memberTiers: { enabled: false, tiers: [] }, loyalty: { enabled: false, pointsPerEuro: 1, eurosPerPoint: 10, topUpPoints: true, rewards: [], maxRewardsPerOrder: 1 }, customerAccounts: false } });
+    }],
+
     ["the POS: paired devices, waiters' PINs, tables locked to the device that has them open, takeaway, moving a table, settlement", async () => {
       // Only the manager pairs a device; its token is what lets waiters sign in on it.
       assert.equal((await call("POST", "/api/admin/pos-devices", { role: "staff", body: { name: "Tablet A" } })).status, 403);
@@ -1635,9 +1690,9 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       for (const loyalty of [{ pointsPerEuro: -1 }, { rewards: [{ productId: "photo-n1-6", points: 0 }] }, { rewards: [{ productId: "a", points: 1 }, { productId: "a", points: 2 }] }, { maxRewardsPerOrder: 0 }]) {
         assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty } })).status, 400, `${JSON.stringify(loyalty)} must be refused`);
       }
-      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 } } });
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, eurosPerPoint: 1, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 } } });
       assert.equal(saved.status, 200);
-      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.loyalty, { pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 });
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.loyalty, { pointsPerEuro: 2, eurosPerPoint: 1, topUpPoints: true, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 });
 
       const guest = (await call("POST", "/api/customer/register", { body: { email: "points@example.com", password: "collect-them-all" } })).json;
       const me = async () => (await call("GET", "/api/customer", { customerToken: guest.token })).json.customer;
@@ -1680,7 +1735,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await me()).points, 20);
 
       // Too dear now: refused whole, nothing spent.
-      await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 500 }], maxRewardsPerOrder: 1 } } });
+      await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, eurosPerPoint: 1, rewards: [{ productId: "photo-n1-6", points: 500 }], maxRewardsPerOrder: 1 } } });
       const dear = await pickup([{ id: "photo-n1-6", qty: 1, reward: true }]);
       assert.equal(dear.status, 409);
       assert.equal(dear.json.code, "NOT_ENOUGH_POINTS");

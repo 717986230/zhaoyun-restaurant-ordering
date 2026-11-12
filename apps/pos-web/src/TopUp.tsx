@@ -1,3 +1,4 @@
+import { TierChip } from "./TierChip";
 import { useRef, useState } from "react";
 import type { ApiCustomer } from "@zhaoyun/contracts";
 import { api } from "./App";
@@ -50,9 +51,12 @@ export function TopUp({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
         payments: [{ type: method, amount: cents / 100 }]
       });
       const bonus = receipt.lines.find((line) => line.kind === "topup")?.bonusCents ?? 0;
-      pos.notify(t("toppedUp", { name: updated.name, balance: money(updated.balanceCents ?? 0) }) + (bonus ? t("topUpBonus", { amount: money(bonus) }) : ""));
+      pos.notify(t("toppedUp", { name: updated.name || updated.phone || updated.email, balance: money(updated.balanceCents ?? 0) }) + (bonus ? t("topUpBonus", { amount: money(bonus) }) : ""));
       requestId.current = crypto.randomUUID();
+      // Re-read the member: the top-up may have lifted their level, and the
+      // top-up's answer carries the balance but not their standing.
       setMember(updated);
+      api.member(login.trim()).then(({ member: fresh }) => setMember(fresh)).catch(() => undefined);
       setAmount("");
       setReasonKey("");
       setCustom("");
@@ -81,8 +85,8 @@ export function TopUp({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
 
     {member && <>
       <div className="pos-topup-member">
-        <b>{member.name}</b>
-        <span>{t("balance", { amount: money(member.balanceCents ?? 0) })}</span>
+        <b>{(member.membership?.tierLevel ?? 0) > 0 && <TierChip level={member.membership?.tierLevel ?? 0} t={t} />} {member.name || member.phone || member.email}</b>
+        <span>{t("balance", { amount: money(member.balanceCents ?? 0) })} · {t("memberPoints", { points: member.points })}</span>
       </div>
       <label className="pos-topup-amount"><span>{t("topUpAmount")}</span><input inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => setAmount(event.target.value)} /></label>
       <div className="pos-pay-types" role="group">

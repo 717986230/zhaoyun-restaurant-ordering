@@ -204,7 +204,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
 
     {loyalty && <section className="guest-section">
       <h3>{g(language, "rewards")}</h3>
-      <p className="cart-hint">{g(language, "pointsLead", { n: loyalty.pointsPerEuro })}</p>
+      <p className="cart-hint">{g(language, "pointsLead", { n: loyalty.pointsPerEuro, e: loyalty.eurosPerPoint ?? 1 })}{loyalty.topUpPoints ? ` · ${g(language, "pointsTopUp")}` : ""}</p>
       {rewards.length > 0 && <ul className="reward-list">{rewards.map(({ product, points }) => {
         const affordable = customer.points >= points;
         return <li key={product.id}>

@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { PosApi, toProduct } from "@zhaoyun/api-client";
 import type { PosStaff, RealtimeEnvelope } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
+import { serverErrorText } from "@zhaoyun/domain";
 import { formatEuro, initialLanguage, POS_LANGUAGES, translator } from "./i18n";
 import type { PosKey, PosLanguage } from "./i18n";
 import { Floor } from "./Floor";
@@ -94,15 +95,19 @@ export function App() {
     return () => { listeners.current.delete(listener); };
   }, []);
 
+  // One timer for the toast: a new message restarts it, so an earlier toast's
+  // timer never wipes a newer message before it can be read.
+  const toastTimer = useRef<number | undefined>(undefined);
   const notify = useCallback((message: string, kind: "ok" | "error" = "ok") => {
     setToast({ message, kind });
-    window.setTimeout(() => setToast(null), 2600);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
   }, []);
   const failed = useCallback((error: unknown) => {
     const message = error instanceof Error ? error.message : "";
     // A session that ran out, or a waiter switched off: back to the names.
     if (/401|authentication required/i.test(message) || (error as { status?: number })?.status === 401) setStaff(null);
-    notify(message || translator(language)("failed"), "error");
+    notify(message ? serverErrorText(message, language) : translator(language)("failed"), "error");
   }, [notify, language]);
 
   useEffect(() => {

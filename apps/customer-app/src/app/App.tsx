@@ -18,6 +18,11 @@ import { orderingState } from "./ordering";
 import { assignedTableNo } from "./table";
 import { useCustomer } from "../features/account/useCustomer";
 import { AccountSheet } from "../features/account/AccountSheet";
+import { MemberEntrance } from "../features/account/MemberEntrance";
+import { unlockAudioOnFirstGesture } from "../features/account/useTierEntry";
+
+// iOS only plays sound from audio opened inside a tap: open it on the first one.
+unlockAudioOnFirstGesture();
 import { CartSheet } from "../features/cart/CartSheet";
 
 // Booking a table opens over the menu; its code and styles load on the first tap.
@@ -114,6 +119,7 @@ export function App() {
   }, [featuredSettings, products]);
 
   return <main className="app-shell">
+    {accountsOn && <MemberEntrance customer={account.customer} language={language} />}
     {!online && <div className="offline-bar" role="status">{t(language, "offlineMenu")}</div>}
     <CatalogScreen
       state={{ ...state, language }}

@@ -400,7 +400,7 @@ export function menuSettingsView(settings) {
     // A new account brings these points, once (shared/http.mjs, register); said only when it does.
     ...(customerAccountsOn(settings) && settings.reservations?.signupPoints ? { signupPoints: settings.reservations.signupPoints } : {}),
     loyalty: settings.loyalty?.enabled
-      ? { pointsPerEuro: settings.loyalty.pointsPerEuro, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }
+      ? { pointsPerEuro: settings.loyalty.pointsPerEuro, eurosPerPoint: settings.loyalty.eurosPerPoint, topUpPoints: settings.loyalty.topUpPoints, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }
       : null,
     // 生日营销: the birthday-month offer, so a member knows to add their birthday.
     ...(settings.birthdayPerk?.enabled ? { birthdayPerk: { discountPercent: settings.birthdayPerk.discountPercent, ...(settings.birthdayPerk.greetByEmail ? { email: true } : {}) } } : {}),
