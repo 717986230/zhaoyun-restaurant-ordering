@@ -109,9 +109,12 @@ function LoyaltyForm({ loyalty, products, onSave }: { loyalty: ApiLoyalty; produ
   return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
     <Toggle checked={draft.enabled} label={t("loyaltyEnabled")} onChange={(enabled) => { setDraft({ ...draft, enabled }); void onSave({ ...draft, enabled }); }} />
     <div className="field-grid">
-      <label><span>{t("loyaltyPerEuro")}</span><input type="number" name="pointsPerEuro" min={0} max={100} step={1} value={draft.pointsPerEuro} onChange={(event) => setDraft({ ...draft, pointsPerEuro: Number(event.target.value) })} /></label>
+      <label><span>{t("loyaltyEurosPerPoint")}</span><input type="number" name="eurosPerPoint" inputMode="numeric" min={1} max={1000} step={1} value={draft.eurosPerPoint || ""} onChange={(event) => setDraft({ ...draft, eurosPerPoint: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} /></label>
+      <label><span>{t("loyaltyPerEuro")}</span><input type="number" name="pointsPerEuro" inputMode="numeric" min={0} max={100} step={1} value={draft.pointsPerEuro} onChange={(event) => setDraft({ ...draft, pointsPerEuro: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} /></label>
       <label><span>{t("loyaltyMaxRewards")}</span><input type="number" name="maxRewardsPerOrder" min={1} max={10} step={1} value={draft.maxRewardsPerOrder} onChange={(event) => setDraft({ ...draft, maxRewardsPerOrder: Number(event.target.value) })} /></label>
     </div>
+    <Toggle checked={draft.topUpPoints} label={t("loyaltyTopUpPoints")} onChange={(topUpPoints) => setDraft({ ...draft, topUpPoints })} />
+    <p className="settings-hint">{t("loyaltyRateHint", { euros: String(draft.eurosPerPoint || 1), points: String(draft.pointsPerEuro) })}</p>
     <p className="settings-label">{t("loyaltyRewards")}</p>
     <ul className="reward-rows">{draft.rewards.map((reward) => <li key={reward.productId}>
       <span>{name(reward.productId)}</span>
@@ -131,7 +134,7 @@ function LoyaltyForm({ loyalty, products, onSave }: { loyalty: ApiLoyalty; produ
         setPick("");
       }}>{t("loyaltyAdd")}</button>
     </div>}
-    <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
+    <button className="primary-action" type="submit" disabled={!changed || draft.eurosPerPoint < 1}>{t("save")}</button>
   </form>;
 }
 

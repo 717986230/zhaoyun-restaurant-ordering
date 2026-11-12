@@ -84,6 +84,8 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 /* The live channel: green while changes arrive as they happen, grey while the screens poll. */
 .pos-live { width: 9px; height: 9px; border-radius: 50%; background: var(--p-muted); flex-shrink: 0; }
 .pos-live.on { background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.25); }
+/* 待补发: orders held on this device while offline, waiting to send again. */
+.pos-queue { align-self: center; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; background: #d98324; color: #1b211e; font-weight: 700; font-size: 13px; white-space: nowrap; }
 .pos-head-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .pos-head-actions button { min-height: 40px; border-color: #3c4a44; background: transparent; color: #fff; }
 .pos-languages { display: flex; gap: 2px; }
@@ -203,10 +205,12 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   display: grid;
   align-content: start;
   gap: 4px;
-  /* The dish's category colour as a left stripe (inset, so it adds no width). */
-  box-shadow: inset 4px 0 0 var(--tag, transparent);
+  /* The dish's category colour, bold enough to read in a glance: the whole
+     card is tinted with it, with a thick solid bar down the left edge. */
+  background: color-mix(in srgb, var(--tag, transparent) 16%, var(--p-card));
+  box-shadow: inset 6px 0 0 var(--tag, transparent);
   min-height: 92px;
-  padding: 10px;
+  padding: 10px 10px 10px 14px;
   text-align: left;
 }
 
@@ -223,14 +227,31 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 /* 每日限量: the portions left today, on the dish. */
 .pos-dishes button { position: relative; }
 .pos-stock-left { position: absolute; top: 4px; right: 4px; padding: 1px 6px; border-radius: 999px; background: var(--p-seated); color: var(--p-ink); font-size: 11px; font-style: normal; font-weight: 700; }
+/* 已点份数: a red count of how many of this dish are in the unsent order. */
+.pos-dish-count { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--p-warn); color: var(--p-accent-ink); font-size: 12px; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* When a dish shows both, the 剩量 pill drops below the count badge. */
+.pos-dishes button:has(.pos-dish-count) .pos-stock-left { top: 28px; }
 .pos-soldout-mode.on { border-color: var(--p-warn); background: var(--p-warn-wash); color: var(--p-warn); font-weight: 700; }
 
-.pos-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.55); }
+.pos-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.55); }
 .pos-modal .pos-card { width: min(520px, 100%); max-height: 90vh; overflow-y: auto; }
 .pos-modal fieldset { margin: 0; padding: 0; border: 0; }
 .pos-modal legend { margin-bottom: 6px; font-weight: 700; }
 .pos-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .pos-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.pos-move { display: grid; gap: 12px; }
+.pos-move-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; max-height: 46vh; overflow-y: auto; }
+.pos-move-grid button { min-height: 56px; font-size: 20px; font-weight: 700; }
+.pos-move-other { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.pos-move-other input { min-height: 48px; }
+.pos-move .pos-modal-actions { grid-template-columns: 1fr; }
+.pos-move-grid button.pos-seat-booked { display: grid; gap: 2px; border-color: var(--p-accent); color: var(--p-accent); }
+.pos-move-grid button.pos-seat-booked small { font-size: 11px; font-weight: 600; }
+
+.pos-stock-form { display: grid; gap: 12px; }
+.pos-stock-form input { min-height: 52px; font-size: 22px; text-align: center; }
+.pos-stock-form .pos-primary { min-height: 52px; font-size: 18px; }
 
 .pos-pay-screen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
 .pos-pay-lines { display: grid; gap: 10px; min-width: 0; }
@@ -242,7 +263,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-discount { grid-template-columns: 1fr 110px; align-items: center; }
 .pos-total { display: flex; justify-content: space-between; align-items: baseline; }
 .pos-total b { font-size: 30px; font-variant-numeric: tabular-nums; }
-.pos-pay-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pos-pay-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
 .pos-payments { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .pos-payments li { display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 6px; padding: 10px; border-radius: 10px; background: var(--p-bg); }
 .pos-payments li > :not(button) { grid-column: 1; }
@@ -800,6 +821,25 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   font-weight: 700;
 }
 
+/* 会员储值充值: the counter's top-up screen, reached from the floor bar. */
+.pos-floor-bar .pos-topup-open { font-weight: 700; }
+.pos-topup { display: grid; gap: 14px; width: min(520px, 100%); margin: 0 auto; }
+.pos-topup-find { display: flex; gap: 8px; align-items: end; }
+.pos-topup-find label { flex: 1 1 auto; }
+.pos-topup-find button { min-height: 44px; padding: 0 16px; }
+.pos-topup-member {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--p-bg);
+}
+.pos-topup-member b { font-size: 18px; }
+.pos-topup-member span { color: var(--p-accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pos-topup .pos-primary { min-height: 56px; font-size: 18px; }
+
 .pos-scan {
   position: fixed;
   inset: 0;
@@ -892,6 +932,55 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.pos-scan-find {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--p-line);
+  padding-top: 12px;
+}
+
+.pos-scan-find > input {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.pos-scan-matches {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pos-scan-matches button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--p-line);
+  border-radius: 10px;
+  background: var(--p-card);
+  color: var(--p-ink);
+  text-align: start;
+  font-size: 15px;
+}
+
+.pos-scan-matches em {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: var(--p-accent-wash);
+  color: var(--p-accent);
+  font-style: normal;
+  font-weight: 700;
 }
 
 @keyframes pos-scan-in {
