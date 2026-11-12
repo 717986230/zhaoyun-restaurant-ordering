@@ -225,6 +225,22 @@ export function phoneKey(phone) {
   return digits.length >= 6 ? digits.slice(-9) : "";
 }
 
+/**
+ * Whether `contact` is the phone number or email a booking was made with, so a
+ * guest with no account and no saved link can still prove a booking is theirs
+ * by its reference and the way they can be reached. An entry with an "@" is
+ * matched as an email (same text, lower-cased); anything else as a mobile
+ * number by its digits (phoneKey). An empty contact, or a booking missing that
+ * field, never matches.
+ */
+export function reservationContactMatches(row, contact) {
+  const value = String(contact ?? "").trim();
+  if (!value) return false;
+  if (value.includes("@")) return Boolean(row.email) && value.toLowerCase() === String(row.email).toLowerCase();
+  const key = phoneKey(value);
+  return Boolean(key) && key === phoneKey(row.phone);
+}
+
 /** Whether the guest picks their table (the owner listed bookable tables). */
 export function seatSelection(rules) {
   return rules.tables.length > 0;

@@ -1,7 +1,16 @@
+import { useState } from "react";
 import type { StaffRole } from "@zhaoyun/api-client";
 import type { ApiDeliveryOrder, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
+import { loadAnnounceMode, nextAnnounceMode, saveAnnounceMode, unlockAudio, useOrderAnnouncer } from "./announce";
+import type { AnnounceMode } from "./announce";
+
+const ANNOUNCE_KEYS: Record<AnnounceMode, CopyKey> = {
+  off: "boardSoundOff",
+  beep: "boardSoundBeep",
+  voice: "boardSoundVoice"
+};
 
 export const ORDER_STATUS_KEYS: Record<ApiOrder["status"], CopyKey> = {
   new: "orderNew",
@@ -57,8 +66,21 @@ export function BoardPanel(props: Props) {
   const openOrders = props.orders.filter((order) => order.status !== "completed" && order.status !== "cancelled");
   const openRequests = props.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled");
 
+  // The bell is this tablet's own choice: tap to cycle silent → chime → voice.
+  const [announce, setAnnounce] = useState<AnnounceMode>(loadAnnounceMode);
+  useOrderAnnouncer(props.orders, announce, language);
+  function cycleAnnounce() {
+    const next = nextAnnounceMode(announce);
+    if (next !== "off") unlockAudio();
+    saveAnnounceMode(next);
+    setAnnounce(next);
+  }
+
   return <section id="boardPanel" className="admin-panel active">
-    <div className="list-head"><div><h1>{t("boardTitle")}</h1></div><button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>{t("refresh")}</button></div>
+    <div className="list-head"><div><h1>{t("boardTitle")}</h1></div><div className="list-head-actions">
+      <button className={`ghost-action board-sound ${announce}`} onClick={cycleAnnounce} aria-label={t(ANNOUNCE_KEYS[announce])} title={t(ANNOUNCE_KEYS[announce])}>{announce === "off" ? "🔕" : announce === "beep" ? "🔔" : "🗣️"} {t(ANNOUNCE_KEYS[announce])}</button>
+      <button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>{t("refresh")}</button>
+    </div></div>
 
     <div className="board-layout">
       <section className="board-column">
