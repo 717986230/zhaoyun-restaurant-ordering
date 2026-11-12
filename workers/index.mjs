@@ -48,6 +48,36 @@ function adminToken(env) {
   return expected && String(expected).length >= 32 ? expected : null;
 }
 
+/** The store and the API over this deployment's D1, as a request or the cron sees them. */
+function buildApi(env, ctx) {
+  const store = createStore(d1Driver(env.DB));
+  const api = createApi({
+    store,
+    state,
+    tokens: { manager: adminToken(env), staff: env.STAFF_TOKEN, kitchen: env.KITCHEN_TOKEN },
+    // Pictures only, and small enough for one D1 row. A video needs a bucket this deployment does not have.
+    uploads: async (productId, file) => {
+      const extension = UPLOAD_IMAGE_TYPES.get(file.type);
+      if (!extension) return { error: "Only JPEG, PNG and WebP pictures can be stored here" };
+      if (file.size > MAX_STORED_IMAGE_BYTES) return { error: "Picture exceeds 1.5 MB — make it smaller first", status: 413 };
+      return { product: await store.storeMedia(productId, { contentType: file.type, extension, bytes: new Uint8Array(await file.arrayBuffer()) }) };
+    },
+    publish: (event) => ctx?.waitUntil(publishLive(env, event)),
+    // VERSION is the commit, set by the deploy (wrangler deploy --var VERSION:<sha>).
+    version: env.VERSION || null,
+    // The delivery platforms' secrets (wrangler secret put LIEFERANDO_WEBHOOK_SECRET, …; docs/DELIVERY.md).
+    delivery: deliveryConfig(env),
+    // Email for the guests' codes (wrangler secret put BREVO_API_KEY, …; docs/MAIL.md).
+    mail: mailConfig(env),
+    // Where an unplanned-error alert goes (wrangler secret put OWNER_ALERT_EMAIL;
+    // needs Brevo configured too). Unset: errors are logged only, not emailed.
+    ownerAlertEmail: env.OWNER_ALERT_EMAIL || null,
+    // Let the alert's send outlive the response the way the live channel does.
+    defer: (task) => ctx?.waitUntil(Promise.resolve(task).catch(() => {}))
+  });
+  return { store, api };
+}
+
 export default {
   async fetch(request, env, ctx) {
     const cors = corsHeaders(request, env);
@@ -57,26 +87,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/ws") return openLive(request, env);
 
-    const store = createStore(d1Driver(env.DB));
-    const api = createApi({
-      store,
-      state,
-      tokens: { manager: adminToken(env), staff: env.STAFF_TOKEN, kitchen: env.KITCHEN_TOKEN },
-      // Pictures only, and small enough for one D1 row. A video needs a bucket this deployment does not have.
-      uploads: async (productId, file) => {
-        const extension = UPLOAD_IMAGE_TYPES.get(file.type);
-        if (!extension) return { error: "Only JPEG, PNG and WebP pictures can be stored here" };
-        if (file.size > MAX_STORED_IMAGE_BYTES) return { error: "Picture exceeds 1.5 MB — make it smaller first", status: 413 };
-        return { product: await store.storeMedia(productId, { contentType: file.type, extension, bytes: new Uint8Array(await file.arrayBuffer()) }) };
-      },
-      publish: (event) => ctx?.waitUntil(publishLive(env, event)),
-      // VERSION is the commit, set by the deploy (wrangler deploy --var VERSION:<sha>).
-      version: env.VERSION || null,
-      // The delivery platforms' secrets (wrangler secret put LIEFERANDO_WEBHOOK_SECRET, …; docs/DELIVERY.md).
-      delivery: deliveryConfig(env),
-      // Email for the guests' codes (wrangler secret put BREVO_API_KEY, …; docs/MAIL.md).
-      mail: mailConfig(env)
-    });
+    const { api } = buildApi(env, ctx);
 
     // Cloudflare's own id for the request (cf-ray) where there is one: the same id its logs show.
     const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
@@ -95,5 +106,16 @@ export default {
     if (!headers.has("content-security-policy")) headers.set("content-security-policy", "default-src 'none'; frame-ancestors 'none'");
     headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
     return new Response(response.body, { status: response.status, headers });
+  },
+
+  /**
+   * The hourly cron (wrangler.toml [triggers]): 生日祝福邮件. The job itself
+   * waits until 09:00 in the restaurant's time zone and mails each member once
+   * a year, so running it every hour only makes it robust to a missed run.
+   */
+  async scheduled(controller, env, ctx) {
+    const { api } = buildApi(env, ctx);
+    const result = await api.birthdayGreetings(new Date(controller.scheduledTime || Date.now()));
+    if (result.sent || result.failed) console.log(JSON.stringify({ level: "info", msg: "birthday greetings", ...result }));
   }
 };

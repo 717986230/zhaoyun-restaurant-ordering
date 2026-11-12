@@ -77,7 +77,11 @@ jobs:
         run: npm run build
 
       # The browsers are kept between runs, by Playwright's own version: a
-      # download that stalls once cost a whole twenty-minute run.
+      # download that stalls once cost a whole twenty-minute run. The runner
+      # image id is in the key too: a browser build is linked against that
+      # image's system libraries (libicu and friends), so when the image rolls
+      # the cached build must be re-downloaded or WebKit fails to launch with
+      # a "cannot open shared object file" on a now-missing .so.
       - name: Playwright version
         id: playwright
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
@@ -87,7 +91,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ steps.playwright.outputs.version }}
 
       # WebKit for the iPhone projects: every browser on iOS is WebKit. A
       # stalled download is cut off after four minutes and tried again, up to
@@ -104,33 +108,17 @@ jobs:
           exit 1
 
       # The system libraries the browsers need, from apt, whether or not they
-      # came from the cache. The apt mirror sometimes serves the font packages
-      # slowly and the install stalls past the step timeout, so a cut-off
-      # attempt is tried again, up to three times — the same way the browser
-      # download above is.
+      # came from the cache. The Azure apt mirror stalls on the odd package,
+      # and a single run past six minutes failed the whole shard before a test
+      # ran; so, like the download above, each attempt is given room and tried
+      # again, refreshing the package lists between tries.
       - name: Install the browsers' system libraries
         timeout-minutes: 15
         run: |
-          # A cut-off attempt (`timeout` killing npx) leaves its apt-get child
-          # running and holding the dpkg lock, so an instant retry dies on
-          # "Could not get lock /var/lib/dpkg/lock-frontend". Between attempts,
-          # stop any leftover apt/dpkg, repair a half-done install, and wait for
-          # the locks to clear before trying again.
-          recover_apt() {
-            sudo pkill -9 -f 'apt-get|apt\.systemd|unattended-upgr' 2>/dev/null || true
-            sudo dpkg --configure -a 2>/dev/null || true
-            for _ in $(seq 1 30); do
-              if ! sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1; then
-                return 0
-              fi
-              sleep 2
-            done
-          }
           for attempt in 1 2 3; do
-            # `-k 20` hard-kills a stalled attempt 20s after the first signal.
-            if timeout -k 20 300 npx playwright install-deps chromium webkit; then exit 0; fi
-            echo "::warning::install-deps stalled or failed (attempt $attempt of 3)"
-            recover_apt
+            if npx playwright install-deps chromium webkit; then exit 0; fi
+            echo "::warning::apt stalled installing browser libraries (attempt $attempt of 3)"
+            sudo apt-get update || true
           done
           exit 1
 

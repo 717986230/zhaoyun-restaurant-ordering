@@ -48,13 +48,17 @@ const incremental = [
   { file: "0060_receipts_created.sql", drop: "DROP INDEX idx_receipts_created;" },
   { file: "0061_auth_throttle.sql", drop: "DROP TABLE auth_throttle;" },
   { file: "0062_reservations.sql", drop: "DROP INDEX idx_reservations_customer; DROP INDEX idx_reservations_date; DROP TABLE reservations;" },
-  { file: "0070_waitlist.sql", drop: "DROP INDEX idx_waitlist_status; DROP TABLE waitlist;" },
   { file: "0063_delivery_orders.sql", drop: "DROP INDEX idx_delivery_orders_status; DROP INDEX idx_delivery_orders_created; DROP TABLE delivery_orders;" },
   { file: "0064_product_stock.sql", drop: "DROP TABLE product_stock;" },
   { file: "0065_cash_drawer.sql", drop: "DROP INDEX idx_drawer_movements_session; DROP TABLE drawer_movements; DROP INDEX idx_drawer_sessions_closed; DROP TABLE drawer_sessions;" },
   { file: "0066_email_verification.sql", drop: "DROP TABLE mail_outbox; DROP TABLE customer_verified_emails; DROP INDEX idx_email_codes_customer; DROP TABLE email_codes;" },
   // Data only: it changes no table, on any database.
-  { file: "0068_hide_hot_pot.sql", drop: "" }
+  { file: "0068_hide_hot_pot.sql", drop: "" },
+  { file: "0069_member_balance.sql", drop: "DROP INDEX idx_balance_ledger_ref; DROP INDEX idx_balance_ledger_customer; DROP TABLE balance_ledger; DROP TABLE member_balances;" },
+  { file: "0070_member_birthday.sql", drop: "DROP TABLE member_birthdays;" },
+  { file: "0071_birthday_greetings.sql", drop: "DROP TABLE birthday_greetings;" },
+  { file: "0072_balance_operator.sql", drop: "DROP TABLE balance_operators;" },
+  { file: "0073_waitlist.sql", drop: "DROP INDEX idx_waitlist_status; DROP TABLE waitlist;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")

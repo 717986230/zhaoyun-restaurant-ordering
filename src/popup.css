@@ -1,0 +1,59 @@
+/* ---------------------------------------------------------------------------
+   Floating "scale popup" — the shared look for every dialog in the system
+   (2026-11). A popup opens as a floating card: the dark scrim fades in and the
+   card scales up from 0.94 with a soft rise, on the house easing curve, the
+   whole thing done in a third of a second. It matches the customer menu's
+   frosted sheets (Sheet.tsx) and the POS booking scanner (.pos-scan), so the
+   back office and the till now open the same way the guest's menu does.
+
+   This file is imported by the admin and POS apps. It only
+   restyles the plain-React overlay dialogs that did not yet animate — the
+   back-office record card (.res-dialog) and the POS modals (.pos-modal). The
+   customer sheets and the POS scanner already carry their own scale+fade and
+   are left untouched; they only share the card chrome below for consistency.
+
+   Enter animation only: the plain dialogs unmount the moment they close, so
+   there is no element left to animate out (same as .pos-scan always has).
+   Everything is disabled under prefers-reduced-motion.
+   ------------------------------------------------------------------------ */
+
+@keyframes popup-scrim-in {
+  from { opacity: 0; }
+}
+
+@keyframes popup-card-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.94); }
+}
+
+/* The scrim behind the card fades up from clear. */
+.res-dialog,
+.pos-modal {
+  animation: popup-scrim-in 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* The floating card scales up from 0.94 with a soft rise. */
+.res-dialog > .res-print,
+.pos-modal > .pos-card {
+  animation: popup-card-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform-origin: 50% 60%;
+}
+
+/* Premium card chrome: generous corners and a soft lift, shared across every
+   floating popup so the back office, the till and the scanner all read alike. */
+.res-dialog > .res-print,
+.pos-modal > .pos-card,
+.pos-scan > .pos-scan-card {
+  border-radius: 18px;
+  box-shadow:
+    0 24px 60px -18px rgba(10, 16, 13, 0.45),
+    0 8px 22px -12px rgba(10, 16, 13, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .res-dialog,
+  .pos-modal,
+  .res-dialog > .res-print,
+  .pos-modal > .pos-card {
+    animation: none;
+  }
+}

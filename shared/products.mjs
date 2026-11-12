@@ -8,10 +8,19 @@
 
 import { DEFAULT_TIME_ZONE, isOnSchedule } from "../src/schedule.js";
 import { normalizeAllergens } from "../src/allergens.js";
+import { TAG_COLORS } from "../src/tag-colors.js";
 import { bool, parseJson, priceToCents, uuid } from "./core.mjs";
 import { PRINT_STATIONS } from "./printing.mjs";
 
 export const PRODUCT_KINDS = new Set(["food", "drink", "sushi"]);
+
+/** The one colour a dish may carry, if the owner picked one: a palette value,
+ *  or "" for none (then the POS falls back to the category's colour). */
+const TAG_COLOR_SET = new Set(TAG_COLORS);
+export function normalizeTagColor(value) {
+  const colour = String(value ?? "").trim();
+  return TAG_COLOR_SET.has(colour) ? colour : "";
+}
 
 /**
  * The Austrian rates a restaurant charges (§ 10 UStG): 10% for food, 20% for
@@ -60,6 +69,7 @@ export function mapProduct(row, media = [], stock = null) {
       art: row.art,
       pattern: row.pattern
     },
+    tagColor: row.tag_color || null,
     modifiers: parseJson(row.modifiers_json, []),
     bundleItems: parseJson(row.bundle_items_json, []),
     available: Boolean(row.available),
@@ -108,7 +118,8 @@ export function normalizeProduct(input, current = {}) {
     ingredients: String(details.ingredients ?? current.ingredients ?? "").trim(),
     art: String(appearance.art ?? current.art ?? "linear-gradient(135deg,#2d3a35,#121416 78%)"),
     pattern: String(appearance.pattern ?? current.pattern ?? "lines"),
-    modifiersJson: JSON.stringify(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, [])),
+    tagColor: normalizeTagColor(input.tagColor ?? current.tag_color),
+    modifiersJson: JSON.stringify(normalizeModifierGroups(Array.isArray(input.modifiers) ? input.modifiers : parseJson(current.modifiers_json, []))),
     bundleItemsJson: JSON.stringify(input.bundleItems === undefined ? parseJson(current.bundle_items_json, []) : normalizeBundleItems(input.bundleItems)),
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
@@ -139,6 +150,7 @@ export function duplicateInput(product) {
     allergens: product.allergens,
     details: product.details,
     appearance: product.appearance,
+    tagColor: product.tagColor,
     modifiers: product.modifiers,
     bundleItems: product.bundleItems,
     available: product.available,
@@ -162,7 +174,34 @@ export function resolveModifiers(productRow, requested = []) {
     selectedGroups.set(option.groupId, count);
     selected.push({ id: option.id, name: option.names.zh, names: option.names, priceCents: Number(option.priceCents) || 0 });
   }
+  // 必选 / 最少最多: a group may require a floor and cap the number of options.
+  for (const group of groups) {
+    const count = selectedGroups.get(group.id) || 0;
+    const min = Math.max(0, Math.trunc(Number(group.min) || 0));
+    const max = Math.max(0, Math.trunc(Number(group.max) || 0));
+    if (min > 0 && count < min) throw new Error(`At least ${min} option(s) required for ${group.id}`);
+    if (max > 0 && count > max) throw new Error(`At most ${max} option(s) allowed for ${group.id}`);
+  }
   return selected;
+}
+
+/**
+ * 规格组的 min/max 只在是正整数时才存下来（缺省/0 表示不限、不必选），
+ * 这样老数据和没设限的组保持原样，不会凭空多出字段。
+ */
+function normalizeModifierGroups(groups) {
+  if (!Array.isArray(groups)) return [];
+  return groups.map((group) => {
+    const { min: _min, max: _max, ...rest } = group;
+    const min = Math.max(0, Math.trunc(Number(group.min) || 0));
+    // 单选组最多就是 1，不另存 max；多选组存正整数的上限。
+    const max = group.selection === "single" ? 0 : Math.max(0, Math.trunc(Number(group.max) || 0));
+    return {
+      ...rest,
+      ...(min > 0 ? { min } : {}),
+      ...(max > 0 ? { max } : {})
+    };
+  });
 }
 
 /**

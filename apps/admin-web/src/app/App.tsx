@@ -3,7 +3,7 @@ import { AdminApi, toProduct } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
 import type { AccountUpdateCommand, ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings, RegisterCommand, VatPercent } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
-import { LANGUAGE_INFO } from "@zhaoyun/domain";
+import { LANGUAGE_INFO, serverErrorText } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
 import { ADMIN_LANGUAGES, useI18n } from "./i18n";
@@ -15,6 +15,7 @@ import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { GuestsPanel } from "../features/guests/GuestsPanel";
+import { MembersPanel } from "../features/members/MembersPanel";
 import { LinksPanel } from "../features/links/LinksPanel";
 import { ReportsPanel } from "../features/reports/ReportsPanel";
 import { TodayPanel } from "../features/reports/TodayPanel";
@@ -61,7 +62,7 @@ const LIVE_SETTLE_MS = 250;
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
   if (role === "staff") return ["board", "tables", "reservations", "waitlist", "delivery", "links"];
-  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "printers", "guests", "system", "links"] : ["today", "catalog", "reservations", "waitlist", "delivery", "guests", "system", "links"];
+  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "printers", "guests", "members", "system", "links"] : ["today", "catalog", "reservations", "waitlist", "delivery", "guests", "members", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
@@ -74,6 +75,7 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
   reports: "tabReports",
   printers: "tabPrinters",
   guests: "tabGuests",
+  members: "tabMembers",
   system: "tabSettings",
   links: "tabLinks",
   today: "tabToday"
@@ -81,9 +83,19 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
 
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
 
+/**
+ * The open tab is kept in the URL hash (#members, #reports, …) so a deep link
+ * opens straight to it — a staff member can save admin.html#members to the home
+ * screen and land on the 会员 page every time. Unknown or empty hash: no change.
+ */
+function tabFromHash(): AdminTab | null {
+  const key = (typeof location === "undefined" ? "" : location.hash.replace(/^#/, "")) as AdminTab;
+  return key in TAB_KEYS ? key : null;
+}
+
 export function App() {
   const { t, language, setLanguage } = useI18n();
-  const [state, setState] = useState(initialState);
+  const [state, setState] = useState(() => ({ ...initialState, tab: tabFromHash() ?? initialState.tab }));
   // The board polls on an interval; keeping the role in a ref avoids rebuilding
   // that callback (and restarting the timer) on every reconnect.
   const roleRef = useRef<StaffRole | null>(null);
@@ -94,14 +106,18 @@ export function App() {
     document.title = restaurantName ? `${restaurantName} · ${t("admin")}` : t("admin");
   }, [restaurantName, t]);
 
+  // One timer for the toast: a new message restarts it, so an earlier toast's
+  // timer never wipes a newer message before it can be read.
+  const toastTimer = useRef<number | undefined>(undefined);
   const notify = useCallback((message: string, kind: "success" | "warning" | "error" = "success") => {
     setState((current) => ({ ...current, toast: { message, kind } }));
-    window.setTimeout(() => setState((current) => ({ ...current, toast: null })), 2400);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setState((current) => ({ ...current, toast: null })), kind === "error" ? 4000 : 2400);
   }, []);
 
   const failed = useCallback((error: unknown, fallback: CopyKey) => {
-    notify(error instanceof Error && error.message ? error.message : t(fallback), "error");
-  }, [notify, t]);
+    notify(error instanceof Error && error.message ? serverErrorText(error.message, language) : t(fallback), "error");
+  }, [notify, t, language]);
 
   /** True when the console is through and loaded; false when whatever is in
    *  the header did not open the door. */
@@ -237,6 +253,16 @@ export function App() {
     void loadTables();
   }, [state.tab, loadTables]);
 
+  // Each section is its own page: a tab switched to opens at the top, not
+  // wherever the last one was left scrolled. On a phone the whole window
+  // scrolls; the desktop catalog's framed panes are fresh on each mount, so
+  // taking the window (and the main column) back to the top is enough.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [state.tab]);
+
   // The board and the room follow the floor live (shared/live.mjs): a waiter's
   // order, a guest's call or a paid bill shows at once. Polling stays as the
   // net under it — slow while the channel is open, quick while it is not.
@@ -346,6 +372,21 @@ export function App() {
     } catch (error) {
       failed(error, "saveFailed");
       return false;
+    }
+  }
+
+  /** Applies one change (price / 上架 / 有货) to several dishes at once, each a
+   *  full PUT built from the dish as it is, so nothing else is touched. One
+   *  refresh and one toast at the end, however many dishes. */
+  async function bulkSaveProducts(updates: Array<{ id: string; input: AdminProductInput }>): Promise<void> {
+    if (!updates.length) return;
+    try {
+      for (const update of updates) await adminApi.updateProduct(update.id, update.input);
+      await connect();
+      notify(t("bulkSaved", { n: updates.length }));
+    } catch (error) {
+      failed(error, "saveFailed");
+      await connect();
     }
   }
 
@@ -581,7 +622,18 @@ export function App() {
     window.location.href = "index.html";
   }
 
-  function setTab(tab: AdminTab) { setState((current) => ({ ...current, tab })); }
+  function setTab(tab: AdminTab) {
+    setState((current) => ({ ...current, tab }));
+    try { if (location.hash.replace(/^#/, "") !== tab) location.hash = tab; } catch { /* no history in this environment */ }
+  }
+
+  // A deep link or the browser's back/forward changes the hash: follow it, so
+  // admin.html#members always lands on the 会员 page.
+  useEffect(() => {
+    const onHash = () => { const tab = tabFromHash(); if (tab) setState((current) => (current.tab === tab ? current : { ...current, tab })); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const languagePicker = <div className="admin-languages" role="group" aria-label={t("language")}>{ADMIN_LANGUAGES.map((option) => <button
     key={option}
@@ -632,8 +684,8 @@ export function App() {
     </nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     </div>
-    <main>
-      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}
+    <main ref={mainRef}>
+      {state.tab === "catalog" && <CatalogPanel products={state.products} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onBulkSave={bulkSaveProducts} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}
       {state.tab === "board" && <BoardPanel
         orders={state.orders}
         requests={state.requests}
@@ -674,6 +726,7 @@ export function App() {
       {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
+      {state.tab === "members" && <MembersPanel api={adminApi} settings={state.settings} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel
         api={adminApi}
         notify={notify}

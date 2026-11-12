@@ -130,6 +130,9 @@ export const ProductBody = Type.Object({
     art: Type.String({ maxLength: 400 }),
     pattern: Type.String({ maxLength: 32 })
   })),
+  // 颜色标签: a palette colour, or "" / null to follow the category colour.
+  // normalizeTagColor (shared/products.mjs) keeps only real palette values.
+  tagColor: Type.Optional(Type.Union([Type.String({ maxLength: 16 }), Type.Null()])),
   modifiers: Type.Optional(Type.Array(ModifierGroup, { maxItems: 16 })),
   // A combo: the existing dishes it packages, so it is otherwise a normal
   // product with its own name, price and photo, not a distinct product kind.
@@ -198,9 +201,27 @@ export const SettingsBody = Type.Object({
   loyalty: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),
     pointsPerEuro: Type.Optional(Type.Number()),
+    eurosPerPoint: Type.Optional(Type.Number()),
+    topUpPoints: Type.Optional(Type.Boolean()),
     maxRewardsPerOrder: Type.Optional(Type.Number()),
     rewards: Type.Optional(Type.Array(Type.Object({ productId: ProductId, points: Type.Number() }), { maxItems: 30 }))
   }, { maxProperties: 8 })),
+  // Members' stored value: the bonus tiers are shared/customer.mjs's to check.
+  membership: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    tiers: Type.Optional(Type.Array(Type.Object({ thresholdCents: Type.Number(), bonusCents: Type.Number() }), { maxItems: 20 }))
+  }, { maxProperties: 4 })),
+  // 会员等级 + 会员价: the levels are shared/customer.mjs's to check.
+  memberTiers: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    tiers: Type.Optional(Type.Array(Type.Object({ name: Type.String({ maxLength: 40 }), thresholdCents: Type.Number(), discountPercent: Type.Number() }), { maxItems: 8 }))
+  }, { maxProperties: 4 })),
+  // 生日营销: the birthday discount is shared/customer.mjs's to check.
+  birthdayPerk: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    discountPercent: Type.Optional(Type.Number()),
+    greetByEmail: Type.Optional(Type.Boolean())
+  }, { maxProperties: 3 })),
   // Online table bookings; the rules are shared/reservations.mjs's to check.
   reservations: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),
@@ -267,10 +288,36 @@ export const CheckoutBody = Type.Object({
     amount: Type.Number(),
     tendered: Type.Optional(Type.Number()),
     voucherCode: Type.Optional(Type.String({ maxLength: 32 })),
+    // Whose stored value a `balance` payment spends (planCheckout).
+    memberId: Type.Optional(Type.String({ maxLength: 128 })),
     // Trinkgeld, beside the amount: the staff's, not in the total (planCheckout).
     tip: Type.Optional(Type.Number())
   // None only for a receipt of nothing to pay: a reward bought with points (planCheckout).
   }), { minItems: 0, maxItems: 10 })
+}, { additionalProperties: false });
+
+// A member putting money in (会员储值充值): who, how much, and how it is paid
+// (cash or card). The bonus is the house's to work out from the tiers, not the
+// till's to send, so it is not here. See shared/register.mjs, planTopUp.
+export const TopUpBody = Type.Object({
+  clientRequestId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  memberId: Type.String({ minLength: 1, maxLength: 128 }),
+  amount: Type.Number(),
+  // Why the top-up is booked: required on the wire and again server-side
+  // (shared/customer.mjs, normalizeTopUpReason), so no free credit slips in.
+  reason: Type.String({ minLength: 1, maxLength: 120 }),
+  payments: Type.Array(Type.Object({
+    type: Type.String({ maxLength: 16 }),
+    amount: Type.Number(),
+    tendered: Type.Optional(Type.Number())
+  }), { minItems: 1, maxItems: 4 })
+}, { additionalProperties: false });
+
+// The manager's hand-change of a member's balance (退款 / 调整): an amount in
+// euros, not zero, and why (shared/customer.mjs, normalizeBalanceAdjustment).
+export const BalanceAdjustBody = Type.Object({
+  amount: Type.Number(),
+  note: Type.String({ minLength: 1, maxLength: 120 })
 }, { additionalProperties: false });
 
 // The POS (shared/pos.mjs). The rules on names, roles and PINs are the
@@ -411,6 +458,11 @@ export const ReservationBody = Type.Object({
   // The guest's own table, where the restaurant lets guests pick one.
   table: Type.Optional(Type.String({ maxLength: 8 }))
 }, { additionalProperties: false });
+/** A guest looking a booking up again by its number and the way they can be reached. */
+export const ReservationLookupBody = Type.Object({
+  reference: Type.String({ minLength: 4, maxLength: 14 }),
+  contact: Type.String({ minLength: 3, maxLength: 254 })
+}, { additionalProperties: false });
 /** Taken by the staff, over the phone or at the door. */
 export const StaffReservationBody = Type.Object({
   ...ReservationFields,
@@ -482,6 +534,12 @@ export const CustomerRegisterBody = Type.Object({ email: Email, name: Type.Optio
 export const CustomerSignInBody = Type.Object({ email: Type.String({ maxLength: 254 }), password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
 // A code to the guest's email, and the code back (shared/email-verify.mjs).
 export const EmailCodeBody = Type.Object({ language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
+// 生日营销: a member sets their birth month and day, or clears it (shared/customer.mjs checks the date).
+export const BirthdayBody = Type.Object({
+  clear: Type.Optional(Type.Boolean()),
+  month: Type.Optional(Type.Integer({ minimum: 1, maximum: 12 })),
+  day: Type.Optional(Type.Integer({ minimum: 1, maximum: 31 }))
+}, { additionalProperties: false });
 export const EmailVerifyBody = Type.Object({ code: Type.String({ minLength: 1, maxLength: 12 }) }, { additionalProperties: false });
 // The console's test email to the owner's own address.
 export const MailTestBody = Type.Object({ to: Type.String({ minLength: 3, maxLength: 254 }), language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });

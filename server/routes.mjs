@@ -59,8 +59,19 @@ export function registerRoutes(app, { database, realtime, config }) {
     version: config.version ?? null,
     delivery: config.delivery ?? {},
     mail: config.mail ?? null,
+    ownerAlertEmail: config.ownerAlertEmail ?? null,
     ...(config.deliveryFetch ? { fetch: config.deliveryFetch } : {})
   });
+
+  // 生日祝福邮件: the same daily job the Worker's cron runs, every hour here.
+  // It sends nothing before 09:00 local time and greets each member once a
+  // year, so the beat only needs to be regular, not exact. Unref'd: it never
+  // keeps the process alive, and it stops with the server.
+  const runGreetings = () => api.birthdayGreetings().catch((error) => app.log.error({ err: error }, "birthday greetings failed"));
+  const greetingTimer = setInterval(runGreetings, 60 * 60 * 1000);
+  greetingTimer.unref?.();
+  app.addHook("onClose", async () => clearInterval(greetingTimer));
+  app.decorate("birthdayGreetings", (at) => api.birthdayGreetings(at));
 
   /** A Fastify request as the web's Request, for shared/http.mjs. */
   function toRequest(request) {
