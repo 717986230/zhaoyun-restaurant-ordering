@@ -201,6 +201,14 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const cartCents = cart.reduce((sum, line) => sum + (line.product.priceCents + line.modifiers.reduce((part, modifier) => part + modifier.priceCents, 0)) * line.quantity, 0);
   const sentCents = Math.round((bill?.total ?? 0) * 100);
   const newCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+  // 已点份数: how many of each dish are already in the (unsent) order, summed
+  // across its modifier variants — shown as a red badge on the dish so the
+  // waiter sees a repeat before sending to the kitchen.
+  const cartCountById = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const line of cart) counts.set(line.product.id, (counts.get(line.product.id) ?? 0) + line.quantity);
+    return counts;
+  }, [cart]);
 
   return <section className={`pos-order ${sheetOpen ? "sheet-open" : ""}`}>
     {sheetOpen && <div className="pos-sheet-scrim" onClick={() => setSheetOpen(false)} />}
@@ -267,6 +275,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       <div className={`pos-dishes ${soldOutMode || stockMode ? "choosing-soldout" : ""}`}>{shown.map((product) => {
         const left = product.leftToday ?? null;
         const out = !product.available || left === 0;
+        const inCart = cartCountById.get(product.id) ?? 0;
         return <button key={product.id} type="button" data-sku={product.sku}
           style={{ "--tag": product.tagColor || catColor(product.category) } as CSSProperties}
           className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
@@ -275,6 +284,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
           <b>{name(product)}</b>
           <span>{!product.available ? t("soldOut") : left === 0 ? t("stockOut") : money(product.priceCents)}</span>
           {left !== null && left > 0 && <em className="pos-stock-left" data-left={left}>{t("stockLeft", { n: left })}</em>}
+          {inCart > 0 && <em className="pos-dish-count" aria-label={t("inCart", { n: inCart })}>{inCart}</em>}
         </button>;
       })}</div>
     </div>

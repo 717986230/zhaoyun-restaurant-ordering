@@ -22,7 +22,7 @@ import {
 import {
   ACTIVE_RESERVATION_STATUSES, addDays, availability, bookingView, guestLimit, guestMayCancel, guestReservationView, isDate, localNow,
   newReference, NO_SHOW_WINDOW_DAYS, picksTable, normalizeReservationInput, normalizeReservationUpdate, outsideWindow, peakGuests, phoneKey, RESERVATION_RETENTION_DAYS,
-  RESERVATION_STATUSES, reservationError, reservationTable, reservationView, slotMinutes, tableFree, tablesAt, toMinutes
+  RESERVATION_STATUSES, reservationContactMatches, reservationError, reservationTable, reservationView, slotMinutes, tableFree, tablesAt, toMinutes
 } from "./reservations.mjs";
 
 const ACTIVE_SQL = ACTIVE_RESERVATION_STATUSES.map((status) => `'${status}'`).join(", ");
@@ -219,6 +219,27 @@ export function createReservationStore(driver, { settings }) {
       if (!row?.token_hash || !token || (await hashSessionToken(token)) !== row.token_hash) return null;
       const { now: clock } = await context();
       return { ...guestReservationView(row), cancellable: guestMayCancel(row, clock) };
+    },
+
+    /**
+     * A guest finding their own booking again by its reference and the phone
+     * number or email they booked with — no account, no saved link. A fresh
+     * management token is drawn and returned, so the booking page shows and
+     * cancels it the same way it does a booking just made (an older emailed
+     * link stops working, as the newest link is the one that holds). Only a
+     * booking still within the records (recent or to come) is found; null where
+     * the reference or the contact does not match.
+     */
+    async lookup(referenceInput, contact) {
+      const reference = String(referenceInput ?? "").trim().toUpperCase();
+      if (!/^[A-Z0-9]{4,12}$/.test(reference)) return null;
+      const { now: clock, rules } = await context();
+      await expireMissed(rules, clock);
+      const row = await driver.first("SELECT * FROM reservations WHERE reference = ? AND date >= ?", reference, addDays(clock.date, -RESERVATION_RETENTION_DAYS));
+      if (!row || !reservationContactMatches(row, contact)) return null;
+      const token = newSessionToken();
+      await driver.run("UPDATE reservations SET token_hash = ?, updated_at = ? WHERE id = ?", await hashSessionToken(token), now(), row.id);
+      return { reservation: { ...guestReservationView(row), cancellable: guestMayCancel(row, clock) }, token };
     },
 
     /** The guest's own bookings, from a month back on, newest day first. */
