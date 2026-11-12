@@ -10,6 +10,7 @@ import { applyColorScheme, storedColorScheme } from "./app/useColorScheme";
 import { cachedMenuSettings } from "./app/useCatalog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "../../../src/styles.css";
+import "../../../src/member-tier.css";
 
 // The menu renders with just the lightweight `m` component; the full motion
 // feature set loads as its own chunk right after first paint (app/motionFeatures).

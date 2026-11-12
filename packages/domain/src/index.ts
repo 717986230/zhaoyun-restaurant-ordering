@@ -51,6 +51,8 @@ export interface Product {
   details: { time: string; people: string; level: string; ingredients: string };
   appearance: { art: string; pattern: string };
   media: ProductMedia[];
+  /** 颜色标签: a palette colour (src/tag-colors.js) the POS tags the dish with; null/absent follows the category colour. */
+  tagColor?: string | null;
   modifiers?: ModifierGroup[];
   /** Present on a combo: the existing dishes it packages, by id. A combo is
    *  otherwise an ordinary product — its own name, price and photo. */
@@ -195,3 +197,6 @@ export type { MenuTheme, MenuThemeId, Season, MonthDay } from "./themes.js";
 export { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, resolveMenuLanguage } from "./languages.js";
 export type { MenuLanguage } from "./languages.js";
 export { NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_PINNED_MAX, NAV_SETS, drinkTabs, orderNavTabs } from "./navigation.js";
+export { memberTierTheme, memberTierVisual, tierNumeral } from "./member-tier.js";
+export { serverErrorText } from "./server-errors.js";
+export type { MemberTierTheme, MemberTierSkin, MemberTierVisual } from "./member-tier.js";
