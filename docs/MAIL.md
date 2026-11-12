@@ -25,6 +25,7 @@
    npx wrangler secret put BREVO_API_KEY        # 第 4 步的密钥
    npx wrangler secret put BREVO_SENDER_EMAIL   # 第 3 步已验证的发件邮箱
    npx wrangler secret put BREVO_SENDER_NAME    # 发件人名称（可不填，默认用餐厅名）
+   npx wrangler secret put OWNER_ALERT_EMAIL    # 可选：系统出错时给店主发告警邮件的收件地址（见 docs/OPERATIONS.md 第 2 节）
    ```
 
    Node 服务器（自己托管的情况）用同名的环境变量。
@@ -36,6 +37,7 @@
 - 验证码 6 位，**10 分钟**有效，最多试 **5 次**；数据库只保存验证码的哈希。
 - 同一账户每分钟最多发 1 次，每小时最多 5 次；同一设备每分钟最多 10 次。
 - 邮件语言跟随预约页的语言（中文、德文、英文），默认德文。
+- 顾客用自己的预约链接取消后，收到一封取消通知邮件（带日期、时间、人数、桌号、预约号）；取消后的邮件不再带「查看 / 取消」链接。发信失败不影响取消本身，且同一次取消只发一封。
 - 注销账户时，验证码和验证记录一起删除。
 
 ## 测试

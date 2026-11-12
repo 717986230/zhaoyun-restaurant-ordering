@@ -40,7 +40,7 @@ test.beforeAll(async ({ request }, testInfo) => {
     menuLanguages: ["zh", "en", "de"],
     customerAccounts: true,
     guestOrdering: { enabled: true, dineIn: true, pickup: true, requireOpenTable: true, minIntervalSeconds: 0 },
-    loyalty: { enabled: true, pointsPerEuro: 1, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 },
+    loyalty: { enabled: true, pointsPerEuro: 1, eurosPerPoint: 1, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 },
     reviewUrl: "https://g.page/r/chiri-kitchen/review"
   })).ok()).toBe(true);
   tableToken = (await (await admin(request, "post", "/api/admin/tables", { table: "G5" })).json()).table.token;

@@ -24,6 +24,10 @@ export interface ModifierGroup {
   names: { zh: string; de: string; en: string };
   selection: "single" | "multi";
   options: ModifierOption[];
+  /** How many options the guest must pick from this group; ≥1 makes it required. Absent/0 = optional. */
+  min?: number;
+  /** The most options the guest may pick from this group; absent/0 = no cap (a single group is 1 regardless). */
+  max?: number;
 }
 
 export interface SelectedModifier {
@@ -63,6 +67,8 @@ export interface Product {
   /** 指定出单打印机: the id of one printer (a PrinterProfile) this dish prints
    *  on, over the printers of its station; null/absent routes by station. */
   printPrinterId?: string | null;
+  /** Where the dish sits in the menu: the guest list and admin both follow it. */
+  sortOrder?: number;
   /** 每日限量: the portions each day starts with, and what is left today; null for no limit. */
   dailyLimit?: number | null;
   leftToday?: number | null;
@@ -200,3 +206,6 @@ export type { MenuTheme, MenuThemeId, Season, MonthDay } from "./themes.js";
 export { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, resolveMenuLanguage } from "./languages.js";
 export type { MenuLanguage } from "./languages.js";
 export { NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_PINNED_MAX, NAV_SETS, drinkTabs, orderNavTabs } from "./navigation.js";
+export { memberTierTheme, memberTierVisual, tierNumeral } from "./member-tier.js";
+export { serverErrorText } from "./server-errors.js";
+export type { MemberTierTheme, MemberTierSkin, MemberTierVisual } from "./member-tier.js";
