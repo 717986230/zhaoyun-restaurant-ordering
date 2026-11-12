@@ -63,6 +63,8 @@ const MAX_REWARDS = 30;
 const MAX_POINTS = 1_000_000;
 /** A single top-up is at most this much, as a value voucher is (shared/register.mjs). */
 export const MAX_TOPUP_CENTS = 100_000;
+/** Member tiers count lifetime top-ups, which add up far past one top-up's cap. */
+export const MAX_TIER_THRESHOLD_CENTS = 100_000_000;
 /** A manager's hand-change of a balance is at most this much either way. */
 const MAX_BALANCE_CENTS = 1_000_000;
 /** At most this many top-up tiers, and a tier's bonus is at most a whole top-up. */
@@ -237,7 +239,7 @@ export function normalizeMemberTiers(value) {
     const thresholdCents = Number(tier?.thresholdCents);
     const discountPercent = Number(tier?.discountPercent);
     if (!name || name.length > MAX_TIER_NAME) throw new Error("A member tier has a name");
-    if (!Number.isInteger(thresholdCents) || thresholdCents < 0 || thresholdCents > MAX_TOPUP_CENTS) throw new Error("A tier's threshold is 0 cent to 1000 euros");
+    if (!Number.isInteger(thresholdCents) || thresholdCents < 0 || thresholdCents > MAX_TIER_THRESHOLD_CENTS) throw new Error("A tier's threshold is 0 to 1000000 euros");
     if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("A tier's discount is 0 to 100 percent");
     if (seen.has(thresholdCents)) throw new Error("A threshold is a tier once");
     seen.add(thresholdCents);
