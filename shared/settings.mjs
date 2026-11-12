@@ -8,7 +8,7 @@
 
 import { DEFAULT_TIME_ZONE, normalizeSchedule, normalizeTimeZone } from "../src/schedule.js";
 import { GUEST_ORDERING_DEFAULTS, normalizeGuestOrdering, orderingMenuView } from "./ordering.mjs";
-import { LOYALTY_DEFAULTS, normalizeLoyalty } from "./customer.mjs";
+import { BIRTHDAY_PERK_DEFAULTS, LOYALTY_DEFAULTS, MEMBER_TIERS_DEFAULTS, MEMBERSHIP_DEFAULTS, normalizeBirthdayPerk, normalizeLoyalty, normalizeMemberTiers, normalizeMembership } from "./customer.mjs";
 import { normalizeReservationSettings } from "./reservations.mjs";
 import { normalizeDeliverySettings } from "./delivery.mjs";
 
@@ -317,6 +317,12 @@ export const APP_SETTINGS = {
   guestOrdering: { key: "guest_ordering", fallback: () => ({ ...GUEST_ORDERING_DEFAULTS, hours: [] }), normalize: (value) => normalizeGuestOrdering(value) },
   // Points for what guests pay, and the rewards they buy with them (shared/customer.mjs).
   loyalty: { key: "loyalty", fallback: () => ({ ...LOYALTY_DEFAULTS, rewards: [] }), normalize: (value) => normalizeLoyalty(value) },
+  // Members' stored value: whether top-ups are on, and the bonus tiers (shared/customer.mjs).
+  membership: { key: "membership", fallback: () => ({ ...MEMBERSHIP_DEFAULTS, tiers: [] }), normalize: (value) => normalizeMembership(value) },
+  // 会员等级 + 会员价: levels reached by lifetime top-up, each giving a counter discount (shared/customer.mjs).
+  memberTiers: { key: "memberTiers", fallback: () => ({ ...MEMBER_TIERS_DEFAULTS, tiers: [] }), normalize: (value) => normalizeMemberTiers(value) },
+  // 生日营销: a discount offered in a member's birthday month (shared/customer.mjs).
+  birthdayPerk: { key: "birthdayPerk", fallback: () => ({ ...BIRTHDAY_PERK_DEFAULTS }), normalize: (value) => normalizeBirthdayPerk(value) },
   // Guests booking a table online, and the rules they book under (shared/reservations.mjs).
   reservations: { key: "reservations", fallback: () => normalizeReservationSettings({}), normalize: normalizeReservationSettings },
   // The delivery platforms: which are on, whether their orders go to the kitchen unasked, and how long one takes (shared/delivery.mjs).
@@ -394,8 +400,10 @@ export function menuSettingsView(settings) {
     // A new account brings these points, once (shared/http.mjs, register); said only when it does.
     ...(customerAccountsOn(settings) && settings.reservations?.signupPoints ? { signupPoints: settings.reservations.signupPoints } : {}),
     loyalty: settings.loyalty?.enabled
-      ? { pointsPerEuro: settings.loyalty.pointsPerEuro, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }
+      ? { pointsPerEuro: settings.loyalty.pointsPerEuro, eurosPerPoint: settings.loyalty.eurosPerPoint, topUpPoints: settings.loyalty.topUpPoints, rewards: settings.loyalty.rewards, maxRewardsPerOrder: settings.loyalty.maxRewardsPerOrder }
       : null,
+    // 生日营销: the birthday-month offer, so a member knows to add their birthday.
+    ...(settings.birthdayPerk?.enabled ? { birthdayPerk: { discountPercent: settings.birthdayPerk.discountPercent, ...(settings.birthdayPerk.greetByEmail ? { email: true } : {}) } } : {}),
     // Only when switched on: a guest has no use for a list of ids otherwise.
     featured: settings.featuredEnabled
       ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate, schedule: settings.featuredSchedule }

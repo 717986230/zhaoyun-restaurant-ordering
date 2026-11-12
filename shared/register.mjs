@@ -23,8 +23,9 @@
  */
 
 import { now, parseJson, uuid } from "./core.mjs";
+import { bonusForTopUp, MAX_TOPUP_CENTS, normalizeTopUpReason } from "./customer.mjs";
 
-export const PAYMENT_TYPES = ["cash", "card", "voucher"];
+export const PAYMENT_TYPES = ["cash", "card", "voucher", "balance"];
 /** The hash the first journal entry follows. */
 export const GENESIS_HASH = "0".repeat(64);
 export const MAX_VOUCHER_CENTS = 100_000;
@@ -268,7 +269,7 @@ export function normalizeVoucherCode(value) {
  * status and billed_at, and paid_quantity (ORDER_ITEMS_SQL). `voucherRows`
  * are the vouchers paid with, by code.
  */
-export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings, role, staff = null, at = now() }) {
+export function planCheckout(input, { itemRows, voucherRows, memberRows = [], receiptNo, settings, role, staff = null, at = now() }) {
   const byId = new Map(itemRows.map((row) => [String(row.id), row]));
   const requested = Array.isArray(input.items) ? input.items : [];
   const soldVouchers = Array.isArray(input.vouchers) ? input.vouchers : [];
@@ -337,16 +338,18 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
   const totalCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const payments = [];
   const voucherDebits = new Map();
+  const balanceDebits = new Map();
   const available = new Map(voucherRows.map((row) => [row.code, row]));
+  const members = new Map(memberRows.map((row) => [String(row.id), row]));
   for (const payment of Array.isArray(input.payments) ? input.payments : []) {
     const type = String(payment.type);
-    if (!PAYMENT_TYPES.includes(type)) throw new Error("Payment is cash, card or voucher");
+    if (!PAYMENT_TYPES.includes(type)) throw new Error("Payment is cash, card, voucher or balance");
     const amountCents = cents(payment.amount, "A payment");
     const entry = { type, amountCents };
     const tipCents = given(payment.tip) ? Math.round(Number(payment.tip) * 100) : 0;
     if (!Number.isFinite(tipCents) || tipCents < 0 || tipCents > MAX_TIP_CENTS) throw new Error("A tip is 0 to 500 euros");
     if (tipCents) {
-      if (type === "voucher") throw new Error("A tip is paid in cash or by card");
+      if (type === "voucher" || type === "balance") throw new Error("A tip is paid in cash or by card");
       entry.tipCents = tipCents;
     }
     if (type === "cash" && given(payment.tendered)) {
@@ -364,6 +367,18 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
       if (debit > voucher.balance_cents) throw new Error(`Voucher ${code} has ${(voucher.balance_cents / 100).toFixed(2)} left`);
       voucherDebits.set(code, debit);
       entry.voucherCode = code;
+    }
+    // A member's stored value (会员储值), spent like a voucher but kept against
+    // the member's own balance, not a code: a top-up is never bought with it.
+    if (type === "balance") {
+      if (vouchers.length) throw new Error("A voucher cannot be bought with balance");
+      const memberId = String(payment.memberId ?? "");
+      const member = members.get(memberId);
+      if (!member) throw new Error("No member for this balance payment");
+      const debit = (balanceDebits.get(memberId) || 0) + amountCents;
+      if (debit > member.balance_cents) throw new Error(`The member has ${(member.balance_cents / 100).toFixed(2)} left`);
+      balanceDebits.set(memberId, debit);
+      entry.memberId = memberId;
     }
     payments.push(entry);
   }
@@ -387,7 +402,70 @@ export function planCheckout(input, { itemRows, voucherRows, receiptNo, settings
     staffName: staff?.name ?? null,
     createdAt: at
   };
-  return { receipt, receiptItems, vouchers, voucherDebits: [...voucherDebits].map(([code, amountCents]) => ({ code, amountCents })) };
+  return {
+    receipt, receiptItems, vouchers,
+    voucherDebits: [...voucherDebits].map(([code, amountCents]) => ({ code, amountCents })),
+    balanceDebits: [...balanceDebits].map(([memberId, amountCents]) => ({ memberId, amountCents }))
+  };
+}
+
+/**
+ * A member putting money in (会员储值充值): a receipt of its own with a single
+ * 0% line, paid in cash or by card. Under Austrian law a top-up is the sale
+ * of a multi-purpose voucher (Mehrzweckgutschein): no tax is due until the
+ * balance is spent on food or drink, so the line is at 0% and nothing is a
+ * sale yet. The house's bonus (充值赠送) is not paid for and not on the
+ * receipt — it is only added to the balance, so `credit` carries both.
+ */
+export function planTopUp(input, { member, receiptNo, settings, membership, role, staff = null, at = now() }) {
+  if (!member) throw Object.assign(new Error("No such member"), { code: "NOT_FOUND" });
+  if (!membership?.enabled) throw new Error("Member top-up is switched off");
+  const principalCents = cents(input.amount, "A top-up");
+  if (principalCents > MAX_TOPUP_CENTS) throw new Error("A top-up is at most 1000 euros");
+  // Why this credit is booked (必填, server-enforced) and who booked it: both
+  // land on the member's balance ledger so no untraceable free credit is possible.
+  const reason = normalizeTopUpReason(input.reason);
+  const operator = staff?.name || role || "";
+  const bonusCents = bonusForTopUp(membership, principalCents);
+  const line = {
+    kind: "topup", memberId: String(member.id), memberName: member.name || "", bonusCents,
+    name: "Guthaben-Aufladung", names: { zh: "会员储值充值", de: "Guthaben-Aufladung", en: "Member top-up" },
+    quantity: 1, unitPriceCents: principalCents, totalCents: principalCents, vatSplit: [{ percent: 0, cents: principalCents }]
+  };
+  const payments = [];
+  for (const payment of Array.isArray(input.payments) ? input.payments : []) {
+    const type = String(payment.type);
+    if (type !== "cash" && type !== "card") throw new Error("A top-up is paid in cash or by card");
+    const amountCents = cents(payment.amount, "A payment");
+    const entry = { type, amountCents };
+    if (type === "cash" && given(payment.tendered)) {
+      const tenderedCents = cents(payment.tendered, "The cash handed over");
+      if (tenderedCents < amountCents) throw new Error("Less cash was handed over than it pays");
+      entry.tenderedCents = tenderedCents;
+      entry.changeCents = tenderedCents - amountCents;
+    }
+    payments.push(entry);
+  }
+  const paidCents = payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+  if (paidCents !== principalCents) throw new Error(`The payments add up to ${(paidCents / 100).toFixed(2)}, the top-up to ${(principalCents / 100).toFixed(2)}`);
+  const receipt = {
+    id: uuid(),
+    receiptNo,
+    clientRequestId: String(input.clientRequestId || uuid()),
+    cashRegisterId: settings.cashRegisterId,
+    type: "sale",
+    table: null,
+    lines: [line],
+    vat: vatGroups([{ percent: 0, cents: principalCents }]),
+    totalCents: principalCents,
+    payments,
+    refersTo: null,
+    staffRole: role,
+    staffId: staff?.id ?? null,
+    staffName: staff?.name ?? null,
+    createdAt: at
+  };
+  return { receipt, credit: { memberId: String(member.id), principalCents, bonusCents, reason, operator } };
 }
 
 /**
@@ -414,6 +492,7 @@ export function planStorno(original, { receiptNo, reason, soldVoucherRows, role,
     type: payment.type,
     amountCents: -payment.amountCents,
     ...(payment.voucherCode ? { voucherCode: payment.voucherCode } : {}),
+    ...(payment.memberId ? { memberId: payment.memberId } : {}),
     // The tip goes back with the sale: the guest who is refunded is refunded the tip too.
     ...(payment.tipCents ? { tipCents: -payment.tipCents } : {})
   }));
@@ -436,7 +515,15 @@ export function planStorno(original, { receiptNo, reason, soldVoucherRows, role,
     createdAt: at
   };
   const refunds = payments.filter((payment) => payment.type === "voucher").map((payment) => ({ code: payment.voucherCode, amountCents: -payment.amountCents }));
-  return { receipt, refunds, voided: soldVoucherRows.map((voucher) => voucher.code) };
+  // A bill paid from a balance, cancelled: the money goes back to the member.
+  const balanceRefunds = payments.filter((payment) => payment.type === "balance").map((payment) => ({ memberId: payment.memberId, amountCents: -payment.amountCents }));
+  // A top-up cancelled: the money and the bonus it gave are taken back (the
+  // original line, not the negated one, carries both). The batch is refused
+  // if the member has already spent below that (CHECK balance_cents >= 0).
+  const balanceReversals = parseJson(original.lines_json, [])
+    .filter((line) => line.kind === "topup")
+    .map((line) => ({ memberId: line.memberId, amountCents: line.totalCents + (line.bonusCents || 0) }));
+  return { receipt, refunds, voided: soldVoucherRows.map((voucher) => voucher.code), balanceRefunds, balanceReversals };
 }
 
 /** A receipt as the rows store it. */
@@ -520,6 +607,7 @@ export function closingTotals(rows) {
   const tips = { cash: 0, card: 0 };
   let grossCents = 0;
   let vouchersSoldCents = 0;
+  let topUpsSoldCents = 0;
   let discountCents = 0;
   let sales = 0;
   let stornos = 0;
@@ -533,6 +621,7 @@ export function closingTotals(rows) {
     }
     for (const line of parseJson(row.lines_json, [])) {
       if (line.kind === "voucher") vouchersSoldCents += line.totalCents;
+      if (line.kind === "topup") topUpsSoldCents += line.totalCents;
       if (line.kind === "discount") discountCents += line.totalCents;
     }
   }
@@ -546,6 +635,7 @@ export function closingTotals(rows) {
     vat: vatGroups(vatParts).filter((group) => group.grossCents !== 0),
     payments,
     vouchersSoldCents,
+    topUpsSoldCents,
     discountCents,
     cashCents: payments.cash,
     tips,
