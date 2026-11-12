@@ -18,6 +18,7 @@ CREATE TABLE products (
       ingredients TEXT NOT NULL DEFAULT '',
       art TEXT NOT NULL DEFAULT '',
       pattern TEXT NOT NULL DEFAULT 'lines',
+      tag_color TEXT NOT NULL DEFAULT '',
       available INTEGER NOT NULL DEFAULT 1,
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
@@ -307,6 +308,36 @@ CREATE TABLE points_ledger (
       note TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
     );
+CREATE TABLE member_balances (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      balance_cents INTEGER NOT NULL DEFAULT 0 CHECK (balance_cents >= 0),
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE balance_ledger (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      delta_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL CHECK (reason IN ('topup','bonus','spend','refund','adjust','reverse')),
+      ref TEXT,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE balance_operators (
+      ledger_id TEXT PRIMARY KEY,
+      operator TEXT NOT NULL DEFAULT ''
+    );
+CREATE TABLE member_birthdays (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+      day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE birthday_greetings (
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (customer_id, year)
+    );
 CREATE TABLE guest_orders (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
       customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
@@ -468,6 +499,8 @@ CREATE INDEX idx_receipts_created ON receipts(created_at);
 CREATE INDEX idx_customer_sessions_expiry ON customer_sessions(expires_at);
 CREATE INDEX idx_points_ledger_customer ON points_ledger(customer_id, created_at);
 CREATE INDEX idx_points_ledger_ref ON points_ledger(ref, reason);
+CREATE INDEX idx_balance_ledger_customer ON balance_ledger(customer_id, created_at);
+CREATE INDEX idx_balance_ledger_ref ON balance_ledger(ref, reason);
 CREATE INDEX idx_guest_orders_table ON guest_orders(table_no, created_at);
 CREATE INDEX idx_guest_orders_customer ON guest_orders(customer_id, created_at);
 CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);

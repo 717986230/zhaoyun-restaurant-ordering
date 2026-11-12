@@ -125,7 +125,10 @@ test("admin workspace loads catalog and printer modules", async ({ page }) => {
   await page.getByRole("button", { name: "菜品", exact: true }).click();
   await expect(page.locator(".product-list")).toContainText("黑椒牛柳");
   await page.locator(".product-row").click({ force: true });
-  await expect(page.locator('textarea[name="modifiers"]')).toHaveValue(/"spice"/);
+  // 口味/规格 is now a visual editor: the dish's existing group loads into it,
+  // and the hidden field it keeps in sync is what the form still submits.
+  await expect(page.locator('input[name="modifiers"]')).toHaveValue(/"spice"/);
+  await expect(page.locator(".modifier-group .modifier-names input").first()).toHaveValue("辣度");
   await page.getByRole("button", { name: "打印", exact: true }).click();
   await expect(page.locator(".printer-list")).toContainText("厨房打印机");
   // Searching the room and test prints need the Android shell; a browser has
@@ -468,7 +471,7 @@ test("the console says Admin, and switches its own language without touching the
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日菜品订单桌位预约外卖报表打印顾客设置跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日菜品订单桌位预约外卖报表打印顾客会员设置跳转");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
@@ -503,12 +506,12 @@ test("orders, tables and printers stay out of the way until ordering is switched
   appSettings.showOrdering = false;
   await page.reload();
   const nav = page.getByRole("navigation", { name: "管理模块" });
-  await expect(nav).toHaveText("今日菜品预约外卖顾客设置跳转");
+  await expect(nav).toHaveText("今日菜品预约外卖顾客会员设置跳转");
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("今日菜品订单桌位预约外卖报表打印顾客设置跳转");
+  await expect(nav).toHaveText("今日菜品订单桌位预约外卖报表打印顾客会员设置跳转");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {

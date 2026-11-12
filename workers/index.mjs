@@ -49,6 +49,36 @@ function adminToken(env) {
   return expected && String(expected).length >= 32 ? expected : null;
 }
 
+/** The store and the API over this deployment's D1, as a request or the cron sees them. */
+function buildApi(env, ctx) {
+  const store = createStore(d1Driver(env.DB));
+  const api = createApi({
+    store,
+    state,
+    tokens: { manager: adminToken(env), staff: env.STAFF_TOKEN, kitchen: env.KITCHEN_TOKEN },
+    // Pictures only, and small enough for one D1 row. A video needs a bucket this deployment does not have.
+    uploads: async (productId, file) => {
+      const extension = UPLOAD_IMAGE_TYPES.get(file.type);
+      if (!extension) return { error: "Only JPEG, PNG and WebP pictures can be stored here" };
+      if (file.size > MAX_STORED_IMAGE_BYTES) return { error: "Picture exceeds 1.5 MB — make it smaller first", status: 413 };
+      return { product: await store.storeMedia(productId, { contentType: file.type, extension, bytes: new Uint8Array(await file.arrayBuffer()) }) };
+    },
+    publish: (event) => ctx?.waitUntil(publishLive(env, event)),
+    // VERSION is the commit, set by the deploy (wrangler deploy --var VERSION:<sha>).
+    version: env.VERSION || null,
+    // The delivery platforms' secrets (wrangler secret put LIEFERANDO_WEBHOOK_SECRET, …; docs/DELIVERY.md).
+    delivery: deliveryConfig(env),
+    // Email for the guests' codes (wrangler secret put BREVO_API_KEY, …; docs/MAIL.md).
+    mail: mailConfig(env),
+    // Where an unplanned-error alert goes (wrangler secret put OWNER_ALERT_EMAIL;
+    // needs Brevo configured too). Unset: errors are logged only, not emailed.
+    ownerAlertEmail: env.OWNER_ALERT_EMAIL || null,
+    // Let the alert's send outlive the response the way the live channel does.
+    defer: (task) => ctx?.waitUntil(Promise.resolve(task).catch(() => {}))
+  });
+  return { store, api };
+}
+
 export default {
   async fetch(request, env, ctx) {
     const cors = corsHeaders(request, env);
@@ -58,31 +88,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/ws") return openLive(request, env);
 
-    const store = createStore(d1Driver(env.DB));
-    const api = createApi({
-      store,
-      state,
-      tokens: { manager: adminToken(env), staff: env.STAFF_TOKEN, kitchen: env.KITCHEN_TOKEN },
-      // Pictures only, and small enough for one D1 row. A video needs a bucket this deployment does not have.
-      uploads: async (productId, file) => {
-        const extension = UPLOAD_IMAGE_TYPES.get(file.type);
-        if (!extension) return { error: "Only JPEG, PNG and WebP pictures can be stored here" };
-        if (file.size > MAX_STORED_IMAGE_BYTES) return { error: "Picture exceeds 1.5 MB — make it smaller first", status: 413 };
-        return { product: await store.storeMedia(productId, { contentType: file.type, extension, bytes: new Uint8Array(await file.arrayBuffer()) }) };
-      },
-      publish: (event) => ctx?.waitUntil(publishLive(env, event)),
-      // VERSION is the commit, set by the deploy (wrangler deploy --var VERSION:<sha>).
-      version: env.VERSION || null,
-      // The delivery platforms' secrets (wrangler secret put LIEFERANDO_WEBHOOK_SECRET, …; docs/DELIVERY.md).
-      delivery: deliveryConfig(env),
-      // Email for the guests' codes (wrangler secret put BREVO_API_KEY, …; docs/MAIL.md).
-      mail: mailConfig(env),
-      // Where an unplanned-error alert goes (wrangler secret put OWNER_ALERT_EMAIL;
-      // needs Brevo configured too). Unset: errors are logged only, not emailed.
-      ownerAlertEmail: env.OWNER_ALERT_EMAIL || null,
-      // Let the alert's send outlive the response the way the live channel does.
-      defer: (task) => ctx?.waitUntil(Promise.resolve(task).catch(() => {}))
-    });
+    const { api } = buildApi(env, ctx);
 
     // Cloudflare's own id for the request (cf-ray) where there is one: the same id its logs show.
     const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
@@ -103,18 +109,31 @@ export default {
     return new Response(response.body, { status: response.status, headers });
   },
 
-  // The Cron Trigger (wrangler.toml [triggers]): once a day, email tomorrow's
-  // confirmed bookings their reminder (shared/reminders.mjs). Off on its own
-  // when mail or reservations are off; this just runs it to completion.
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil((async () => {
-      try {
-        const store = createStore(d1Driver(env.DB));
-        const result = await remindReservations({ store, mail: mailConfig(env) });
-        console.log(JSON.stringify({ level: "info", msg: "reservation reminders", ...result }));
-      } catch (error) {
-        console.error(JSON.stringify({ level: "error", msg: "reservation reminders failed", error: String(error?.message ?? error) }));
-      }
-    })());
+  /**
+   * The cron (wrangler.toml [triggers]): 生日祝福邮件 and the day-before
+   * reservation reminders. Both are idempotent — each greeting and each
+   * reminder is claimed in the database before it is sent — so running the job
+   * every hour only makes it robust to a missed run.
+   */
+  async scheduled(controller, env, ctx) {
+    const at = new Date(controller.scheduledTime || Date.now());
+    const { api } = buildApi(env, ctx);
+    const result = await api.birthdayGreetings(at);
+    if (result.sent || result.failed) console.log(JSON.stringify({ level: "info", msg: "birthday greetings", ...result }));
+    // Reservation reminders go out once a day: the 09:00 UTC tick is late
+    // morning in Austria (UTC+1/+2), a reminder for the next day and not the
+    // middle of the night. (The reservation_reminders table makes it idempotent
+    // either way.)
+    if (at.getUTCHours() === 9) {
+      ctx.waitUntil((async () => {
+        try {
+          const store = createStore(d1Driver(env.DB));
+          const reminded = await remindReservations({ store, mail: mailConfig(env) });
+          console.log(JSON.stringify({ level: "info", msg: "reservation reminders", ...reminded }));
+        } catch (error) {
+          console.error(JSON.stringify({ level: "error", msg: "reservation reminders failed", error: String(error?.message ?? error) }));
+        }
+      })());
+    }
   }
 };
