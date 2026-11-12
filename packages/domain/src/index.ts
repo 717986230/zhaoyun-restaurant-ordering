@@ -24,6 +24,10 @@ export interface ModifierGroup {
   names: { zh: string; de: string; en: string };
   selection: "single" | "multi";
   options: ModifierOption[];
+  /** How many options the guest must pick from this group; ≥1 makes it required. Absent/0 = optional. */
+  min?: number;
+  /** The most options the guest may pick from this group; absent/0 = no cap (a single group is 1 regardless). */
+  max?: number;
 }
 
 export interface SelectedModifier {
