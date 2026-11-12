@@ -197,7 +197,7 @@ html.bk-root body {
   opacity: 0.6;
 }
 
-/* Picking a table: a tile per table, its seats as dots. */
+/* Picking a table: a tile per table, drawn as a little seating plan. */
 .bk-tables {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -220,11 +220,22 @@ html.bk-root body {
 .bk-table strong {
   font-size: 15px;
 }
-.bk-seats {
+/* The seating plan: the table and its chairs take the tile's own colour, so a
+   chosen tile (accent) and a greyed-out one carry straight over, no extra
+   rule. The table reads solid, the chairs a touch lighter. */
+.bk-seat-plan {
+  display: block;
+  width: auto;
+  height: 46px;
   color: var(--accent);
-  font-size: 10px;
-  letter-spacing: 2px;
-  line-height: 1;
+}
+.bk-seat-table {
+  fill: currentColor;
+  opacity: 0.88;
+}
+.bk-seat-chair {
+  fill: currentColor;
+  opacity: 0.4;
 }
 .bk-table small {
   color: var(--muted);
@@ -235,7 +246,7 @@ html.bk-root body {
   border-color: var(--accent);
   color: var(--accent-ink);
 }
-.bk-table.active .bk-seats,
+.bk-table.active .bk-seat-plan,
 .bk-table.active small {
   color: var(--accent-ink);
 }
@@ -449,6 +460,10 @@ html.bk-root body {
 
 .bk-page {
   --bk-serif: Georgia, "Noto Serif SC", "Songti SC", serif;
+  /* The menu's bundled display serif (styles.css), for the booking's marquee
+     moments — the title and the big numbers on the ticket — so the two pages
+     read as one restaurant. The quieter serif text keeps --bk-serif. */
+  --bk-display: var(--font-display);
   --bk-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   gap: 14px;
 }
@@ -457,7 +472,7 @@ html.bk-root body {
   padding: 12px 0 6px;
 }
 .bk-head h1 {
-  font-family: var(--bk-serif);
+  font-family: var(--bk-display);
   font-weight: 500;
   font-size: clamp(32px, 9vw, 44px);
   line-height: 1.05;
@@ -692,11 +707,11 @@ html.bk-root body {
   gap: 4px;
 }
 .bk-when strong {
-  font-family: var(--bk-serif);
-  font-weight: 500;
+  font-family: var(--bk-display);
+  font-weight: 600;
   font-size: clamp(48px, 16vw, 64px);
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums lining-nums;
 }
 .bk-when span {
@@ -900,11 +915,11 @@ html.bk-root body {
 }
 .bk-pass-front strong,
 .bk-pass-back strong {
-  font-family: var(--bk-serif);
-  font-weight: 500;
+  font-family: var(--bk-display);
+  font-weight: 600;
   font-size: clamp(48px, 16vw, 64px);
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums lining-nums;
 }
 .bk-pass-back strong {
@@ -1385,4 +1400,191 @@ html.bk-root body {
   color: var(--ink);
   font-size: 14px;
   font-weight: 600;
+}
+
+/* Add-to-calendar sits among the booking's actions; its icon rides with the label. */
+.bk-add-cal {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.bk-add-cal svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+/* ---------------------------------------------------------------------------
+   Picking when to come (2026-10): a count, a calendar, then the times. The
+   day was a dropdown and the time another; a calendar reads as a calendar and
+   the times as times, grouped into lunch and dinner. The card itself (bk-card)
+   lays these out in a column with its own gap.
+   ------------------------------------------------------------------------ */
+
+/* The party sits on its own short line above the calendar, not full width. */
+.bk-party-field {
+  max-width: 150px;
+}
+.bk-party-field input#bookingParty {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The calendar. */
+.bk-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.bk-cal-title {
+  font-family: var(--bk-display);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: 0.01em;
+}
+.bk-cal-nav {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s var(--bk-ease), background 0.2s var(--bk-ease);
+}
+.bk-cal-nav:not(:disabled):hover {
+  border-color: var(--line-strong);
+}
+.bk-cal-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.bk-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+}
+.bk-cal-wd {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  padding-bottom: 2px;
+}
+.bk-cal-blank {
+  visibility: hidden;
+}
+.bk-cal-day {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.18s var(--bk-ease), border-color 0.18s var(--bk-ease), color 0.18s, transform 0.18s var(--bk-ease), box-shadow 0.18s;
+}
+.bk-cal-day:not(:disabled):not(.active):hover {
+  border-color: var(--line-strong);
+}
+.bk-cal-day:disabled {
+  background: transparent;
+  color: var(--faint);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bk-cal-day.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* The times, grouped into lunch and dinner. */
+.bk-times-label {
+  margin: 0 0 2px;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+}
+.bk-meal {
+  margin: 8px 0 7px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.bk-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bk-slot {
+  min-width: 74px;
+  min-height: 46px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: var(--bk-serif);
+  font-weight: 500;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums lining-nums;
+  cursor: pointer;
+  transition: background 0.2s var(--bk-ease), border-color 0.2s var(--bk-ease), color 0.2s, transform 0.2s var(--bk-ease), box-shadow 0.2s;
+}
+.bk-slot:not(:disabled):not(.active):hover {
+  border-color: var(--line-strong);
+}
+.bk-slot:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bk-slot small {
+  font-family: var(--bk-serif);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.bk-slot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-cal-day,
+  .bk-cal-nav,
+  .bk-slot {
+    transition: none;
+  }
+  .bk-cal-day.active,
+  .bk-slot.active {
+    transform: none;
+  }
 }

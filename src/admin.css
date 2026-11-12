@@ -888,6 +888,17 @@ h2 {
   padding: 20px clamp(16px, 3vw, 30px) 0;
 }
 
+/* The bell: dim when muted, lit when it will chime or speak. */
+.board-sound.off {
+  opacity: 0.6;
+}
+.board-sound.beep,
+.board-sound.voice {
+  border-color: var(--a-accent, var(--a-line-2));
+  color: var(--a-accent, inherit);
+  font-weight: 600;
+}
+
 .ghost-action {
   border: 1px solid var(--a-line-2);
   border-radius: 5px;
@@ -3446,6 +3457,21 @@ em.voided {
 
 .staff-list .ghost-action {
   padding: 6px 10px;
+  font-size: 13px;
+}
+
+.staff-pin-edit {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.staff-pin-edit input {
+  width: 9ch;
+  min-height: 34px;
+  padding: 4px 8px;
+}
+.staff-pin-edit .primary-action {
+  padding: 6px 12px;
   font-size: 13px;
 }
 

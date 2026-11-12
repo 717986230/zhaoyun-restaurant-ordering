@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { deconstruct, drinkTabs, LANGUAGE_INFO, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
 import { RollingNumber } from "../../components/RollingNumber";
@@ -254,7 +254,7 @@ function Deconstruction({ product, language, reduceMotion, showing }: { product:
   if (!parts.length && !portions.length && !unattributed.length) return null;
   return <div className="dish-parts-block">
     <p className="parts-heading">{t(language, "parts")}</p>
-    <ol className="dish-parts">{parts.map((part, index) => <motion.li className="dish-part" key={`${part.de}-${index}`}
+    <ol className="dish-parts">{parts.map((part, index) => <m.li className="dish-part" key={`${part.de}-${index}`}
       // The parts come off the dish as the card turns over, not while it
       // is still face up and they cannot be seen.
       initial={reduceMotion ? false : { opacity: 0, y: 14, rotateX: -24 }}
@@ -263,7 +263,7 @@ function Deconstruction({ product, language, reduceMotion, showing }: { product:
       <span className="part-index">{String(index + 1).padStart(2, "0")}</span>
       <span className="part-name"><b>{name(part)}</b><small>{second(part)}</small></span>
       {part.allergens.length > 0 && <span className="allergen-list part-allergens">{part.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, language)}>{code}</b>)}</span>}
-    </motion.li>)}</ol>
+    </m.li>)}</ol>
     {portions.length > 0 && <p className="parts-portion">{t(language, "portionOf")} · {portions.map((part) => name(part)).join(" / ")}</p>}
     {/* When nothing could be attributed, this box would just repeat the
         declared list a few lines further down, so it stays closed. */}
@@ -387,14 +387,14 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
     return () => window.removeEventListener("keydown", onKey);
   }, [sheetOpen, dispatch]);
 
-  return <motion.div id="dishOverlay" className="dish-overlay open" aria-hidden="false"
+  return <m.div id="dishOverlay" className="dish-overlay open" aria-hidden="false"
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
     transition={{ duration: seconds(DURATION.backdrop), ease: EASE }}
     onClick={(event) => {
       if (event.target === event.currentTarget) dispatch({ type: "close-product" });
     }}>
     {/* Rises toward the guest, tilted back a few degrees, and settles flat. */}
-    <motion.div className="dish-detail-card" data-detail-id={product.id}
+    <m.div className="dish-detail-card" data-detail-id={product.id}
       style={{ transformPerspective: 1400 }}
       initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.94, rotateX: 9 }}
       animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
@@ -404,7 +404,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
       {/* Mid-turn the card dips back a little, the way a card lifted off a
           table does; the rotation itself is a spring, so a second tap while
           it is turning reverses it from where it is instead of jumping. */}
-      <motion.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}
+      <m.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}
         initial={false}
         animate={{ rotateY: state.productFlipped ? 180 : 0, scale: reduceMotion ? 1 : [1, 0.86, 1] }}
         transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP, scale: { duration: 0.8, times: [0, 0.45, 1], ease: EASE } }}>
@@ -457,9 +457,9 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
             </dl>
           </div>
         </section>
-      </motion.div>
-    </motion.div>
-  </motion.div>;
+      </m.div>
+    </m.div>
+  </m.div>;
 }
 
 /**
@@ -723,7 +723,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     <div id="stack" ref={stackRef} className="stack" inert={Boolean(activeProduct)}>
       <div ref={sheetRef} className="page-sheet">
         {prevPage && <p className="page-hint page-hint-prev" aria-hidden="true"><i /><span className="page-hint-idle">↑ {t(state.language, "prevPage")} · {pageName(prevPage)}</span><span className="page-hint-armed">{t(state.language, "releaseToTurn")} · {pageName(prevPage)}</span></p>}
-        <motion.div key={`${state.category}|${query}`} className={`stack-page ${turn.current.direction ? "turned" : ""}`}
+        <m.div key={`${state.category}|${query}`} className={`stack-page ${turn.current.direction ? "turned" : ""}`}
           initial={enter}
           animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
@@ -769,7 +769,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
             <span className="page-next-arrow" aria-hidden="true">→</span>
           </button>}
           {paging && !nextPage && complete && visible.length > 0 && <p className="page-end">{t(state.language, "endOfMenu")}</p>}
-        </motion.div>
+        </m.div>
       </div>
     </div>
     <InstallOffer language={state.language} />
