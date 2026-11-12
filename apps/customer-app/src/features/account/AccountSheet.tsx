@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ApiMenuSettings } from "@zhaoyun/contracts";
+import type { ApiBirthday, ApiMenuSettings } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import type { Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
@@ -17,6 +17,7 @@ interface Props {
   products: Product[];
   account: CustomerAccount;
   loyalty: ApiMenuSettings["loyalty"];
+  birthdayPerk: ApiMenuSettings["birthdayPerk"];
   ordering: OrderingState;
   /** Who keeps the data, for the privacy notice. */
   restaurantName: string;
@@ -59,12 +60,12 @@ async function downloadMyData(language: Language, dispatch: CustomerDispatch) {
  * and once in, their points and the rewards they buy with them, their
  * orders, and their settings — deleting the account included.
  */
-export function AccountSheet({ state, dispatch, products, account, loyalty, ordering, restaurantName, signupPoints }: Props) {
+export function AccountSheet({ state, dispatch, products, account, loyalty, birthdayPerk, ordering, restaurantName, signupPoints }: Props) {
   const language = state.language;
   const close = () => dispatch({ type: "sheet", sheet: null });
   return <Sheet id="accountSheet" title={g(language, "account")} closeLabel={t(language, "close")} onClose={close}>
     {account.signedIn && account.customer
-      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={restaurantName} signupPoints={signupPoints} />
+      ? <SignedIn state={state} dispatch={dispatch} products={products} account={account} loyalty={loyalty} birthdayPerk={birthdayPerk} ordering={ordering} restaurantName={restaurantName} signupPoints={signupPoints} />
       : <SignInForm language={language} account={account} restaurantName={restaurantName} signupPoints={signupPoints} />}
   </Sheet>;
 }
@@ -132,7 +133,7 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
   </form>;
 }
 
-function SignedIn({ state, dispatch, products, account, loyalty, ordering, restaurantName }: Props) {
+function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, ordering, restaurantName }: Props) {
   const language = state.language;
   const customer = account.customer!;
   const byId = new Map(products.map((product) => [product.id, product]));
@@ -144,6 +145,19 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
   const history = useQuery({ queryKey: ["customer-points", customer.id, customer.points], enabled: showHistory, queryFn: () => restaurantApi.customerPoints() });
   const [showTopUps, setShowTopUps] = useState(false);
   const topUps = useQuery({ queryKey: ["customer-balance", customer.id, customer.balanceCents], enabled: showTopUps, queryFn: () => restaurantApi.customerBalance() });
+  const [saved, setSaved] = useState<ApiBirthday | null>(customer.membership?.birthday ?? null);
+  const [bMonth, setBMonth] = useState(saved?.month ?? 0);
+  const [bDay, setBDay] = useState(saved?.day ?? 0);
+  async function saveBirthday() {
+    if (!bMonth || !bDay) return;
+    try {
+      const { birthday } = await restaurantApi.setCustomerBirthday(bMonth, bDay);
+      setSaved(birthday);
+      dispatch({ type: "toast", message: g(language, "birthdaySaved") });
+    } catch (error) {
+      dispatch({ type: "toast", message: error instanceof ApiError ? error.message : g(language, "birthdaySaved") });
+    }
+  }
   const dateOf = (iso: string) => new Date(iso).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB");
 
   function redeem(product: Product, points: number) {
@@ -158,6 +172,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
       <div>
         <strong>{g(language, "welcome", { name: customer.name || customer.email.split("@")[0] || customer.email })}</strong>
         <small>{customer.email}</small>
+        {customer.membership?.tier && <small className="member-tier">{g(language, "myTier")}: {customer.membership.tier}{customer.membership.discountPercent > 0 ? ` · ${g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}` : ""}</small>}
       </div>
       {loyalty && <div className="points-balance" aria-label={g(language, "points")}><b>{customer.points}</b><small>{g(language, "points")}</small></div>}
     </div>
@@ -193,6 +208,29 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
         </li>)}
         {topUps.data && topUps.data.entries.length === 0 && <li className="cart-hint">{g(language, "noTopUps")}</li>}
       </ul>}
+    </section>}
+
+    {birthdayPerk && <section className="guest-section">
+      <h3>{g(language, "myBirthday")}</h3>
+      {customer.membership?.birthdayMonth
+        ? <p className="cart-hint">{g(language, "birthdayMonthNote", { percent: birthdayPerk.discountPercent })}</p>
+        : <p className="cart-hint">{g(language, "birthdayHint", { percent: birthdayPerk.discountPercent })}</p>}
+      {birthdayPerk.email && <p className="cart-hint">{g(language, "birthdayEmailNote")}</p>}
+      <div className="birthday-fields">
+        <label><span>{g(language, "birthMonth")}</span>
+          <select value={bMonth} onChange={(event) => setBMonth(Number(event.target.value))}>
+            <option value={0}>—</option>
+            {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => <option key={month} value={month}>{month}</option>)}
+          </select>
+        </label>
+        <label><span>{g(language, "birthDay")}</span>
+          <select value={bDay} onChange={(event) => setBDay(Number(event.target.value))}>
+            <option value={0}>—</option>
+            {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => <option key={day} value={day}>{day}</option>)}
+          </select>
+        </label>
+        <button type="button" className="secondary" disabled={!bMonth || !bDay || (saved?.month === bMonth && saved?.day === bDay)} onClick={() => void saveBirthday()}>{g(language, "birthdaySave")}</button>
+      </div>
     </section>}
 
     <div className="guest-actions">

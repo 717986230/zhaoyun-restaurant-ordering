@@ -431,6 +431,27 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- 会员生日 (生日营销, shared/customer.mjs): the member's birthday as a month
+    -- and day only — never the year, so no age or full date of birth is kept.
+    -- A table of its own, like the balances, because a deployed D1 takes a new
+    -- table safely but not a new column. See migrations/0070_member_birthday.sql.
+    CREATE TABLE IF NOT EXISTS member_birthdays (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+      day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
+      updated_at TEXT NOT NULL
+    );
+
+    -- 生日祝福邮件: one greeting a member a year, claimed before it is sent, so
+    -- two runs (or two Worker isolates) never mail the same member twice.
+    -- See migrations/0071_birthday_greetings.sql.
+    CREATE TABLE IF NOT EXISTS birthday_greetings (
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (customer_id, year)
+    );
+
     -- A guest's own order from the menu (shared/ordering.mjs): at the table or
     -- for pickup, by whom when signed in, and the points it spent.
     CREATE TABLE IF NOT EXISTS guest_orders (

@@ -1141,7 +1141,10 @@ export function createStore(driver) {
     openTable,
     closeTable: async (table) => (await run(CLOSE_TABLE_SESSION_SQL, normalizeTableNo(table))) > 0,
     // Guests' accounts, favourites and points: the one implementation both backends share.
-    customers: createCustomerStore(driver, { ordersFor: (rows) => Promise.all(rows.map(viewOrder)) }),
+    customers: createCustomerStore(driver, {
+      ordersFor: (rows) => Promise.all(rows.map(viewOrder)),
+      membershipConfig: async () => { const s = await getSettings(); return { memberTiers: s.memberTiers, birthdayPerk: s.birthdayPerk, timeZone: s.timeZone }; }
+    }),
     // Table reservations (shared/reservation-store.mjs), both backends alike.
     reservations: createReservationStore(driver, { settings: getSettings }),
     // Orders from the delivery platforms (shared/delivery-store.mjs), both backends alike.

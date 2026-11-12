@@ -322,6 +322,18 @@ CREATE TABLE balance_ledger (
       note TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
     );
+CREATE TABLE member_birthdays (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+      day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE birthday_greetings (
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (customer_id, year)
+    );
 CREATE TABLE guest_orders (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
       customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,

@@ -210,6 +210,122 @@ export function bonusForTopUp(membership, amountCents) {
   return bonus;
 }
 
+/** At most this many membership levels, and a level's name is at most this long. */
+export const MAX_MEMBER_TIERS = 8;
+const MAX_TIER_NAME = 40;
+
+/**
+ * 会员等级 (member levels) as the owner sets them (app_settings "memberTiers").
+ * Off until switched on. A level is reached by累计充值 (lifetime top-up): the
+ * member sits at the highest level whose threshold their top-ups have passed,
+ * and that level's `discountPercent` is the 会员价 the counter offers them —
+ * applied through the till's ordinary discount, so the fiscal record is
+ * unchanged. The level is derived, never stored: it follows the top-ups.
+ */
+export const MEMBER_TIERS_DEFAULTS = Object.freeze({ enabled: false, tiers: [] });
+
+export function normalizeMemberTiers(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Member-tier settings must be an object");
+  const known = new Set(Object.keys(MEMBER_TIERS_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown member-tier setting ${key}`);
+  const merged = { ...MEMBER_TIERS_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Member tiers enabled must be true or false");
+  if (!Array.isArray(merged.tiers) || merged.tiers.length > MAX_MEMBER_TIERS) throw new Error(`At most ${MAX_MEMBER_TIERS} member tiers`);
+  const seen = new Set();
+  const tiers = merged.tiers.map((tier) => {
+    const name = String(tier?.name ?? "").trim();
+    const thresholdCents = Number(tier?.thresholdCents);
+    const discountPercent = Number(tier?.discountPercent);
+    if (!name || name.length > MAX_TIER_NAME) throw new Error("A member tier has a name");
+    if (!Number.isInteger(thresholdCents) || thresholdCents < 0 || thresholdCents > MAX_TOPUP_CENTS) throw new Error("A tier's threshold is 0 cent to 1000 euros");
+    if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("A tier's discount is 0 to 100 percent");
+    if (seen.has(thresholdCents)) throw new Error("A threshold is a tier once");
+    seen.add(thresholdCents);
+    return { name, thresholdCents, discountPercent };
+  }).sort((left, right) => left.thresholdCents - right.thresholdCents);
+  return { enabled: merged.enabled, tiers };
+}
+
+/** The level a member of `growthCents` lifetime top-up sits at: the highest
+ *  threshold they have passed, or null when tiers are off or none is reached. */
+export function memberTierFor(growthCents, memberTiers) {
+  if (!memberTiers?.enabled || !Array.isArray(memberTiers.tiers)) return null;
+  let best = null;
+  for (const tier of memberTiers.tiers) if (growthCents >= tier.thresholdCents && (!best || tier.thresholdCents >= best.thresholdCents)) best = tier;
+  return best ? { name: best.name, thresholdCents: best.thresholdCents, discountPercent: best.discountPercent } : null;
+}
+
+/** A member's standing to show beside their account: how much they have topped
+ *  up over time, their level now, and the discount that level earns. */
+export function membershipStatus(growthCents, memberTiers) {
+  const tier = memberTierFor(growthCents, memberTiers);
+  return { growthCents: Math.max(0, growthCents | 0), tier: tier?.name ?? null, discountPercent: tier?.discountPercent ?? 0 };
+}
+
+/**
+ * 生日营销 (birthday perk) as the owner sets it (app_settings "birthdayPerk").
+ * Off until switched on. In their birthday month a member is offered
+ * `discountPercent` off at the till, through the same whole-bill discount a
+ * tier uses. A member enters only their birth month and day — never the year.
+ */
+export const BIRTHDAY_PERK_DEFAULTS = Object.freeze({ enabled: false, discountPercent: 0, greetByEmail: false });
+
+export function normalizeBirthdayPerk(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Birthday-perk settings must be an object");
+  const known = new Set(Object.keys(BIRTHDAY_PERK_DEFAULTS));
+  for (const key of Object.keys(value)) if (!known.has(key)) throw new Error(`Unknown birthday-perk setting ${key}`);
+  const merged = { ...BIRTHDAY_PERK_DEFAULTS, ...value };
+  if (typeof merged.enabled !== "boolean") throw new Error("Birthday perk enabled must be true or false");
+  const discountPercent = Number(merged.discountPercent);
+  if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error("The birthday discount is 0 to 100 percent");
+  if (typeof merged.greetByEmail !== "boolean") throw new Error("Birthday greeting email must be true or false");
+  return { enabled: merged.enabled, discountPercent, greetByEmail: merged.greetByEmail };
+}
+
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** A birthday a member gives — month and day only (29 Feb allowed). Throws on a bad date. */
+export function normalizeBirthday(input) {
+  const month = Number(input?.month);
+  const day = Number(input?.day);
+  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error("A birthday month is 1 to 12");
+  if (!Number.isInteger(day) || day < 1 || day > DAYS_IN_MONTH[month - 1]) throw new Error("That is not a day in the month");
+  return { month, day };
+}
+
+/** Whether `birthday` falls in month `month` (1–12): the window the perk is live. */
+export function isBirthdayMonth(birthday, month) {
+  return Boolean(birthday) && Number(birthday.month) === Number(month);
+}
+
+/**
+ * 生日祝福邮件: the birthdays a greeting is due for on `date` (the restaurant's
+ * own calendar day, { year, month, day }). A 29 February birthday is greeted on
+ * 28 February in a year that has no 29th, so nobody is skipped for three years.
+ */
+export function birthdayDaysFor(date) {
+  const { year, month, day } = date;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return month === 2 && day === 28 && !leap ? [28, 29] : [day];
+}
+
+/** The restaurant's calendar day and hour now, in its own time zone. */
+export function localDayIn(timeZone, at = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: timeZone || "UTC", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" })
+    .formatToParts(at).map((part) => [part.type, part.value]));
+  return { year: Number(parts.year), month: Number(parts.month), day: Number(parts.day), hour: Number(parts.hour) };
+}
+
+/** Members whose birthday is on one of the days, with an address to write to, not yet greeted this year. */
+export const BIRTHDAYS_DUE_SQL = "SELECT c.id, c.email, c.name FROM member_birthdays b JOIN customers c ON c.id = b.customer_id WHERE b.month = ? AND b.day IN (?, ?) AND NOT EXISTS (SELECT 1 FROM birthday_greetings g WHERE g.customer_id = c.id AND g.year = ?) ORDER BY c.created_at LIMIT ?";
+/** Claimed before the mail goes out: 1 change when this run has it, 0 when another already did. */
+export const CLAIM_GREETING_SQL = "INSERT OR IGNORE INTO birthday_greetings (customer_id, year, sent_at) VALUES (?, ?, ?)";
+export const RELEASE_GREETING_SQL = "DELETE FROM birthday_greetings WHERE customer_id = ? AND year = ?";
+
+export const MEMBER_BIRTHDAY_SQL = "SELECT month, day FROM member_birthdays WHERE customer_id = ?";
+export const UPSERT_BIRTHDAY_SQL = "INSERT INTO member_birthdays (customer_id, month, day, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET month = excluded.month, day = excluded.day, updated_at = excluded.updated_at";
+export const DELETE_BIRTHDAY_SQL = "DELETE FROM member_birthdays WHERE customer_id = ?";
+
 /** A balance ledger line as a member sees it, and as the console lists it. */
 export function balanceEntryView(row) {
   return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, createdAt: row.created_at };
@@ -288,6 +404,8 @@ export const INSERT_POINTS_SQL = "INSERT INTO points_ledger (id, customer_id, de
 export const CHANGE_POINTS_SQL = "UPDATE customers SET points = points + ?, updated_at = ? WHERE id = ?";
 
 export const BALANCE_HISTORY_SQL = "SELECT * FROM balance_ledger WHERE customer_id = ? ORDER BY created_at DESC, id DESC LIMIT ?";
+/** 累计充值 (lifetime top-up principal): what a member has paid in over time, the basis for their 会员等级. Read-only. */
+export const MEMBER_GROWTH_SQL = "SELECT COALESCE(SUM(delta_cents), 0) AS growth_cents FROM balance_ledger WHERE customer_id = ? AND reason = 'topup'";
 export const INSERT_BALANCE_SQL = "INSERT INTO balance_ledger (id, customer_id, delta_cents, reason, ref, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
 /** A member's balance row, made the first time they have one (starts at zero). Parameters: customer id, at. */
 export const ENSURE_BALANCE_SQL = "INSERT OR IGNORE INTO member_balances (customer_id, balance_cents, updated_at) VALUES (?, 0, ?)";
