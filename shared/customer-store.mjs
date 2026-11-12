@@ -24,7 +24,8 @@ import {
   DELETE_EXPIRED_CUSTOMER_SESSIONS_SQL, FAVORITES_SQL, INSERT_CUSTOMER_SESSION_SQL, INSERT_CUSTOMER_SQL, INSERT_POINTS_SQL, isOverdrawn,
   isPhoneLogin, MAX_FAVORITES, normalizeCustomerName, normalizeLogin, normalizeCustomerRegistration, normalizePointsAdjustment, pointsEntryView, POINTS_HISTORY_SQL,
   REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL,
-  balanceEntryView, BALANCE_HISTORY_SQL, changeBalanceStatements, INSERT_BALANCE_SQL, normalizeBalanceAdjustment
+  balanceEntryView, BALANCE_HISTORY_SQL, changeBalanceStatements, INSERT_BALANCE_SQL, normalizeBalanceAdjustment,
+  MEMBER_GROWTH_SQL, MEMBER_TIERS_DEFAULTS, membershipStatus
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
 import { guestReservationView } from "./reservations.mjs";
@@ -49,13 +50,29 @@ function coded(message, code, status, extra = {}) {
   return error;
 }
 
-export function createCustomerStore(driver, { ordersFor }) {
+export function createCustomerStore(driver, { ordersFor, memberTiers }) {
+  // 会员等级: the owner's levels, or none when the caller gives no getter (tests).
+  const tiersNow = memberTiers ?? (async () => MEMBER_TIERS_DEFAULTS);
+
+  /**
+   * A member view with their 会员等级 attached: lifetime top-up (read-only), the
+   * level it reaches, and that level's 会员价 discount. A plain `customerView`
+   * when there is no member to enrich. Never writes.
+   */
+  async function withMembership(view) {
+    if (!view) return view;
+    const tiers = await tiersNow();
+    if (!tiers?.enabled) return view;
+    const row = await driver.first(MEMBER_GROWTH_SQL, view.id);
+    return { ...view, membership: membershipStatus(row?.growth_cents ?? 0, tiers) };
+  }
+
   async function openSession(row) {
     const token = newSessionToken();
     const at = now();
     await driver.run(DELETE_EXPIRED_CUSTOMER_SESSIONS_SQL, at);
     await driver.run(INSERT_CUSTOMER_SESSION_SQL, await hashSessionToken(token), row.id, new Date(Date.now() + CUSTOMER_SESSION_TTL_MS).toISOString(), at);
-    return { token, expiresInMs: CUSTOMER_SESSION_TTL_MS, customer: customerView(row) };
+    return { token, expiresInMs: CUSTOMER_SESSION_TTL_MS, customer: await withMembership(customerView(row)) };
   }
 
   async function byId(id) {
@@ -104,7 +121,7 @@ export function createCustomerStore(driver, { ordersFor }) {
       await driver.run(DELETE_CUSTOMER_SESSION_SQL, tokenHash);
       return null;
     }
-    return customerView(row);
+    return withMembership(customerView(row));
   }
 
   async function signOut(token) {
@@ -117,7 +134,7 @@ export function createCustomerStore(driver, { ordersFor }) {
 
   async function profile(customerId) {
     const row = await byId(customerId);
-    return row ? { customer: customerView(row), favorites: await favorites(customerId) } : null;
+    return row ? { customer: await withMembership(customerView(row)), favorites: await favorites(customerId) } : null;
   }
 
   /**
@@ -301,7 +318,7 @@ export function createCustomerStore(driver, { ordersFor }) {
     async get(customerId) {
       const row = await byId(customerId);
       return row ? {
-        customer: customerView(row),
+        customer: await withMembership(customerView(row)),
         points: (await driver.all(POINTS_HISTORY_SQL, row.id, 50)).map(pointsEntryView),
         balance: (await driver.all(BALANCE_HISTORY_SQL, row.id, 50)).map(balanceEntryView)
       } : null;
@@ -314,7 +331,7 @@ export function createCustomerStore(driver, { ordersFor }) {
       let key;
       try { key = normalizeLogin(login); } catch { return null; }
       const row = await driver.first(CUSTOMER_BY_EMAIL_SQL, key);
-      return row ? customerView(row) : null;
+      return row ? withMembership(customerView(row)) : null;
     },
     /** A guest who forgot their password gets a new one at the counter; every session of theirs ends. */
     async resetPassword(customerId, password) {
@@ -326,7 +343,7 @@ export function createCustomerStore(driver, { ordersFor }) {
       return customerView(await byId(row.id));
     },
     /** A guest as they see themselves, or null. */
-    byIdView: async (customerId) => customerView(await byId(customerId)),
+    byIdView: async (customerId) => withMembership(customerView(await byId(customerId))),
     async remove(customerId) {
       if (!(await byId(customerId))) return false;
       await removeAccount(customerId);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi, CustomerDetail } from "@zhaoyun/api-client";
-import type { ApiCustomer, ApiMemberReport, ApiMembership, ApiSettings, BalanceReason } from "@zhaoyun/contracts";
+import type { ApiCustomer, ApiMemberReport, ApiMembership, ApiMemberTiers, ApiSettings, BalanceReason } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { Section, Toggle } from "../settings/SettingsPanel";
@@ -45,6 +45,9 @@ export function MembersPanel({ api, settings, notify, failed, onSaveSettings }: 
       </Section>
       <Section id="member-settings" title={t("sectionMembership")} summary={t(settings.membership.enabled ? "orderingOn" : "orderingOff")}>
         <MembershipForm key={JSON.stringify(settings.membership)} membership={settings.membership} onSave={(membership) => onSaveSettings({ membership }, "membershipSaved")} />
+      </Section>
+      <Section id="member-tiers" title={t("sectionMemberTiers")} summary={t(settings.memberTiers.enabled ? "orderingOn" : "orderingOff")}>
+        <MemberTiersForm key={JSON.stringify(settings.memberTiers)} memberTiers={settings.memberTiers} onSave={(memberTiers) => onSaveSettings({ memberTiers }, "memberTiersSaved")} />
       </Section>
       <Section id="member-list" title={t("membersListTitle")} wide>
         <MemberList api={api} notify={notify} failed={failed} />
@@ -113,6 +116,32 @@ function MemberStats({ api, timeZone, failed }: { api: AdminApi; timeZone: strin
   </div>;
 }
 
+/**
+ * 会员等级 + 会员价：按累计充值升级，每级给一个结账折扣（会员价）。折扣走收银
+ * 台原有的整单折扣，税务记录不变；等级由累计充值派生，不另记。
+ */
+function MemberTiersForm({ memberTiers, onSave }: { memberTiers: ApiMemberTiers; onSave: (value: ApiMemberTiers) => Promise<void> | void }) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(memberTiers);
+  const changed = JSON.stringify(draft) !== JSON.stringify(memberTiers);
+  const setTier = (index: number, key: "name" | "thresholdCents" | "discountPercent", value: string | number) =>
+    setDraft((current) => ({ ...current, tiers: current.tiers.map((tier, at) => (at === index ? { ...tier, [key]: value } : tier)) }));
+
+  return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
+    <Toggle checked={draft.enabled} label={t("memberTiersEnabled")} onChange={(enabled) => { setDraft({ ...draft, enabled }); void onSave({ ...draft, enabled }); }} />
+    <p className="settings-label">{t("memberTiersListLabel")}</p>
+    <p className="settings-hint">{t("memberTiersHint")}</p>
+    <ul className="reward-rows">{draft.tiers.map((tier, index) => <li key={index}>
+      <label><span>{t("memberTierName")}</span><input type="text" maxLength={40} value={tier.name} onChange={(event) => setTier(index, "name", event.target.value)} /></label>
+      <label><span>{t("memberTierThreshold")}</span><input type="number" min={0} max={1000} step={1} value={tier.thresholdCents / 100} onChange={(event) => setTier(index, "thresholdCents", Math.round(Number(event.target.value) * 100))} /></label>
+      <label><span>{t("memberTierDiscount")}</span><input type="number" min={0} max={100} step={1} value={tier.discountPercent} onChange={(event) => setTier(index, "discountPercent", Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
+      <button type="button" className="ghost-action" aria-label={t("remove")} onClick={() => setDraft({ ...draft, tiers: draft.tiers.filter((_, at) => at !== index) })}>✕</button>
+    </li>)}</ul>
+    {draft.tiers.length < 8 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { name: "", thresholdCents: 10000, discountPercent: 5 }] })}>{t("memberTierAdd")}</button>}
+    <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
+  </form>;
+}
+
 /** 会员储值赠送档位：充 X 送 Y，由服务端排序并取不超过充值额的最高一档。 */
 function MembershipForm({ membership, onSave }: { membership: ApiMembership; onSave: (value: ApiMembership) => Promise<void> | void }) {
   const { t } = useI18n();
@@ -176,6 +205,7 @@ function MemberList({ api, notify, failed }: { api: AdminApi; notify: (message: 
         <button type="button" className="ghost-action" onClick={() => void adjustBalance(customer)}>{t("adjustBalance")}</button>
       </span>
       {open?.customer.id === customer.id && <div className="customer-history">
+        {open.customer.membership?.tier && <small className="member-tier-line">{t("memberTierLabel", { tier: open.customer.membership.tier })}{open.customer.membership.discountPercent > 0 ? ` · ${t("memberPriceOff", { percent: String(open.customer.membership.discountPercent) })}` : ""} · {t("memberGrowthLabel", { amount: formatMoney(open.customer.membership.growthCents, language) })}</small>}
         <small>{t("balanceHistory", { amount: formatMoney(open.customer.balanceCents ?? 0, language) })}</small>
         {open.balance.length === 0 ? <p className="settings-hint">{t("membersNoLedger")}</p> : <ul>{open.balance.map((entry) => <li key={entry.id}>
           <span>{formatTime(entry.createdAt, language)}</span><span>{t(BALANCE_REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.deltaCents > 0 ? `+${formatMoney(entry.deltaCents, language)}` : formatMoney(entry.deltaCents, language)}</b>

@@ -158,6 +158,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
       <div>
         <strong>{g(language, "welcome", { name: customer.name || customer.email.split("@")[0] || customer.email })}</strong>
         <small>{customer.email}</small>
+        {customer.membership?.tier && <small className="member-tier">{g(language, "myTier")}: {customer.membership.tier}{customer.membership.discountPercent > 0 ? ` · ${g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}` : ""}</small>}
       </div>
       {loyalty && <div className="points-balance" aria-label={g(language, "points")}><b>{customer.points}</b><small>{g(language, "points")}</small></div>}
     </div>

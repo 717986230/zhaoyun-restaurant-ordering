@@ -8,7 +8,7 @@
 
 import { DEFAULT_TIME_ZONE, normalizeSchedule, normalizeTimeZone } from "../src/schedule.js";
 import { GUEST_ORDERING_DEFAULTS, normalizeGuestOrdering, orderingMenuView } from "./ordering.mjs";
-import { LOYALTY_DEFAULTS, MEMBERSHIP_DEFAULTS, normalizeLoyalty, normalizeMembership } from "./customer.mjs";
+import { LOYALTY_DEFAULTS, MEMBER_TIERS_DEFAULTS, MEMBERSHIP_DEFAULTS, normalizeLoyalty, normalizeMemberTiers, normalizeMembership } from "./customer.mjs";
 import { normalizeReservationSettings } from "./reservations.mjs";
 import { normalizeDeliverySettings } from "./delivery.mjs";
 
@@ -319,6 +319,8 @@ export const APP_SETTINGS = {
   loyalty: { key: "loyalty", fallback: () => ({ ...LOYALTY_DEFAULTS, rewards: [] }), normalize: (value) => normalizeLoyalty(value) },
   // Members' stored value: whether top-ups are on, and the bonus tiers (shared/customer.mjs).
   membership: { key: "membership", fallback: () => ({ ...MEMBERSHIP_DEFAULTS, tiers: [] }), normalize: (value) => normalizeMembership(value) },
+  // 会员等级 + 会员价: levels reached by lifetime top-up, each giving a counter discount (shared/customer.mjs).
+  memberTiers: { key: "memberTiers", fallback: () => ({ ...MEMBER_TIERS_DEFAULTS, tiers: [] }), normalize: (value) => normalizeMemberTiers(value) },
   // Guests booking a table online, and the rules they book under (shared/reservations.mjs).
   reservations: { key: "reservations", fallback: () => normalizeReservationSettings({}), normalize: normalizeReservationSettings },
   // The delivery platforms: which are on, whether their orders go to the kitchen unasked, and how long one takes (shared/delivery.mjs).
