@@ -197,7 +197,7 @@ html.bk-root body {
   opacity: 0.6;
 }
 
-/* Picking a table: a tile per table, its seats as dots. */
+/* Picking a table: a tile per table, drawn as a little seating plan. */
 .bk-tables {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -220,11 +220,22 @@ html.bk-root body {
 .bk-table strong {
   font-size: 15px;
 }
-.bk-seats {
+/* The seating plan: the table and its chairs take the tile's own colour, so a
+   chosen tile (accent) and a greyed-out one carry straight over, no extra
+   rule. The table reads solid, the chairs a touch lighter. */
+.bk-seat-plan {
+  display: block;
+  width: auto;
+  height: 46px;
   color: var(--accent);
-  font-size: 10px;
-  letter-spacing: 2px;
-  line-height: 1;
+}
+.bk-seat-table {
+  fill: currentColor;
+  opacity: 0.88;
+}
+.bk-seat-chair {
+  fill: currentColor;
+  opacity: 0.4;
 }
 .bk-table small {
   color: var(--muted);
@@ -235,7 +246,7 @@ html.bk-root body {
   border-color: var(--accent);
   color: var(--accent-ink);
 }
-.bk-table.active .bk-seats,
+.bk-table.active .bk-seat-plan,
 .bk-table.active small {
   color: var(--accent-ink);
 }
