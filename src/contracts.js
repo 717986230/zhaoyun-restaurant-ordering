@@ -209,6 +209,11 @@ export const SettingsBody = Type.Object({
     enabled: Type.Optional(Type.Boolean()),
     tiers: Type.Optional(Type.Array(Type.Object({ thresholdCents: Type.Number(), bonusCents: Type.Number() }), { maxItems: 20 }))
   }, { maxProperties: 4 })),
+  // 会员等级 + 会员价: the levels are shared/customer.mjs's to check.
+  memberTiers: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    tiers: Type.Optional(Type.Array(Type.Object({ name: Type.String({ maxLength: 40 }), thresholdCents: Type.Number(), discountPercent: Type.Number() }), { maxItems: 8 }))
+  }, { maxProperties: 4 })),
   // Online table bookings; the rules are shared/reservations.mjs's to check.
   reservations: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),
