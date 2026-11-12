@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiCustomer, CustomerRegisterCommand, CustomerUpdateCommand } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import { customerToken, restaurantApi, setCustomerToken } from "../../app/api";
+import { forgetEntrances } from "./MemberEntrance";
+import { primeAudio } from "./useTierEntry";
 
 export interface CustomerAccount {
   signedIn: boolean;
@@ -60,10 +62,12 @@ export function useCustomer(enabled: boolean): CustomerAccount {
     favorites: profile.data?.favorites ?? [],
     signupBonus,
     async signIn(email, password) {
+      primeAudio();
       const session = await restaurantApi.signInCustomer(email, password);
       remember(session.token);
     },
     async register(command) {
+      primeAudio();
       const session = await restaurantApi.registerCustomer(command);
       setSignupBonus(session.signupBonus ? session.customer.points : 0);
       remember(session.token);
@@ -71,6 +75,7 @@ export function useCustomer(enabled: boolean): CustomerAccount {
     async signOut() {
       await restaurantApi.signOutCustomer().catch(() => undefined);
       setSignupBonus(0);
+      forgetEntrances();
       remember(null);
     },
     async toggleFavorite(productId) {

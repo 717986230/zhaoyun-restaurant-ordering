@@ -122,3 +122,88 @@ export function salesReport(rows, range, timeZone) {
 }
 
 export const REPORT_RECEIPTS_SQL = "SELECT * FROM receipts WHERE created_at >= ? AND created_at < ? ORDER BY receipt_no";
+
+/**
+ * 会员数据看板 (member analytics). Read-only: built from the customers table
+ * and the two member ledgers (points_ledger, balance_ledger), never writing a
+ * line. Scalar "as of now" figures (how many members, balance and points
+ * outstanding, the top members) come pre-shaped from SQL; the "over the days"
+ * figures are summed here from ledger rows read over the wide window, dropping
+ * the ones outside the manager's days in the restaurant's own time zone — the
+ * same local-day rule the sales report uses.
+ *
+ * `data` carries:
+ *  - totals:   { members, points, balanceCents } — counts across all members now.
+ *  - newMembers:   [{ created_at }]            — accounts opened in the window.
+ *  - balanceLedger:[{ customer_id, delta_cents, reason, created_at }]
+ *  - pointsLedger: [{ customer_id, delta, created_at }]   (points, not cents)
+ *  - topBalance / topPoints: already ordered and capped by SQL.
+ */
+export function memberReport(data, range, timeZone) {
+  const local = localParts(timeZone);
+  const inDays = (iso) => {
+    const date = local(iso).date;
+    return date >= range.from && date <= range.to;
+  };
+
+  let newMembers = 0;
+  for (const row of data.newMembers ?? []) if (inDays(row.created_at)) newMembers += 1;
+
+  // Over the days: top-up principal, the house's bonus, and balance spent.
+  let topUpCents = 0;
+  let bonusCents = 0;
+  let spentCents = 0;
+  for (const row of data.balanceLedger ?? []) {
+    if (!inDays(row.created_at)) continue;
+    const delta = row.delta_cents ?? 0;
+    if (row.reason === "topup") topUpCents += delta;
+    else if (row.reason === "bonus") bonusCents += delta;
+    else if (row.reason === "spend") spentCents += -delta;
+  }
+
+  // Over the days: points earned (delta > 0) and redeemed (delta < 0).
+  let earned = 0;
+  let redeemed = 0;
+  for (const row of data.pointsLedger ?? []) {
+    if (!inDays(row.created_at)) continue;
+    const delta = row.delta ?? 0;
+    if (delta > 0) earned += delta;
+    else redeemed += -delta;
+  }
+
+  // 活跃 / 复购: a member counts as active on a day they earned points or spent
+  // balance. Active members are the distinct ones; repeat members are those
+  // active on two or more days in the window.
+  const daysByMember = new Map();
+  const note = (customerId, iso) => {
+    if (!customerId || !inDays(iso)) return;
+    const set = daysByMember.get(customerId) ?? new Set();
+    set.add(local(iso).date);
+    daysByMember.set(customerId, set);
+  };
+  for (const row of data.pointsLedger ?? []) if ((row.delta ?? 0) > 0) note(row.customer_id, row.created_at);
+  for (const row of data.balanceLedger ?? []) if (row.reason === "spend") note(row.customer_id, row.created_at);
+  let repeatBuyers = 0;
+  for (const set of daysByMember.values()) if (set.size >= 2) repeatBuyers += 1;
+  const buyers = daysByMember.size;
+
+  const totals = data.totals ?? {};
+  return {
+    from: range.from,
+    to: range.to,
+    timeZone,
+    members: { total: totals.members ?? 0, new: newMembers, active: buyers },
+    balance: { outstandingCents: totals.balanceCents ?? 0, topUpCents, bonusCents, spentCents },
+    points: { outstanding: totals.points ?? 0, earned, redeemed },
+    repeat: { buyers, repeatBuyers, ratePct: buyers > 0 ? Math.round((repeatBuyers / buyers) * 100) : 0 },
+    topBalance: (data.topBalance ?? []).map((row) => ({ id: row.id, name: row.name || "", email: row.email || "", balanceCents: row.balance_cents ?? 0 })),
+    topPoints: (data.topPoints ?? []).map((row) => ({ id: row.id, name: row.name || "", email: row.email || "", points: row.points ?? 0 }))
+  };
+}
+
+/** The member ledgers over the wide window, read for memberReport (store.mjs). */
+export const MEMBER_BALANCE_LEDGER_SQL = "SELECT customer_id, delta_cents, reason, created_at FROM balance_ledger WHERE created_at >= ? AND created_at < ?";
+export const MEMBER_POINTS_LEDGER_SQL = "SELECT customer_id, delta, created_at FROM points_ledger WHERE created_at >= ? AND created_at < ?";
+export const MEMBER_NEW_SQL = "SELECT created_at FROM customers WHERE created_at >= ? AND created_at < ?";
+export const MEMBER_TOP_BALANCE_SQL = "SELECT c.id, c.name, c.email, mb.balance_cents FROM member_balances mb JOIN customers c ON c.id = mb.customer_id WHERE mb.balance_cents > 0 ORDER BY mb.balance_cents DESC, c.created_at ASC LIMIT 10";
+export const MEMBER_TOP_POINTS_SQL = "SELECT id, name, email, points FROM customers WHERE points > 0 ORDER BY points DESC, created_at ASC LIMIT 10";

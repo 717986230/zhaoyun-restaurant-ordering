@@ -1,4 +1,5 @@
-import type { ApiOrder, GuestOrderRefusal, PointsKind, PointsReason } from "@zhaoyun/contracts";
+import type { ApiOrder, BalanceReason, GuestOrderRefusal, PointsKind, PointsReason } from "@zhaoyun/contracts";
+import type { MemberTierTheme } from "@zhaoyun/domain";
 import type { Language } from "./i18n";
 
 /**
@@ -16,8 +17,14 @@ const copy = {
     reviewTitle: "吃得满意吗？", reviewBody: "花半分钟在 Google 上给我们打个分，对小店帮助很大。", reviewGo: "去评价", reviewLater: "以后再说",
     suggestDrinks: "来点喝的？",
     accountsOff: "餐厅暂未开放顾客注册", signInLead: "登录后可以收藏菜品、外带自取、积攒积分兑换菜品。", welcome: "你好，{name}",
-    points: "积分", pointsLead: "每消费 €1 得 {n} 积分，结账后到账", rewards: "积分兑换", redeem: "兑换", notEnoughPoints: "积分不够", rewardAdded: "已加入购物车：{name}（{points} 积分）",
+    points: "积分", pointsLead: "每消费 €{e} 得 {n} 积分，结账后到账", pointsTopUp: "到店充值也按这个比例送积分", rewards: "积分兑换", redeem: "兑换", notEnoughPoints: "积分不够", rewardAdded: "已加入购物车：{name}（{points} 积分）",
     pointsHistory: "积分记录", reasonEarn: "消费获得", reasonReverse: "退款扣回", reasonRedeem: "兑换", reasonRefund: "取消退回", reasonAdjust: "餐厅调整", reasonWelcome: "首次到店赠送", reasonNoShow: "预约未到扣除", reasonNoShowBack: "预约未到退回", reasonSignup: "注册赠送", reasonBooking: "预约", reasonBookingBack: "取消预约退回",
+    myTier: "会员等级", memberPriceOff: "会员价 {percent}% off",
+    rankBronze: "青铜龙纹", rankSilver: "白银龙纹", rankGold: "黄金龙纹", rankPlatinum: "铂金龙鳞", rankDark: "暗黑龙王", rankGilded: "鎏金龙王",
+    memberGrowth: "累计储值 {amount}", exclusiveDark: "暗黑龙王 · 专属界面", exclusiveGilded: "鎏金龙王 · 玻璃界面", soundOn: "入场音效：开", soundOff: "入场音效：关",
+    myBirthday: "我的生日", birthMonth: "月", birthDay: "日", birthdaySave: "保存", birthdaySaved: "生日已保存", birthdayEmailNote: "生日当天会给你发一封祝福邮件，清除生日即可停止。",
+    birthdayHint: "填写生日（月/日，不含年份），生日月享会员价 {percent}% off", birthdayMonthNote: "🎂 生日月快乐！本月享会员价 {percent}% off",
+    myBalance: "我的余额", topUpHistory: "储值记录", topUpAtCounter: "充值请到店内收银台（现金 / 刷卡）", noTopUps: "还没有储值记录", balTopup: "充值", balBonus: "赠送", balSpend: "消费", balRefund: "退回", balAdjust: "餐厅调整", balReverse: "充值撤销",
     myOrders: "我的订单", noOrders: "还没有订单", favorites: "我的收藏", favorite: "收藏", unfavorite: "取消收藏", favoritesPage: "♥ 收藏", signInToFavorite: "登录后可以收藏菜品",
     profile: "账户设置", currentPassword: "当前密码", newPassword: "新密码（不改就留空）", save: "保存", saved: "已保存", deleteAccount: "删除账户", deleteConfirm: "删除后积分和收藏都会清除，不能恢复。请输入密码确认。", deleted: "账户已删除", callButton: "呼叫服务员", bookTable: "预约餐桌", callTitle: "呼叫服务员 · {table} 桌", callWaiter: "请服务员过来", callPay: "买单", callWater: "加水", callUtensils: "餐具", callNapkin: "纸巾", callTakeaway: "打包盒", callClear: "收台",
     callSent: "已通知服务员，请稍候", callRepeated: "服务员已经收到，马上就来", callFailed: "没有发出去，请直接示意服务员", downloadData: "下载我的数据", dataDownloaded: "已下载你的数据",
@@ -48,8 +55,14 @@ const copy = {
     reviewTitle: "Hat es geschmeckt?", reviewBody: "Eine kurze Bewertung auf Google hilft uns sehr.", reviewGo: "Jetzt bewerten", reviewLater: "Später",
     suggestDrinks: "Etwas zu trinken dazu?",
     accountsOff: "Kundenkonten sind derzeit nicht verfügbar", signInLead: "Mit Konto: Lieblingsgerichte merken, zum Abholen bestellen, Punkte sammeln und einlösen.", welcome: "Hallo, {name}",
-    points: "Punkte", pointsLead: "{n} Punkte pro € 1, gutgeschrieben nach dem Bezahlen", rewards: "Prämien", redeem: "Einlösen", notEnoughPoints: "Zu wenig Punkte", rewardAdded: "Im Warenkorb: {name} ({points} Punkte)",
+    points: "Punkte", pointsLead: "{n} Punkte je € {e}, gutgeschrieben nach dem Bezahlen", pointsTopUp: "Auch Aufladungen an der Kassa bringen Punkte", rewards: "Prämien", redeem: "Einlösen", notEnoughPoints: "Zu wenig Punkte", rewardAdded: "Im Warenkorb: {name} ({points} Punkte)",
     pointsHistory: "Punkteverlauf", reasonEarn: "Gesammelt", reasonReverse: "Storniert", reasonRedeem: "Eingelöst", reasonRefund: "Zurückgebucht", reasonAdjust: "Vom Restaurant", reasonWelcome: "Erster Besuch", reasonNoShow: "Reservierung versäumt", reasonNoShowBack: "Versäumt, zurückgebucht", reasonSignup: "Registrierung", reasonBooking: "Reservierung", reasonBookingBack: "Reservierung storniert",
+    myTier: "Mitgliedsstufe", memberPriceOff: "Mitgliedspreis {percent}% Rabatt",
+    rankBronze: "Bronze-Drache", rankSilver: "Silber-Drache", rankGold: "Gold-Drache", rankPlatinum: "Platin-Drache", rankDark: "Schwarzer Drachenkönig", rankGilded: "Goldener Drachenkönig",
+    memberGrowth: "Aufgeladen gesamt {amount}", exclusiveDark: "Schwarzer Drachenkönig · Eigenes Design", exclusiveGilded: "Goldener Drachenkönig · Glas-Design", soundOn: "Eintrittston: an", soundOff: "Eintrittston: aus",
+    myBirthday: "Mein Geburtstag", birthMonth: "Monat", birthDay: "Tag", birthdaySave: "Speichern", birthdaySaved: "Geburtstag gespeichert", birthdayEmailNote: "Am Geburtstag schicken wir Ihnen eine Glückwunsch-E-Mail; Geburtstag löschen beendet das.",
+    birthdayHint: "Geburtstag eintragen (Monat/Tag, ohne Jahr) — im Geburtstagsmonat {percent}% Mitgliedspreis", birthdayMonthNote: "🎂 Alles Gute! Diesen Monat {percent}% Mitgliedspreis",
+    myBalance: "Mein Guthaben", topUpHistory: "Guthaben-Verlauf", topUpAtCounter: "Aufladen an der Kassa im Lokal (bar / Karte)", noTopUps: "Noch kein Guthaben-Verlauf", balTopup: "Aufladung", balBonus: "Bonus", balSpend: "Ausgegeben", balRefund: "Rückerstattung", balAdjust: "Vom Restaurant", balReverse: "Aufladung storniert",
     myOrders: "Meine Bestellungen", noOrders: "Noch keine Bestellungen", favorites: "Favoriten", favorite: "Merken", unfavorite: "Nicht mehr merken", favoritesPage: "♥ Favoriten", signInToFavorite: "Zum Merken bitte anmelden",
     profile: "Konto-Einstellungen", currentPassword: "Aktuelles Passwort", newPassword: "Neues Passwort (leer lassen = unverändert)", save: "Speichern", saved: "Gespeichert", deleteAccount: "Konto löschen", deleteConfirm: "Punkte und Favoriten werden endgültig gelöscht. Zum Bestätigen Passwort eingeben.", deleted: "Konto gelöscht", callButton: "Personal rufen", bookTable: "Tisch reservieren", callTitle: "Personal rufen · Tisch {table}", callWaiter: "Bitte an den Tisch kommen", callPay: "Zahlen", callWater: "Wasser", callUtensils: "Besteck", callNapkin: "Servietten", callTakeaway: "Box zum Mitnehmen", callClear: "Abräumen",
     callSent: "Das Personal ist informiert – einen Moment bitte", callRepeated: "Schon angekommen – es kommt gleich jemand", callFailed: "Nicht gesendet – bitte dem Personal Bescheid geben", downloadData: "Meine Daten herunterladen", dataDownloaded: "Deine Daten wurden heruntergeladen",
@@ -80,8 +93,14 @@ const copy = {
     reviewTitle: "Did you enjoy it?", reviewBody: "Half a minute on Google helps a small restaurant a lot.", reviewGo: "Rate us", reviewLater: "Maybe later",
     suggestDrinks: "Something to drink?",
     accountsOff: "Guest accounts are not available right now", signInLead: "With an account: keep favourites, order for pickup, collect points and redeem them.", welcome: "Hello, {name}",
-    points: "Points", pointsLead: "{n} points per €1, credited once paid", rewards: "Rewards", redeem: "Redeem", notEnoughPoints: "Not enough points", rewardAdded: "In your cart: {name} ({points} points)",
+    points: "Points", pointsLead: "{n} points for every €{e}, credited once paid", pointsTopUp: "Top-ups at the counter earn points at the same rate", rewards: "Rewards", redeem: "Redeem", notEnoughPoints: "Not enough points", rewardAdded: "In your cart: {name} ({points} points)",
     pointsHistory: "Points history", reasonEarn: "Earned", reasonReverse: "Refunded receipt", reasonRedeem: "Redeemed", reasonRefund: "Returned", reasonAdjust: "By the restaurant", reasonWelcome: "First visit", reasonNoShow: "Booking missed", reasonNoShowBack: "Booking missed, given back", reasonSignup: "Signed up", reasonBooking: "Booking", reasonBookingBack: "Booking cancelled",
+    myTier: "Member tier", memberPriceOff: "member price {percent}% off",
+    rankBronze: "Bronze Dragon", rankSilver: "Silver Dragon", rankGold: "Gold Dragon", rankPlatinum: "Platinum Dragon", rankDark: "Dark Dragon King", rankGilded: "Gilded Dragon King",
+    memberGrowth: "Topped up {amount} in all", exclusiveDark: "Dark Dragon King · exclusive theme", exclusiveGilded: "Gilded Dragon King · glass theme", soundOn: "Entry sound: on", soundOff: "Entry sound: off",
+    myBirthday: "My birthday", birthMonth: "Month", birthDay: "Day", birthdaySave: "Save", birthdaySaved: "Birthday saved", birthdayEmailNote: "We will send you a greeting email on your birthday; clearing your birthday stops it.",
+    birthdayHint: "Add your birthday (month/day, no year) for {percent}% member price in your birthday month", birthdayMonthNote: "🎂 Happy birthday month! {percent}% member price this month",
+    myBalance: "My balance", topUpHistory: "Stored-value history", topUpAtCounter: "Top up at the counter in the restaurant (cash / card)", noTopUps: "No stored-value history yet", balTopup: "Top-up", balBonus: "Bonus", balSpend: "Spent", balRefund: "Refund", balAdjust: "By the restaurant", balReverse: "Top-up reversed",
     myOrders: "My orders", noOrders: "No orders yet", favorites: "Favourites", favorite: "Save", unfavorite: "Remove from favourites", favoritesPage: "♥ Favourites", signInToFavorite: "Sign in to keep favourites",
     profile: "Account settings", currentPassword: "Current password", newPassword: "New password (leave empty to keep)", save: "Save", saved: "Saved", deleteAccount: "Delete account", deleteConfirm: "Your points and favourites are deleted for good. Enter your password to confirm.", deleted: "Account deleted", callButton: "Call a waiter", bookTable: "Book a table", callTitle: "Call a waiter · table {table}", callWaiter: "Please come to the table", callPay: "The bill", callWater: "Water", callUtensils: "Cutlery", callNapkin: "Napkins", callTakeaway: "Takeaway box", callClear: "Clear the table",
     callSent: "The staff know – someone is on the way", callRepeated: "Already received – someone is coming", callFailed: "Not sent – please wave to the staff", downloadData: "Download my data", dataDownloaded: "Your data was downloaded",
@@ -117,6 +136,14 @@ export function refusal(language: Language, code: string | undefined, values: Re
   return text ? text.replace(/\{(\w+)\}/g, (match, name: string) => (values[name] === undefined ? match : String(values[name]))) : null;
 }
 
+const RANK: Record<MemberTierTheme, GuestKey> = {
+  bronze: "rankBronze", silver: "rankSilver", gold: "rankGold", platinum: "rankPlatinum", dark: "rankDark", gilded: "rankGilded"
+};
+/** The 龙王称号 for a badge's theme, in the guest's language. */
+export function tierRank(language: Language, theme: MemberTierTheme): string {
+  return g(language, RANK[theme]);
+}
+
 const STATUS: Record<ApiOrder["status"], GuestKey> = {
   new: "statusNew", preparing: "statusPreparing", ready: "statusReady", completed: "statusCompleted", cancelled: "statusCancelled"
 };
@@ -134,4 +161,13 @@ const KIND: Record<PointsKind, GuestKey> = { welcome: "reasonWelcome", no_show: 
 /** What a line of the guest's points is: the booking membership's own lines by their kind, the rest by their reason. */
 export function pointsReason(language: Language, reason: PointsReason, kind?: PointsKind): string {
   return g(language, kind ? KIND[kind] : REASON[reason]);
+}
+
+const BALANCE_REASON: Record<BalanceReason, GuestKey> = {
+  topup: "balTopup", bonus: "balBonus", spend: "balSpend", refund: "balRefund", adjust: "balAdjust", reverse: "balReverse"
+};
+
+/** What a line of the guest's stored-value ledger is. */
+export function balanceReason(language: Language, reason: BalanceReason): string {
+  return g(language, BALANCE_REASON[reason]);
 }
