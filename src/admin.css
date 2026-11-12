@@ -3260,6 +3260,21 @@ em.voided {
   font-size: 13px;
 }
 
+.staff-pin-edit {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.staff-pin-edit input {
+  width: 9ch;
+  min-height: 34px;
+  padding: 4px 8px;
+}
+.staff-pin-edit .primary-action {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
 .staff-add {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr) auto;

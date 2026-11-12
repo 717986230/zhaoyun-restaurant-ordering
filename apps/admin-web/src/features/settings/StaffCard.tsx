@@ -14,6 +14,9 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
   const { t, language } = useI18n();
   const [staff, setStaff] = useState<PosStaff[]>([]);
   const [devices, setDevices] = useState<PosDevice[]>([]);
+  // The waiter whose PIN is being changed inline, and what is typed so far.
+  const [pinFor, setPinFor] = useState<string | null>(null);
+  const [pin, setPin] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -41,6 +44,12 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
       await load();
     } catch (error) { failed(error); }
   }
+  function submitPin(person: PosStaff) {
+    const next = pin.trim();
+    setPinFor(null);
+    setPin("");
+    if (next) void save(person, { pin: next });
+  }
   async function unpair(device: PosDevice) {
     if (!window.confirm(t("unpairConfirm", { name: device.name }))) return;
     try {
@@ -57,10 +66,16 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
         <option value="staff">{t("roleWaiter")}</option>
         <option value="manager">{t("roleManagerShort")}</option>
       </select>
-      <span className="staff-actions">
-        <button type="button" className="ghost-action" onClick={() => { const pin = window.prompt(t("newPin", { name: person.name }))?.trim(); if (pin) void save(person, { pin }); }}>{t("changePin")}</button>
-        <button type="button" className="ghost-action" onClick={() => void save(person, { active: !person.active })}>{t(person.active ? "deactivate" : "activate")}</button>
-      </span>
+      {pinFor === person.id
+        ? <form className="staff-pin-edit" onSubmit={(event) => { event.preventDefault(); submitPin(person); }}>
+          <input inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6} autoComplete="off" autoFocus aria-label={t("newPin", { name: person.name })} placeholder={t("newPin", { name: person.name })} value={pin} onChange={(event) => setPin(event.target.value.replace(/[^0-9]/g, ""))} />
+          <button type="submit" className="primary-action" disabled={pin.trim().length < 4}>{t("save")}</button>
+          <button type="button" className="ghost-action" onClick={() => { setPinFor(null); setPin(""); }}>{t("cancel")}</button>
+        </form>
+        : <span className="staff-actions">
+          <button type="button" className="ghost-action" onClick={() => { setPinFor(person.id); setPin(""); }}>{t("changePin")}</button>
+          <button type="button" className="ghost-action" onClick={() => void save(person, { active: !person.active })}>{t(person.active ? "deactivate" : "activate")}</button>
+        </span>}
       {!person.active && <em>{t("staffInactive")}</em>}
     </li>)}</ul> : <p className="settings-hint">{t("noStaffYet")}</p>}
 
