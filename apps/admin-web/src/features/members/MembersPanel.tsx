@@ -1,9 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi, CustomerDetail } from "@zhaoyun/api-client";
-import type { ApiCustomer, ApiMembership, ApiSettings, BalanceReason } from "@zhaoyun/contracts";
+import type { ApiCustomer, ApiMemberReport, ApiMembership, ApiSettings, BalanceReason } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { Section, Toggle } from "../settings/SettingsPanel";
+
+const DAY_MS = 86_400_000;
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+type StatPreset = "today" | "week" | "month";
+const STAT_PRESETS: Array<[StatPreset, CopyKey]> = [["today", "reportToday"], ["week", "reportWeek"], ["month", "reportMonth"]];
+
+/** The restaurant's today, and a preset's day range, in its own time zone. */
+function statRange(preset: StatPreset, timeZone: string): [string, string] {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const at = Date.parse(`${today}T00:00:00Z`);
+  if (preset === "today") return [today, today];
+  if (preset === "week") return [isoDay(at - 6 * DAY_MS), today];
+  return [`${today.slice(0, 8)}01`, today];
+}
 
 interface Props {
   api: AdminApi;
@@ -26,6 +40,9 @@ export function MembersPanel({ api, settings, notify, failed, onSaveSettings }: 
   return <section id="membersPanel" className="admin-panel active"><div className="settings-page">
     <h1 className="settings-title">{t("tabMembers")}</h1>
     <div className="settings-grid">
+      <Section id="member-stats" title={t("memberStatsTitle")} summary={t("memberStatsHint")} wide>
+        <MemberStats api={api} timeZone={settings.timeZone} failed={failed} />
+      </Section>
       <Section id="member-settings" title={t("sectionMembership")} summary={t(settings.membership.enabled ? "orderingOn" : "orderingOff")}>
         <MembershipForm key={JSON.stringify(settings.membership)} membership={settings.membership} onSave={(membership) => onSaveSettings({ membership }, "membershipSaved")} />
       </Section>
@@ -34,6 +51,66 @@ export function MembersPanel({ api, settings, notify, failed, onSaveSettings }: 
       </Section>
     </div>
   </div></section>;
+}
+
+/**
+ * 会员概况: a read-only dashboard over a day range — how many members, how much
+ * balance and points are outstanding, what moved over the days, the repeat
+ * rate, and the top members. Never writes; it only reads /api/admin/reports/members.
+ */
+function MemberStats({ api, timeZone, failed }: { api: AdminApi; timeZone: string; failed: (error: unknown) => void }) {
+  const { t, language } = useI18n();
+  const [preset, setPreset] = useState<StatPreset>("month");
+  const [report, setReport] = useState<ApiMemberReport | null>(null);
+  const [busy, setBusy] = useState(false);
+  const money = (cents: number) => formatMoney(cents, language);
+
+  useEffect(() => {
+    let live = true;
+    const [from, to] = statRange(preset, timeZone);
+    setBusy(true);
+    api.memberReport(from, to).then((result) => { if (live) setReport(result.report); }).catch((error) => { if (live) failed(error); }).finally(() => { if (live) setBusy(false); });
+    return () => { live = false; };
+  }, [api, preset, timeZone, failed]);
+
+  const named = (row: { name: string; email: string }) => row.name || row.email || t("statMember");
+  return <div className="member-stats">
+    <div className="report-presets" role="group" aria-label={t("memberStatsTitle")}>
+      {STAT_PRESETS.map(([key, label]) => <button key={key} type="button" className={preset === key ? "primary-action" : "ghost-action"} aria-pressed={preset === key} onClick={() => setPreset(key)}>{t(label)}</button>)}
+    </div>
+    {report && <>
+      <div className="report-tiles">
+        <div className="report-tile"><small>{t("statMembersTotal")}</small><b>{report.members.total}</b></div>
+        <div className="report-tile"><small>{t("statMembersNew")}</small><b>{report.members.new}</b></div>
+        <div className="report-tile"><small>{t("statMembersActive")}</small><b>{report.members.active}</b></div>
+        <div className="report-tile"><small>{t("statRepeatRate")}</small><b title={t("statRepeatHint")}>{report.repeat.ratePct}%</b></div>
+        <div className="report-tile"><small>{t("statBalanceOutstanding")}</small><b>{money(report.balance.outstandingCents)}</b></div>
+        {report.balance.topUpCents !== 0 && <div className="report-tile"><small>{t("statBalanceTopUp")}</small><b>{money(report.balance.topUpCents)}</b></div>}
+        {report.balance.bonusCents !== 0 && <div className="report-tile"><small>{t("statBalanceBonus")}</small><b>{money(report.balance.bonusCents)}</b></div>}
+        {report.balance.spentCents !== 0 && <div className="report-tile"><small>{t("statBalanceSpent")}</small><b>{money(report.balance.spentCents)}</b></div>}
+        <div className="report-tile"><small>{t("statPointsOutstanding")}</small><b>{report.points.outstanding}</b></div>
+        {report.points.earned !== 0 && <div className="report-tile"><small>{t("statPointsEarned")}</small><b>{report.points.earned}</b></div>}
+        {report.points.redeemed !== 0 && <div className="report-tile"><small>{t("statPointsRedeemed")}</small><b>{report.points.redeemed}</b></div>}
+      </div>
+      {report.members.total === 0 ? <div className="admin-empty">{t("statNoMembers")}</div> : <div className="report-grid">
+        {report.topBalance.length > 0 && <section className="report-card">
+          <h2>{t("statTopBalance")}</h2>
+          <table className="report-table">
+            <thead><tr><th>#</th><th>{t("statMember")}</th><th>{t("statBalanceOutstanding")}</th></tr></thead>
+            <tbody>{report.topBalance.map((row, index) => <tr key={row.id}><td>{index + 1}</td><td>{named(row)}</td><td>{money(row.balanceCents)}</td></tr>)}</tbody>
+          </table>
+        </section>}
+        {report.topPoints.length > 0 && <section className="report-card">
+          <h2>{t("statTopPoints")}</h2>
+          <table className="report-table">
+            <thead><tr><th>#</th><th>{t("statMember")}</th><th>{t("statPointsOutstanding")}</th></tr></thead>
+            <tbody>{report.topPoints.map((row, index) => <tr key={row.id}><td>{index + 1}</td><td>{named(row)}</td><td>{row.points}</td></tr>)}</tbody>
+          </table>
+        </section>}
+      </div>}
+    </>}
+    {!report && busy && <div className="admin-empty">…</div>}
+  </div>;
 }
 
 /** 会员储值赠送档位：充 X 送 Y，由服务端排序并取不超过充值额的最高一档。 */

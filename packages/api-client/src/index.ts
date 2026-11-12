@@ -1,7 +1,7 @@
 import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles, IconApp,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiMemberReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiBalanceEntry, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
@@ -418,6 +418,10 @@ export class AdminApi {
   today(): Promise<{ today: ApiToday }> { return this.#request("/api/admin/today"); }
   salesReport(from: string, to: string): Promise<{ report: ApiSalesReport }> {
     return this.#request(`/api/admin/reports/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  }
+  /** 会员数据看板: read-only member analytics over the same days. */
+  memberReport(from: string, to: string): Promise<{ report: ApiMemberReport }> {
+    return this.#request(`/api/admin/reports/members?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   }
   /** A guest's data, for a request that reached the restaurant by e-mail or at the counter. */
   exportCustomer(id: string): Promise<CustomerDataExport> { return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/export`); }

@@ -58,7 +58,10 @@ import {
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
 import { appIconsView } from "./app-icons.mjs";
-import { REPORT_RECEIPTS_SQL, reportRange, salesReport } from "./reports.mjs";
+import {
+  MEMBER_BALANCE_LEDGER_SQL, MEMBER_NEW_SQL, MEMBER_POINTS_LEDGER_SQL, MEMBER_TOP_BALANCE_SQL, MEMBER_TOP_POINTS_SQL,
+  memberReport, REPORT_RECEIPTS_SQL, reportRange, salesReport
+} from "./reports.mjs";
 import {
   CLOSE_TABLE_SESSION_SQL, closePaidTableStatements, guestOrderError, LAST_CUSTOMER_PICKUP_SQL, LAST_TABLE_GUEST_ORDER_SQL, LIVE_TABLE_SESSIONS_SQL,
   moveTableSessionStatements, NEXT_GUEST_PICKUP_SQL, OPEN_PICKUPS_SQL, openTableStatements, pickupDayStart, planGuestOrder, TABLE_SESSION_SQL, tableSessionView
@@ -1277,6 +1280,24 @@ export function createStore(driver) {
       // The delivery platforms' orders beside the register's: their money is the platform's to collect, not in the receipts.
       report.delivery = await deliveryStore.totalsFor(range.readFrom, range.readTo, range.from, range.to);
       return report;
+    },
+    /** 会员数据看板: read-only member analytics over the manager's days (shared/reports.mjs). */
+    memberReport: async (from, to) => {
+      const range = reportRange(from, to);
+      const [memberCounts, balanceTotal, newMembers, balanceLedger, pointsLedger, topBalance, topPoints] = await Promise.all([
+        first("SELECT COUNT(*) AS members, COALESCE(SUM(points), 0) AS points FROM customers"),
+        first("SELECT COALESCE(SUM(balance_cents), 0) AS balance_cents FROM member_balances"),
+        all(MEMBER_NEW_SQL, range.readFrom, range.readTo),
+        all(MEMBER_BALANCE_LEDGER_SQL, range.readFrom, range.readTo),
+        all(MEMBER_POINTS_LEDGER_SQL, range.readFrom, range.readTo),
+        all(MEMBER_TOP_BALANCE_SQL),
+        all(MEMBER_TOP_POINTS_SQL)
+      ]);
+      const data = {
+        totals: { members: memberCounts?.members ?? 0, points: memberCounts?.points ?? 0, balanceCents: balanceTotal?.balance_cents ?? 0 },
+        newMembers, balanceLedger, pointsLedger, topBalance, topPoints
+      };
+      return memberReport(data, range, (await getSettings()).timeZone);
     },
     /**
      * Wrong passwords and PINs, counted in the database so that every Worker
