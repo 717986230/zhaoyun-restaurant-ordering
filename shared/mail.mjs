@@ -60,6 +60,8 @@ const COPY = {
     bookingPendingSubject: "{restaurant}：预约已收到 · {date} {time}",
     bookingConfirmedLead: "你的预约已确认：",
     bookingPendingLead: "我们收到了你的预约，正在确认，确认后会再通知你：",
+    bookingCancelledSubject: "{restaurant}：预约已取消 · {date} {time}",
+    bookingCancelledLead: "你的以下预约已取消：",
     bookingDate: "日期：{date}",
     bookingTime: "时间：{time}",
     bookingParty: "人数：{party} 位",
@@ -82,6 +84,8 @@ const COPY = {
     bookingPendingSubject: "{restaurant} – Reservierung eingegangen · {date} {time}",
     bookingConfirmedLead: "Ihre Reservierung ist bestätigt:",
     bookingPendingLead: "Wir haben Ihre Reservierung erhalten und bestätigen sie in Kürze:",
+    bookingCancelledSubject: "{restaurant} – Reservierung storniert · {date} {time}",
+    bookingCancelledLead: "Ihre folgende Reservierung wurde storniert:",
     bookingDate: "Datum: {date}",
     bookingTime: "Uhrzeit: {time}",
     bookingParty: "Personen: {party}",
@@ -104,6 +108,8 @@ const COPY = {
     bookingPendingSubject: "{restaurant} – booking received · {date} {time}",
     bookingConfirmedLead: "Your booking is confirmed:",
     bookingPendingLead: "We have your booking and will confirm it shortly:",
+    bookingCancelledSubject: "{restaurant} – booking cancelled · {date} {time}",
+    bookingCancelledLead: "Your booking below has been cancelled:",
     bookingDate: "Date: {date}",
     bookingTime: "Time: {time}",
     bookingParty: "Party: {party}",
@@ -140,12 +146,15 @@ export function codeMessage(code, { language = "de", restaurant = "", minutes = 
 }
 
 /**
- * The email a guest gets when they book online: confirmed at once, or received
- * and awaiting the restaurant's confirmation, with the day, time, party, table
- * (when one is set) and reference, and the link back to view or cancel it.
+ * The email a guest gets about a booking they made online: confirmed at once,
+ * received and awaiting the restaurant's confirmation, or — once they cancel
+ * through their own link — cancelled. It carries the day, time, party, table
+ * (when one is set) and reference; the manage link rides along while the
+ * booking still stands, and is dropped once it is cancelled.
  */
 export function bookingMessage(reservation, { language = "de", restaurant = "", manageUrl = "" } = {}) {
   const copy = COPY[language] ?? COPY.de;
+  const cancelled = reservation.status === "cancelled";
   const confirmed = reservation.status === "confirmed";
   const values = { restaurant: restaurant || "Restaurant", date: reservation.date, time: reservation.time, party: reservation.party, table: reservation.table ?? "", reference: reservation.reference };
   const lines = [
@@ -155,10 +164,12 @@ export function bookingMessage(reservation, { language = "de", restaurant = "", 
     ...(reservation.table ? [fill(copy.bookingTable, values)] : []),
     fill(copy.bookingReference, values)
   ];
-  const lead = fill(confirmed ? copy.bookingConfirmedLead : copy.bookingPendingLead, values);
-  const manage = manageUrl ? fill(copy.bookingManage, { url: manageUrl }) : "";
+  const subject = cancelled ? copy.bookingCancelledSubject : confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject;
+  const lead = fill(cancelled ? copy.bookingCancelledLead : confirmed ? copy.bookingConfirmedLead : copy.bookingPendingLead, values);
+  // A cancelled booking has nothing left to manage, so no link.
+  const manage = !cancelled && manageUrl ? fill(copy.bookingManage, { url: manageUrl }) : "";
   return {
-    subject: fill(confirmed ? copy.bookingConfirmedSubject : copy.bookingPendingSubject, values),
+    subject: fill(subject, values),
     text: `${lead}\n\n${lines.join("\n")}\n${manage ? `\n${manage}\n` : ""}`,
     html: `<p>${escapeHtml(lead)}</p><ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>${manage ? `<p><a href="${escapeHtml(manageUrl)}">${escapeHtml(fill(copy.bookingManage, { url: "" }).replace(/[:：]\s*$/, ""))}</a></p>` : ""}`
   };
@@ -169,6 +180,31 @@ export function testMessage({ language = "de", restaurant = "" } = {}) {
   const copy = COPY[language] ?? COPY.de;
   const values = { restaurant: restaurant || "Restaurant" };
   return { subject: fill(copy.testSubject, values), text: `${copy.test}\n`, html: `<p>${escapeHtml(copy.test)}</p>` };
+}
+
+/**
+ * The email the owner gets when the system hits an error it did not plan for
+ * (a request that ended in a 500). The caller sends it best-effort and at most
+ * once per cooldown, so a burst of failures is one email, not a flood. Written
+ * in all three languages, because the owner may read any of them, with the
+ * request id that matches the line in the host's log (docs/OPERATIONS.md).
+ */
+export function alertMessage({ restaurant = "", method = "", path = "", requestId = "", time = "" } = {}) {
+  const name = restaurant || "Restaurant";
+  const where = `${method} ${path}`.trim();
+  const facts = [
+    `时间 / Zeit / time: ${time}`,
+    `请求 / Anfrage / request: ${where}`,
+    ...(requestId ? [`编号 / ID: ${requestId}`] : [])
+  ];
+  const zh = `${name} 的点餐系统刚刚遇到一个未预料到的错误（一次请求失败，返回 500）。可能还有更多，详见托管平台（Cloudflare）的日志。`;
+  const de = `Im Bestellsystem von ${name} ist ein unerwarteter Fehler aufgetreten (eine Anfrage schlug mit 500 fehl). Weitere Details stehen im Log der Hosting-Plattform (Cloudflare).`;
+  const en = `${name}'s ordering system hit an unexpected error (a request failed with 500). There may be more — see the hosting platform's log (Cloudflare).`;
+  return {
+    subject: `${name}：系统出错提醒 / Systemfehler / system error`,
+    text: `${zh}\n\n${de}\n\n${en}\n\n${facts.join("\n")}\n`,
+    html: `<p>${escapeHtml(zh)}</p><p>${escapeHtml(de)}</p><p>${escapeHtml(en)}</p><ul>${facts.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+  };
 }
 
 /**

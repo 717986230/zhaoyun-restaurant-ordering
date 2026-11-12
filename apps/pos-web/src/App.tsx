@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { PosApi, toProduct } from "@zhaoyun/api-client";
-import type { PosStaff, RealtimeEnvelope } from "@zhaoyun/contracts";
+import type { CreateOrderCommand, PosStaff, RealtimeEnvelope } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { serverErrorText } from "@zhaoyun/domain";
 import { formatEuro, initialLanguage, POS_LANGUAGES, translator } from "./i18n";
 import type { PosKey, PosLanguage } from "./i18n";
+import { enqueue, flushOutbox, readOutbox } from "./offline-queue";
 import { Floor } from "./Floor";
 import { OrderScreen } from "./OrderScreen";
 import { PayScreen } from "./PayScreen";
@@ -29,6 +30,8 @@ export interface Pos {
   onLive: (listener: (event: RealtimeEnvelope) => void) => () => void;
   /** Loads the menu again (a dish sold out here, say). */
   refreshMenu: () => void;
+  /** 断网补发: an order that could not reach the server, kept on this device to send again once it is back online. */
+  queueOffline: (command: CreateOrderCommand, count: number) => void;
 }
 
 type LiveListener = (event: RealtimeEnvelope) => void;
@@ -110,11 +113,47 @@ export function App() {
     notify(message ? serverErrorText(message, language) : translator(language)("failed"), "error");
   }, [notify, language]);
 
+  // 断网补发: orders that could not reach the server wait in this device's
+  // outbox and go out on their own once it is back online.
+  const [pending, setPending] = useState(() => readOutbox(localStorage).length);
+  const queueOffline = useCallback((command: CreateOrderCommand, count: number) => {
+    setPending(enqueue(localStorage, { ...command, count, queuedAt: Date.now() }).length);
+  }, []);
+  const flush = useCallback(async () => {
+    const translate = translator(language);
+    await flushOutbox(localStorage, (command) => api.order(command), (outcome) => {
+      if (outcome.kind === "sent") notify(translate("queueResent", { table: outcome.order.table, count: outcome.order.count }));
+      else if (outcome.kind === "dropped") notify(translate("queueDropped", { table: outcome.order.table, count: outcome.order.count, reason: outcome.reason }), "error");
+    });
+    setPending(readOutbox(localStorage).length);
+  }, [notify, language]);
+
+  // Try the outbox on sign-in, the moment the device comes back online, when
+  // the live channel reconnects, and every 20 s while anything still waits.
+  useEffect(() => {
+    if (!staff) return undefined;
+    void flush();
+    const onOnline = () => void flush();
+    window.addEventListener("online", onOnline);
+    const timer = window.setInterval(() => { if (readOutbox(localStorage).length) void flush(); }, 20_000);
+    return () => { window.removeEventListener("online", onOnline); window.clearInterval(timer); };
+  }, [staff, flush]);
+  useEffect(() => { if (staff && live) void flush(); }, [staff, live, flush]);
+
   useEffect(() => {
     document.documentElement.lang = language === "zh" ? "zh-CN" : language;
     try { localStorage.setItem("zy_pos_language", language); } catch { /* not kept */ }
   }, [language]);
 
+  // Every screen opens at the top: the floor, a table's order, paying, the
+  // records — and pairing and signing in. The window is what scrolls (the
+  // ticket is sticky inside it), so a new screen must not inherit the last
+  // one's scroll position.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [screen, paired, staff]);
   // Keep the hash in step with the standalone screens, so #topup is a saveable
   // deep link; table screens (order/pay) carry no table in the URL, so clear it.
   useEffect(() => {
@@ -153,7 +192,7 @@ export function App() {
   if (!paired) body = <Pair t={t} onPaired={() => setPaired(true)} />;
   else if (!staff) body = <SignIn t={t} onSignedIn={setStaff} onUnpair={unpair} failed={failed} />;
   else {
-    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive, refreshMenu: loadCatalog };
+    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive, refreshMenu: loadCatalog, queueOffline };
     body = screen.name === "order" ? <OrderScreen pos={pos} table={screen.table} pickupNo={screen.pickupNo} go={setScreen} />
       : screen.name === "pay" ? <PayScreen pos={pos} table={screen.table} go={setScreen} />
       : screen.name === "topup" ? <TopUp pos={pos} go={setScreen} />
@@ -167,12 +206,13 @@ export function App() {
       {staff && <span className="pos-who">{staff.name}{staff.role === "manager" ? " ★" : ""}</span>}
       {staff && <i className={`pos-live ${live ? "on" : ""}`} role="img" aria-label={t(live ? "liveOn" : "liveOff")} title={t(live ? "liveOn" : "liveOff")} />}
       <span className="pos-head-actions">
+        {staff && pending > 0 && <span className="pos-queue" role="status" title={t(pending === 1 ? "queuePendingOne" : "queuePendingMany", { count: pending })}>⟳ {pending}</span>}
         {staff && screen.name === "floor" && <button type="button" onClick={() => setScreen({ name: "records" })}>{t("records")}</button>}
         {languages}
         {staff && <button type="button" onClick={() => { void api.signOut().finally(() => { setStaff(null); setScreen({ name: "floor" }); }); }}>{t("signOut")}</button>}
       </span>
     </header>
-    <main className="pos-main">{body}</main>
+    <main ref={mainRef} className="pos-main">{body}</main>
     <div className={`pos-toast ${toast ? `show ${toast.kind}` : ""}`} role="status">{toast?.message ?? ""}</div>
   </div>;
 }
