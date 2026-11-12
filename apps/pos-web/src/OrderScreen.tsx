@@ -134,22 +134,25 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
 
   async function send() {
     if (!cart.length) return;
+    const count = cart.reduce((sum, line) => sum + line.quantity, 0);
+    const command = {
+      clientRequestId: requestId.current,
+      table,
+      note: note.trim(),
+      items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}) }))
+    };
+    const limited = cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined);
     setBusy(true);
     try {
-      await api.order({
-        clientRequestId: requestId.current,
-        table,
-        note: note.trim(),
-        items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}) }))
-      });
-      pos.notify(t("sentToKitchen", { count: cart.reduce((sum, line) => sum + line.quantity, 0) }));
+      await api.order(command);
+      pos.notify(t("sentToKitchen", { count }));
       requestId.current = crypto.randomUUID();
       setCart([]);
       setNote("");
       setSheetOpen(false);
       await loadBill();
       // The counts of limited dishes went down.
-      if (cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined)) pos.refreshMenu();
+      if (limited) pos.refreshMenu();
     } catch (error) {
       if (error instanceof ApiError && error.code === "SOLD_OUT") {
         // Another table was quicker: say which dish and how many there still are, and show the new counts.
@@ -157,6 +160,18 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         const left = Number(error.details.left ?? 0);
         pos.notify(left ? t("stockShort", { name: dish ? name(dish) : String(error.details.sku), left }) : t("stockOutNote", { name: dish ? name(dish) : String(error.details.sku) }), "error");
         pos.refreshMenu();
+      } else if (!(error instanceof ApiError)) {
+        // The server was never reached (the Wi-Fi dropped): keep the order on
+        // this device and let it send itself once the network is back, rather
+        // than lose it. It carries the same clientRequestId, so it cannot fire
+        // twice even if the first attempt had in fact landed.
+        pos.queueOffline(command, count);
+        pos.notify(t("queuedOffline", { count }));
+        requestId.current = crypto.randomUUID();
+        setCart([]);
+        setNote("");
+        setSheetOpen(false);
+        if (limited) pos.refreshMenu();
       } else pos.failed(error);
     } finally {
       setBusy(false);
