@@ -3,7 +3,7 @@ import { AdminApi, toProduct } from "@zhaoyun/api-client";
 import type { AdminProductInput, AdminStorage, StaffRole } from "@zhaoyun/api-client";
 import type { AccountUpdateCommand, ApiCatalogProduct, ApiOrder, ApiServiceRequest, ApiSettings, RegisterCommand, VatPercent } from "@zhaoyun/contracts";
 import type { PrinterProfile, Product } from "@zhaoyun/domain";
-import { LANGUAGE_INFO } from "@zhaoyun/domain";
+import { LANGUAGE_INFO, serverErrorText } from "@zhaoyun/domain";
 import { kiosk, printer as nativePrinter } from "@zhaoyun/native-bridge";
 import type { AdminState, AdminTab, ProductFilter } from "./types";
 import { ADMIN_LANGUAGES, useI18n } from "./i18n";
@@ -104,14 +104,18 @@ export function App() {
     document.title = restaurantName ? `${restaurantName} · ${t("admin")}` : t("admin");
   }, [restaurantName, t]);
 
+  // One timer for the toast: a new message restarts it, so an earlier toast's
+  // timer never wipes a newer message before it can be read.
+  const toastTimer = useRef<number | undefined>(undefined);
   const notify = useCallback((message: string, kind: "success" | "warning" | "error" = "success") => {
     setState((current) => ({ ...current, toast: { message, kind } }));
-    window.setTimeout(() => setState((current) => ({ ...current, toast: null })), 2400);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setState((current) => ({ ...current, toast: null })), kind === "error" ? 4000 : 2400);
   }, []);
 
   const failed = useCallback((error: unknown, fallback: CopyKey) => {
-    notify(error instanceof Error && error.message ? error.message : t(fallback), "error");
-  }, [notify, t]);
+    notify(error instanceof Error && error.message ? serverErrorText(error.message, language) : t(fallback), "error");
+  }, [notify, t, language]);
 
   /** True when the console is through and loaded; false when whatever is in
    *  the header did not open the door. */

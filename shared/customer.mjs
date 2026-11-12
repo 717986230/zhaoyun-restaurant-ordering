@@ -144,7 +144,7 @@ export function pointsKind(id) {
  * a mug) and what each costs in points; a reward is ordered like a dish and
  * costs nothing but its points and any priced options.
  */
-export const LOYALTY_DEFAULTS = Object.freeze({ enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 });
+export const LOYALTY_DEFAULTS = Object.freeze({ enabled: false, pointsPerEuro: 1, eurosPerPoint: 10, topUpPoints: true, rewards: [], maxRewardsPerOrder: 1 });
 
 export function normalizeLoyalty(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Loyalty settings must be an object");
@@ -154,6 +154,10 @@ export function normalizeLoyalty(value) {
   if (typeof merged.enabled !== "boolean") throw new Error("Loyalty enabled must be true or false");
   const pointsPerEuro = Number(merged.pointsPerEuro);
   if (!Number.isInteger(pointsPerEuro) || pointsPerEuro < 0 || pointsPerEuro > 100) throw new Error("Points per euro is a whole number from 0 to 100");
+  // The rate is pointsPerEuro points for every eurosPerPoint euros (默认每 10 欧元 1 积分).
+  const eurosPerPoint = Number(merged.eurosPerPoint);
+  if (!Number.isInteger(eurosPerPoint) || eurosPerPoint < 1 || eurosPerPoint > 1000) throw new Error("Euros per point is a whole number from 1 to 1000");
+  if (typeof merged.topUpPoints !== "boolean") throw new Error("Top-up points must be true or false");
   const maxRewardsPerOrder = Number(merged.maxRewardsPerOrder);
   if (!Number.isInteger(maxRewardsPerOrder) || maxRewardsPerOrder < 1 || maxRewardsPerOrder > 10) throw new Error("Rewards per order is 1 to 10");
   if (!Array.isArray(merged.rewards) || merged.rewards.length > MAX_REWARDS) throw new Error(`At most ${MAX_REWARDS} rewards`);
@@ -167,7 +171,7 @@ export function normalizeLoyalty(value) {
     seen.add(productId);
     return { productId, points };
   });
-  return { enabled: merged.enabled, pointsPerEuro, rewards, maxRewardsPerOrder };
+  return { enabled: merged.enabled, pointsPerEuro, eurosPerPoint, topUpPoints: merged.topUpPoints, rewards, maxRewardsPerOrder };
 }
 
 /** The rewards a guest may order now: dish id → points, or null when the programme is off. */
@@ -437,7 +441,8 @@ export const BALANCE_HISTORY_SQL = `SELECT balance_ledger.*, COALESCE(balance_op
   FROM balance_ledger LEFT JOIN balance_operators ON balance_operators.ledger_id = balance_ledger.id
   WHERE customer_id = ? ORDER BY created_at DESC, balance_ledger.id DESC LIMIT ?`;
 /** 累计充值 (lifetime top-up principal): what a member has paid in over time, the basis for their 会员等级. Read-only. */
-export const MEMBER_GROWTH_SQL = "SELECT COALESCE(SUM(delta_cents), 0) AS growth_cents FROM balance_ledger WHERE customer_id = ? AND reason = 'topup'";
+/** 成长值: money a member has put in — top-ups, less cancelled ones, plus the manager's hand changes (credit given or taken at the counter). Bonus and spending do not count. */
+export const MEMBER_GROWTH_SQL = "SELECT COALESCE(SUM(delta_cents), 0) AS growth_cents FROM balance_ledger WHERE customer_id = ? AND reason IN ('topup', 'reverse', 'adjust')";
 export const INSERT_BALANCE_SQL = "INSERT INTO balance_ledger (id, customer_id, delta_cents, reason, ref, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
 /** Who booked a ledger entry (会员储值操作人), keyed by the entry's id. Written only when the operator is known. */
 export const INSERT_OPERATOR_SQL = "INSERT INTO balance_operators (ledger_id, operator) VALUES (?, ?)";
@@ -467,18 +472,19 @@ export function changeBalanceStatements(memberId, delta, at) {
 /**
  * Points for a paid receipt, run after its receipt_items in the same
  * transaction or batch: per signed-in guest whose order lines it paid, the
- * dish prices of those lines × pointsPerEuro, whole points, rounded down.
- * Parameters: pointsPerEuro, at, receipt id, pointsPerEuro.
+ * dish prices of those lines × numerator / denominator (cents → points, see
+ * earnPointsStatements), whole points, rounded down — integer maths throughout.
+ * Parameters: numerator, denominator, at, receipt id, numerator, denominator.
  */
 export const EARN_POINTS_SQL = `INSERT INTO points_ledger (id, customer_id, delta, reason, ref, note, created_at)
   SELECT 'earn-' || receipt_items.receipt_id || '-' || guest_orders.customer_id, guest_orders.customer_id,
-    CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / 100 AS INTEGER), 'earn', receipt_items.receipt_id, '', ?
+    CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / ? AS INTEGER), 'earn', receipt_items.receipt_id, '', ?
   FROM receipt_items
   JOIN order_items ON order_items.id = receipt_items.order_item_id
   JOIN guest_orders ON guest_orders.order_id = order_items.order_id
   WHERE receipt_items.receipt_id = ? AND guest_orders.customer_id IS NOT NULL
   GROUP BY guest_orders.customer_id
-  HAVING CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / 100 AS INTEGER) > 0`;
+  HAVING CAST(SUM(receipt_items.quantity * order_items.unit_price_cents) * ? / ? AS INTEGER) > 0`;
 /** The ledger lines of one kind for one receipt or order, added to each guest's balance (applyPointsParams). */
 export const APPLY_POINTS_SQL = `UPDATE customers SET
   points = points + (SELECT SUM(delta) FROM points_ledger WHERE points_ledger.customer_id = customers.id AND points_ledger.ref = ? AND points_ledger.reason = ?),
@@ -560,11 +566,41 @@ export function redeemPointsStatements(orderId, customerId, points, at) {
   ];
 }
 
-/** A receipt issued: the points its guests earned, while the programme is on. */
-export function earnPointsStatements(receiptId, loyalty, at) {
+/** Whole points for `cents` at the programme's rate: pointsPerEuro per eurosPerPoint euros. */
+export function pointsFor(cents, loyalty) {
+  if (!loyalty?.enabled || !loyalty.pointsPerEuro || cents <= 0) return 0;
+  return Math.floor((cents * loyalty.pointsPerEuro) / (100 * (loyalty.eurosPerPoint || 1)));
+}
+
+/**
+ * A receipt issued: the points its guests earned, while the programme is on.
+ * When top-ups earn points (充值送积分), the part of the bill paid from stored
+ * value earns nothing again — it was counted when it was topped up — so the
+ * earn is scaled by the share paid in cash, card or voucher.
+ */
+export function earnPointsStatements(receiptId, loyalty, at, { totalCents = 0, balanceCents = 0 } = {}) {
   if (!loyalty?.enabled || !loyalty.pointsPerEuro) return [];
+  let numerator = loyalty.pointsPerEuro;
+  let denominator = 100 * (loyalty.eurosPerPoint || 1);
+  if (loyalty.topUpPoints && balanceCents > 0 && totalCents > 0) {
+    const paidOtherwise = Math.max(0, totalCents - balanceCents);
+    if (paidOtherwise === 0) return [];
+    numerator *= paidOtherwise;
+    denominator *= totalCents;
+  }
   return [
-    [EARN_POINTS_SQL, [loyalty.pointsPerEuro, at, receiptId, loyalty.pointsPerEuro]],
+    [EARN_POINTS_SQL, [numerator, denominator, at, receiptId, numerator, denominator]],
+    [APPLY_POINTS_SQL, applyPointsParams(receiptId, "earn", at)]
+  ];
+}
+
+/** 充值送积分: a top-up's money (not the house's bonus) earns points at the programme's rate. */
+export function topUpPointsStatements(memberId, principalCents, receiptId, loyalty, at) {
+  if (!loyalty?.topUpPoints) return [];
+  const points = pointsFor(principalCents, loyalty);
+  if (!points) return [];
+  return [
+    [INSERT_POINTS_SQL, [`earn-${receiptId}-${memberId}`, memberId, points, "earn", receiptId, "", at]],
     [APPLY_POINTS_SQL, applyPointsParams(receiptId, "earn", at)]
   ];
 }

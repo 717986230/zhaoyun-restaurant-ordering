@@ -205,3 +205,77 @@
   font: 700 11px/1 "Songti SC", Georgia, serif; letter-spacing: 1px;
   color: var(--badge-foil-1, #eee); white-space: nowrap;
 }
+
+/* ── 会员入场 — the full-screen reveal at sign-in ─────────────────────────── */
+.member-entrance {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; place-items: center; padding: 24px;
+  background:
+    radial-gradient(60% 45% at 50% 42%, color-mix(in srgb, var(--tier-glow) 55%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(6, 6, 8, 0.94), rgba(3, 3, 5, 0.97));
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  animation: entrance-in 420ms ease both;
+  cursor: pointer; overflow: hidden;
+}
+.member-entrance.tier-skin-dark {
+  background:
+    radial-gradient(60% 45% at 50% 42%, rgba(214, 41, 85, 0.42), transparent 70%),
+    radial-gradient(80% 60% at 50% 110%, rgba(88, 28, 135, 0.4), transparent 70%),
+    linear-gradient(180deg, #0b0307, #050208);
+}
+.member-entrance.tier-skin-gilded {
+  background:
+    radial-gradient(60% 45% at 50% 42%, rgba(240, 200, 90, 0.5), transparent 70%),
+    linear-gradient(180deg, rgba(30, 20, 4, 0.95), rgba(10, 6, 1, 0.98));
+}
+.member-entrance.is-leaving { animation: entrance-out 480ms ease both; }
+.member-entrance-rays {
+  position: absolute; left: 50%; top: 42%; width: 160vmax; height: 160vmax;
+  margin: -80vmax 0 0 -80vmax; pointer-events: none; opacity: 0.32;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--badge-foil-1) 45%, transparent) 0deg 4deg, transparent 4deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 0%, transparent 55%); mask: radial-gradient(circle, #000 0%, transparent 55%);
+  animation: entrance-rays 14s linear infinite;
+}
+.member-entrance-card {
+  position: relative; display: grid; justify-items: center; gap: 10px; text-align: center;
+  padding: 30px 34px 26px; border-radius: 22px; min-width: min(300px, 84vw);
+  border: 1px solid color-mix(in srgb, var(--badge-ring) 70%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--badge-disc-1) 70%, transparent), color-mix(in srgb, var(--badge-disc-2) 85%, transparent));
+  box-shadow: 0 0 60px color-mix(in srgb, var(--tier-glow) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: entrance-card 900ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+.member-entrance.tier-skin-gilded .member-entrance-card {
+  background: linear-gradient(150deg, rgba(80, 60, 20, 0.45), rgba(24, 16, 4, 0.5));
+  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+}
+.member-entrance .member-badge-lg { width: 132px; height: 132px; }
+.member-entrance-rank {
+  margin-top: 4px; font: 700 13px/1.2 "Songti SC", "STSong", Georgia, serif; letter-spacing: 6px;
+  color: var(--badge-foil-1); animation: entrance-text 700ms ease 650ms both;
+}
+.member-entrance-name {
+  font: 700 30px/1.1 Georgia, "Songti SC", serif;
+  background: linear-gradient(120deg, var(--badge-foil-1), var(--badge-foil-2), var(--badge-foil-1));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: entrance-text 700ms ease 800ms both;
+}
+.member-entrance-welcome { color: #e9edee; opacity: 0.8; font-size: 14px; animation: entrance-text 700ms ease 950ms both; }
+@keyframes entrance-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes entrance-out { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+@keyframes entrance-card { 0% { opacity: 0; transform: translateY(26px) scale(0.92); } 100% { opacity: 1; transform: none; } }
+@keyframes entrance-text { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes entrance-rays { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .member-entrance-rays { animation: none; }
+  .member-entrance-card, .member-entrance-rank, .member-entrance-name, .member-entrance-welcome { animation: none; }
+  .member-entrance .member-badge svg, .member-entrance .member-badge-sheen { animation: none; }
+}
+
+/* Inside a member skin the account's sections are cards: give them room. */
+.guest-account.tier-skin-dark .guest-section,
+.guest-account.tier-skin-gilded .guest-section {
+  padding: 14px 16px; border-radius: 14px; border-style: solid; border-width: 1px;
+}
+.guest-account.tier-skin-dark .guest-section h3,
+.guest-account.tier-skin-gilded .guest-section h3 { margin-top: 0; }
+.guest-account.member-themed .link-button { color: var(--badge-foil-1); }

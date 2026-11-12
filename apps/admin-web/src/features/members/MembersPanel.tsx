@@ -165,6 +165,9 @@ function MemberTiersForm({ memberTiers, onSave }: { memberTiers: ApiMemberTiers;
   const setTier = (index: number, key: "name" | "thresholdCents" | "discountPercent", value: string | number) =>
     setDraft((current) => ({ ...current, tiers: current.tiers.map((tier, at) => (at === index ? { ...tier, [key]: value } : tier)) }));
 
+  const nameless = draft.tiers.some((tier) => !tier.name.trim());
+  const thresholds = draft.tiers.map((tier) => tier.thresholdCents);
+  const clash = new Set(thresholds).size !== thresholds.length;
   return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
     <Toggle checked={draft.enabled} label={t("memberTiersEnabled")} onChange={(enabled) => { setDraft({ ...draft, enabled }); void onSave({ ...draft, enabled }); }} />
     <p className="settings-label">{t("memberTiersListLabel")}</p>
@@ -175,9 +178,18 @@ function MemberTiersForm({ memberTiers, onSave }: { memberTiers: ApiMemberTiers;
       <label><span>{t("memberTierDiscount")}</span><WholeNumberInput max={100} value={tier.discountPercent} onChange={(percent) => setTier(index, "discountPercent", percent)} /></label>
       <button type="button" className="ghost-action" aria-label={t("remove")} onClick={() => setDraft({ ...draft, tiers: draft.tiers.filter((_, at) => at !== index) })}>✕</button>
     </li>)}</ul>
-    {draft.tiers.length < 8 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { name: "", thresholdCents: 10000, discountPercent: 5 }] })}>{t("memberTierAdd")}</button>}
-    <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
+    {nameless && <p className="settings-hint form-warning" role="alert">{t("memberTierNeedsName")}</p>}
+    {clash && <p className="settings-hint form-warning" role="alert">{t("memberTierClash")}</p>}
+    {draft.tiers.length < 8 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { name: "", thresholdCents: Math.min(100_000_000, Math.max(0, ...draft.tiers.map((tier) => tier.thresholdCents)) + 10000), discountPercent: Math.min(100, Math.max(0, ...draft.tiers.map((tier) => tier.discountPercent)) + (draft.tiers.length ? 2 : 5)) }] })}>{t("memberTierAdd")}</button>}
+    <button className="primary-action" type="submit" disabled={!changed || nameless || clash}>{t("save")}</button>
   </form>;
+}
+
+/** A new bonus tier: €100 above the highest (capped at a top-up's €1,000), 10% on top. */
+function nextBonusTier(tiers: ApiMembership["tiers"]): ApiMembership["tiers"][number] {
+  const top = Math.max(0, ...tiers.map((tier) => tier.thresholdCents));
+  const thresholdCents = Math.min(100_000, top + 10000);
+  return { thresholdCents, bonusCents: Math.round(thresholdCents / 10) };
 }
 
 /** 会员储值赠送档位：充 X 送 Y，由服务端排序并取不超过充值额的最高一档。 */
@@ -187,6 +199,9 @@ function MembershipForm({ membership, onSave }: { membership: ApiMembership; onS
   const changed = JSON.stringify(draft) !== JSON.stringify(membership);
   const setTier = (index: number, key: "thresholdCents" | "bonusCents", cents: number) =>
     setDraft((current) => ({ ...current, tiers: current.tiers.map((tier, at) => (at === index ? { ...tier, [key]: cents } : tier)) }));
+  const amounts = draft.tiers.map((tier) => tier.thresholdCents);
+  const clash = new Set(amounts).size !== amounts.length;
+  const zero = amounts.some((amount) => amount < 1);
 
   return <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
     <Toggle checked={draft.enabled} label={t("membershipEnabled")} onChange={(enabled) => { setDraft({ ...draft, enabled }); void onSave({ ...draft, enabled }); }} />
@@ -197,8 +212,10 @@ function MembershipForm({ membership, onSave }: { membership: ApiMembership; onS
       <label><span>{t("membershipBonus")}</span><WholeNumberInput max={1000} value={tier.bonusCents / 100} onChange={(euros) => setTier(index, "bonusCents", euros * 100)} /></label>
       <button type="button" className="ghost-action" aria-label={t("remove")} onClick={() => setDraft({ ...draft, tiers: draft.tiers.filter((_, at) => at !== index) })}>✕</button>
     </li>)}</ul>
-    {draft.tiers.length < 20 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { thresholdCents: 10000, bonusCents: 1000 }] })}>{t("membershipAddTier")}</button>}
-    <button className="primary-action" type="submit" disabled={!changed}>{t("save")}</button>
+    {clash && <p className="settings-hint form-warning" role="alert">{t("membershipClash")}</p>}
+    {zero && <p className="settings-hint form-warning" role="alert">{t("membershipZero")}</p>}
+    {draft.tiers.length < 20 && <button type="button" className="ghost-action" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, nextBonusTier(draft.tiers)] })}>{t("membershipAddTier")}</button>}
+    <button className="primary-action" type="submit" disabled={!changed || clash || zero}>{t("save")}</button>
   </form>;
 }
 
@@ -230,8 +247,10 @@ function MemberList({ api, notify, failed }: { api: AdminApi; notify: (message: 
     // instead of the raw refusal (equal to 0 vs. over the €10,000 single-change cap).
     if (!Number.isFinite(amount) || cents === 0) { failed(new Error(t("balanceAmountInvalid"))); return; }
     if (Math.abs(cents) > 1_000_000) { failed(new Error(t("balanceAmountTooLarge"))); return; }
-    const note = window.prompt(t("adjustNotePrompt"))?.trim();
-    if (!note) return;
+    const noteRaw = window.prompt(t("adjustNotePrompt"));
+    if (noteRaw === null) return; // cancelled
+    const note = noteRaw.trim();
+    if (!note) { failed(new Error(t("adjustNoteRequired"))); return; }
     try {
       await api.adjustBalance(customer.id, amount, note);
       notify(t("balanceAdjusted"));

@@ -127,7 +127,11 @@ export interface ApiGuestOrdering {
 /** Points for what guests pay, and the dishes they buy with them. */
 export interface ApiLoyalty {
   enabled: boolean;
+  /** pointsPerEuro points for every eurosPerPoint euros (默认每 10 欧元 1 积分). */
   pointsPerEuro: number;
+  eurosPerPoint: number;
+  /** 充值送积分: a top-up earns points at the same rate; balance-paid bills then earn nothing again. */
+  topUpPoints: boolean;
   rewards: Array<{ productId: string; points: number }>;
   maxRewardsPerOrder: number;
 }

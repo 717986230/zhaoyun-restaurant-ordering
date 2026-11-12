@@ -91,7 +91,7 @@ export const GUEST_ORDERING_DEFAULTS: ApiGuestOrdering = {
   enabled: false, dineIn: true, pickup: false, hours: [], requireOpenTable: true, tableSessionHours: 4,
   maxItems: 30, maxOrderCents: 30_000, minIntervalSeconds: 60, maxOpenPickups: 2
 };
-export const LOYALTY_DEFAULTS: ApiLoyalty = { enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 };
+export const LOYALTY_DEFAULTS: ApiLoyalty = { enabled: false, pointsPerEuro: 1, eurosPerPoint: 10, topUpPoints: true, rewards: [], maxRewardsPerOrder: 1 };
 /** shared/customer.mjs, MEMBERSHIP_DEFAULTS. */
 export const MEMBERSHIP_DEFAULTS: ApiMembership = { enabled: false, tiers: [] };
 /** shared/customer.mjs, MEMBER_TIERS_DEFAULTS. */

@@ -201,6 +201,8 @@ export const SettingsBody = Type.Object({
   loyalty: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),
     pointsPerEuro: Type.Optional(Type.Number()),
+    eurosPerPoint: Type.Optional(Type.Number()),
+    topUpPoints: Type.Optional(Type.Boolean()),
     maxRewardsPerOrder: Type.Optional(Type.Number()),
     rewards: Type.Optional(Type.Array(Type.Object({ productId: ProductId, points: Type.Number() }), { maxItems: 30 }))
   }, { maxProperties: 8 })),
