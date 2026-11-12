@@ -1,4 +1,4 @@
-import type { ApiOrder, GuestOrderRefusal, PointsKind, PointsReason } from "@zhaoyun/contracts";
+import type { ApiOrder, BalanceReason, GuestOrderRefusal, PointsKind, PointsReason } from "@zhaoyun/contracts";
 import type { Language } from "./i18n";
 
 /**
@@ -18,6 +18,7 @@ const copy = {
     accountsOff: "餐厅暂未开放顾客注册", signInLead: "登录后可以收藏菜品、外带自取、积攒积分兑换菜品。", welcome: "你好，{name}",
     points: "积分", pointsLead: "每消费 €1 得 {n} 积分，结账后到账", rewards: "积分兑换", redeem: "兑换", notEnoughPoints: "积分不够", rewardAdded: "已加入购物车：{name}（{points} 积分）",
     pointsHistory: "积分记录", reasonEarn: "消费获得", reasonReverse: "退款扣回", reasonRedeem: "兑换", reasonRefund: "取消退回", reasonAdjust: "餐厅调整", reasonWelcome: "首次到店赠送", reasonNoShow: "预约未到扣除", reasonNoShowBack: "预约未到退回", reasonSignup: "注册赠送", reasonBooking: "预约", reasonBookingBack: "取消预约退回",
+    myBalance: "我的余额", topUpHistory: "储值记录", topUpAtCounter: "充值请到店内收银台（现金 / 刷卡）", noTopUps: "还没有储值记录", balTopup: "充值", balBonus: "赠送", balSpend: "消费", balRefund: "退回", balAdjust: "餐厅调整", balReverse: "充值撤销",
     myOrders: "我的订单", noOrders: "还没有订单", favorites: "我的收藏", favorite: "收藏", unfavorite: "取消收藏", favoritesPage: "♥ 收藏", signInToFavorite: "登录后可以收藏菜品",
     profile: "账户设置", currentPassword: "当前密码", newPassword: "新密码（不改就留空）", save: "保存", saved: "已保存", deleteAccount: "删除账户", deleteConfirm: "删除后积分和收藏都会清除，不能恢复。请输入密码确认。", deleted: "账户已删除", callButton: "呼叫服务员", bookTable: "预约餐桌", callTitle: "呼叫服务员 · {table} 桌", callWaiter: "请服务员过来", callPay: "买单", callWater: "加水", callUtensils: "餐具", callNapkin: "纸巾", callTakeaway: "打包盒", callClear: "收台",
     callSent: "已通知服务员，请稍候", callRepeated: "服务员已经收到，马上就来", callFailed: "没有发出去，请直接示意服务员", downloadData: "下载我的数据", dataDownloaded: "已下载你的数据",
@@ -49,6 +50,7 @@ const copy = {
     accountsOff: "Kundenkonten sind derzeit nicht verfügbar", signInLead: "Mit Konto: Lieblingsgerichte merken, zum Abholen bestellen, Punkte sammeln und einlösen.", welcome: "Hallo, {name}",
     points: "Punkte", pointsLead: "{n} Punkte pro € 1, gutgeschrieben nach dem Bezahlen", rewards: "Prämien", redeem: "Einlösen", notEnoughPoints: "Zu wenig Punkte", rewardAdded: "Im Warenkorb: {name} ({points} Punkte)",
     pointsHistory: "Punkteverlauf", reasonEarn: "Gesammelt", reasonReverse: "Storniert", reasonRedeem: "Eingelöst", reasonRefund: "Zurückgebucht", reasonAdjust: "Vom Restaurant", reasonWelcome: "Erster Besuch", reasonNoShow: "Reservierung versäumt", reasonNoShowBack: "Versäumt, zurückgebucht", reasonSignup: "Registrierung", reasonBooking: "Reservierung", reasonBookingBack: "Reservierung storniert",
+    myBalance: "Mein Guthaben", topUpHistory: "Guthaben-Verlauf", topUpAtCounter: "Aufladen an der Kassa im Lokal (bar / Karte)", noTopUps: "Noch kein Guthaben-Verlauf", balTopup: "Aufladung", balBonus: "Bonus", balSpend: "Ausgegeben", balRefund: "Rückerstattung", balAdjust: "Vom Restaurant", balReverse: "Aufladung storniert",
     myOrders: "Meine Bestellungen", noOrders: "Noch keine Bestellungen", favorites: "Favoriten", favorite: "Merken", unfavorite: "Nicht mehr merken", favoritesPage: "♥ Favoriten", signInToFavorite: "Zum Merken bitte anmelden",
     profile: "Konto-Einstellungen", currentPassword: "Aktuelles Passwort", newPassword: "Neues Passwort (leer lassen = unverändert)", save: "Speichern", saved: "Gespeichert", deleteAccount: "Konto löschen", deleteConfirm: "Punkte und Favoriten werden endgültig gelöscht. Zum Bestätigen Passwort eingeben.", deleted: "Konto gelöscht", callButton: "Personal rufen", bookTable: "Tisch reservieren", callTitle: "Personal rufen · Tisch {table}", callWaiter: "Bitte an den Tisch kommen", callPay: "Zahlen", callWater: "Wasser", callUtensils: "Besteck", callNapkin: "Servietten", callTakeaway: "Box zum Mitnehmen", callClear: "Abräumen",
     callSent: "Das Personal ist informiert – einen Moment bitte", callRepeated: "Schon angekommen – es kommt gleich jemand", callFailed: "Nicht gesendet – bitte dem Personal Bescheid geben", downloadData: "Meine Daten herunterladen", dataDownloaded: "Deine Daten wurden heruntergeladen",
@@ -80,6 +82,7 @@ const copy = {
     accountsOff: "Guest accounts are not available right now", signInLead: "With an account: keep favourites, order for pickup, collect points and redeem them.", welcome: "Hello, {name}",
     points: "Points", pointsLead: "{n} points per €1, credited once paid", rewards: "Rewards", redeem: "Redeem", notEnoughPoints: "Not enough points", rewardAdded: "In your cart: {name} ({points} points)",
     pointsHistory: "Points history", reasonEarn: "Earned", reasonReverse: "Refunded receipt", reasonRedeem: "Redeemed", reasonRefund: "Returned", reasonAdjust: "By the restaurant", reasonWelcome: "First visit", reasonNoShow: "Booking missed", reasonNoShowBack: "Booking missed, given back", reasonSignup: "Signed up", reasonBooking: "Booking", reasonBookingBack: "Booking cancelled",
+    myBalance: "My balance", topUpHistory: "Stored-value history", topUpAtCounter: "Top up at the counter in the restaurant (cash / card)", noTopUps: "No stored-value history yet", balTopup: "Top-up", balBonus: "Bonus", balSpend: "Spent", balRefund: "Refund", balAdjust: "By the restaurant", balReverse: "Top-up reversed",
     myOrders: "My orders", noOrders: "No orders yet", favorites: "Favourites", favorite: "Save", unfavorite: "Remove from favourites", favoritesPage: "♥ Favourites", signInToFavorite: "Sign in to keep favourites",
     profile: "Account settings", currentPassword: "Current password", newPassword: "New password (leave empty to keep)", save: "Save", saved: "Saved", deleteAccount: "Delete account", deleteConfirm: "Your points and favourites are deleted for good. Enter your password to confirm.", deleted: "Account deleted", callButton: "Call a waiter", bookTable: "Book a table", callTitle: "Call a waiter · table {table}", callWaiter: "Please come to the table", callPay: "The bill", callWater: "Water", callUtensils: "Cutlery", callNapkin: "Napkins", callTakeaway: "Takeaway box", callClear: "Clear the table",
     callSent: "The staff know – someone is on the way", callRepeated: "Already received – someone is coming", callFailed: "Not sent – please wave to the staff", downloadData: "Download my data", dataDownloaded: "Your data was downloaded",
@@ -131,4 +134,13 @@ const KIND: Record<PointsKind, GuestKey> = { welcome: "reasonWelcome", no_show: 
 /** What a line of the guest's points is: the booking membership's own lines by their kind, the rest by their reason. */
 export function pointsReason(language: Language, reason: PointsReason, kind?: PointsKind): string {
   return g(language, kind ? KIND[kind] : REASON[reason]);
+}
+
+const BALANCE_REASON: Record<BalanceReason, GuestKey> = {
+  topup: "balTopup", bonus: "balBonus", spend: "balSpend", refund: "balRefund", adjust: "balAdjust", reverse: "balReverse"
+};
+
+/** What a line of the guest's stored-value ledger is. */
+export function balanceReason(language: Language, reason: BalanceReason): string {
+  return g(language, BALANCE_REASON[reason]);
 }

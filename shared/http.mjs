@@ -582,6 +582,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return json({ favorites: await customers.setFavorite(customer.id, path[3], method === "PUT") });
         }
         if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
+        // 会员储值: the guest's own balance history (read-only; top-ups happen at the counter).
+        if (rest === "balance" && method === "GET") return json({ entries: await customers.balanceHistory(customer.id) });
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
         if (rest === "reservations" && method === "GET") return json({ reservations: await store.reservations.forCustomer(customer.id) }, 200, { "cache-control": "no-store" });

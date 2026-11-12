@@ -662,6 +662,8 @@ export class RestaurantApi {
     return this.#request(`/api/customer/favorites/${encodeURIComponent(productId)}`, { method: on ? "PUT" : "DELETE" });
   }
   customerPoints(): Promise<{ entries: ApiPointsEntry[] }> { return this.#request("/api/customer/points"); }
+  /** 会员储值: this guest's own stored-value ledger (read-only; top-ups are at the counter). */
+  customerBalance(): Promise<{ entries: ApiBalanceEntry[] }> { return this.#request("/api/customer/balance"); }
   customerOrders(): Promise<{ orders: ApiOrder[] }> { return this.#request("/api/customer/orders"); }
   /** Everything kept about this guest's account, to download. */
   exportCustomerData(): Promise<CustomerDataExport> { return this.#request("/api/customer/export"); }
