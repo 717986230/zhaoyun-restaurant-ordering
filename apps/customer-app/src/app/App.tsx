@@ -18,6 +18,11 @@ import { orderingState } from "./ordering";
 import { assignedTableNo } from "./table";
 import { useCustomer } from "../features/account/useCustomer";
 import { AccountSheet } from "../features/account/AccountSheet";
+import { MemberEntrance } from "../features/account/MemberEntrance";
+import { unlockAudioOnFirstGesture } from "../features/account/useTierEntry";
+
+// iOS only plays sound from audio opened inside a tap: open it on the first one.
+unlockAudioOnFirstGesture();
 import { CartSheet } from "../features/cart/CartSheet";
 
 // Booking a table opens over the menu; its code and styles load on the first tap.
@@ -96,6 +101,7 @@ export function App() {
   const accountsOn = Boolean(catalog.menu?.accounts);
   const account = useCustomer(accountsOn);
   const loyalty = catalog.menu?.loyalty ?? null;
+  const birthdayPerk = catalog.menu?.birthdayPerk ?? null;
   const rewardPoints = useMemo(() => new Map((loyalty?.rewards ?? []).map((reward) => [reward.productId, reward.points])), [loyalty]);
   const cart = summarize(state.cart, catalog.products, rewardPoints);
   // A sheet whose feature was switched off while it was open closes.
@@ -113,6 +119,7 @@ export function App() {
   }, [featuredSettings, products]);
 
   return <main className="app-shell">
+    {accountsOn && <MemberEntrance customer={account.customer} language={language} />}
     {!online && <div className="offline-bar" role="status">{t(language, "offlineMenu")}</div>}
     <CatalogScreen
       state={{ ...state, language }}
@@ -135,7 +142,7 @@ export function App() {
     />
     <AnimatePresence>
       {sheet === "cart" && <CartSheet key="cart" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} ordering={ordering} loyalty={loyalty} account={account} suggestions={catalog.menu?.suggestions ?? []} />}
-      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} signupPoints={catalog.menu?.signupPoints ?? 0} />}
+      {sheet === "account" && <AccountSheet key="account" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} account={account} loyalty={loyalty} birthdayPerk={birthdayPerk} ordering={ordering} restaurantName={catalog.menu?.restaurantName ?? ""} signupPoints={catalog.menu?.signupPoints ?? 0} />}
       {sheet === "service" && serviceTable && <ServiceSheet key="service" state={{ ...state, language }} dispatch={dispatch} table={serviceTable} />}
       {sheet === "orders" && <OrdersSheet key="orders" state={{ ...state, language }} dispatch={dispatch} products={catalog.products} signedIn={account.signedIn} />}
       {sheet === "booking" && <Suspense key="booking" fallback={null}><BookingSheet language={language} onClose={() => dispatch({ type: "sheet", sheet: null })} /></Suspense>}

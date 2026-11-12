@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import type { ApiReservation } from "@zhaoyun/contracts";
 import type { Pos } from "./App";
 
 /**
@@ -51,12 +52,24 @@ async function detector(): Promise<Detect> {
  * the number goes to `onFound`; the floor does the rest. A member's code
  * (the booking page shows it to a guest short of points) goes there too.
  */
-export function BookingScanner({ pos, onFound, onClose }: { pos: Pos; onFound: (scanned: Scanned) => void; onClose: () => void }) {
+export function BookingScanner({ pos, bookings, onFound, onClose }: { pos: Pos; bookings: ApiReservation[]; onFound: (scanned: Scanned) => void; onClose: () => void }) {
   const { t } = pos;
   const video = useRef<HTMLVideoElement>(null);
   const [cameraFailed, setCameraFailed] = useState(false);
   const [typed, setTyped] = useState("");
+  const [search, setSearch] = useState("");
   const found = useRef(false);
+
+  // A guest who says they have a booking but has no code: the waiter types a
+  // name or a mobile number and seats the match, the same way a scan does.
+  const matches = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return [] as ApiReservation[];
+    const digits = query.replace(/\D/g, "");
+    return bookings.filter((booking) =>
+      booking.name.toLowerCase().includes(query) || (digits.length >= 3 && (booking.phone ?? "").replace(/\D/g, "").includes(digits))
+    ).slice(0, 8);
+  }, [bookings, search]);
   // The latest handler, without restarting the camera when the floor re-renders.
   const handler = useRef(onFound);
   handler.current = onFound;
@@ -126,6 +139,20 @@ export function BookingScanner({ pos, onFound, onClose }: { pos: Pos; onFound: (
           autoCapitalize="characters" autoComplete="off" spellCheck={false} maxLength={14} aria-label={t("scanTypeReference")} />
         <button type="submit" className="pos-primary" disabled={!bookingReferenceFrom(typed)}>{t("scanCheckIn")}</button>
       </form>
+      <div className="pos-scan-find">
+        <input id="posScanSearch" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("scanSearchName")}
+          autoComplete="off" spellCheck={false} maxLength={40} aria-label={t("scanSearchName")} />
+        {search.trim()
+          ? matches.length
+            ? <ul className="pos-scan-matches">{matches.map((booking) => <li key={booking.id}>
+                <button type="button" data-reference={booking.reference} onClick={() => onFound({ kind: "booking", reference: booking.reference.toUpperCase() })}>
+                  <span><b>{booking.time}</b> · {booking.name} · {booking.party} 👤{booking.table ? ` · ${t("table", { table: booking.table })}` : ""}</span>
+                  <em>{t("scanSeat")}</em>
+                </button>
+              </li>)}</ul>
+            : <p className="pos-scan-note">{t("scanSearchNone")}</p>
+          : null}
+      </div>
     </section>
   </div>;
 }

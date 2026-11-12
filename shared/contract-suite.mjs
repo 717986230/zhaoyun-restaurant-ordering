@@ -1035,7 +1035,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(preview.sales, 4);
       assert.equal(preview.stornos, 2);
       assert.equal(preview.grossCents, 1000 + 3000, "a cancelled sale adds up to nothing");
-      assert.deepEqual(preview.payments, { cash: 0, card: 4000, voucher: 0 });
+      assert.deepEqual(preview.payments, { cash: 0, card: 4000, voucher: 0, balance: 0 });
       assert.equal(preview.vouchersSoldCents, 3000);
       assert.equal((await call("GET", "/api/admin/day-closings/preview", staff)).status, 403);
       const closed = await call("POST", "/api/admin/day-closings", { admin: true });
@@ -1065,6 +1065,160 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await call("PATCH", `/api/orders/${placed.id}/status`, { role: "staff", body: { status: "preparing" } });
       await call("DELETE", "/api/admin/tables/K1", { admin: true });
       for (const product of [noodles, tea]) await call("DELETE", `/api/admin/products/${product.id}`, { admin: true });
+    }],
+
+    ["members' stored value: top-up with a bonus tier at 0%, balance payment on a bill, storno refunds and reversals, the manager's hand-change", async () => {
+      const staff = { role: "staff" };
+      const topUp = (body, auth = staff) => call("POST", "/api/admin/topup", { ...auth, body: { reason: "现金充值", ...body } });
+      const lookup = (login, auth = staff) => call("GET", `/api/admin/members?login=${encodeURIComponent(login)}`, auth);
+
+      // A member signs up by mobile number — the way they are found at the till.
+      await call("PUT", "/api/admin/settings", { admin: true, body: { customerAccounts: true } });
+      const member = (await call("POST", "/api/customer/register", { body: { email: "+43 660 9988776", name: "Guthaben Gast", password: "stored-value-9" } })).json.customer;
+      assert.equal(member.balanceCents, 0);
+      assert.equal(member.phone, "+436609988776");
+
+      // Top-up is off until the owner switches it on, and only cash or card pays it.
+      assert.equal((await topUp({ memberId: member.id, amount: 50, payments: [{ type: "cash", amount: 50 }] })).status, 400, "top-up off");
+      await call("PUT", "/api/admin/settings", { admin: true, body: { membership: { enabled: true, tiers: [{ thresholdCents: 10000, bonusCents: 1000 }] } } });
+
+      // 50 euros, below the tier: no bonus. The receipt is one 0% line (a
+      // multi-purpose voucher), not a sale of anything yet.
+      const first = await topUp({ memberId: member.id, amount: 50, payments: [{ type: "cash", amount: 50, tendered: 50 }], clientRequestId: "topup-a" });
+      assert.equal(first.status, 201, JSON.stringify(first.json));
+      assert.equal(first.json.member.balanceCents, 5000);
+      assert.equal(first.json.receipt.lines[0].kind, "topup");
+      assert.deepEqual(first.json.receipt.vat, [{ percent: 0, grossCents: 5000, netCents: 5000, vatCents: 0 }]);
+      assert.equal(first.json.receipt.totalCents, 5000);
+      assert.equal((await topUp({ memberId: member.id, amount: 50, payments: [{ type: "cash", amount: 50 }], clientRequestId: "topup-a" })).json.receipt.id, first.json.receipt.id, "a retried top-up is the same receipt");
+      assert.equal((await topUp({ memberId: "no-such", amount: 50, payments: [{ type: "card", amount: 50 }] })).status, 404, "no such member");
+      assert.equal((await topUp({ memberId: member.id, amount: 50, payments: [{ type: "voucher", amount: 50 }] })).status, 400, "a top-up is cash or card");
+      assert.equal((await topUp({ memberId: member.id, amount: 50, payments: [{ type: "cash", amount: 40 }] })).status, 400, "the payment must match");
+      // The reason a top-up is booked is required (防止绕过): no free credit without a trace.
+      assert.equal((await call("POST", "/api/admin/topup", { ...staff, body: { memberId: member.id, amount: 50, payments: [{ type: "cash", amount: 50 }] } })).status, 400, "a top-up needs a reason");
+      assert.equal((await topUp({ memberId: member.id, amount: 50, reason: "   ", payments: [{ type: "cash", amount: 50 }] })).status, 400, "a blank reason is no reason");
+
+      // 100 euros reaches the tier: 10 euros on top (充100送10). The bonus is the
+      // house's gift — the member paid 100, the balance grows by 110.
+      const bonusTopUp = await topUp({ memberId: member.id, amount: 100, payments: [{ type: "card", amount: 100 }] });
+      assert.equal(bonusTopUp.status, 201, JSON.stringify(bonusTopUp.json));
+      assert.equal(bonusTopUp.json.receipt.totalCents, 10000, "only the money paid is on the receipt");
+      assert.equal(bonusTopUp.json.member.balanceCents, 16000);
+      assert.equal((await lookup("0660 9988776")).json.member.balanceCents, 16000, "found by the number written any way");
+
+      // A bill paid from the balance (余额支付): booked at its real VAT, settled
+      // from stored value like a voucher — and it works in a split.
+      const dish = async (body) => (await call("POST", "/api/admin/products", { admin: true, body: { names: { zh: body.sku, de: body.sku, en: body.sku }, published: true, available: true, ...body } })).json.product;
+      const noodles = await dish({ sku: "MEM-N", kind: "food", category: "MEMTEST", price: 10, printStation: "kitchen" });
+      const token = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "M1" } })).json.table.token;
+      const order = async (clientRequestId, qty) => (await call("POST", "/api/orders", { tableToken: token, body: { clientRequestId, table: "M1", note: "", items: [{ id: noodles.id, qty }] } })).json.order;
+      const lineOf = async () => (await call("GET", "/api/admin/tables/M1/bill", staff)).json.bill.items[0];
+
+      await order("mem-order-1", 2);
+      const billLine = await lineOf();
+      assert.equal((await call("POST", "/api/admin/checkout", { ...staff, body: { table: "M1", items: [{ orderItemId: billLine.orderItemId, quantity: 2 }], payments: [{ type: "balance", amount: 200, memberId: member.id }] } })).status, 400, "more than the balance holds? no — more than the bill");
+      const paid = await call("POST", "/api/admin/checkout", { ...staff, body: { table: "M1", items: [{ orderItemId: billLine.orderItemId, quantity: 2 }], payments: [{ type: "balance", amount: 20, memberId: member.id }] } });
+      assert.equal(paid.status, 201, JSON.stringify(paid.json));
+      const balancePayment = paid.json.receipt.payments[0];
+      assert.equal(balancePayment.type, "balance");
+      assert.equal(balancePayment.memberId, member.id);
+      assert.deepEqual(paid.json.receipt.vat, [{ percent: 10, grossCents: 2000, netCents: 1818, vatCents: 182 }], "the food is taxed, not the tender");
+      assert.equal((await lookup("+436609988776")).json.member.balanceCents, 14000, "the bill came off the balance");
+
+      // That bill cancelled: the money goes back to the member.
+      assert.equal((await call("POST", `/api/admin/receipts/${paid.json.receipt.id}/storno`, { role: "manager", body: { reason: "wrong member" } })).status, 201);
+      assert.equal((await lookup("+436609988776")).json.member.balanceCents, 16000, "the storno gave the balance back");
+
+      // A balance payment names a member the house knows, or it is refused.
+      await order("mem-order-2", 2);
+      const openLine = await lineOf();
+      assert.equal((await call("POST", "/api/admin/checkout", { ...staff, body: { table: "M1", items: [{ orderItemId: openLine.orderItemId, quantity: 2 }], payments: [{ type: "balance", amount: 20, memberId: "no-such" }] } })).status, 400, "no such member for a balance payment");
+      // Settle the open bill so the table is free to tidy up.
+      assert.equal((await call("POST", "/api/admin/checkout", { ...staff, body: { table: "M1", items: [{ orderItemId: openLine.orderItemId, quantity: 2 }], payments: [{ type: "balance", amount: 20, memberId: member.id }] } })).status, 201);
+
+      // The manager changes a member's balance by hand, with a note; a waiter cannot.
+      assert.equal((await call("POST", `/api/admin/customers/${member.id}/balance`, { ...staff, body: { amount: -5, note: "x" } })).status, 403);
+      const adjusted = await call("POST", `/api/admin/customers/${member.id}/balance`, { role: "manager", body: { amount: -5, note: "goodwill correction" } });
+      assert.equal(adjusted.status, 200, JSON.stringify(adjusted.json));
+      assert.equal(adjusted.json.customer.balanceCents, 13500);
+      assert.equal((await call("POST", `/api/admin/customers/${member.id}/balance`, { role: "manager", body: { amount: -9999, note: "too much" } })).status, 409, "cannot take more than is there");
+      assert.equal((await call("POST", `/api/admin/customers/${member.id}/balance`, { role: "manager", body: { amount: 0, note: "nothing" } })).status, 400);
+
+      // A top-up cancelled: the money and its bonus come back out of the balance.
+      const reversible = await topUp({ memberId: member.id, amount: 100, payments: [{ type: "card", amount: 100 }] });
+      assert.equal(reversible.json.member.balanceCents, 24500);
+      assert.equal((await call("POST", `/api/admin/receipts/${reversible.json.receipt.id}/storno`, { role: "manager", body: { reason: "topped up by mistake" } })).status, 201);
+      assert.equal((await lookup("+436609988776")).json.member.balanceCents, 13500, "the top-up and its bonus are taken back");
+
+      // The console sees the balance and its ledger.
+      const detail = (await call("GET", `/api/admin/customers/${member.id}`, { role: "manager" })).json;
+      assert.equal(detail.customer.balanceCents, 13500);
+      assert.ok(detail.balance.some((entry) => entry.reason === "bonus"), "the ledger keeps the bonus");
+      assert.ok(detail.balance.some((entry) => entry.reason === "spend"), "and the spend");
+      // Every top-up and hand-adjust carries why and who (会员储值操作记录): the
+      // reason booked at the till and the manager who changed the balance.
+      assert.ok(detail.balance.some((entry) => entry.reason === "topup" && entry.note === "现金充值"), "a top-up keeps its reason");
+      assert.ok(detail.balance.some((entry) => entry.reason === "adjust" && entry.operator === "manager"), "a hand-adjust keeps who made it");
+
+      await call("DELETE", "/api/admin/tables/M1", { admin: true });
+      await call("DELETE", `/api/admin/products/${noodles.id}`, { admin: true });
+      await call("DELETE", `/api/admin/customers/${member.id}`, { role: "manager" });
+      await call("PUT", "/api/admin/settings", { admin: true, body: { membership: { enabled: false, tiers: [] }, customerAccounts: false } });
+    }],
+
+    ["充值送积分 at 10 euros a point, no double points on a balance-paid bill, and a hand-credited member reaching their tier", async () => {
+      const staff = { role: "staff" };
+      const topUp = (body) => call("POST", "/api/admin/topup", { ...staff, body: { reason: "现金充值", ...body } });
+      const pointsOf = async (id) => (await call("GET", `/api/admin/customers/${id}`, { role: "manager" })).json.customer.points;
+      await call("PUT", "/api/admin/settings", { admin: true, body: {
+        customerAccounts: true,
+        membership: { enabled: true, tiers: [] },
+        loyalty: { enabled: true, pointsPerEuro: 1, eurosPerPoint: 10, topUpPoints: true, rewards: [], maxRewardsPerOrder: 1 },
+        memberTiers: { enabled: true, tiers: [{ name: "Silber", thresholdCents: 10000, discountPercent: 0 }, { name: "Gold", thresholdCents: 1000000, discountPercent: 0 }] }
+      } });
+      const member = (await call("POST", "/api/customer/register", { body: { email: "+43 660 1234321", name: "Punkte Gast", password: "points-at-ten-1" } })).json.customer;
+
+      // 105 euros put in: 10 points (one per full 10 euros), credited at once.
+      const start = await pointsOf(member.id);
+      const paidIn = await topUp({ memberId: member.id, amount: 105, payments: [{ type: "cash", amount: 105 }] });
+      assert.equal(paidIn.status, 201, JSON.stringify(paidIn.json));
+      assert.equal(await pointsOf(member.id), start + 10, "a top-up earns points at 10 euros a point");
+
+      // A bill paid wholly from that balance earns nothing again.
+      const dish = (await call("POST", "/api/admin/products", { admin: true, body: { names: { zh: "PT", de: "PT", en: "PT" }, sku: "PT-1", kind: "food", category: "PTTEST", price: 50, printStation: "kitchen", published: true, available: true } })).json.product;
+      const token = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "P1" } })).json.table.token;
+      const memberToken = (await call("POST", "/api/customer/sign-in", { body: { email: "+43 660 1234321", password: "points-at-ten-1" } })).json.token;
+      assert.ok(memberToken, "the member signs in");
+      const placed = await call("POST", "/api/orders", { tableToken: token, customerToken: memberToken, body: { clientRequestId: "pt-order-1", table: "P1", note: "", items: [{ id: dish.id, qty: 1 }] } });
+      assert.equal(placed.status, 201, JSON.stringify(placed.json));
+      const line = (await call("GET", "/api/admin/tables/P1/bill", staff)).json.bill.items[0];
+      const bill = await call("POST", "/api/admin/checkout", { ...staff, body: { table: "P1", items: [{ orderItemId: line.orderItemId, quantity: 1 }], payments: [{ type: "balance", amount: 50, memberId: member.id }] } });
+      assert.equal(bill.status, 201, JSON.stringify(bill.json));
+      const ledger = (await call("GET", "/api/customer/points", { customerToken: memberToken })).json.entries;
+      assert.ok(!ledger.some((entry) => entry.reason === "earn" && entry.ref === bill.json.receipt.id), "stored value already earned its points when it was topped up");
+      const settled = await pointsOf(member.id);
+
+      // The top-up cancelled: its points come back out.
+      const again = await topUp({ memberId: member.id, amount: 30, payments: [{ type: "card", amount: 30 }] });
+      assert.equal(await pointsOf(member.id), settled + 3);
+      assert.equal((await call("POST", `/api/admin/receipts/${again.json.receipt.id}/storno`, { role: "manager", body: { reason: "mistake" } })).status, 201);
+      assert.equal(await pointsOf(member.id), settled, "a cancelled top-up takes its points back");
+
+      // 成长值 counts what the house credits by hand too: 105 put in, then a big
+      // credit at the counter lifts the member to the top tier.
+      const before = (await call("GET", `/api/admin/customers/${member.id}`, { role: "manager" })).json.customer.membership;
+      assert.equal(before.tierLevel, 1);
+      assert.equal(before.tier, "Silber");
+      await call("POST", `/api/admin/customers/${member.id}/balance`, { role: "manager", body: { amount: 9999, note: "VIP" } });
+      const after = (await call("GET", `/api/admin/customers/${member.id}`, { role: "manager" })).json.customer.membership;
+      assert.equal(after.tier, "Gold");
+      assert.equal(after.tierLevel, 2);
+      assert.equal(after.tierCount, 2);
+
+      await call("DELETE", "/api/admin/tables/P1", { admin: true });
+      await call("DELETE", `/api/admin/products/${dish.id}`, { admin: true });
+      await call("DELETE", `/api/admin/customers/${member.id}`, { role: "manager" });
+      await call("PUT", "/api/admin/settings", { admin: true, body: { membership: { enabled: false, tiers: [] }, memberTiers: { enabled: false, tiers: [] }, loyalty: { enabled: false, pointsPerEuro: 1, eurosPerPoint: 10, topUpPoints: true, rewards: [], maxRewardsPerOrder: 1 }, customerAccounts: false } });
     }],
 
     ["the POS: paired devices, waiters' PINs, tables locked to the device that has them open, takeaway, moving a table, settlement", async () => {
@@ -1406,7 +1560,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const registered = await call("POST", "/api/customer/register", { body: guest });
       assert.equal(registered.status, 201, JSON.stringify(registered.json));
       assert.ok(registered.json.token);
-      assert.deepEqual({ ...registered.json.customer, id: "", createdAt: "" }, { id: "", email: "mei.lin@example.com", name: "Mei", points: 0, createdAt: "", emailVerified: false });
+      assert.deepEqual({ ...registered.json.customer, id: "", createdAt: "" }, { id: "", email: "mei.lin@example.com", name: "Mei", points: 0, balanceCents: 0, createdAt: "", emailVerified: false });
       const again = await call("POST", "/api/customer/register", { body: { ...guest, email: "mei.lin@example.com" } });
       assert.equal(again.status, 409);
       assert.equal(again.json.code, "EMAIL_TAKEN");
@@ -1536,9 +1690,9 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       for (const loyalty of [{ pointsPerEuro: -1 }, { rewards: [{ productId: "photo-n1-6", points: 0 }] }, { rewards: [{ productId: "a", points: 1 }, { productId: "a", points: 2 }] }, { maxRewardsPerOrder: 0 }]) {
         assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty } })).status, 400, `${JSON.stringify(loyalty)} must be refused`);
       }
-      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 } } });
+      const saved = await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, eurosPerPoint: 1, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 } } });
       assert.equal(saved.status, 200);
-      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.loyalty, { pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 });
+      assert.deepEqual((await call("GET", "/api/catalog")).json.menu.loyalty, { pointsPerEuro: 2, eurosPerPoint: 1, topUpPoints: true, rewards: [{ productId: "photo-n1-6", points: 5 }], maxRewardsPerOrder: 1 });
 
       const guest = (await call("POST", "/api/customer/register", { body: { email: "points@example.com", password: "collect-them-all" } })).json;
       const me = async () => (await call("GET", "/api/customer", { customerToken: guest.token })).json.customer;
@@ -1581,7 +1735,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await me()).points, 20);
 
       // Too dear now: refused whole, nothing spent.
-      await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, rewards: [{ productId: "photo-n1-6", points: 500 }], maxRewardsPerOrder: 1 } } });
+      await call("PUT", "/api/admin/settings", { admin: true, body: { loyalty: { enabled: true, pointsPerEuro: 2, eurosPerPoint: 1, rewards: [{ productId: "photo-n1-6", points: 500 }], maxRewardsPerOrder: 1 } } });
       const dear = await pickup([{ id: "photo-n1-6", qty: 1, reward: true }]);
       assert.equal(dear.status, 409);
       assert.equal(dear.json.code, "NOT_ENOUGH_POINTS");
@@ -2002,6 +2156,26 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await mine(first.json.reservation.id)).status, 404, "no token, no booking");
       assert.equal((await mine(first.json.reservation.id, second.json.token)).status, 404, "another guest's token opens nothing");
       assert.equal((await mine(second.json.reservation.id, "x".repeat(43), "POST", "/cancel")).status, 404);
+
+      // A guest with no account and no saved link finds their booking again by its
+      // number and the phone or email they booked with; a fresh link comes back.
+      const toFind = await book({ date: addDays(day, 2), time: "13:00", party: 2, name: "Lotte", phone: "0660 9090909" });
+      assert.equal(toFind.status, 201, JSON.stringify(toFind.json));
+      const lookup = (body) => call("POST", "/api/reservations/lookup", { body });
+      const found = await lookup({ reference: toFind.json.reservation.reference.toLowerCase(), contact: "0043 660 9090909" });
+      assert.equal(found.status, 200, "the number written another way, and the reference in any case, still match");
+      assert.equal(found.json.reservation.id, toFind.json.reservation.id);
+      assert.equal(found.json.reservation.name, "Lotte");
+      assert.equal(found.json.reservation.source, undefined, "no staff fields for the guest");
+      assert.ok(found.json.token, "a fresh link to view or cancel it");
+      assert.equal((await lookup({ reference: toFind.json.reservation.reference, contact: "0660 0000000" })).status, 404, "the contact must match the booking");
+      assert.equal((await lookup({ reference: "ZZZZZZ", contact: "0660 9090909" })).status, 404, "an unknown reference is not found");
+      assert.equal((await lookup({ reference: "ab", contact: "0660 9090909" })).status, 400, "the reference is at least four characters");
+      // The link the lookup gives manages the booking the usual way.
+      const refound = await mine(found.json.reservation.id, found.json.token);
+      assert.equal(refound.status, 200);
+      assert.equal(refound.json.reservation.cancellable, true);
+      assert.equal((await mine(found.json.reservation.id, found.json.token, "POST", "/cancel")).json.reservation.status, "cancelled");
 
       // The floor's list: today by default, any run of days by asking.
       assert.equal((await call("GET", `/api/admin/reservations?from=${day}&to=${day}`)).status, 401);
