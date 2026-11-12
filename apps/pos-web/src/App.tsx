@@ -9,6 +9,7 @@ import { Floor } from "./Floor";
 import { OrderScreen } from "./OrderScreen";
 import { PayScreen } from "./PayScreen";
 import { Records } from "./Records";
+import { TopUp } from "./TopUp";
 
 export const api = new PosApi();
 
@@ -53,6 +54,7 @@ export type Screen =
   | { name: "floor" }
   | { name: "order"; table: string; pickupNo?: number }
   | { name: "pay"; table: string }
+  | { name: "topup" }
   | { name: "records" };
 
 const LANGUAGE_NAMES: Record<PosLanguage, string> = { zh: "中文", de: "Deutsch", en: "English" };
@@ -126,6 +128,7 @@ export function App() {
     const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive, refreshMenu: loadCatalog };
     body = screen.name === "order" ? <OrderScreen pos={pos} table={screen.table} pickupNo={screen.pickupNo} go={setScreen} />
       : screen.name === "pay" ? <PayScreen pos={pos} table={screen.table} go={setScreen} />
+      : screen.name === "topup" ? <TopUp pos={pos} go={setScreen} />
       : screen.name === "records" ? <Records pos={pos} go={setScreen} />
       : <Floor pos={pos} go={setScreen} />;
   }

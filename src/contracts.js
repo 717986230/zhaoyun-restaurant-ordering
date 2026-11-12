@@ -204,6 +204,11 @@ export const SettingsBody = Type.Object({
     maxRewardsPerOrder: Type.Optional(Type.Number()),
     rewards: Type.Optional(Type.Array(Type.Object({ productId: ProductId, points: Type.Number() }), { maxItems: 30 }))
   }, { maxProperties: 8 })),
+  // Members' stored value: the bonus tiers are shared/customer.mjs's to check.
+  membership: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    tiers: Type.Optional(Type.Array(Type.Object({ thresholdCents: Type.Number(), bonusCents: Type.Number() }), { maxItems: 20 }))
+  }, { maxProperties: 4 })),
   // Online table bookings; the rules are shared/reservations.mjs's to check.
   reservations: Type.Optional(Type.Object({
     enabled: Type.Optional(Type.Boolean()),
@@ -270,10 +275,33 @@ export const CheckoutBody = Type.Object({
     amount: Type.Number(),
     tendered: Type.Optional(Type.Number()),
     voucherCode: Type.Optional(Type.String({ maxLength: 32 })),
+    // Whose stored value a `balance` payment spends (planCheckout).
+    memberId: Type.Optional(Type.String({ maxLength: 128 })),
     // Trinkgeld, beside the amount: the staff's, not in the total (planCheckout).
     tip: Type.Optional(Type.Number())
   // None only for a receipt of nothing to pay: a reward bought with points (planCheckout).
   }), { minItems: 0, maxItems: 10 })
+}, { additionalProperties: false });
+
+// A member putting money in (会员储值充值): who, how much, and how it is paid
+// (cash or card). The bonus is the house's to work out from the tiers, not the
+// till's to send, so it is not here. See shared/register.mjs, planTopUp.
+export const TopUpBody = Type.Object({
+  clientRequestId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  memberId: Type.String({ minLength: 1, maxLength: 128 }),
+  amount: Type.Number(),
+  payments: Type.Array(Type.Object({
+    type: Type.String({ maxLength: 16 }),
+    amount: Type.Number(),
+    tendered: Type.Optional(Type.Number())
+  }), { minItems: 1, maxItems: 4 })
+}, { additionalProperties: false });
+
+// The manager's hand-change of a member's balance (退款 / 调整): an amount in
+// euros, not zero, and why (shared/customer.mjs, normalizeBalanceAdjustment).
+export const BalanceAdjustBody = Type.Object({
+  amount: Type.Number(),
+  note: Type.String({ minLength: 1, maxLength: 120 })
 }, { additionalProperties: false });
 
 // The POS (shared/pos.mjs). The rules on names, roles and PINs are the

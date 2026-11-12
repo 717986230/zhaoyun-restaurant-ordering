@@ -23,7 +23,8 @@ import {
   CUSTOMER_SESSION_TTL_MS, customerView, DELETE_CUSTOMER_SESSION_SQL, DELETE_CUSTOMER_SESSIONS_SQL, DELETE_CUSTOMER_STATEMENTS,
   DELETE_EXPIRED_CUSTOMER_SESSIONS_SQL, FAVORITES_SQL, INSERT_CUSTOMER_SESSION_SQL, INSERT_CUSTOMER_SQL, INSERT_POINTS_SQL, isOverdrawn,
   isPhoneLogin, MAX_FAVORITES, normalizeCustomerName, normalizeLogin, normalizeCustomerRegistration, normalizePointsAdjustment, pointsEntryView, POINTS_HISTORY_SQL,
-  REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL
+  REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL,
+  balanceEntryView, BALANCE_HISTORY_SQL, changeBalanceStatements, INSERT_BALANCE_SQL, normalizeBalanceAdjustment
 } from "./customer.mjs";
 import { CUSTOMER_ORDERS_SQL, GUEST_ORDERS_BY_REQUEST_SQL, MAX_TRACKED_ORDERS } from "./ordering.mjs";
 import { guestReservationView } from "./reservations.mjs";
@@ -170,6 +171,28 @@ export function createCustomerStore(driver, { ordersFor }) {
     return customerView(await byId(customerId));
   }
 
+  /** A manager's hand-change of a member's balance (退款 / 调整), with a note. */
+  async function adjustBalance(customerId, input) {
+    const { deltaCents, note } = normalizeBalanceAdjustment(input);
+    if (!(await byId(customerId))) return null;
+    const at = now();
+    const id = uuid();
+    try {
+      await driver.batch([
+        [INSERT_BALANCE_SQL, [id, String(customerId), deltaCents, "adjust", id, note, at]],
+        ...changeBalanceStatements(String(customerId), deltaCents, at)
+      ]);
+    } catch (error) {
+      if (isOverdrawn(error)) throw coded("The member does not have that much balance", "NOT_ENOUGH_BALANCE", 409);
+      throw error;
+    }
+    return customerView(await byId(customerId));
+  }
+
+  async function balanceHistory(customerId, limit = 50) {
+    return (await driver.all(BALANCE_HISTORY_SQL, String(customerId), Math.min(Math.max(Number(limit) || 50, 1), 200))).map(balanceEntryView);
+  }
+
   /**
    * A new code for the account's address (shared/email-verify.mjs): once a
    * minute, five times an hour. Returns the address and the code for the
@@ -252,6 +275,7 @@ export function createCustomerStore(driver, { ordersFor }) {
         account: { ...customerView(row), updatedAt: row.updated_at },
         favorites: await favorites(row.id),
         points: (await driver.all(POINTS_HISTORY_SQL, row.id, MAX_EXPORTED_ROWS)).map(pointsEntryView),
+        balance: (await driver.all(BALANCE_HISTORY_SQL, row.id, MAX_EXPORTED_ROWS)).map(balanceEntryView),
         orders: await ordersFor(await driver.all(CUSTOMER_ORDERS_SQL, row.id, MAX_EXPORTED_ROWS)),
         reservations: (await driver.all("SELECT * FROM reservations WHERE customer_id = ? ORDER BY date DESC, time DESC LIMIT ?", row.id, MAX_EXPORTED_ROWS)).map(guestReservationView)
       };
@@ -276,9 +300,22 @@ export function createCustomerStore(driver, { ordersFor }) {
     },
     async get(customerId) {
       const row = await byId(customerId);
-      return row ? { customer: customerView(row), points: (await driver.all(POINTS_HISTORY_SQL, row.id, 50)).map(pointsEntryView) } : null;
+      return row ? {
+        customer: customerView(row),
+        points: (await driver.all(POINTS_HISTORY_SQL, row.id, 50)).map(pointsEntryView),
+        balance: (await driver.all(BALANCE_HISTORY_SQL, row.id, 50)).map(balanceEntryView)
+      } : null;
     },
     adjustPoints,
+    adjustBalance,
+    balanceHistory,
+    /** A member found at the counter by their email or mobile number, or null. */
+    async byLogin(login) {
+      let key;
+      try { key = normalizeLogin(login); } catch { return null; }
+      const row = await driver.first(CUSTOMER_BY_EMAIL_SQL, key);
+      return row ? customerView(row) : null;
+    },
     /** A guest who forgot their password gets a new one at the counter; every session of theirs ends. */
     async resetPassword(customerId, password) {
       const row = await byId(customerId);

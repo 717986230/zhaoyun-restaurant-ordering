@@ -4,8 +4,8 @@ import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 
 const HOLD_MS = 30_000;
-const PAY_KEYS: Record<PaymentType, "cash" | "card" | "voucher"> = { cash: "cash", card: "card", voucher: "voucher" };
-interface Payment { type: PaymentType; amount: string; tendered: string; voucherCode: string; balanceCents: number | null; tip: string }
+const PAY_KEYS: Record<PaymentType, "cash" | "card" | "voucher" | "balance"> = { cash: "cash", card: "card", voucher: "voucher", balance: "balance" };
+interface Payment { type: PaymentType; amount: string; tendered: string; voucherCode: string; balanceCents: number | null; tip: string; memberLogin: string; memberId: string; memberName: string }
 
 const toCents = (text: string) => Math.round(Number(String(text).replace(",", ".")) * 100) || 0;
 const toAmount = (cents: number) => (cents / 100).toFixed(2);
@@ -72,10 +72,12 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const cash = payments.find((payment) => payment.type === "cash" && payment.tendered);
   // The cash handed over pays the amount and the tip; what is left is the change.
   const change = cash ? toCents(cash.tendered) - toCents(cash.amount) - toCents(cash.tip) : 0;
-  const tipCents = payments.reduce((sum, payment) => sum + (payment.type === "voucher" ? 0 : toCents(payment.tip)), 0);
+  const tipCents = payments.reduce((sum, payment) => sum + (payment.type === "voucher" || payment.type === "balance" ? 0 : toCents(payment.tip)), 0);
   // A reward bought with points is a receipt of nothing to pay: no payment on it.
   const picked = Object.values(picks).some((count) => count > 0);
-  const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && !busy;
+  // A balance payment needs a member found, and may not draw more than their stored value.
+  const memberOk = payments.every((payment) => payment.type !== "balance" || (payment.memberId && payment.balanceCents !== null && toCents(payment.amount) <= payment.balanceCents));
+  const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && memberOk && !busy;
 
   const setMode = (next: boolean) => {
     setSeparate(next);
@@ -83,7 +85,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     setPicks(next ? {} : Object.fromEntries(lines.map((item) => [item.orderItemId, item.qty])));
   };
   const pick = (id: string, quantity: number, max: number) => setPicks((current) => ({ ...current, [id]: Math.max(0, Math.min(max, quantity)) }));
-  const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "" }]);
+  const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "" }]);
   const edit = (index: number, change: Partial<Payment>) => setPayments((current) => current.map((payment, at) => (at === index ? { ...payment, ...change } : payment)));
   /** Aufrunden: the tip that brings amount and tip to the next whole euro — again for the one after. */
   const roundUp = (index: number) => {
@@ -103,6 +105,20 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     } catch (error) { pos.failed(error); }
   }
 
+  // A member paying from their stored value (会员储值): looked up at the till by
+  // their mobile number or email, their balance read, and the bill drawn from it.
+  async function checkMember(index: number) {
+    const login = payments[index]?.memberLogin?.trim();
+    if (!login) return;
+    try {
+      const { member } = await api.member(login);
+      edit(index, { memberId: member.id, memberName: member.name, balanceCents: member.balanceCents ?? 0 });
+    } catch (error) {
+      edit(index, { memberId: "", memberName: "", balanceCents: null });
+      pos.failed(error);
+    }
+  }
+
   async function issue() {
     setBusy(true);
     try {
@@ -116,7 +132,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
           amount: toCents(payment.amount) / 100,
           ...(payment.type === "cash" && payment.tendered ? { tendered: toCents(payment.tendered) / 100 } : {}),
           ...(payment.type === "voucher" ? { voucherCode: payment.voucherCode } : {}),
-          ...(payment.type !== "voucher" && toCents(payment.tip) > 0 ? { tip: toCents(payment.tip) / 100 } : {})
+          ...(payment.type === "balance" ? { memberId: payment.memberId } : {}),
+          ...(payment.type !== "voucher" && payment.type !== "balance" && toCents(payment.tip) > 0 ? { tip: toCents(payment.tip) / 100 } : {})
         }))
       });
       const given = receipt.payments.find((payment) => payment.changeCents);
@@ -165,14 +182,17 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     <div className="pos-pay-panel">
       <label className="pos-discount"><span>{t("discount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={discount} onChange={(event) => setDiscount(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>
-      <div className="pos-pay-types">{(["cash", "card", "voucher"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
+      <div className="pos-pay-types">{(["cash", "card", "voucher", "balance"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
       <ul className="pos-payments">{payments.map((payment, index) => <li key={index}>
         <b>{t(PAY_KEYS[payment.type])}</b>
         <label><span>{t("amount")}</span><input inputMode="decimal" value={payment.amount} onChange={(event) => edit(index, { amount: event.target.value })} /></label>
         {payment.type === "cash" && <label><span>{t("tendered")}</span><input inputMode="decimal" placeholder={toAmount(toCents(payment.amount) + toCents(payment.tip))} value={payment.tendered} onChange={(event) => edit(index, { tendered: event.target.value })} /></label>}
-        {payment.type !== "voucher" && <label className="pos-tip"><span>{t("tip")}</span><input inputMode="decimal" placeholder="0.00" value={payment.tip} onChange={(event) => edit(index, { tip: event.target.value })} /><button type="button" data-action="round-up" onClick={() => roundUp(index)}>{t("roundUp")}</button></label>}
+        {payment.type !== "voucher" && payment.type !== "balance" && <label className="pos-tip"><span>{t("tip")}</span><input inputMode="decimal" placeholder="0.00" value={payment.tip} onChange={(event) => edit(index, { tip: event.target.value })} /><button type="button" data-action="round-up" onClick={() => roundUp(index)}>{t("roundUp")}</button></label>}
         {payment.type === "voucher" && <label><span>{t("voucherCode")}</span><input value={payment.voucherCode} autoCapitalize="characters" onChange={(event) => edit(index, { voucherCode: event.target.value.toUpperCase(), balanceCents: null })} onBlur={() => void checkVoucher(index)} /></label>}
+        {payment.type === "balance" && <label><span>{t("memberLogin")}</span><input value={payment.memberLogin} inputMode="email" autoCapitalize="none" spellCheck={false} placeholder={t("memberLoginHint")} onChange={(event) => edit(index, { memberLogin: event.target.value, memberId: "", memberName: "", balanceCents: null })} onBlur={() => void checkMember(index)} /></label>}
+        {payment.type === "balance" && payment.memberName && <small>{payment.memberName}</small>}
         {payment.balanceCents !== null && <small>{t("balance", { amount: money(payment.balanceCents) })}</small>}
+        {payment.type === "balance" && payment.balanceCents !== null && toCents(payment.amount) > payment.balanceCents && <small className="pos-error">{t("balanceShort")}</small>}
         <button type="button" aria-label={t("remove")} onClick={() => setPayments((current) => current.filter((_, at) => at !== index))}>✕</button>
       </li>)}</ul>
       {tipCents > 0 && <p className="pos-tip-total">{t("tipLine", { amount: money(tipCents), total: money(totalCents + tipCents) })}</p>}

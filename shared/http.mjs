@@ -17,7 +17,7 @@ import { Value } from "@sinclair/typebox/value";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, EmailCodeBody, EmailVerifyBody, MailTestBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
-  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, CustomerPasswordBody, TableOrderingBody,
+  GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
@@ -582,6 +582,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return json({ favorites: await customers.setFavorite(customer.id, path[3], method === "PUT") });
         }
         if (rest === "points" && method === "GET") return json({ entries: await customers.points(customer.id) });
+        // 会员储值: the guest's own balance history (read-only; top-ups happen at the counter).
+        if (rest === "balance" && method === "GET") return json({ entries: await customers.balanceHistory(customer.id) });
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
         if (rest === "reservations" && method === "GET") return json({ reservations: await store.reservations.forCustomer(customer.id) }, 200, { "cache-control": "no-store" });
@@ -1144,6 +1146,29 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         return visit ? json(visit) : fail("No such member", 404);
       }
 
+      // A member looked up at the till by their email or mobile number, to
+      // read their balance (会员储值) and pay a bill from it, or to top it up.
+      if (path[2] === "members" && path.length === 3 && method === "GET") {
+        const { denied } = await gate("staff");
+        if (denied) return denied;
+        const member = await store.customers.byLogin(url.searchParams.get("login") ?? "");
+        return member ? json({ member }) : fail("No such member", 404);
+      }
+
+      // A member putting money in (会员储值充值): a top-up receipt, the money and
+      // the house's bonus added to their balance (shared/register.mjs, planTopUp).
+      if (path.length === 3 && path[2] === "topup" && method === "POST") {
+        const { denied, role, pos } = await gate("staff");
+        if (denied) return denied;
+        try {
+          const { value, invalid } = await body(request, TopUpBody);
+          if (invalid) return invalid;
+          return json(await store.topUp(value, role, pos), 201);
+        } catch (error) {
+          return fail(error.message, error.code === "NOT_FOUND" ? 404 : 400);
+        }
+      }
+
       // Table bookings are the floor's: the waiters take them by phone, seat
       // them and mark who never came. Erasing one for good is the manager's.
       if (path[2] === "reservations" && path.length <= 4) {
@@ -1338,6 +1363,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             const { value, invalid } = await body(request, PointsAdjustBody);
             if (invalid) return invalid;
             const customer = await customers.adjustPoints(id, value);
+            return customer ? json({ customer }) : fail("Guest not found", 404);
+          }
+          // The manager changes a member's balance by hand (退款 / 调整), with a note.
+          if (path.length === 5 && path[4] === "balance" && method === "POST") {
+            const { value, invalid } = await body(request, BalanceAdjustBody);
+            if (invalid) return invalid;
+            const customer = await customers.adjustBalance(id, value);
             return customer ? json({ customer }) : fail("Guest not found", 404);
           }
           if (path.length === 5 && path[4] === "password" && method === "POST") {

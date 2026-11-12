@@ -18,7 +18,7 @@ import { createStore, PRODUCT_INSERT_SQL, productInsertParams } from "../shared/
  * d1:migrations): a new table goes here and, for a D1 already deployed, into
  * a hand-written migration of its own.
  */
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 
 export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS } = {}) {
@@ -409,6 +409,28 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       created_at TEXT NOT NULL
     );
 
+    -- A member's stored value (会员储值): the running balance, and the ledger
+    -- it is the sum of — money put in, the house's bonus, bills settled from
+    -- it, refunds and the manager's hand-changes. A table of its own rather
+    -- than a column on customers, because that is what a deployed D1 can be
+    -- given safely. The balance may never go below zero, so two bills spending
+    -- the same balance cannot both be written. See migrations/0069_member_balance.sql.
+    CREATE TABLE IF NOT EXISTS member_balances (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      balance_cents INTEGER NOT NULL DEFAULT 0 CHECK (balance_cents >= 0),
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS balance_ledger (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      delta_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL CHECK (reason IN ('topup','bonus','spend','refund','adjust','reverse')),
+      ref TEXT,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
     -- A guest's own order from the menu (shared/ordering.mjs): at the table or
     -- for pickup, by whom when signed in, and the points it spent.
     CREATE TABLE IF NOT EXISTS guest_orders (
@@ -608,6 +630,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_customer_sessions_expiry ON customer_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_points_ledger_customer ON points_ledger(customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_points_ledger_ref ON points_ledger(ref, reason);
+    CREATE INDEX IF NOT EXISTS idx_balance_ledger_customer ON balance_ledger(customer_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_balance_ledger_ref ON balance_ledger(ref, reason);
     CREATE INDEX IF NOT EXISTS idx_guest_orders_table ON guest_orders(table_no, created_at);
     CREATE INDEX IF NOT EXISTS idx_guest_orders_customer ON guest_orders(customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);

@@ -1,9 +1,9 @@
 import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles, IconApp,
   ApiBill, ApiCatalogProduct, ApiMenuSettings, ApiDiscoveredPrinter, ApiOrder, ApiPrintBridge, ApiPrintJob, ApiPrintQueue, ApiServiceRequest, ApiSettings, CreateOrderCommand,
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
-  ApiReceipt, CheckoutCommand, ApiVoucher, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
+  ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
-  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
+  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiBalanceEntry, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
   ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand
 } from "@zhaoyun/contracts";
@@ -77,6 +77,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     customerAccounts: false,
     guestOrdering: { ...GUEST_ORDERING_DEFAULTS, hours: [] },
     loyalty: { ...LOYALTY_DEFAULTS, rewards: [] },
+    membership: { ...MEMBERSHIP_DEFAULTS, tiers: [] },
     reservations: { ...RESERVATION_DEFAULTS, hours: RESERVATION_DEFAULTS.hours.map((range) => ({ ...range, days: [...range.days] })), closedDates: [], tables: [] },
     delivery: { lieferando: { ...DELIVERY_PLATFORM_DEFAULTS }, foodora: { ...DELIVERY_PLATFORM_DEFAULTS } },
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
@@ -89,6 +90,8 @@ export const GUEST_ORDERING_DEFAULTS: ApiGuestOrdering = {
   maxItems: 30, maxOrderCents: 30_000, minIntervalSeconds: 60, maxOpenPickups: 2
 };
 export const LOYALTY_DEFAULTS: ApiLoyalty = { enabled: false, pointsPerEuro: 1, rewards: [], maxRewardsPerOrder: 1 };
+/** shared/customer.mjs, MEMBERSHIP_DEFAULTS. */
+export const MEMBERSHIP_DEFAULTS: ApiMembership = { enabled: false, tiers: [] };
 /** shared/reservations.mjs, RESERVATION_DEFAULTS. */
 export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   enabled: false,
@@ -109,8 +112,8 @@ export type DeliveryAction = "accept" | "reject" | "ready" | "complete" | "resen
 /** The floor's list of bookings over some days. */
 export interface ReservationList { reservations: ApiReservation[]; today: string; from: string; to: string; capacity: number; durationMinutes: number }
 
-/** A guest in the console's list, and their points' history. */
-export interface CustomerDetail { customer: ApiCustomer; points: ApiPointsEntry[] }
+/** A guest in the console's list, their points' history, and their stored-value ledger. */
+export interface CustomerDetail { customer: ApiCustomer; points: ApiPointsEntry[]; balance: ApiBalanceEntry[] }
 
 export interface RestaurantApiOptions {
   baseUrl: () => string;
@@ -401,6 +404,10 @@ export class AdminApi {
   adjustPoints(id: string, delta: number, note: string): Promise<{ customer: ApiCustomer }> {
     return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/points`, { method: "POST", body: JSON.stringify({ delta, note }) });
   }
+  /** 会员储值: the manager adds to or takes from a member's balance by hand (refund / correction), with a note. */
+  adjustBalance(id: string, amount: number, note: string): Promise<{ customer: ApiCustomer }> {
+    return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/balance`, { method: "POST", body: JSON.stringify({ amount, note }) });
+  }
   /** A new password for a guest who forgot theirs; their sessions end. */
   resetCustomerPassword(id: string, password: string): Promise<{ customer: ApiCustomer }> {
     return this.#request(`/api/admin/customers/${encodeURIComponent(id)}/password`, { method: "POST", body: JSON.stringify({ password }) });
@@ -579,6 +586,10 @@ export class PosApi {
   /** The receipt on the front printer again, marked as a copy (Belegkopie). */
   reprintReceipt(id: string): Promise<void> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/print`, { method: "POST" }); }
   voucher(code: string): Promise<{ voucher: ApiVoucher }> { return this.#request(`/api/admin/vouchers/${encodeURIComponent(code)}`); }
+  /** Look a member up by email or mobile number, to read their balance (会员储值) or top it up. */
+  member(login: string): Promise<ApiMemberLookup> { return this.#request(`/api/admin/members?login=${encodeURIComponent(login)}`); }
+  /** Put money into a member's balance: a top-up receipt (0% VAT), the principal and the house bonus credited. */
+  topUp(command: TopUpCommand): Promise<TopUpResult> { return this.#request("/api/admin/topup", { method: "POST", body: JSON.stringify(command) }); }
   settlement(staffId?: string): Promise<{ totals: PosSettlement["totals"] }> { return this.#request(`/api/pos/settlement${staffId ? `?staffId=${encodeURIComponent(staffId)}` : ""}`); }
   settle(staffId?: string): Promise<{ settlement: PosSettlement }> { return this.#request("/api/pos/settlement", { method: "POST", body: JSON.stringify(staffId ? { staffId } : {}) }); }
   drawer(): Promise<{ drawer: PosDrawer | null }> { return this.#request("/api/pos/drawer"); }
@@ -651,6 +662,8 @@ export class RestaurantApi {
     return this.#request(`/api/customer/favorites/${encodeURIComponent(productId)}`, { method: on ? "PUT" : "DELETE" });
   }
   customerPoints(): Promise<{ entries: ApiPointsEntry[] }> { return this.#request("/api/customer/points"); }
+  /** 会员储值: this guest's own stored-value ledger (read-only; top-ups are at the counter). */
+  customerBalance(): Promise<{ entries: ApiBalanceEntry[] }> { return this.#request("/api/customer/balance"); }
   customerOrders(): Promise<{ orders: ApiOrder[] }> { return this.#request("/api/customer/orders"); }
   /** Everything kept about this guest's account, to download. */
   exportCustomerData(): Promise<CustomerDataExport> { return this.#request("/api/customer/export"); }

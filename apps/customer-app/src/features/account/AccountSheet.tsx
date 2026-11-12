@@ -4,8 +4,8 @@ import type { ApiMenuSettings } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
 import type { Product } from "@zhaoyun/domain";
 import { restaurantApi } from "../../app/api";
-import { g, pointsReason } from "../../app/guest-i18n";
-import { productName, t } from "../../app/i18n";
+import { balanceReason, g, pointsReason } from "../../app/guest-i18n";
+import { formatPrice, productName, t } from "../../app/i18n";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import type { OrderingState } from "../../app/ordering";
 import { Sheet } from "../../components/Sheet";
@@ -142,6 +142,9 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
   });
   const [showHistory, setShowHistory] = useState(false);
   const history = useQuery({ queryKey: ["customer-points", customer.id, customer.points], enabled: showHistory, queryFn: () => restaurantApi.customerPoints() });
+  const [showTopUps, setShowTopUps] = useState(false);
+  const topUps = useQuery({ queryKey: ["customer-balance", customer.id, customer.balanceCents], enabled: showTopUps, queryFn: () => restaurantApi.customerBalance() });
+  const dateOf = (iso: string) => new Date(iso).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB");
 
   function redeem(product: Product, points: number) {
     dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [], reward: true });
@@ -173,9 +176,23 @@ function SignedIn({ state, dispatch, products, account, loyalty, ordering, resta
       })}</ul>}
       <button type="button" className="link-button" onClick={() => setShowHistory(!showHistory)}>{g(language, "pointsHistory")} {showHistory ? "▴" : "▾"}</button>
       {showHistory && <ul className="points-history">{(history.data?.entries ?? []).map((entry) => <li key={entry.id}>
-        <span>{pointsReason(language, entry.reason, entry.kind)}{entry.note ? ` · ${entry.note}` : ""}<small>{new Date(entry.createdAt).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")}</small></span>
+        <span>{pointsReason(language, entry.reason, entry.kind)}{entry.note ? ` · ${entry.note}` : ""}<small>{dateOf(entry.createdAt)}</small></span>
         <b className={entry.delta > 0 ? "plus" : "minus"}>{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</b>
       </li>)}</ul>}
+    </section>}
+
+    {(customer.balanceCents ?? 0) > 0 && <section className="guest-section">
+      <h3>{g(language, "myBalance")}</h3>
+      <div className="points-balance" aria-label={g(language, "myBalance")}><b>{formatPrice(customer.balanceCents ?? 0, language)}</b></div>
+      <p className="cart-hint">{g(language, "topUpAtCounter")}</p>
+      <button type="button" className="link-button" onClick={() => setShowTopUps(!showTopUps)}>{g(language, "topUpHistory")} {showTopUps ? "▴" : "▾"}</button>
+      {showTopUps && <ul className="points-history">
+        {(topUps.data?.entries ?? []).map((entry) => <li key={entry.id}>
+          <span>{balanceReason(language, entry.reason)}{entry.note ? ` · ${entry.note}` : ""}<small>{dateOf(entry.createdAt)}</small></span>
+          <b className={entry.deltaCents > 0 ? "plus" : "minus"}>{entry.deltaCents > 0 ? `+${formatPrice(entry.deltaCents, language)}` : formatPrice(entry.deltaCents, language)}</b>
+        </li>)}
+        {topUps.data && topUps.data.entries.length === 0 && <li className="cart-hint">{g(language, "noTopUps")}</li>}
+      </ul>}
     </section>}
 
     <div className="guest-actions">

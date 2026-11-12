@@ -285,6 +285,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
         <button type="submit">{t("open")}</button>
       </form>
       <button type="button" className="pos-scan-open" id="posScanBooking" onClick={() => setScanning(true)}>{t("scanBooking")}</button>
+      <button type="button" className="pos-topup-open" onClick={() => go({ name: "topup" })}>{t("topUp")}</button>
       <button type="button" className="pos-primary" onClick={() => void newTakeaway()}>{t("newTakeaway")}</button>
     </div>
     {scanning && <BookingScanner pos={pos} onFound={(code) => { setScanning(false); void scanned(pos, code, bookings, () => void load()); }} onClose={() => setScanning(false)} />}
