@@ -75,7 +75,7 @@ export type PointsKind = "welcome" | "no_show" | "no_show_back" | "signup" | "bo
 export interface ApiPointsEntry { id: string; delta: number; reason: PointsReason; ref: string | null; note: string; createdAt: string; kind?: PointsKind }
 /** A line in a member's stored-value ledger (shared/customer.mjs, balanceEntryView). */
 export type BalanceReason = "topup" | "bonus" | "spend" | "refund" | "adjust" | "reverse";
-export interface ApiBalanceEntry { id: string; deltaCents: number; reason: BalanceReason; ref: string | null; note: string; createdAt: string }
+export interface ApiBalanceEntry { id: string; deltaCents: number; reason: BalanceReason; ref: string | null; note: string; operator: string; createdAt: string }
 /** A member's code scanned at the counter: the guest, and whether this visit gave the first visit's bonus. */
 export interface ApiMemberVisit { customer: ApiCustomer; granted: boolean; welcomePoints: number; minPoints: number }
 /** A member looked up at the till by email or mobile number (GET /api/admin/members?login=): the guest with their balance. */
@@ -85,6 +85,8 @@ export interface TopUpCommand {
   clientRequestId?: string;
   memberId: string;
   amount: number;
+  /** Why this top-up is being booked (required, server-enforced): recorded on the member's balance ledger so a free credit can't be slipped in untraceably. */
+  reason: string;
   payments: Array<{ type: "cash" | "card"; amount: number; tendered?: number }>;
 }
 /** The outcome of a top-up: the receipt booked, and the member's account as it now stands (`balanceCents` already includes the bonus). */

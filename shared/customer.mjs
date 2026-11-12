@@ -330,7 +330,7 @@ export const DELETE_BIRTHDAY_SQL = "DELETE FROM member_birthdays WHERE customer_
 
 /** A balance ledger line as a member sees it, and as the console lists it. */
 export function balanceEntryView(row) {
-  return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, createdAt: row.created_at };
+  return { id: row.id, deltaCents: row.delta_cents, reason: row.reason, ref: row.ref, note: row.note, operator: row.operator ?? "", createdAt: row.created_at };
 }
 
 /** A manager's change of a member's balance: cents, not zero, and a note. */
@@ -340,6 +340,17 @@ export function normalizeBalanceAdjustment(input) {
   const note = String(input?.note ?? "").trim().replace(/\s+/g, " ");
   if (!note || note.length > 120) throw new Error("Say why the balance changes (1–120 characters)");
   return { deltaCents, note };
+}
+
+/**
+ * Why a counter top-up is being booked (收银台充值原因): required and capped,
+ * so a free credit can't be slipped in with no trace. Server-enforced, not
+ * only asked for in the till UI.
+ */
+export function normalizeTopUpReason(input) {
+  const reason = String(input ?? "").trim().replace(/\s+/g, " ");
+  if (!reason || reason.length > 120) throw new Error("Say why the top-up is booked (1–120 characters)");
+  return reason;
 }
 
 /** A manager's change of a guest's points: a whole number, not zero, and a note. */
@@ -374,6 +385,7 @@ export const DELETE_CUSTOMER_STATEMENTS = [
      status = CASE WHEN status IN ('pending', 'confirmed') THEN 'cancelled' ELSE status END WHERE customer_id = ?`,
   "DELETE FROM points_ledger WHERE customer_id = ?",
   // Their balance goes with them (GDPR erasure): any money left is written off, not kept.
+  "DELETE FROM balance_operators WHERE ledger_id IN (SELECT id FROM balance_ledger WHERE customer_id = ?)",
   "DELETE FROM balance_ledger WHERE customer_id = ?",
   "DELETE FROM member_balances WHERE customer_id = ?",
   "DELETE FROM customer_favorites WHERE customer_id = ?",
@@ -405,10 +417,18 @@ export const INSERT_POINTS_SQL = "INSERT INTO points_ledger (id, customer_id, de
 /** Fails the write (CHECK points >= 0) when the guest has fewer points than it takes. */
 export const CHANGE_POINTS_SQL = "UPDATE customers SET points = points + ?, updated_at = ? WHERE id = ?";
 
-export const BALANCE_HISTORY_SQL = "SELECT * FROM balance_ledger WHERE customer_id = ? ORDER BY created_at DESC, id DESC LIMIT ?";
+export const BALANCE_HISTORY_SQL = `SELECT balance_ledger.*, COALESCE(balance_operators.operator, '') AS operator
+  FROM balance_ledger LEFT JOIN balance_operators ON balance_operators.ledger_id = balance_ledger.id
+  WHERE customer_id = ? ORDER BY created_at DESC, balance_ledger.id DESC LIMIT ?`;
 /** 累计充值 (lifetime top-up principal): what a member has paid in over time, the basis for their 会员等级. Read-only. */
 export const MEMBER_GROWTH_SQL = "SELECT COALESCE(SUM(delta_cents), 0) AS growth_cents FROM balance_ledger WHERE customer_id = ? AND reason = 'topup'";
 export const INSERT_BALANCE_SQL = "INSERT INTO balance_ledger (id, customer_id, delta_cents, reason, ref, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+/** Who booked a ledger entry (会员储值操作人), keyed by the entry's id. Written only when the operator is known. */
+export const INSERT_OPERATOR_SQL = "INSERT INTO balance_operators (ledger_id, operator) VALUES (?, ?)";
+/** The operator-insert for a ledger line, or nothing when the operator is unknown (automated writes). */
+function operatorStatements(ledgerId, operator) {
+  return operator ? [[INSERT_OPERATOR_SQL, [ledgerId, String(operator)]]] : [];
+}
 /** A member's balance row, made the first time they have one (starts at zero). Parameters: customer id, at. */
 export const ENSURE_BALANCE_SQL = "INSERT OR IGNORE INTO member_balances (customer_id, balance_cents, updated_at) VALUES (?, 0, ?)";
 /**
@@ -611,39 +631,48 @@ export function refundPointsStatements(orderId, at) {
 
 // ——— Stored value: what a top-up, a bill or a storno adds to its own batch.
 
-/** A top-up receipt: the money in, and the house's bonus on top, added to the member's balance. */
-export function topUpBalanceStatements(memberId, principalCents, bonusCents, receiptId, at) {
+/**
+ * A top-up receipt: the money in, and the house's bonus on top, added to the
+ * member's balance. `note` is why it was booked (收银台充值原因, required at
+ * the till) and `operator` who booked it, so the credit is never untraceable.
+ */
+export function topUpBalanceStatements(memberId, principalCents, bonusCents, receiptId, at, note = "", operator = "") {
   const statements = [
-    [INSERT_BALANCE_SQL, [`topup-${receiptId}`, memberId, principalCents, "topup", receiptId, "", at]],
+    [INSERT_BALANCE_SQL, [`topup-${receiptId}`, memberId, principalCents, "topup", receiptId, note, at]],
+    ...operatorStatements(`topup-${receiptId}`, operator),
     ...changeBalanceStatements(memberId, principalCents, at)
   ];
   if (bonusCents) statements.push(
     [INSERT_BALANCE_SQL, [`bonus-${receiptId}`, memberId, bonusCents, "bonus", receiptId, "", at]],
+    ...operatorStatements(`bonus-${receiptId}`, operator),
     ...changeBalanceStatements(memberId, bonusCents, at)
   );
   return statements;
 }
 
 /** A bill settled from balances: each member's share taken, or the batch refused (CHECK >= 0). */
-export function spendBalanceStatements(receiptId, debits, at) {
+export function spendBalanceStatements(receiptId, debits, at, operator = "") {
   return debits.flatMap((debit, index) => [
     [INSERT_BALANCE_SQL, [`spend-${receiptId}-${index}`, debit.memberId, -debit.amountCents, "spend", receiptId, "", at]],
+    ...operatorStatements(`spend-${receiptId}-${index}`, operator),
     ...changeBalanceStatements(debit.memberId, -debit.amountCents, at)
   ]);
 }
 
 /** That bill cancelled: each member's share given back. */
-export function refundBalanceStatements(stornoId, refunds, at) {
+export function refundBalanceStatements(stornoId, refunds, at, operator = "") {
   return refunds.flatMap((refund, index) => [
     [INSERT_BALANCE_SQL, [`refund-${stornoId}-${index}`, refund.memberId, refund.amountCents, "refund", stornoId, "", at]],
+    ...operatorStatements(`refund-${stornoId}-${index}`, operator),
     ...changeBalanceStatements(refund.memberId, refund.amountCents, at)
   ]);
 }
 
 /** A top-up cancelled: the money and its bonus taken back, or the batch refused if already spent. */
-export function reverseBalanceStatements(stornoId, reversals, at) {
+export function reverseBalanceStatements(stornoId, reversals, at, operator = "") {
   return reversals.flatMap((reversal, index) => [
     [INSERT_BALANCE_SQL, [`reverse-${stornoId}-${index}`, reversal.memberId, -reversal.amountCents, "reverse", stornoId, "", at]],
+    ...operatorStatements(`reverse-${stornoId}-${index}`, operator),
     ...changeBalanceStatements(reversal.memberId, -reversal.amountCents, at)
   ]);
 }

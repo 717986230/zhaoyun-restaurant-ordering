@@ -24,7 +24,7 @@ import {
   DELETE_EXPIRED_CUSTOMER_SESSIONS_SQL, FAVORITES_SQL, INSERT_CUSTOMER_SESSION_SQL, INSERT_CUSTOMER_SQL, INSERT_POINTS_SQL, isOverdrawn,
   isPhoneLogin, MAX_FAVORITES, normalizeCustomerName, normalizeLogin, normalizeCustomerRegistration, normalizePointsAdjustment, pointsEntryView, POINTS_HISTORY_SQL,
   REMOVE_FAVORITE_SQL, SEARCH_CUSTOMERS_SQL, storedCustomerPassword, UPDATE_CUSTOMER_SQL,
-  balanceEntryView, BALANCE_HISTORY_SQL, changeBalanceStatements, INSERT_BALANCE_SQL, normalizeBalanceAdjustment,
+  balanceEntryView, BALANCE_HISTORY_SQL, changeBalanceStatements, INSERT_BALANCE_SQL, INSERT_OPERATOR_SQL, normalizeBalanceAdjustment,
   MEMBER_GROWTH_SQL, MEMBER_TIERS_DEFAULTS, membershipStatus,
   BIRTHDAY_PERK_DEFAULTS, MEMBER_BIRTHDAY_SQL, UPSERT_BIRTHDAY_SQL, DELETE_BIRTHDAY_SQL, normalizeBirthday, isBirthdayMonth,
   BIRTHDAYS_DUE_SQL, CLAIM_GREETING_SQL, RELEASE_GREETING_SQL, birthdayDaysFor
@@ -205,8 +205,8 @@ export function createCustomerStore(driver, { ordersFor, membershipConfig }) {
     return customerView(await byId(customerId));
   }
 
-  /** A manager's hand-change of a member's balance (退款 / 调整), with a note. */
-  async function adjustBalance(customerId, input) {
+  /** A manager's hand-change of a member's balance (退款 / 调整), with a required note and who made it. */
+  async function adjustBalance(customerId, input, operator = "") {
     const { deltaCents, note } = normalizeBalanceAdjustment(input);
     if (!(await byId(customerId))) return null;
     const at = now();
@@ -214,6 +214,7 @@ export function createCustomerStore(driver, { ordersFor, membershipConfig }) {
     try {
       await driver.batch([
         [INSERT_BALANCE_SQL, [id, String(customerId), deltaCents, "adjust", id, note, at]],
+        ...(operator ? [[INSERT_OPERATOR_SQL, [id, String(operator)]]] : []),
         ...changeBalanceStatements(String(customerId), deltaCents, at)
       ]);
     } catch (error) {

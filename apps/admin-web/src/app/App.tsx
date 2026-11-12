@@ -81,9 +81,19 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
 
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
 
+/**
+ * The open tab is kept in the URL hash (#members, #reports, …) so a deep link
+ * opens straight to it — a staff member can save admin.html#members to the home
+ * screen and land on the 会员 page every time. Unknown or empty hash: no change.
+ */
+function tabFromHash(): AdminTab | null {
+  const key = (typeof location === "undefined" ? "" : location.hash.replace(/^#/, "")) as AdminTab;
+  return key in TAB_KEYS ? key : null;
+}
+
 export function App() {
   const { t, language, setLanguage } = useI18n();
-  const [state, setState] = useState(initialState);
+  const [state, setState] = useState(() => ({ ...initialState, tab: tabFromHash() ?? initialState.tab }));
   // The board polls on an interval; keeping the role in a ref avoids rebuilding
   // that callback (and restarting the timer) on every reconnect.
   const roleRef = useRef<StaffRole | null>(null);
@@ -596,7 +606,18 @@ export function App() {
     window.location.href = "index.html";
   }
 
-  function setTab(tab: AdminTab) { setState((current) => ({ ...current, tab })); }
+  function setTab(tab: AdminTab) {
+    setState((current) => ({ ...current, tab }));
+    try { if (location.hash.replace(/^#/, "") !== tab) location.hash = tab; } catch { /* no history in this environment */ }
+  }
+
+  // A deep link or the browser's back/forward changes the hash: follow it, so
+  // admin.html#members always lands on the 会员 page.
+  useEffect(() => {
+    const onHash = () => { const tab = tabFromHash(); if (tab) setState((current) => (current.tab === tab ? current : { ...current, tab })); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const languagePicker = <div className="admin-languages" role="group" aria-label={t("language")}>{ADMIN_LANGUAGES.map((option) => <button
     key={option}

@@ -1069,7 +1069,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
 
     ["members' stored value: top-up with a bonus tier at 0%, balance payment on a bill, storno refunds and reversals, the manager's hand-change", async () => {
       const staff = { role: "staff" };
-      const topUp = (body, auth = staff) => call("POST", "/api/admin/topup", { ...auth, body });
+      const topUp = (body, auth = staff) => call("POST", "/api/admin/topup", { ...auth, body: { reason: "现金充值", ...body } });
       const lookup = (login, auth = staff) => call("GET", `/api/admin/members?login=${encodeURIComponent(login)}`, auth);
 
       // A member signs up by mobile number — the way they are found at the till.
@@ -1094,6 +1094,9 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await topUp({ memberId: "no-such", amount: 50, payments: [{ type: "card", amount: 50 }] })).status, 404, "no such member");
       assert.equal((await topUp({ memberId: member.id, amount: 50, payments: [{ type: "voucher", amount: 50 }] })).status, 400, "a top-up is cash or card");
       assert.equal((await topUp({ memberId: member.id, amount: 50, payments: [{ type: "cash", amount: 40 }] })).status, 400, "the payment must match");
+      // The reason a top-up is booked is required (防止绕过): no free credit without a trace.
+      assert.equal((await call("POST", "/api/admin/topup", { ...staff, body: { memberId: member.id, amount: 50, payments: [{ type: "cash", amount: 50 }] } })).status, 400, "a top-up needs a reason");
+      assert.equal((await topUp({ memberId: member.id, amount: 50, reason: "   ", payments: [{ type: "cash", amount: 50 }] })).status, 400, "a blank reason is no reason");
 
       // 100 euros reaches the tier: 10 euros on top (充100送10). The bonus is the
       // house's gift — the member paid 100, the balance grows by 110.
@@ -1152,6 +1155,10 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(detail.customer.balanceCents, 13500);
       assert.ok(detail.balance.some((entry) => entry.reason === "bonus"), "the ledger keeps the bonus");
       assert.ok(detail.balance.some((entry) => entry.reason === "spend"), "and the spend");
+      // Every top-up and hand-adjust carries why and who (会员储值操作记录): the
+      // reason booked at the till and the manager who changed the balance.
+      assert.ok(detail.balance.some((entry) => entry.reason === "topup" && entry.note === "现金充值"), "a top-up keeps its reason");
+      assert.ok(detail.balance.some((entry) => entry.reason === "adjust" && entry.operator === "manager"), "a hand-adjust keeps who made it");
 
       await call("DELETE", "/api/admin/tables/M1", { admin: true });
       await call("DELETE", `/api/admin/products/${noodles.id}`, { admin: true });

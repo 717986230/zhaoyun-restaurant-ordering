@@ -23,7 +23,7 @@
  */
 
 import { now, parseJson, uuid } from "./core.mjs";
-import { bonusForTopUp, MAX_TOPUP_CENTS } from "./customer.mjs";
+import { bonusForTopUp, MAX_TOPUP_CENTS, normalizeTopUpReason } from "./customer.mjs";
 
 export const PAYMENT_TYPES = ["cash", "card", "voucher", "balance"];
 /** The hash the first journal entry follows. */
@@ -422,6 +422,10 @@ export function planTopUp(input, { member, receiptNo, settings, membership, role
   if (!membership?.enabled) throw new Error("Member top-up is switched off");
   const principalCents = cents(input.amount, "A top-up");
   if (principalCents > MAX_TOPUP_CENTS) throw new Error("A top-up is at most 1000 euros");
+  // Why this credit is booked (必填, server-enforced) and who booked it: both
+  // land on the member's balance ledger so no untraceable free credit is possible.
+  const reason = normalizeTopUpReason(input.reason);
+  const operator = staff?.name || role || "";
   const bonusCents = bonusForTopUp(membership, principalCents);
   const line = {
     kind: "topup", memberId: String(member.id), memberName: member.name || "", bonusCents,
@@ -461,7 +465,7 @@ export function planTopUp(input, { member, receiptNo, settings, membership, role
     staffName: staff?.name ?? null,
     createdAt: at
   };
-  return { receipt, credit: { memberId: String(member.id), principalCents, bonusCents } };
+  return { receipt, credit: { memberId: String(member.id), principalCents, bonusCents, reason, operator } };
 }
 
 /**

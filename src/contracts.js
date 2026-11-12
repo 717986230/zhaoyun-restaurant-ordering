@@ -301,6 +301,9 @@ export const TopUpBody = Type.Object({
   clientRequestId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
   memberId: Type.String({ minLength: 1, maxLength: 128 }),
   amount: Type.Number(),
+  // Why the top-up is booked: required on the wire and again server-side
+  // (shared/customer.mjs, normalizeTopUpReason), so no free credit slips in.
+  reason: Type.String({ minLength: 1, maxLength: 120 }),
   payments: Type.Array(Type.Object({
     type: Type.String({ maxLength: 16 }),
     amount: Type.Number(),

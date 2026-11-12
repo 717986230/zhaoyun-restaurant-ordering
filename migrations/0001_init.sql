@@ -322,6 +322,10 @@ CREATE TABLE balance_ledger (
       note TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
     );
+CREATE TABLE balance_operators (
+      ledger_id TEXT PRIMARY KEY,
+      operator TEXT NOT NULL DEFAULT ''
+    );
 CREATE TABLE member_birthdays (
       customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
       month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
