@@ -7,7 +7,7 @@ import { ApiError, RestaurantApi } from "@zhaoyun/api-client";
 import { apiBaseUrl, customerToken, setCustomerToken } from "../app/api";
 import { Sheet } from "../components/Sheet";
 import { CalendarIcon, PersonIcon, QrIcon, RefreshIcon } from "../components/LineIcons";
-import { b, bookingError, formatDay, initialLanguage } from "./booking-i18n";
+import { b, bookingError, formatDay, formatMonth, initialLanguage, weekdayInitials } from "./booking-i18n";
 import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
 import { checkMobile } from "../../../../shared/phone.mjs";
 
@@ -208,15 +208,18 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
               <BookingForm language={language} info={info} customer={customer} recent={recent} onSignedIn={signedIn} onVerified={setCustomer} onBooked={booked} />
             </>}
 
-    {/* The guest's other bookings and their account: two round buttons, raised off the bottom corner. */}
-    <nav className="bk-dock" aria-label={b(language, "account")}>
+    {/* The guest's other bookings and their account: two round buttons, raised
+        off the bottom corner — only once signed in. Signed out, both buttons
+        only lead to "sign in to see", which the form on the page already is,
+        and they would sit over its password field and the sign-in button. */}
+    {customer && <nav className="bk-dock" aria-label={b(language, "account")}>
       <button type="button" id="bookingDockBookings" aria-haspopup="dialog" aria-label={b(language, "myBookings")} title={b(language, "myBookings")} onClick={() => setSheet("bookings")}>
-        <CalendarIcon />{customer && others.length ? <b className="bk-dock-count">{others.length}</b> : null}
+        <CalendarIcon />{others.length ? <b className="bk-dock-count">{others.length}</b> : null}
       </button>
       <button type="button" id="bookingDockAccount" aria-haspopup="dialog" aria-label={b(language, "account")} title={b(language, "account")} onClick={() => setSheet("account")}>
         <PersonIcon />
       </button>
-    </nav>
+    </nav>}
   </div>
   {/* A second pane of glass over the first, outside it so it covers the whole screen. */}
   {createPortal(<AnimatePresence>
@@ -461,6 +464,19 @@ function SignInCard({ language, info, onSignedIn }: { language: BookingLanguage;
 const PARTY_CHIPS = 8;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** The hour that splits lunch from dinner: a time before it is 午市, at or after it 晚市. */
+const DINNER_FROM_HOUR = 16;
+
+/** The day's times split into lunch and dinner, each group kept only when it has times. */
+function groupSlots(slots: ApiReservationSlot[]): Array<{ key: "lunch" | "dinner"; slots: ApiReservationSlot[] }> {
+  const lunch = slots.filter((slot) => Number(slot.time.slice(0, 2)) < DINNER_FROM_HOUR);
+  const dinner = slots.filter((slot) => Number(slot.time.slice(0, 2)) >= DINNER_FROM_HOUR);
+  return [
+    ...(lunch.length ? [{ key: "lunch" as const, slots: lunch }] : []),
+    ...(dinner.length ? [{ key: "dinner" as const, slots: dinner }] : [])
+  ];
+}
+
 /** What is wrong with the email or mobile number a guest signs up with, or "": no code is sent, the number is checked to be one that could be real. */
 function loginProblem(language: BookingLanguage, value: string): string {
   const clean = value.trim();
@@ -496,12 +512,101 @@ function rememberContact(name: string, phone: string): void {
   try { localStorage.setItem(CONTACT_KEY, JSON.stringify({ name, phone })); } catch { /* Kept for this visit only. */ }
 }
 
+/** The month `delta` months from `yearMonth` ("YYYY-MM"), as the same string. */
+function shiftMonth(yearMonth: string, delta: number): string {
+  const parts = yearMonth.split("-");
+  const moved = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1 + delta, 1));
+  return `${moved.getUTCFullYear()}-${String(moved.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * A month of days to pick from, a calendar rather than a dropdown: the days
+ * the restaurant takes bookings for are buttons, the rest are dimmed, and the
+ * arrows move within the window it books — no further back than today, no
+ * further forward than the last open day. Monday first, in the guest's
+ * language.
+ */
+function BookingCalendar({ language, value, onPick, bookable, today, lastDate }: {
+  language: BookingLanguage; value: string; onPick: (date: string) => void;
+  bookable: (date: string) => boolean; today: string; lastDate: string;
+}) {
+  const firstMonth = today.slice(0, 7);
+  const lastMonth = lastDate.slice(0, 7);
+  const clamp = (month: string) => (month < firstMonth ? firstMonth : month > lastMonth ? lastMonth : month);
+  const [month, setMonth] = useState(() => clamp(value.slice(0, 7)));
+  // Follow the chosen day when a tap elsewhere (the default pick, a new party) moves it to another month.
+  useEffect(() => {
+    const picked = value.slice(0, 7);
+    if (picked >= firstMonth && picked <= lastMonth) setMonth(picked);
+  }, [value, firstMonth, lastMonth]);
+
+  const parts = month.split("-");
+  const daysInMonth = new Date(Date.UTC(Number(parts[0]), Number(parts[1]), 0)).getUTCDate();
+  // Monday-first blanks before the first of the month (weekdayOf is 1–7, Mon–Sun).
+  const lead = weekdayOf(`${month}-01`) - 1;
+
+  return <div className="bk-cal" id="bookingCalendar">
+    <div className="bk-cal-head">
+      <button type="button" className="bk-cal-nav" aria-label={b(language, "prevMonth")} disabled={month <= firstMonth} onClick={() => setMonth((current) => shiftMonth(current, -1))}>‹</button>
+      <strong className="bk-cal-title" aria-live="polite">{formatMonth(language, month)}</strong>
+      <button type="button" className="bk-cal-nav" aria-label={b(language, "nextMonth")} disabled={month >= lastMonth} onClick={() => setMonth((current) => shiftMonth(current, 1))}>›</button>
+    </div>
+    <div className="bk-cal-grid" role="grid">
+      {weekdayInitials(language).map((initial, index) => <span key={`wd${index}`} className="bk-cal-wd" aria-hidden="true">{initial}</span>)}
+      {Array.from({ length: lead }).map((_, index) => <span key={`blank${index}`} className="bk-cal-blank" aria-hidden="true" />)}
+      {Array.from({ length: daysInMonth }, (_, index) => {
+        const day = index + 1;
+        const date = `${month}-${String(day).padStart(2, "0")}`;
+        const open = bookable(date);
+        const chosen = date === value;
+        return <button key={date} type="button" data-date={date} disabled={!open} aria-pressed={chosen}
+          className={`bk-cal-day ${chosen ? "active" : ""}`} aria-label={formatDay(language, date, { weekday: "long", day: "numeric", month: "long" })}
+          onClick={() => onPick(date)}>{day}</button>;
+      })}
+    </div>
+  </div>;
+}
+
 /**
  * The booking, quickest first: every choice is one tap — the party, the day,
  * the time, the table — and each one brings the next step up the screen. Then
  * the one card that is left: signing in, proving the email, or the name and
  * mobile number, filled in from the last booking on this phone.
  */
+/**
+ * A table seen from above, its chairs the number it seats: a little plan the
+ * guest reads at a glance — round for a two-top, a longer bench as the party
+ * grows — so the choice is a seating map, not a list. Decorative: the table's
+ * name and its seat count stay in the text beside it, and the SVG inherits the
+ * tile's colour so the chosen (and the greyed-out) tile carry straight over.
+ */
+function TableSeating({ seats }: { seats: number }) {
+  const shown = Math.max(1, Math.min(seats, 10));
+  const top = Math.ceil(shown / 2);
+  const bottom = shown - top;
+  const chairW = 11;
+  const chairGap = 4;
+  const cols = Math.max(top, bottom, 1);
+  const tableW = cols * chairW + (cols - 1) * chairGap;
+  const width = tableW + 12;
+  const height = 52;
+  const cx = width / 2;
+  const round = shown <= 2;
+  const row = (count: number, y: number) => {
+    const rowW = count * chairW + (count - 1) * chairGap;
+    const x0 = cx - rowW / 2;
+    return Array.from({ length: count }, (_, i) =>
+      <rect key={i} x={x0 + i * (chairW + chairGap)} y={y} width={chairW} height={8} rx={3} className="bk-seat-chair" />);
+  };
+  return <svg className="bk-seat-plan" viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-hidden="true" focusable="false">
+    {top ? row(top, 2) : null}
+    {round
+      ? <circle cx={cx} cy={height / 2} r={13} className="bk-seat-table" />
+      : <rect x={cx - tableW / 2} y={16} width={tableW} height={20} rx={7} className="bk-seat-table" />}
+    {bottom ? row(bottom, height - 10) : null}
+  </svg>;
+}
+
 function BookingForm({ language, info, customer, recent, onSignedIn, onVerified, onBooked }: {
   language: BookingLanguage; info: ApiBookingInfo; customer: ApiCustomer | null;
   recent: { name: string; phone: string } | null;
@@ -592,13 +697,6 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   }, [seatSelection, date, party, time, language]);
   useEffect(() => { void loadTables(); }, [loadTables]);
 
-  // Every day that takes bookings, up to the last one open.
-  const days = useMemo(() => {
-    const open: string[] = [];
-    for (let day = info.today; day <= info.lastDate && open.length < 120; day = addDays(day, 1)) if (bookable(day)) open.push(day);
-    return open.length ? open : [info.today];
-  }, [info]);
-
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!time) {
@@ -640,34 +738,41 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   }
 
   const anyFree = slots?.some((slot) => slot.available);
+  const mealGroups = groupSlots(slots ?? []);
 
   return <div className="bk-form">
-    {/* How many, which day, what time: three dropdowns on one card. */}
+    {/* How many, which day, what time: a count, a calendar, then the times. */}
     <section className="bk-card bk-pick" id="bookingTimes">
-      <div className="bk-selects">
-        <label className="bk-field bk-select"><span>{b(language, "party")}</span>
-          <input id="bookingParty" type="number" inputMode="numeric" min={1} max={info.maxParty} step={1} value={partyText}
-            onChange={(event) => {
-              setPartyText(event.target.value);
-              const count = Number(event.target.value);
-              if (Number.isInteger(count) && count >= 1 && count <= info.maxParty) setParty(count);
-            }}
-            onBlur={() => setPartyText(String(party))} />
-        </label>
-        <label className="bk-field bk-select"><span>{b(language, "date")}</span>
-          <select id="bookingDate" value={date} onChange={(event) => setDate(event.target.value)}>
-            {days.map((day) => <option key={day} value={day}>{formatDay(language, day)}</option>)}
-          </select>
-        </label>
-        <label className="bk-field bk-select"><span>{b(language, "time")}</span>
-          <select id="bookingTime" value={time} disabled={!slots?.length} onChange={(event) => { setTime(event.target.value); setError(""); if (event.target.value) setBringUp(seatSelection ? "bookingSeats" : "bookingFinish"); }}>
-            <option value="">{slots === null ? b(language, "timesLoading") : b(language, "chooseTime")}</option>
-            {(slots ?? []).map((slot) => <option key={slot.time} value={slot.time} disabled={!slot.available}>{slot.available ? slot.time : `${slot.time} · ${b(language, "full")}`}</option>)}
-          </select>
-        </label>
+      <label className="bk-field bk-party-field"><span>{b(language, "party")}</span>
+        <input id="bookingParty" type="number" inputMode="numeric" min={1} max={info.maxParty} step={1} value={partyText}
+          onChange={(event) => {
+            setPartyText(event.target.value);
+            const count = Number(event.target.value);
+            if (Number.isInteger(count) && count >= 1 && count <= info.maxParty) setParty(count);
+          }}
+          onBlur={() => setPartyText(String(party))} />
+      </label>
+      <BookingCalendar language={language} value={date} onPick={(day) => { setDate(day); setError(""); }} bookable={bookable} today={info.today} lastDate={info.lastDate} />
+      <div className="bk-times">
+        <p className="bk-times-label">{b(language, "time")}</p>
+        {slots === null
+          ? <p className="bk-muted">{b(language, "timesLoading")}</p>
+          : !slots.length
+            ? <p className="bk-muted" id="bookingNoTimes">{b(language, "noTimes")}</p>
+            : <div className="bk-slot-groups" role="radiogroup" aria-label={b(language, "time")}>
+              {mealGroups.map((group) => <div className="bk-slot-group" key={group.key}>
+                {mealGroups.length > 1 ? <p className="bk-meal">{b(language, group.key)}</p> : null}
+                <div className="bk-slots">
+                  {group.slots.map((slot) => <button key={slot.time} type="button" role="radio" aria-checked={slot.time === time}
+                    data-time={slot.time} disabled={!slot.available} className={`bk-slot ${slot.time === time ? "active" : ""}`}
+                    onClick={() => { setTime(slot.time); setError(""); setBringUp(seatSelection ? "bookingSeats" : "bookingFinish"); }}>
+                    <span>{slot.time}</span>{!slot.available ? <small>{b(language, "full")}</small> : null}
+                  </button>)}
+                </div>
+              </div>)}
+            </div>}
+        {slots?.length && !anyFree ? <p className="bk-muted" id="bookingFullDay">{b(language, "fullDay")}</p> : null}
       </div>
-      {slots && !slots.length ? <p className="bk-muted" id="bookingNoTimes">{b(language, "noTimes")}</p> : null}
-      {slots?.length && !anyFree ? <p className="bk-muted" id="bookingFullDay">{b(language, "fullDay")}</p> : null}
     </section>
 
     {/* Only once there is a time: an empty card before it said nothing. */}
@@ -682,7 +787,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
         {tables.map((choice) => <button key={choice.table} type="button" role="radio" aria-checked={choice.table === table} data-table={choice.table}
           disabled={!choice.available} className={`bk-table ${choice.table === table ? "active" : ""}`} onClick={() => { setTable(choice.table); setError(""); setBringUp("bookingFinish"); }}>
           <strong>{b(language, "tableName", { table: choice.table })}</strong>
-          <span className="bk-seats" aria-hidden="true">{"●".repeat(Math.min(choice.seats, 12))}</span>
+          <TableSeating seats={choice.seats} />
           <small>{choice.available ? b(language, "tableSeats", { seats: choice.seats }) : choice.seats < party ? b(language, "tableSmall") : b(language, "tableBooked")}</small>
         </button>)}
       </div> : null}
@@ -770,6 +875,40 @@ function useQr(text: string): string {
   return qr;
 }
 
+/** A calendar day+time as an ICS floating-local stamp "YYYYMMDDTHHMMSS", `addHours` later. */
+function icsStamp(date: string, time: string, addHours: number): string {
+  const when = new Date(`${date}T${time}:00Z`);
+  when.setUTCHours(when.getUTCHours() + addHours);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${when.getUTCFullYear()}${pad(when.getUTCMonth() + 1)}${pad(when.getUTCDate())}T${pad(when.getUTCHours())}${pad(when.getUTCMinutes())}00`;
+}
+
+/** Commas, semicolons, backslashes and newlines are escaped in an ICS text value. */
+function escapeIcs(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/([,;])/g, "\\$1").replace(/\r?\n/g, "\\n");
+}
+
+/**
+ * The booking as an .ics event the guest adds to their own calendar. The time
+ * is floating — no timezone — so a guest who read "19:00" keeps 19:00, as the
+ * restaurant means it; the table is held two hours, the usual sitting.
+ */
+function bookingIcs(summary: string, location: string, description: string, date: string, time: string, reference: string): string {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//zhaoyun//booking//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${reference}@zhaoyun`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${icsStamp(date, time, 0)}`,
+    `DTEND:${icsStamp(date, time, 2)}`,
+    `SUMMARY:${escapeIcs(summary)}`,
+    ...(location ? [`LOCATION:${escapeIcs(location)}`] : []),
+    `DESCRIPTION:${escapeIcs(description)}`,
+    "END:VEVENT", "END:VCALENDAR"
+  ].join("\r\n");
+}
+
 function BookingDetails({ language, booking, held, info, customer, onChange, onAnother }: {
   language: BookingLanguage; booking: ApiGuestReservation; held: Held; info: ApiBookingInfo | null; customer: ApiCustomer | null;
   onChange: (booking: ApiGuestReservation) => void; onAnother: () => void;
@@ -778,6 +917,22 @@ function BookingDetails({ language, booking, held, info, customer, onChange, onA
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const link = linkFor(held);
+
+  // The booking saved to the guest's own calendar: a file their phone opens
+  // into Apple/Google Calendar, for a reminder the restaurant need not send.
+  function addToCalendar() {
+    const summary = info?.restaurantName ? `${info.restaurantName} · ${b(language, "calendarTitle")}` : b(language, "calendarTitle");
+    const description = [b(language, "partyOf", { n: booking.party }), booking.table ? b(language, "tableName", { table: booking.table }) : "", `${b(language, "reference")}: ${booking.reference}`].filter(Boolean).join(" · ");
+    const ics = bookingIcs(summary, info?.restaurantName ?? "", description, booking.date, booking.time, booking.reference);
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `booking-${booking.reference}.ics`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
 
   async function cancel() {
     if (!window.confirm(b(language, "cancelConfirm"))) return;
@@ -849,6 +1004,7 @@ function BookingDetails({ language, booking, held, info, customer, onChange, onA
     </div> : null}
     {error ? <p className="bk-error" role="alert">{error}</p> : null}
     <div className="bk-actions">
+      {active ? <button type="button" className="bk-secondary bk-add-cal" id="bookingAddCalendar" onClick={addToCalendar}><CalendarIcon />{b(language, "addToCalendar")}</button> : null}
       {active && booking.cancellable !== false ? <button type="button" className="bk-danger" id="bookingCancel" disabled={busy} onClick={() => void cancel()}>{b(language, "cancel")}</button> : null}
       {active && booking.cancellable === false ? <p className="bk-muted">{b(language, "cannotCancel")}</p> : null}
       {info?.enabled ? <button type="button" className="bk-secondary" id="bookingAnother" onClick={onAnother}>{b(language, "another")}</button> : null}
