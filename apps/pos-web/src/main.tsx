@@ -4,6 +4,7 @@ import { reportClientErrors } from "@zhaoyun/api-client";
 import { api, App } from "./App";
 import "../../../src/pos.css";
 import "../../../src/popup.css";
+import "../../../src/member-tier.css";
 
 // A crash on a waiter's tablet reaches the server's log.
 reportClientErrors("pos", () => api.baseUrl);

@@ -1968,6 +1968,16 @@ em.voided {
   column-span: all;
 }
 
+/* 会员 page is only two full-width cards (储值设置 + 会员与余额列表, the
+   latter column-span: all). With one normal card before a span-all card,
+   Safari/WebKit balances that first card into a full-height column box and
+   leaves a tall blank gap above the list. There is nothing to pack into two
+   columns here anyway, so drop multicol and just stack them. */
+#membersPanel .settings-grid {
+  columns: auto;
+  display: block;
+}
+
 .settings-card {
   display: grid;
   gap: 10px;
@@ -4833,3 +4843,6 @@ em.voided {
 .today-status.pending {
   color: var(--a-danger);
 }
+
+/* A form says what blocks its save, in place. */
+.form-warning { color: var(--a-danger); font-weight: 600; }
