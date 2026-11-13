@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ApiBill, PaymentType } from "@zhaoyun/contracts";
+import type { ApiBill, ApiSepaPayment, PaymentType } from "@zhaoyun/contracts";
+import { epcQrPayload } from "../../../shared/giro.mjs";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 import { TierChip } from "./TierChip";
@@ -28,6 +29,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [discount, setDiscount] = useState(0);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [busy, setBusy] = useState(false);
+  const [sepa, setSepa] = useState<ApiSepaPayment | null>(null);
+  const [showSepa, setShowSepa] = useState(false);
   const requestId = useRef(crypto.randomUUID());
 
   /**
@@ -49,7 +52,11 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
 
   useEffect(() => {
     void load("all");
-    if (takeaway) api.floor().then((floor) => setDiscount(floor.takeawayDiscountPercent)).catch(() => undefined);
+    // The floor also carries the shop's SEPA account, for the pay-by-transfer QR.
+    api.floor().then((floor) => {
+      if (takeaway) setDiscount(floor.takeawayDiscountPercent);
+      setSepa(floor.sepaPayment ?? null);
+    }).catch(() => undefined);
     void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
     return () => { window.clearInterval(hold); void api.release(table).catch(() => undefined); };
@@ -188,6 +195,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       <label className="pos-discount"><span>{t("discount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={discount} onChange={(event) => setDiscount(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>
       <div className="pos-pay-types">{(["cash", "card", "voucher", "balance"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
+      {sepa?.enabled && sepa.iban && totalCents > 0 && <button type="button" className="pos-sepa-btn" onClick={() => setShowSepa(true)}>⃔ {t("sepaScan")}</button>}
       <ul className="pos-payments">{payments.map((payment, index) => <li key={index}>
         <b>{t(PAY_KEYS[payment.type])}</b>
         <label><span>{t("amount")}</span><input inputMode="decimal" value={payment.amount} onChange={(event) => edit(index, { amount: event.target.value })} /></label>
@@ -206,5 +214,47 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       {totalCents > 0 && remaining !== 0 && <p className="pos-remaining">{remaining > 0 ? t("remaining", { amount: money(remaining) }) : t("over", { amount: money(-remaining) })}</p>}
       <button type="button" className="pos-primary pos-issue" disabled={!canIssue} onClick={() => void issue()}>{t("issue")}</button>
     </div>
+
+    {showSepa && sepa && <SepaDialog sepa={sepa} amountCents={totalCents} reference={table} money={money} t={t} onClose={() => setShowSepa(false)} />}
   </section>;
+}
+
+/**
+ * The GiroCode for the amount due: the guest scans it with their bank app and
+ * a SEPA transfer opens already filled in. The QR is drawn from the EPC
+ * payload (shared/giro.mjs); if the account or amount cannot make a valid code,
+ * the dialog says so rather than show something unscannable.
+ */
+function SepaDialog({ sepa, amountCents, reference, money, t, onClose }: {
+  sepa: ApiSepaPayment; amountCents: number; reference: string;
+  money: (cents: number) => string; t: Pos["t"]; onClose: () => void;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    try {
+      const payload = epcQrPayload({ beneficiary: sepa.beneficiary, iban: sepa.iban, bic: sepa.bic, amountCents, reference });
+      void import("qrcode").then(({ default: QRCode }) => QRCode.toDataURL(payload, { width: 320, margin: 1 }))
+        .then((url: string) => { if (live) setSrc(url); })
+        .catch(() => { if (live) setError(true); });
+    } catch {
+      setError(true);
+    }
+    return () => { live = false; };
+  }, [sepa.beneficiary, sepa.iban, sepa.bic, amountCents, reference]);
+
+  return <div className="pos-sepa-overlay" role="dialog" aria-modal="true" aria-label={t("sepaTitle")} onClick={onClose}>
+    <div className="pos-sepa-dialog" onClick={(event) => event.stopPropagation()}>
+      <h2>{t("sepaTitle")}</h2>
+      <p className="pos-sepa-amount">{money(amountCents)}</p>
+      {error ? <p className="pos-sepa-error">{t("sepaError")}</p>
+        : src ? <img className="pos-sepa-qr" src={src} alt={t("sepaTitle")} width={320} height={320} />
+        : <p className="pos-muted">…</p>}
+      <p className="pos-sepa-to">{sepa.beneficiary || "—"}<br /><code>{sepa.iban}</code></p>
+      <p className="pos-muted">{t("sepaScanHint")}</p>
+      <button type="button" className="pos-primary" onClick={onClose}>{t("close")}</button>
+    </div>
+  </div>;
 }

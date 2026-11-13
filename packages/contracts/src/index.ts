@@ -467,6 +467,17 @@ export type ApiAppIcons = Record<IconApp, { version: string; updatedAt: string }
 /** The sizes the console makes from one picture, by the form field the server reads. */
 export type AppIconFiles = Record<"icon180" | "icon192" | "icon512" | "maskable512", Blob>;
 
+export interface ApiSepaPayment {
+  /** Whether the POS offers the pay-by-transfer GiroCode. */
+  enabled: boolean;
+  /** The account holder shown to the payer. */
+  beneficiary: string;
+  /** IBAN, no spaces, upper case; empty until the owner fills it in. */
+  iban: string;
+  /** BIC, optional (not needed for SEPA within the EU). */
+  bic: string;
+}
+
 export interface ApiSettings {
   menuTheme: MenuThemeId;
   /** Which of the three the menu offers; at least one. */
@@ -512,6 +523,8 @@ export interface ApiSettings {
   companyUid: string;
   /** The register's id printed on each receipt. */
   cashRegisterId: string;
+  /** The shop's SEPA account for the POS pay-by-transfer GiroCode. */
+  sepaPayment: ApiSepaPayment;
   /** The discount a takeaway gets at the POS, percent. */
   takeawayDiscountPercent: number;
   /** Tables the floor shows by number, 1 to this. */

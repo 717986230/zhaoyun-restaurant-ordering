@@ -372,11 +372,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     ctx.role = role;
     // A waiter's session carries who they are and which device they are on.
     const pos = session?.staff ? { staff: session.staff, deviceId: session.deviceId } : null;
+    // Who did it, by name, so the audit log traces a POS action to the person,
+    // not just to the shared role token the whole floor signs in with.
+    ctx.staff = pos?.staff ?? null;
     if (!roleAllows(role, minimumRole)) {
       // A valid token used beyond its role is worth recording, not just refusing.
       ctx.audited = true;
       const url = new URL(request.url);
-      await store.recordAudit({ role, ip: ctx.ip ?? "", method: request.method, route: url.pathname + url.search, status: 403, detail: { denied: minimumRole } });
+      await store.recordAudit({ role, ip: ctx.ip ?? "", method: request.method, route: url.pathname + url.search, status: 403, detail: { denied: minimumRole, ...(ctx.staff?.name ? { actor: ctx.staff.name } : {}) } });
       return { denied: json({ error: `This role may not perform ${minimumRole} actions` }, 403) };
     }
     return { role, pos, account: session?.account ?? null };
@@ -914,6 +917,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
+          const floorSettings = await store.getSettings();
           return json({
             tables: await store.tablesOverview(),
             claims: await store.liveClaims(),
@@ -923,7 +927,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             reservations: await store.reservations.today(),
             // Delivery platforms' orders not yet handed over.
             delivery: await store.delivery.open(),
-            takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent
+            takeawayDiscountPercent: floorSettings.takeawayDiscountPercent,
+            // The SEPA account for the pay-by-transfer GiroCode, if the shop set one.
+            sepaPayment: floorSettings.sepaPayment
           });
         }
         if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
@@ -1819,7 +1825,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
   return serve;
 
   async function serve(request, { ip = "", requestId = "" } = {}) {
-    const ctx = { ip, requestId, role: null, audited: false };
+    const ctx = { ip, requestId, role: null, staff: null, audited: false };
     const url = new URL(request.url);
     const writing = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     // The body a write names its table and business fields in, read once.
@@ -1847,6 +1853,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       const detail = {};
       const fields = url.pathname.startsWith("/api/admin/reservations") ? RESERVATION_AUDIT_FIELDS : AUDIT_FIELDS;
       for (const field of fields) if (sent && typeof sent === "object" && sent[field] !== undefined) detail[field] = sent[field];
+      // The waiter who signed in on the device, so "who voided this" has a name.
+      if (ctx.staff?.name) detail.actor = ctx.staff.name;
       try {
         await store.recordAudit({ role: ctx.role, ip, method: request.method, route: url.pathname, status: response.status, detail });
       } catch (error) {

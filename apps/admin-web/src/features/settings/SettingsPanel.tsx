@@ -62,9 +62,15 @@ const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "
 
 function detailSummary(entry: AuditEntry): string {
   const parts = Object.entries(entry.detail)
-    .filter(([key, value]) => key !== "params" && value !== undefined && value !== null)
+    // `actor` is shown on its own next to the role; `params` is noise.
+    .filter(([key, value]) => key !== "params" && key !== "actor" && value !== undefined && value !== null)
     .map(([key, value]) => `${key}=${String(value)}`);
   return parts.length ? ` · ${parts.join(" ")}` : "";
+}
+
+/** The waiter who did it, when the action came from a signed-in POS device. */
+function actorOf(entry: AuditEntry): string {
+  return typeof entry.detail.actor === "string" ? entry.detail.actor : "";
 }
 
 /** The guest menu's address: where this console's API lives, else this site. */
@@ -607,6 +613,21 @@ export function SettingsPanel(props: Props) {
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>
+      {/* The shop's SEPA account for the POS pay-by-transfer GiroCode. */}
+      <Section id="sepa" title={t("sectionSepa")} summary={settings.sepaPayment.enabled ? (settings.sepaPayment.iban || t("sepaNoIban")) : t("foldOff")}>
+        <Toggle checked={settings.sepaPayment.enabled} label={t("sepaEnable")} hint={t("sepaHint")} onChange={(enabled) => void props.onSaveSettings({ sepaPayment: { ...settings.sepaPayment, enabled } }, "sepaSaved")} />
+        <form key={`${settings.sepaPayment.beneficiary}|${settings.sepaPayment.iban}|${settings.sepaPayment.bic}`} className="editor-form" onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const text = (name: string) => String(data.get(name) || "").trim();
+          void props.onSaveSettings({ sepaPayment: { ...settings.sepaPayment, beneficiary: text("beneficiary"), iban: text("iban").replace(/\s+/g, "").toUpperCase(), bic: text("bic").replace(/\s+/g, "").toUpperCase() } }, "sepaSaved");
+        }}>
+          <label><span>{t("sepaBeneficiary")}</span><input name="beneficiary" maxLength={70} defaultValue={settings.sepaPayment.beneficiary} placeholder={settings.companyName || settings.restaurantName} /></label>
+          <label><span>{t("sepaIban")}</span><input name="iban" maxLength={40} defaultValue={settings.sepaPayment.iban} placeholder="AT61 1904 3002 3457 3201" autoComplete="off" /></label>
+          <label><span>{t("sepaBic")}</span><input name="bic" maxLength={11} defaultValue={settings.sepaPayment.bic} placeholder="GIBAATWWXXX" autoComplete="off" /><small className="settings-hint">{t("sepaBicHint")}</small></label>
+          <button className="primary-action" type="submit">{t("save")}</button>
+        </form>
+      </Section>
       <Section id="modules" title={t("sectionModules")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
         <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
       </Section>
@@ -671,7 +692,7 @@ export function SettingsPanel(props: Props) {
     <details className="settings-card settings-section">
       <summary><h2>{t("sectionAudit")}</h2></summary>
       <div className="audit-list settings-body">{props.auditEntries.length ? props.auditEntries.map((entry) => <div className={`audit-row ${entry.status >= 400 ? "denied" : ""}`} key={entry.id}>
-        <span className="audit-role">{ROLE_KEYS[entry.role] ? t(ROLE_KEYS[entry.role]) : entry.role}</span>
+        <span className="audit-role">{ROLE_KEYS[entry.role] ? t(ROLE_KEYS[entry.role]) : entry.role}{actorOf(entry) && <><br /><b className="audit-actor">{actorOf(entry)}</b></>}</span>
         <span className="audit-what"><b>{entry.method} {entry.route}</b><small>{new Date(entry.at).toLocaleString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB")} · {entry.ip} · {entry.status}{detailSummary(entry)}</small></span>
       </div>) : <div className="admin-empty">{t("auditEmpty")}</div>}</div>
     </details>
