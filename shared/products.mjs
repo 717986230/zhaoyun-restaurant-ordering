@@ -76,6 +76,9 @@ export function mapProduct(row, media = [], stock = null) {
     published: Boolean(row.published),
     sortOrder: row.sort_order,
     printStation: row.print_station,
+    // 指定出单打印机: the id of one printer this dish prints on, over its
+    // station's printers; "" (null here) means route by station as before.
+    printPrinterId: row.print_printer_id || null,
     // Only for a dish that has a limit: the rest are as many as ordered, and say nothing.
     ...(stock && (stock.dailyLimit !== null || stock.leftToday !== null) ? { dailyLimit: stock.dailyLimit, leftToday: stock.leftToday } : {}),
     media: media.map((item) => ({
@@ -124,7 +127,12 @@ export function normalizeProduct(input, current = {}) {
     available: bool(input.available, current.available === undefined ? true : Boolean(current.available)),
     published: bool(input.published, current.published === undefined ? true : Boolean(current.published)),
     sortOrder: Number(input.sortOrder ?? current.sort_order ?? 0),
-    printStation
+    printStation,
+    // A dish may be pinned to one printer (its id); "" routes by station. The
+    // printer the id names belongs to `printStation` (the console keeps the two
+    // in step), so the right bridge still claims the job even when the pinned
+    // printer is unreachable and its station's printers stand in.
+    printPrinterId: String(input.printPrinterId ?? current.print_printer_id ?? "").trim()
   };
 
   if (!product.sku) product.sku = `ITEM-${product.id.slice(0, 8).toUpperCase()}`;
@@ -156,7 +164,8 @@ export function duplicateInput(product) {
     available: product.available,
     published: false,
     sortOrder: product.sortOrder,
-    printStation: product.printStation
+    printStation: product.printStation,
+    printPrinterId: product.printPrinterId ?? ""
   };
 }
 

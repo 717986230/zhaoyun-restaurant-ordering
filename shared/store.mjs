@@ -57,6 +57,7 @@ import {
 } from "./drawer.mjs";
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
+import { createWaitlistStore } from "./waitlist-store.mjs";
 import { appIconsView } from "./app-icons.mjs";
 import {
   MEMBER_BALANCE_LEDGER_SQL, MEMBER_NEW_SQL, MEMBER_POINTS_LEDGER_SQL, MEMBER_TOP_BALANCE_SQL, MEMBER_TOP_POINTS_SQL,
@@ -74,7 +75,7 @@ const ABSENT_PASSWORD_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
 const PRODUCT_COLUMNS = [
   "id", "sku", "kind", "category", "name_zh", "name_de", "name_en", "description", "price_cents",
   "allergens_json", "prep_time", "portion", "level", "ingredients", "art", "pattern", "tag_color", "available",
-  "published", "sort_order", "print_station", "modifiers_json", "vat_percent", "bundle_items_json", "created_at", "updated_at"
+  "published", "sort_order", "print_station", "print_printer_id", "modifiers_json", "vat_percent", "bundle_items_json", "created_at", "updated_at"
 ];
 
 export const PRODUCT_INSERT_SQL = `INSERT INTO products (${PRODUCT_COLUMNS.join(", ")}) VALUES (${PRODUCT_COLUMNS.map(() => "?").join(", ")})`;
@@ -86,7 +87,7 @@ export function productInsertParams(product, timestamp) {
     product.nameDe, product.nameEn, product.description, product.priceCents,
     product.allergensJson, product.prepTime, product.portion, product.level,
     product.ingredients, product.art, product.pattern, product.tagColor, product.available,
-    product.published, product.sortOrder, product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, timestamp
+    product.published, product.sortOrder, product.printStation, product.printPrinterId, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, timestamp
   ];
 }
 
@@ -230,13 +231,13 @@ export function createStore(driver) {
         `UPDATE products SET sku = ?, kind = ?, category = ?, name_zh = ?, name_de = ?,
            name_en = ?, description = ?, price_cents = ?, allergens_json = ?, prep_time = ?,
            portion = ?, level = ?, ingredients = ?, art = ?, pattern = ?, tag_color = ?, available = ?,
-           published = ?, sort_order = ?, print_station = ?, modifiers_json = ?,
+           published = ?, sort_order = ?, print_station = ?, print_printer_id = ?, modifiers_json = ?,
            vat_percent = ?, bundle_items_json = ?, updated_at = ? WHERE id = ?`,
         product.sku, product.kind, product.category, product.nameZh, product.nameDe,
         product.nameEn, product.description, product.priceCents, product.allergensJson,
         product.prepTime, product.portion, product.level, product.ingredients, product.art,
         product.pattern, product.tagColor, product.available, product.published, product.sortOrder,
-        product.printStation, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, product.id
+        product.printStation, product.printPrinterId, product.modifiersJson, product.vatPercent, product.bundleItemsJson, timestamp, product.id
       );
     } else {
       await run(PRODUCT_INSERT_SQL, ...productInsertParams(product, timestamp));
@@ -1149,6 +1150,8 @@ export function createStore(driver) {
     }),
     // Table reservations (shared/reservation-store.mjs), both backends alike.
     reservations: createReservationStore(driver, { settings: getSettings }),
+    // The walk-in waitlist (shared/waitlist-store.mjs), both backends alike.
+    waitlist: createWaitlistStore(driver),
     // Orders from the delivery platforms (shared/delivery-store.mjs), both backends alike.
     delivery: deliveryStore,
     /** For what the backends add of their own (seeding, the Node print agent). */

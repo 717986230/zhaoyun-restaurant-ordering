@@ -18,7 +18,7 @@ function dish(id: string, sortOrder: number, over: Partial<Product> = {}): Produ
 
 function panel(onBulkSave: ReturnType<typeof vi.fn>, products: Product[]) {
   return render(<CatalogPanel
-    products={products} editing={null} filter="all" mediaUrl={(path) => path}
+    products={products} printers={[]} editing={null} filter="all" mediaUrl={(path) => path}
     onFilter={() => undefined} onEdit={() => undefined}
     onSave={async () => true} onBulkSave={onBulkSave as never}
     onDelete={async () => undefined} onRefresh={async () => undefined} onDuplicate={async () => undefined}

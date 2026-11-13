@@ -60,3 +60,4 @@ crons = ["0 * * * *"]
 # few days. Included in the Free plan.
 [observability]
 enabled = true
+

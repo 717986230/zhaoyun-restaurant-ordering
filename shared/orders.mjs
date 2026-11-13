@@ -255,18 +255,23 @@ export function planOrder(input, productRows, hours = {}, meta = {}) {
       // Kept only for a line over more than one rate (order_item_vat_splits).
       vatSplitJson: split.length > 1 ? JSON.stringify(split) : null
     });
-    const stationItems = stations.get(product.print_station) || [];
-    stationItems.push({
+    // A dish pinned to one printer (print_printer_id) prints on its own ticket,
+    // apart from the rest of its station; dishes with no pin share one ticket
+    // per station as before. The station is the claim role either way.
+    const printerId = product.print_printer_id || "";
+    const key = `${product.print_station}\u0000${printerId}`;
+    const group = stations.get(key) || { station: product.print_station, printerId, items: [] };
+    group.items.push({
       sku: product.sku,
       name: productName,
       names: { zh: product.name_zh, de: product.name_de, en: product.name_en },
       quantity,
       modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names }))
     });
-    stations.set(product.print_station, stationItems);
+    stations.set(key, group);
   }
 
-  const printJobs = [...stations].map(([station, stationItems]) => ({
+  const printJobs = [...stations.values()].map(({ station, printerId, items: stationItems }) => ({
     id: uuid(),
     orderId: id,
     printerRole: station,
@@ -274,6 +279,9 @@ export function planOrder(input, productRows, hours = {}, meta = {}) {
     // never from the order a guest sends.
     payloadJson: JSON.stringify({
       orderNo, table, note: String(input.note || ""), items: stationItems,
+      // The one printer this ticket is pinned to, when the dishes were; the
+      // bridge sends it there and falls back to the station only if it cannot.
+      ...(printerId ? { printerId } : {}),
       ...(meta.staffName ? { staffName: meta.staffName } : {}),
       ...(meta.pickupNo ? { pickupNo: meta.pickupNo } : {}),
       // A guest's own order (shared/ordering.mjs): how it came in, and whose pickup it is.

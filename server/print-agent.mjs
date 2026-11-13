@@ -210,13 +210,18 @@ const isNetworkPrinter = (printer) => printer.enabled && printer.transport === "
 
 /**
  * The printers a job may go to, in order: a test page to its own printer
- * only; a ticket to its station's printers, then the backup the first of
- * them names.
+ * only; a ticket pinned to one printer (its dishes named it) to that printer,
+ * then its backup — or, when it is not a reachable network printer, down to
+ * its station's printers so the ticket is never lost; an unpinned ticket to
+ * its station's printers, then the backup the first of them names.
  */
 export function printersFor(job, printers) {
   const byId = new Map(printers.map((printer) => [printer.id, printer]));
   if (job.payload?.kind === "test") return [byId.get(job.payload.printerId)].filter((printer) => printer && isNetworkPrinter(printer));
-  const own = printers.filter((printer) => printer.role === job.printerRole && isNetworkPrinter(printer));
+  const pinned = job.payload?.printerId ? byId.get(job.payload.printerId) : null;
+  const own = pinned && isNetworkPrinter(pinned)
+    ? [pinned]
+    : printers.filter((printer) => printer.role === job.printerRole && isNetworkPrinter(printer));
   const backup = own.length ? byId.get(printerOptions(own[0].capabilities).backupPrinterId) : null;
   return backup && isNetworkPrinter(backup) && !own.includes(backup) ? [...own, backup] : own;
 }

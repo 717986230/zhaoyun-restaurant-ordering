@@ -11,6 +11,7 @@ import { createStore } from "../shared/store.mjs";
 import { d1Driver } from "./d1-driver.mjs";
 import { deliveryConfig } from "../shared/delivery.mjs";
 import { mailConfig } from "../shared/mail.mjs";
+import { remindReservations } from "../shared/reminders.mjs";
 import { openLive, publishLive } from "./live.mjs";
 
 export { LiveHub } from "./live.mjs";
@@ -109,13 +110,30 @@ export default {
   },
 
   /**
-   * The hourly cron (wrangler.toml [triggers]): 生日祝福邮件. The job itself
-   * waits until 09:00 in the restaurant's time zone and mails each member once
-   * a year, so running it every hour only makes it robust to a missed run.
+   * The cron (wrangler.toml [triggers]): 生日祝福邮件 and the day-before
+   * reservation reminders. Both are idempotent — each greeting and each
+   * reminder is claimed in the database before it is sent — so running the job
+   * every hour only makes it robust to a missed run.
    */
   async scheduled(controller, env, ctx) {
+    const at = new Date(controller.scheduledTime || Date.now());
     const { api } = buildApi(env, ctx);
-    const result = await api.birthdayGreetings(new Date(controller.scheduledTime || Date.now()));
+    const result = await api.birthdayGreetings(at);
     if (result.sent || result.failed) console.log(JSON.stringify({ level: "info", msg: "birthday greetings", ...result }));
+    // Reservation reminders go out once a day: the 09:00 UTC tick is late
+    // morning in Austria (UTC+1/+2), a reminder for the next day and not the
+    // middle of the night. (The reservation_reminders table makes it idempotent
+    // either way.)
+    if (at.getUTCHours() === 9) {
+      ctx.waitUntil((async () => {
+        try {
+          const store = createStore(d1Driver(env.DB));
+          const reminded = await remindReservations({ store, mail: mailConfig(env) });
+          console.log(JSON.stringify({ level: "info", msg: "reservation reminders", ...reminded }));
+        } catch (error) {
+          console.error(JSON.stringify({ level: "error", msg: "reservation reminders failed", error: String(error?.message ?? error) }));
+        }
+      })());
+    }
   }
 };

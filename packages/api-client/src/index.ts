@@ -3,9 +3,10 @@ import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles
   CreateServiceRequestCommand, MenuLanguage, MenuThemeId, PrintJobStatus, RealtimeEnvelope, VatPercent,
   ApiReceipt, CheckoutCommand, ApiVoucher, ApiMemberLookup, TopUpCommand, TopUpResult, ApiClosingTotals, ApiClosing, ApiSalesReport, ApiMemberReport, ApiJournalExport, PosStaff, PosStaffActivity, PosVoid, PosDevice, PosClaim, PosSettlement, PosDrawer, PosDrawerMovement, DrawerCloseCommand,
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
-  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiMemberTiers, ApiBirthday, ApiBirthdayPerk, ApiBalanceEntry, ApiPointsEntry, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
+  ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiMemberTiers, ApiBirthday, ApiBirthdayPerk, ApiBalanceEntry, ApiPointsEntry, ApiSepaPayment, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
-  ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand
+  ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand,
+  ApiWaitlist, ApiWaitlistEntry, WaitlistCommand, WaitlistUpdateCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -34,6 +35,7 @@ export function toProduct(product: ApiCatalogProduct): Product {
     available: product.available ?? true,
     published: product.published ?? true,
     printStation: product.printStation ?? (product.kind === "drink" ? "bar" : product.kind === "sushi" ? "sushi" : "kitchen"),
+    printPrinterId: product.printPrinterId ?? null,
     dailyLimit: product.dailyLimit ?? null,
     leftToday: product.leftToday ?? null
   };
@@ -72,6 +74,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     companyAddress: "",
     companyUid: "",
     cashRegisterId: "KASSE-1",
+    sepaPayment: { enabled: false, beneficiary: "", iban: "", bic: "" },
     takeawayDiscountPercent: 0,
     floorTables: 20,
     customerAccounts: false,
@@ -141,6 +144,8 @@ export interface AdminProductInput {
   allergens: string[];
   vatPercent?: VatPercent;
   printStation: "kitchen" | "bar" | "sushi" | "front";
+  /** 指定出单打印机: a printer id this dish prints on, over its station; null/"" routes by station. */
+  printPrinterId?: string | null;
   available: boolean;
   published: boolean;
   /** Where the dish sits in the menu; lower shows first (shared/products.mjs). */
@@ -445,6 +450,15 @@ export class AdminApi {
     return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
   }
   deleteReservation(id: string): Promise<void> { return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  // The walk-in waitlist: the floor's queue, a party added, moved on (notified / seated / left) or cleared.
+  waitlist(): Promise<ApiWaitlist> { return this.#request("/api/admin/waitlist"); }
+  addToWaitlist(command: WaitlistCommand): Promise<{ entry: ApiWaitlistEntry }> {
+    return this.#request("/api/admin/waitlist", { method: "POST", body: JSON.stringify(command) });
+  }
+  updateWaitlistEntry(id: string, command: WaitlistUpdateCommand): Promise<{ entry: ApiWaitlistEntry }> {
+    return this.#request(`/api/admin/waitlist/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
+  }
+  deleteWaitlistEntry(id: string): Promise<void> { return this.#request(`/api/admin/waitlist/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   deliveryOrders(from: string, to: string, filter: { provider?: DeliveryProvider | ""; status?: DeliveryStatus | "" } = {}): Promise<DeliveryList> {
     return this.#request(`/api/admin/delivery/orders?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&provider=${encodeURIComponent(filter.provider ?? "")}&status=${encodeURIComponent(filter.status ?? "")}`);
   }
@@ -558,7 +572,7 @@ export class PosApi {
   voidItem(table: string, orderItemId: string, quantity: number, reason: string): Promise<{ void: PosVoid }> {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/void`, { method: "POST", body: JSON.stringify({ orderItemId, quantity, reason }) });
   }
-  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number }> { return this.#request("/api/pos/floor"); }
+  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number; sepaPayment?: ApiSepaPayment }> { return this.#request("/api/pos/floor"); }
   deliveryAction(id: string, action: DeliveryAction, options: { prepMinutes?: number; reason?: DeliveryRejectReason } = {}): Promise<{ order: ApiDeliveryOrder }> {
     return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });
   }

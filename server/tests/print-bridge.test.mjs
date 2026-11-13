@@ -137,6 +137,23 @@ test("a station's printers in order, then the backup the first one names; a test
   assert.deepEqual(printersFor({ printerRole: "kitchen", payload: { kind: "test", printerId: "k3" } }, printers), [], "not a network printer");
 });
 
+test("a ticket pinned to one printer goes there (then its backup); it falls back to the station when that printer is gone", () => {
+  const printers = [
+    { id: "k1", name: "K1", role: "kitchen", transport: "lan", enabled: true, capabilities: { backupPrinterId: "f1" } },
+    { id: "k2", name: "K2", role: "kitchen", transport: "lan", enabled: true, capabilities: {} },
+    { id: "k4", name: "K4", role: "kitchen", transport: "lan", enabled: false, capabilities: {} },
+    { id: "f1", name: "F1", role: "front", transport: "lan", enabled: true, capabilities: {} }
+  ];
+  // Pinned to k1: only k1, then the backup it names.
+  assert.deepEqual(printersFor({ printerRole: "kitchen", payload: { printerId: "k1", items: [] } }, printers).map((printer) => printer.id), ["k1", "f1"]);
+  // Pinned to k2 (no backup): k2 alone, not the whole station.
+  assert.deepEqual(printersFor({ printerRole: "kitchen", payload: { printerId: "k2", items: [] } }, printers).map((printer) => printer.id), ["k2"]);
+  // Pinned to a disabled printer: not reachable, so the station's printers stand in.
+  assert.deepEqual(printersFor({ printerRole: "kitchen", payload: { printerId: "k4", items: [] } }, printers).map((printer) => printer.id), ["k1", "k2", "f1"]);
+  // Pinned to a printer that no longer exists: fall back to the station.
+  assert.deepEqual(printersFor({ printerRole: "kitchen", payload: { printerId: "gone", items: [] } }, printers).map((printer) => printer.id), ["k1", "k2", "f1"]);
+});
+
 test("a failed delivery is reported with every printer tried, and the console hears which ones answer", async () => {
   const calls = [];
   const source = {

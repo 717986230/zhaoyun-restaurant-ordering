@@ -54,6 +54,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
+      print_printer_id TEXT NOT NULL DEFAULT '',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10,
       bundle_items_json TEXT NOT NULL DEFAULT '[]',
@@ -532,6 +533,32 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       updated_at TEXT NOT NULL
     );
 
+    -- One row per booking already reminded (shared/reminders.mjs): the
+    -- day-before reminder email is sent once and never again, whatever the
+    -- schedule fires. A row, not a column, so the migration is a no-op on a
+    -- database created from today's schema. See migrations/0069_reservation_reminders.sql.
+    CREATE TABLE IF NOT EXISTS reservation_reminders (
+      reservation_id TEXT PRIMARY KEY,
+      sent_at TEXT NOT NULL
+    );
+
+    -- Walk-in waitlist (shared/waitlist.mjs, shared/waitlist-store.mjs): parties
+    -- taken at the door when full, in arrival order; notified, then seated or
+    -- gone. See migrations/0070_waitlist.sql.
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      party INTEGER NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      language TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      notified_at TEXT
+    );
+
     -- Orders from the delivery platforms (shared/delivery.mjs), once per
     -- platform and platform id. See migrations/0063_delivery_orders.sql.
     CREATE TABLE IF NOT EXISTS delivery_orders (
@@ -670,6 +697,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
     CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(date, time);
+    CREATE INDEX IF NOT EXISTS idx_waitlist_status ON waitlist(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_reservations_customer ON reservations(customer_id, date);
     CREATE INDEX IF NOT EXISTS idx_delivery_orders_created ON delivery_orders(created_at);
     CREATE INDEX IF NOT EXISTS idx_delivery_orders_status ON delivery_orders(status, created_at);
@@ -685,7 +713,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     "ALTER TABLE orders ADD COLUMN billed_at TEXT",
     "ALTER TABLE restaurant_tables ADD COLUMN locked_at TEXT",
     "ALTER TABLE products ADD COLUMN bundle_items_json TEXT NOT NULL DEFAULT '[]'",
-    "ALTER TABLE products ADD COLUMN tag_color TEXT NOT NULL DEFAULT ''"
+    "ALTER TABLE products ADD COLUMN tag_color TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE products ADD COLUMN print_printer_id TEXT NOT NULL DEFAULT ''"
   ]) {
     try {
       db.exec(statement);

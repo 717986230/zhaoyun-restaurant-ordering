@@ -23,6 +23,7 @@ CREATE TABLE products (
       published INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       print_station TEXT NOT NULL DEFAULT 'kitchen',
+      print_printer_id TEXT NOT NULL DEFAULT '',
       modifiers_json TEXT NOT NULL DEFAULT '[]',
       vat_percent INTEGER NOT NULL DEFAULT 10,
       bundle_items_json TEXT NOT NULL DEFAULT '[]',
@@ -391,6 +392,23 @@ CREATE TABLE reservations (
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE reservation_reminders (
+      reservation_id TEXT PRIMARY KEY,
+      sent_at TEXT NOT NULL
+    );
+CREATE TABLE waitlist (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      party INTEGER NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      language TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      notified_at TEXT
+    );
 CREATE TABLE delivery_orders (
       id TEXT PRIMARY KEY,
       provider TEXT NOT NULL,
@@ -502,6 +520,7 @@ CREATE INDEX idx_guest_orders_customer ON guest_orders(customer_id, created_at);
 CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);
 CREATE INDEX idx_audit_at ON audit_log(at DESC);
 CREATE INDEX idx_reservations_date ON reservations(date, time);
+CREATE INDEX idx_waitlist_status ON waitlist(status, created_at);
 CREATE INDEX idx_reservations_customer ON reservations(customer_id, date);
 CREATE INDEX idx_delivery_orders_created ON delivery_orders(created_at);
 CREATE INDEX idx_delivery_orders_status ON delivery_orders(status, created_at);
