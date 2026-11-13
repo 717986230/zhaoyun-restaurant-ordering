@@ -19,9 +19,9 @@ import {
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
-  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
+  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { alertMessage, birthdayMessage, bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage } from "./mail.mjs";
+import { alertMessage, birthdayMessage, bookingMessage, brevoRequest, codeMessage, mailStatus, testMessage, waitlistReadyMessage } from "./mail.mjs";
 import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
@@ -1268,6 +1268,43 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           }
         } catch (error) {
           return reservationRefusal(error);
+        }
+        return fail("Not found", 404);
+      }
+
+      // The walk-in waitlist is the floor's (shared/waitlist.mjs): parties
+      // taken at the door when full, notified when a table frees up, then
+      // seated or gone. Notifying one with an email sends "your table is
+      // ready" through the same pipeline as a booking.
+      if (path[2] === "waitlist" && path.length <= 4) {
+        const { denied } = await gate("staff");
+        if (denied) return denied;
+        const waitlist = store.waitlist;
+        try {
+          if (path.length === 3 && method === "GET") return json(await waitlist.list());
+          if (path.length === 3 && method === "POST") {
+            const { value, invalid } = await body(request, WaitlistBody);
+            if (invalid) return invalid;
+            return json(await waitlist.add(value), 201);
+          }
+          if (path.length === 4 && method === "PATCH") {
+            const { value, invalid } = await body(request, WaitlistUpdateBody);
+            if (invalid) return invalid;
+            const result = await waitlist.update(path[3], value);
+            if (!result) return fail("Not on the waitlist", 404);
+            // Told their table is ready: once, best-effort, only if they left an email.
+            if (result.justNotified && result.entry.email && mail) {
+              const settings = await store.getSettings();
+              await sendMail({ to: result.entry.email, ...waitlistReadyMessage(result.entry, { language: result.entry.language || "de", restaurant: settings.restaurantName }) });
+            }
+            return json({ entry: result.entry });
+          }
+          if (path.length === 4 && method === "DELETE") {
+            return (await waitlist.remove(path[3])) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("Not on the waitlist", 404);
+          }
+        } catch (error) {
+          if (!error.code) throw error;
+          return json({ error: error.message, code: error.code }, error.status ?? 400);
         }
         return fail("Not found", 404);
       }

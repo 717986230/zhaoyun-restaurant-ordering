@@ -5,7 +5,8 @@ import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiMemberTiers, ApiBirthday, ApiBirthdayPerk, ApiBalanceEntry, ApiPointsEntry, ApiSepaPayment, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
-  ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand
+  ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand,
+  ApiWaitlist, ApiWaitlistEntry, WaitlistCommand, WaitlistUpdateCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -446,6 +447,15 @@ export class AdminApi {
     return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
   }
   deleteReservation(id: string): Promise<void> { return this.#request(`/api/admin/reservations/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  // The walk-in waitlist: the floor's queue, a party added, moved on (notified / seated / left) or cleared.
+  waitlist(): Promise<ApiWaitlist> { return this.#request("/api/admin/waitlist"); }
+  addToWaitlist(command: WaitlistCommand): Promise<{ entry: ApiWaitlistEntry }> {
+    return this.#request("/api/admin/waitlist", { method: "POST", body: JSON.stringify(command) });
+  }
+  updateWaitlistEntry(id: string, command: WaitlistUpdateCommand): Promise<{ entry: ApiWaitlistEntry }> {
+    return this.#request(`/api/admin/waitlist/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(command) });
+  }
+  deleteWaitlistEntry(id: string): Promise<void> { return this.#request(`/api/admin/waitlist/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   deliveryOrders(from: string, to: string, filter: { provider?: DeliveryProvider | ""; status?: DeliveryStatus | "" } = {}): Promise<DeliveryList> {
     return this.#request(`/api/admin/delivery/orders?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&provider=${encodeURIComponent(filter.provider ?? "")}&status=${encodeURIComponent(filter.status ?? "")}`);
   }
