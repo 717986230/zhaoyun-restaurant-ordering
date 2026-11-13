@@ -11,6 +11,7 @@ import { GUEST_ORDERING_DEFAULTS, normalizeGuestOrdering, orderingMenuView } fro
 import { BIRTHDAY_PERK_DEFAULTS, LOYALTY_DEFAULTS, MEMBER_TIERS_DEFAULTS, MEMBERSHIP_DEFAULTS, normalizeBirthdayPerk, normalizeLoyalty, normalizeMemberTiers, normalizeMembership } from "./customer.mjs";
 import { normalizeReservationSettings } from "./reservations.mjs";
 import { normalizeDeliverySettings } from "./delivery.mjs";
+import { normalizeSepaPayment, SEPA_PAYMENT_DEFAULTS } from "./giro.mjs";
 
 // The colour hexes themselves live in packages/domain/src/themes.ts, next to
 // the guest app that renders them; the backend only ever needs to know which
@@ -270,6 +271,8 @@ export const APP_SETTINGS = {
   },
   // The register's id (Kassen-ID) printed on each receipt; unique per business.
   cashRegisterId: { key: "cash_register_id", fallback: () => "KASSE-1", normalize: normalizeCashRegisterId },
+  // The shop's SEPA account for the pay-by-transfer GiroCode on the POS.
+  sepaPayment: { key: "sepa_payment", fallback: () => ({ ...SEPA_PAYMENT_DEFAULTS }), normalize: normalizeSepaPayment },
   // The heading of the guest menu.
   menuTitle: { key: "menu_title", fallback: () => "La Carte", normalize: boundedText("Menu title", 24) },
   // What a guest sees before they touch the sun/moon; their own pick wins.

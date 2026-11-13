@@ -166,6 +166,13 @@ export const SettingsBody = Type.Object({
   companyAddress: Type.Optional(Type.String({ maxLength: 160 })),
   companyUid: Type.Optional(Type.String({ maxLength: 16 })),
   cashRegisterId: Type.Optional(Type.String({ minLength: 1, maxLength: 32 })),
+  // The SEPA account for the POS GiroCode; shared/giro.mjs checks the form.
+  sepaPayment: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    beneficiary: Type.Optional(Type.String({ maxLength: 70 })),
+    iban: Type.Optional(Type.String({ maxLength: 40 })),
+    bic: Type.Optional(Type.String({ maxLength: 11 }))
+  }, { maxProperties: 8 })),
   takeawayDiscountPercent: Type.Optional(Type.Number()),
   floorTables: Type.Optional(Type.Integer({ minimum: 0, maximum: 200 })),
   menuDefaultScheme: Type.Optional(literals(COLOR_SCHEMES)),

@@ -613,6 +613,21 @@ export function SettingsPanel(props: Props) {
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>
+      {/* The shop's SEPA account for the POS pay-by-transfer GiroCode. */}
+      <Section id="sepa" title={t("sectionSepa")} summary={settings.sepaPayment.enabled ? (settings.sepaPayment.iban || t("sepaNoIban")) : t("foldOff")}>
+        <Toggle checked={settings.sepaPayment.enabled} label={t("sepaEnable")} hint={t("sepaHint")} onChange={(enabled) => void props.onSaveSettings({ sepaPayment: { ...settings.sepaPayment, enabled } }, "sepaSaved")} />
+        <form key={`${settings.sepaPayment.beneficiary}|${settings.sepaPayment.iban}|${settings.sepaPayment.bic}`} className="editor-form" onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const text = (name: string) => String(data.get(name) || "").trim();
+          void props.onSaveSettings({ sepaPayment: { ...settings.sepaPayment, beneficiary: text("beneficiary"), iban: text("iban").replace(/\s+/g, "").toUpperCase(), bic: text("bic").replace(/\s+/g, "").toUpperCase() } }, "sepaSaved");
+        }}>
+          <label><span>{t("sepaBeneficiary")}</span><input name="beneficiary" maxLength={70} defaultValue={settings.sepaPayment.beneficiary} placeholder={settings.companyName || settings.restaurantName} /></label>
+          <label><span>{t("sepaIban")}</span><input name="iban" maxLength={40} defaultValue={settings.sepaPayment.iban} placeholder="AT61 1904 3002 3457 3201" autoComplete="off" /></label>
+          <label><span>{t("sepaBic")}</span><input name="bic" maxLength={11} defaultValue={settings.sepaPayment.bic} placeholder="GIBAATWWXXX" autoComplete="off" /><small className="settings-hint">{t("sepaBicHint")}</small></label>
+          <button className="primary-action" type="submit">{t("save")}</button>
+        </form>
+      </Section>
       <Section id="modules" title={t("sectionModules")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
         <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
       </Section>
