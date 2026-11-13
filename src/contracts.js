@@ -166,6 +166,13 @@ export const SettingsBody = Type.Object({
   companyAddress: Type.Optional(Type.String({ maxLength: 160 })),
   companyUid: Type.Optional(Type.String({ maxLength: 16 })),
   cashRegisterId: Type.Optional(Type.String({ minLength: 1, maxLength: 32 })),
+  // The SEPA account for the POS GiroCode; shared/giro.mjs checks the form.
+  sepaPayment: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    beneficiary: Type.Optional(Type.String({ maxLength: 70 })),
+    iban: Type.Optional(Type.String({ maxLength: 40 })),
+    bic: Type.Optional(Type.String({ maxLength: 11 }))
+  }, { maxProperties: 8 })),
   takeawayDiscountPercent: Type.Optional(Type.Number()),
   floorTables: Type.Optional(Type.Integer({ minimum: 0, maximum: 200 })),
   menuDefaultScheme: Type.Optional(literals(COLOR_SCHEMES)),
@@ -480,6 +487,30 @@ export const ReservationUpdateBody = Type.Object({
   notes: Type.Optional(Type.String({ maxLength: 500 })),
   status: Type.Optional(literals(RESERVATION_STATUSES)),
   table: Type.Optional(Type.String({ maxLength: 8 }))
+}, { additionalProperties: false, minProperties: 1 });
+
+// A party on the walk-in waitlist (shared/waitlist.mjs checks the rest: the
+// form of the phone and email). Only name and size are required.
+const WaitlistFields = {
+  name: Type.String({ minLength: 1, maxLength: 80 }),
+  party: Type.Integer({ minimum: 1, maximum: 500 }),
+  phone: Type.Optional(Type.String({ maxLength: 30 })),
+  email: Type.Optional(Type.String({ maxLength: 254 })),
+  notes: Type.Optional(Type.String({ maxLength: 500 })),
+  language: Type.Optional(Type.Union([Type.Literal("zh"), Type.Literal("en"), Type.Literal("de")]))
+};
+/** A party the floor adds at the door. */
+export const WaitlistBody = Type.Object({ ...WaitlistFields }, { additionalProperties: false });
+export const WAITLIST_STATUSES = ["waiting", "notified", "seated", "left"];
+/** A party on the waitlist changed by the floor: only what is sent changes. */
+export const WaitlistUpdateBody = Type.Object({
+  name: Type.Optional(WaitlistFields.name),
+  party: Type.Optional(WaitlistFields.party),
+  phone: Type.Optional(Type.String({ maxLength: 30 })),
+  email: Type.Optional(Type.String({ maxLength: 254 })),
+  notes: Type.Optional(Type.String({ maxLength: 500 })),
+  language: Type.Optional(WaitlistFields.language),
+  status: Type.Optional(literals(WAITLIST_STATUSES))
 }, { additionalProperties: false, minProperties: 1 });
 
 /** The floor's answer to a delivery platform's order (shared/delivery.mjs). */

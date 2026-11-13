@@ -58,6 +58,7 @@ const incremental = [
   { file: "0070_member_birthday.sql", drop: "DROP TABLE member_birthdays;" },
   { file: "0071_birthday_greetings.sql", drop: "DROP TABLE birthday_greetings;" },
   { file: "0072_balance_operator.sql", drop: "DROP TABLE balance_operators;" },
+  { file: "0073_waitlist.sql", drop: "DROP INDEX idx_waitlist_status; DROP TABLE waitlist;" },
   { file: "0074_reservation_reminders.sql", drop: "DROP TABLE reservation_reminders;" }
 ].map((migration) => ({
   ...migration,

@@ -1476,6 +1476,11 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const next = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
       assert.ok((await call("GET", `/api/admin/journal?from=${day}&to=${next}`, { admin: true })).json.entries.some((entry) => entry.kind === "item.voided" && entry.payload.reason === "Gast hat storniert"));
       assert.deepEqual((await call("GET", "/api/pos/settlement", asZhou)).json.totals.voids, { count: 1, cents });
+      // 操作记到人: the void's audit entry names Zhou, not just the role token the whole floor shares.
+      const voidAudit = (await call("GET", "/api/admin/audit", { admin: true })).json.entries
+        .find((entry) => entry.route === "/api/pos/tables/V1/void" && entry.status === 201);
+      assert.ok(voidAudit, "the void leaves an audit entry");
+      assert.equal(voidAudit.detail.actor, "Zhou", "the audit entry names who did it");
 
       // Paid, then printed again for the guest: the same receipt, marked a copy.
       const paid = (await call("POST", "/api/admin/checkout", { ...asZhou, body: { table: "V1", items: [{ orderItemId: line.orderItemId, quantity: 2 }], payments: [{ type: "card", amount: after.total }] } })).json.receipt;
@@ -2237,6 +2242,50 @@ export function contractChecks(call, assert, { liveBase } = {}) {
 
       await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
       assert.equal((await call("GET", "/api/catalog")).json.menu.reservations, false);
+    }],
+
+    ["the floor runs a walk-in waitlist: a party joins, is notified (emailed that its table is ready), then seated; found in arrival order", async () => {
+      // The waitlist is the floor's: a token is needed, a staff PIN enough.
+      assert.equal((await call("GET", "/api/admin/waitlist")).status, 401);
+      const start = (await call("GET", "/api/admin/waitlist", { role: "staff" })).json;
+      assert.ok(Array.isArray(start.entries));
+      const before = start.entries.length;
+
+      // Name and size are required; a bad email is refused.
+      assert.equal((await call("POST", "/api/admin/waitlist", { role: "staff", body: { party: 2 } })).status, 400);
+      assert.equal((await call("POST", "/api/admin/waitlist", { role: "staff", body: { name: "Dana", party: 2, email: "not-an-email" } })).json.code, "INVALID");
+
+      const first = await call("POST", "/api/admin/waitlist", { role: "staff", body: { name: "Dana", party: 4, phone: "0660 1234567", email: "dana@example.com", language: "de" } });
+      assert.equal(first.status, 201);
+      assert.equal(first.json.entry.status, "waiting");
+      assert.equal(first.json.entry.party, 4);
+      assert.ok(first.json.entry.phone, "the number is kept");
+      const second = await call("POST", "/api/admin/waitlist", { role: "staff", body: { name: "Ben", party: 2 } });
+      assert.equal(second.status, 201);
+
+      const queue = (await call("GET", "/api/admin/waitlist", { role: "staff" })).json;
+      assert.equal(queue.entries.length, before + 2);
+      const dana = queue.entries.find((entry) => entry.id === first.json.entry.id);
+      const ben = queue.entries.find((entry) => entry.id === second.json.entry.id);
+      assert.ok(dana && ben && dana.position < ben.position, "first in, first in line");
+      assert.ok(queue.waiting >= 2);
+
+      // Notified: emailed once, best-effort, in their language; the moment is stamped.
+      const notified = await call("PATCH", `/api/admin/waitlist/${first.json.entry.id}`, { role: "staff", body: { status: "notified" } });
+      assert.equal(notified.json.entry.status, "notified");
+      assert.ok(notified.json.entry.notifiedAt, "the moment is stamped");
+      const ready = (await call("GET", "/api/admin/mail/outbox?limit=50", { admin: true })).json.messages.find((message) => message.to === "dana@example.com" && /Tisch/.test(message.subject));
+      assert.ok(ready, "the party is emailed that its table is ready");
+
+      // Seated: off the active queue.
+      assert.equal((await call("PATCH", `/api/admin/waitlist/${first.json.entry.id}`, { role: "staff", body: { status: "seated" } })).json.entry.status, "seated");
+      const afterSeat = (await call("GET", "/api/admin/waitlist", { role: "staff" })).json;
+      assert.ok(!afterSeat.entries.some((entry) => entry.id === first.json.entry.id), "a seated party leaves the queue");
+
+      // An unknown status is refused; a party can be cleared out for good.
+      assert.equal((await call("PATCH", `/api/admin/waitlist/${ben.id}`, { role: "staff", body: { status: "nope" } })).status, 400);
+      assert.equal((await call("DELETE", `/api/admin/waitlist/${ben.id}`, { role: "staff" })).status, 204);
+      assert.equal((await call("DELETE", `/api/admin/waitlist/${ben.id}`, { role: "staff" })).status, 404);
     }],
 
     ["a guest picks their own table online: only a free one big enough, never one already booked for that stay", async () => {

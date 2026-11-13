@@ -70,6 +70,9 @@ const COPY = {
     bookingManage: "查看或取消预约：{url}",
     reminderSubject: "{restaurant}：预约提醒 · 明天 {date} {time}",
     reminderLead: "提醒您，明天在 {restaurant} 有一个预约：",
+    waitlistReadySubject: "{restaurant}：您的桌子准备好了",
+    waitlistReadyLead: "{name} 您好，您等候的桌子（{party} 位）已经准备好了，请到前台就座。",
+    waitlistReadyTail: "如果您已经离开或不再需要，请告知我们，谢谢。",
     birthdaySubject: "{restaurant} 祝你生日快乐！",
     birthdayLead: "{name}，祝你生日快乐！",
     birthdayOffer: "整个生日月来店用餐，报手机号或邮箱给收银员，即享会员价 {percent}% off。",
@@ -96,6 +99,9 @@ const COPY = {
     bookingManage: "Reservierung ansehen oder stornieren: {url}",
     reminderSubject: "{restaurant} – Erinnerung an Ihre Reservierung · morgen {date} {time}",
     reminderLead: "Zur Erinnerung: Sie haben morgen eine Reservierung im {restaurant}:",
+    waitlistReadySubject: "{restaurant} – Ihr Tisch ist bereit",
+    waitlistReadyLead: "Hallo {name}, Ihr Tisch für {party} Personen ist frei. Bitte kommen Sie zum Empfang.",
+    waitlistReadyTail: "Falls Sie schon gegangen sind oder den Tisch nicht mehr brauchen, sagen Sie uns bitte Bescheid.",
     birthdaySubject: "{restaurant} – alles Gute zum Geburtstag!",
     birthdayLead: "Liebe/r {name}, alles Gute zum Geburtstag!",
     birthdayOffer: "Den ganzen Geburtstagsmonat erhalten Sie bei uns {percent}% Mitgliedspreis – einfach an der Kassa Ihre Nummer oder E-Mail nennen.",
@@ -122,6 +128,9 @@ const COPY = {
     bookingManage: "View or cancel your booking: {url}",
     reminderSubject: "{restaurant} – a reminder about your booking · tomorrow {date} {time}",
     reminderLead: "A reminder: you have a booking at {restaurant} tomorrow:",
+    waitlistReadySubject: "{restaurant} – your table is ready",
+    waitlistReadyLead: "Hi {name}, your table for {party} is ready. Please come to the host stand.",
+    waitlistReadyTail: "If you have already left or no longer need the table, please let us know.",
     birthdaySubject: "{restaurant} – happy birthday!",
     birthdayLead: "Happy birthday, {name}!",
     birthdayOffer: "All through your birthday month you get {percent}% member price with us – just give the cashier your number or email.",
@@ -229,6 +238,19 @@ export function createMailer({ mail, store, send = (...args) => fetch(...args) }
       console.error(JSON.stringify({ level: "error", msg: "mail not sent", error: String(error?.message ?? error) }));
     }
     return false;
+  };
+}
+
+/** "Your table is ready" for a party on the walk-in waitlist (shared/waitlist.mjs). */
+export function waitlistReadyMessage(entry, { language = "de", restaurant = "" } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const values = { restaurant: restaurant || "Restaurant", name: entry.name, party: entry.party };
+  const lead = fill(copy.waitlistReadyLead, values);
+  const tail = copy.waitlistReadyTail;
+  return {
+    subject: fill(copy.waitlistReadySubject, values),
+    text: `${lead}\n\n${tail}\n`,
+    html: `<p>${escapeHtml(lead)}</p><p>${escapeHtml(tail)}</p>`
   };
 }
 

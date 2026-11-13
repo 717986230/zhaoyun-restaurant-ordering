@@ -57,6 +57,7 @@ import {
 } from "./drawer.mjs";
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
+import { createWaitlistStore } from "./waitlist-store.mjs";
 import { appIconsView } from "./app-icons.mjs";
 import {
   MEMBER_BALANCE_LEDGER_SQL, MEMBER_NEW_SQL, MEMBER_POINTS_LEDGER_SQL, MEMBER_TOP_BALANCE_SQL, MEMBER_TOP_POINTS_SQL,
@@ -1149,6 +1150,8 @@ export function createStore(driver) {
     }),
     // Table reservations (shared/reservation-store.mjs), both backends alike.
     reservations: createReservationStore(driver, { settings: getSettings }),
+    // The walk-in waitlist (shared/waitlist-store.mjs), both backends alike.
+    waitlist: createWaitlistStore(driver),
     // Orders from the delivery platforms (shared/delivery-store.mjs), both backends alike.
     delivery: deliveryStore,
     /** For what the backends add of their own (seeding, the Node print agent). */

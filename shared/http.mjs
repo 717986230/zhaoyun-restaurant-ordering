@@ -19,9 +19,9 @@ import {
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
-  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, DeliveryActionBody, StockBody
+  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody
 } from "../src/contracts.js";
-import { alertMessage, birthdayMessage, bookingMessage, brevoRequest, codeMessage, createMailer, mailStatus, testMessage } from "./mail.mjs";
+import { alertMessage, birthdayMessage, bookingMessage, brevoRequest, codeMessage, createMailer, mailStatus, testMessage, waitlistReadyMessage } from "./mail.mjs";
 import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
@@ -357,11 +357,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     ctx.role = role;
     // A waiter's session carries who they are and which device they are on.
     const pos = session?.staff ? { staff: session.staff, deviceId: session.deviceId } : null;
+    // Who did it, by name, so the audit log traces a POS action to the person,
+    // not just to the shared role token the whole floor signs in with.
+    ctx.staff = pos?.staff ?? null;
     if (!roleAllows(role, minimumRole)) {
       // A valid token used beyond its role is worth recording, not just refusing.
       ctx.audited = true;
       const url = new URL(request.url);
-      await store.recordAudit({ role, ip: ctx.ip ?? "", method: request.method, route: url.pathname + url.search, status: 403, detail: { denied: minimumRole } });
+      await store.recordAudit({ role, ip: ctx.ip ?? "", method: request.method, route: url.pathname + url.search, status: 403, detail: { denied: minimumRole, ...(ctx.staff?.name ? { actor: ctx.staff.name } : {}) } });
       return { denied: json({ error: `This role may not perform ${minimumRole} actions` }, 403) };
     }
     return { role, pos, account: session?.account ?? null };
@@ -899,6 +902,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
+          const floorSettings = await store.getSettings();
           return json({
             tables: await store.tablesOverview(),
             claims: await store.liveClaims(),
@@ -908,7 +912,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             reservations: await store.reservations.today(),
             // Delivery platforms' orders not yet handed over.
             delivery: await store.delivery.open(),
-            takeawayDiscountPercent: (await store.getSettings()).takeawayDiscountPercent
+            takeawayDiscountPercent: floorSettings.takeawayDiscountPercent,
+            // The SEPA account for the pay-by-transfer GiroCode, if the shop set one.
+            sepaPayment: floorSettings.sepaPayment
           });
         }
         if (path.length === 5 && path[2] === "tables" && path[4] === "claim") {
@@ -1247,6 +1253,43 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           }
         } catch (error) {
           return reservationRefusal(error);
+        }
+        return fail("Not found", 404);
+      }
+
+      // The walk-in waitlist is the floor's (shared/waitlist.mjs): parties
+      // taken at the door when full, notified when a table frees up, then
+      // seated or gone. Notifying one with an email sends "your table is
+      // ready" through the same pipeline as a booking.
+      if (path[2] === "waitlist" && path.length <= 4) {
+        const { denied } = await gate("staff");
+        if (denied) return denied;
+        const waitlist = store.waitlist;
+        try {
+          if (path.length === 3 && method === "GET") return json(await waitlist.list());
+          if (path.length === 3 && method === "POST") {
+            const { value, invalid } = await body(request, WaitlistBody);
+            if (invalid) return invalid;
+            return json(await waitlist.add(value), 201);
+          }
+          if (path.length === 4 && method === "PATCH") {
+            const { value, invalid } = await body(request, WaitlistUpdateBody);
+            if (invalid) return invalid;
+            const result = await waitlist.update(path[3], value);
+            if (!result) return fail("Not on the waitlist", 404);
+            // Told their table is ready: once, best-effort, only if they left an email.
+            if (result.justNotified && result.entry.email && mail) {
+              const settings = await store.getSettings();
+              await sendMail({ to: result.entry.email, ...waitlistReadyMessage(result.entry, { language: result.entry.language || "de", restaurant: settings.restaurantName }) });
+            }
+            return json({ entry: result.entry });
+          }
+          if (path.length === 4 && method === "DELETE") {
+            return (await waitlist.remove(path[3])) ? new Response(null, { status: 204, headers: SECURITY_HEADERS }) : fail("Not on the waitlist", 404);
+          }
+        } catch (error) {
+          if (!error.code) throw error;
+          return json({ error: error.message, code: error.code }, error.status ?? 400);
         }
         return fail("Not found", 404);
       }
@@ -1767,7 +1810,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
   return serve;
 
   async function serve(request, { ip = "", requestId = "" } = {}) {
-    const ctx = { ip, requestId, role: null, audited: false };
+    const ctx = { ip, requestId, role: null, staff: null, audited: false };
     const url = new URL(request.url);
     const writing = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     // The body a write names its table and business fields in, read once.
@@ -1795,6 +1838,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       const detail = {};
       const fields = url.pathname.startsWith("/api/admin/reservations") ? RESERVATION_AUDIT_FIELDS : AUDIT_FIELDS;
       for (const field of fields) if (sent && typeof sent === "object" && sent[field] !== undefined) detail[field] = sent[field];
+      // The waiter who signed in on the device, so "who voided this" has a name.
+      if (ctx.staff?.name) detail.actor = ctx.staff.name;
       try {
         await store.recordAudit({ role: ctx.role, ip, method: request.method, route: url.pathname, status: response.status, detail });
       } catch (error) {
