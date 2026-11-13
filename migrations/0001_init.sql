@@ -392,6 +392,10 @@ CREATE TABLE reservations (
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE reservation_reminders (
+      reservation_id TEXT PRIMARY KEY,
+      sent_at TEXT NOT NULL
+    );
 CREATE TABLE waitlist (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

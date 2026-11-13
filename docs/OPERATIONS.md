@@ -30,6 +30,8 @@
 
 Worker 自己的密钥用 `npx wrangler secret put ADMIN_TOKEN` 设置，至少 32 个字符；`STAFF_TOKEN` 和 `KITCHEN_TOKEN` 同理。
 
+**每日定时任务**：Worker 自带一个定时任务（`wrangler.toml` 的 `[triggers]`，默认每天 09:00 UTC），给「明天」有确认预约、留了邮箱的客人发到店提醒邮件（见 `docs/RESERVATIONS.md`）。它随 Worker 一起部署，不用单独设置；只有配好了 Brevo（`docs/MAIL.md`）且预约功能开着时才会真正发信。自建 Node 服务器没有这个定时任务，改用店里自己的 cron 每天跑一次 `npm run reminders`。
+
 ## 2. 监控
 
 - **健康检查**：`GET /api/health`。
