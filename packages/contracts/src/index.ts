@@ -192,6 +192,8 @@ export interface ApiCatalogProduct {
   available?: boolean;
   published?: boolean;
   printStation?: "kitchen" | "bar" | "sushi" | "front";
+  /** 指定出单打印机: the id of one printer this dish prints on, over its station's printers; null/absent routes by station. */
+  printPrinterId?: string | null;
   /** 每日限量 (shared/stock.mjs): the portions each day starts with, and what is left today; null for no limit. */
   dailyLimit?: number | null;
   leftToday?: number | null;

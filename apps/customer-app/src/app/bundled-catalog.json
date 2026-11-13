@@ -131,6 +131,7 @@
     "published": true,
     "sortOrder": 0,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-r1-e257461a2b.jpg",
@@ -274,6 +275,7 @@
     "published": true,
     "sortOrder": 1,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-r2-a53b43f5cd.jpg",
@@ -417,6 +419,7 @@
     "published": true,
     "sortOrder": 2,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-r3-8bc810e633.jpg",
@@ -561,6 +564,7 @@
     "published": true,
     "sortOrder": 3,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-r4-d9bd73d6ef.jpg",
@@ -647,6 +651,7 @@
     "published": true,
     "sortOrder": 4,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-t1-fc776619b2.jpg",
@@ -732,6 +737,7 @@
     "published": true,
     "sortOrder": 5,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-t2-25172c58ab.jpg",
@@ -818,6 +824,7 @@
     "published": true,
     "sortOrder": 6,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-t3-3917334126.jpg",
@@ -903,6 +910,7 @@
     "published": true,
     "sortOrder": 7,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-t4-76c3fed8d9.jpg",
@@ -988,6 +996,7 @@
     "published": true,
     "sortOrder": 8,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-t4c-bc27205813.jpg",
@@ -1072,6 +1081,7 @@
     "published": true,
     "sortOrder": 9,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-a1-1e0c789f16.jpg",
@@ -1156,6 +1166,7 @@
     "published": true,
     "sortOrder": 10,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-a2-557b7adcfa.jpg",
@@ -1240,6 +1251,7 @@
     "published": true,
     "sortOrder": 11,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-a3-1613e00983.jpg",
@@ -1324,6 +1336,7 @@
     "published": true,
     "sortOrder": 12,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-a4-8439271bd0.jpg",
@@ -1369,6 +1382,7 @@
     "published": true,
     "sortOrder": 17,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n1-6-67ac57406b.jpg",
@@ -1414,6 +1428,7 @@
     "published": true,
     "sortOrder": 18,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n1-10-bf7efb99ce.jpg",
@@ -1459,6 +1474,7 @@
     "published": true,
     "sortOrder": 19,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n2-6-1e814df66e.jpg",
@@ -1504,6 +1520,7 @@
     "published": true,
     "sortOrder": 20,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n2-10-f84178811f.jpg",
@@ -1548,6 +1565,7 @@
     "published": true,
     "sortOrder": 21,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n3-6-2ae2a764c2.jpg",
@@ -1592,6 +1610,7 @@
     "published": true,
     "sortOrder": 22,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n3-10-c179d0ba48.jpg",
@@ -1636,6 +1655,7 @@
     "published": true,
     "sortOrder": 23,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n4-6-9e781bc9a5.jpg",
@@ -1680,6 +1700,7 @@
     "published": true,
     "sortOrder": 24,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-n4-10-890f4cb8b7.jpg",
@@ -1722,6 +1743,7 @@
     "published": true,
     "sortOrder": 25,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-m1-2626cf3bf5.jpg",
@@ -1766,6 +1788,7 @@
     "published": true,
     "sortOrder": 26,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-m2-b4611e882d.jpg",
@@ -1810,6 +1833,7 @@
     "published": true,
     "sortOrder": 27,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-m3-a4021e3b0b.jpg",
@@ -1854,6 +1878,7 @@
     "published": true,
     "sortOrder": 28,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-m5-f568e8abef.jpg",
@@ -1899,6 +1924,7 @@
     "published": true,
     "sortOrder": 29,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-m6-e27e8a3706.jpg",
@@ -1944,6 +1970,7 @@
     "published": true,
     "sortOrder": 30,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-m7-5f23088e4c.jpg",
@@ -1988,6 +2015,7 @@
     "published": true,
     "sortOrder": 31,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-s1-9-b3d6cc46cd.jpg",
@@ -2032,6 +2060,7 @@
     "published": true,
     "sortOrder": 32,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-s1-18-b3d6cc46cd.jpg",
@@ -2076,6 +2105,7 @@
     "published": true,
     "sortOrder": 33,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-s2-9-088eee4527.jpg",
@@ -2120,6 +2150,7 @@
     "published": true,
     "sortOrder": 34,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-s2-18-088eee4527.jpg",
@@ -2165,6 +2196,7 @@
     "published": true,
     "sortOrder": 35,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-s3-9-d4ee1c5270.jpg",
@@ -2210,6 +2242,7 @@
     "published": true,
     "sortOrder": 36,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-s3-18-d4ee1c5270.jpg",
@@ -2256,6 +2289,7 @@
     "published": true,
     "sortOrder": 37,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x1-0f3738830f.jpg",
@@ -2303,6 +2337,7 @@
     "published": true,
     "sortOrder": 38,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x2-292f2ca442.jpg",
@@ -2348,6 +2383,7 @@
     "published": true,
     "sortOrder": 39,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x3-1bf3bba6d5.jpg",
@@ -2393,6 +2429,7 @@
     "published": true,
     "sortOrder": 40,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x4-b8553719d8.jpg",
@@ -2439,6 +2476,7 @@
     "published": true,
     "sortOrder": 41,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x5-4e7ddd9ef0.jpg",
@@ -2484,6 +2522,7 @@
     "published": true,
     "sortOrder": 42,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x6-b07af57da8.jpg",
@@ -2529,6 +2568,7 @@
     "published": true,
     "sortOrder": 43,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x7-fa7c99c54c.jpg",
@@ -2574,6 +2614,7 @@
     "published": true,
     "sortOrder": 44,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x8-a6f1077bd3.jpg",
@@ -2620,6 +2661,7 @@
     "published": true,
     "sortOrder": 45,
     "printStation": "sushi",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-x9-b993a2ff5f.jpg",
@@ -2706,6 +2748,7 @@
     "published": true,
     "sortOrder": 46,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b1-bf9788c202.jpg",
@@ -2787,6 +2830,7 @@
     "published": true,
     "sortOrder": 47,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b2-0414196a4b.jpg",
@@ -2870,6 +2914,7 @@
     "published": true,
     "sortOrder": 48,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b3-b661abbbc0.jpg",
@@ -2956,6 +3001,7 @@
     "published": true,
     "sortOrder": 49,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b4-b11a69f221.jpg",
@@ -3039,6 +3085,7 @@
     "published": true,
     "sortOrder": 50,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b5-9998870cfc.jpg",
@@ -3123,6 +3170,7 @@
     "published": true,
     "sortOrder": 51,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b6-908e398f52.jpg",
@@ -3207,6 +3255,7 @@
     "published": true,
     "sortOrder": 52,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b7-553c2b4e4d.jpg",
@@ -3293,6 +3342,7 @@
     "published": true,
     "sortOrder": 53,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b8-7f47d5c52b.jpg",
@@ -3376,6 +3426,7 @@
     "published": true,
     "sortOrder": 54,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b9-43919083ae.jpg",
@@ -3459,6 +3510,7 @@
     "published": true,
     "sortOrder": 55,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b10-ffec59957a.jpg",
@@ -3544,6 +3596,7 @@
     "published": true,
     "sortOrder": 56,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b11-99ea465417.jpg",
@@ -3629,6 +3682,7 @@
     "published": true,
     "sortOrder": 57,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b12-7e65199687.jpg",
@@ -3715,6 +3769,7 @@
     "published": true,
     "sortOrder": 58,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b13-36edfeb5ee.jpg",
@@ -3800,6 +3855,7 @@
     "published": true,
     "sortOrder": 59,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b14-f9ecaf12a3.jpg",
@@ -3885,6 +3941,7 @@
     "published": true,
     "sortOrder": 60,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-b15-26f0162a69.jpg",
@@ -3968,6 +4025,7 @@
     "published": true,
     "sortOrder": 61,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v1-40ae0c8d63.jpg",
@@ -4053,6 +4111,7 @@
     "published": true,
     "sortOrder": 62,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v2-c5c548a17b.jpg",
@@ -4139,6 +4198,7 @@
     "published": true,
     "sortOrder": 63,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v3-05ec5a4236.jpg",
@@ -4224,6 +4284,7 @@
     "published": true,
     "sortOrder": 64,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v4-8582124984.jpg",
@@ -4309,6 +4370,7 @@
     "published": true,
     "sortOrder": 65,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v5-42049f17f3.jpg",
@@ -4394,6 +4456,7 @@
     "published": true,
     "sortOrder": 66,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v6-918de721e6.jpg",
@@ -4479,6 +4542,7 @@
     "published": true,
     "sortOrder": 67,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v7-15ea283a68.jpg",
@@ -4566,6 +4630,7 @@
     "published": true,
     "sortOrder": 68,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v8-50f33902f4.jpg",
@@ -4650,6 +4715,7 @@
     "published": true,
     "sortOrder": 69,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v9-5c75257f8c.jpg",
@@ -4734,6 +4800,7 @@
     "published": true,
     "sortOrder": 70,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v10-4596cf752a.jpg",
@@ -4818,6 +4885,7 @@
     "published": true,
     "sortOrder": 71,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v11-706f0a0d31.jpg",
@@ -4902,6 +4970,7 @@
     "published": true,
     "sortOrder": 72,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v12-671665e209.jpg",
@@ -4988,6 +5057,7 @@
     "published": true,
     "sortOrder": 73,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v13-88613b757e.jpg",
@@ -5072,6 +5142,7 @@
     "published": true,
     "sortOrder": 74,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v14-0cc5284536.jpg",
@@ -5158,6 +5229,7 @@
     "published": true,
     "sortOrder": 75,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v15-888a826b4b.jpg",
@@ -5241,6 +5313,7 @@
     "published": true,
     "sortOrder": 76,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v16-d91c66a2e5.jpg",
@@ -5324,6 +5397,7 @@
     "published": true,
     "sortOrder": 77,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v17-d730054c8b.jpg",
@@ -5410,6 +5484,7 @@
     "published": true,
     "sortOrder": 78,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-v18-17d79351c7.jpg",
@@ -5553,6 +5628,7 @@
     "published": true,
     "sortOrder": 79,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-u1-db066304b1.jpg",
@@ -5696,6 +5772,7 @@
     "published": true,
     "sortOrder": 80,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-u2-0ce67dcc94.jpg",
@@ -5839,6 +5916,7 @@
     "published": true,
     "sortOrder": 81,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-u3-3fc3003803.jpg",
@@ -5982,6 +6060,7 @@
     "published": true,
     "sortOrder": 82,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-u4-acd725471b.jpg",
@@ -6126,6 +6205,7 @@
     "published": true,
     "sortOrder": 83,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-u5-59bf0c34bf.jpg",
@@ -6207,6 +6287,7 @@
     "published": true,
     "sortOrder": 84,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-side-rice-b197d6cf2a.jpg",
@@ -6291,6 +6372,7 @@
     "published": true,
     "sortOrder": 85,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-side-fried-rice-06828ff693.jpg",
@@ -6375,6 +6457,7 @@
     "published": true,
     "sortOrder": 86,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-d1-d6accec122.jpg",
@@ -6460,6 +6543,7 @@
     "published": true,
     "sortOrder": 87,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-d2-189bed7620.jpg",
@@ -6544,6 +6628,7 @@
     "published": true,
     "sortOrder": 88,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-d3-e4454a1963.jpg",
@@ -6586,6 +6671,7 @@
     "published": true,
     "sortOrder": 89,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-dr-cola-29332158b0.jpg",
@@ -6628,6 +6714,7 @@
     "published": true,
     "sortOrder": 90,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-dr-eistee-09606beda8.jpg",
@@ -6670,6 +6757,7 @@
     "published": true,
     "sortOrder": 91,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-dr-water-a48fa9955a.jpg",
@@ -6712,6 +6800,7 @@
     "published": true,
     "sortOrder": 92,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-dr-aloe-bd6079a2b7.jpg",
@@ -6754,6 +6843,7 @@
     "published": true,
     "sortOrder": 93,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-dr-apple-6c3843c1b3.jpg",
@@ -6796,6 +6886,7 @@
     "published": true,
     "sortOrder": 94,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-dr-orange-32a8c3f2f6.jpg",
@@ -6838,6 +6929,7 @@
     "published": true,
     "sortOrder": 95,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-dr-redbull-65baf6c540.jpg",
@@ -6882,6 +6974,7 @@
     "published": true,
     "sortOrder": 96,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-beer-wiesel-fass-9f391d4e07.jpg",
@@ -6926,6 +7019,7 @@
     "published": true,
     "sortOrder": 97,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-beer-wiesel-stamm-ccc052258e.jpg",
@@ -6970,6 +7064,7 @@
     "published": true,
     "sortOrder": 98,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-beer-nonalc-2310cc2f4f.jpg",
@@ -7014,6 +7109,7 @@
     "published": true,
     "sortOrder": 99,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-beer-japan-b3218f5bf4.jpg",
@@ -7058,6 +7154,7 @@
     "published": true,
     "sortOrder": 100,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-wine-white-e9e0a5c4f5.jpg",
@@ -7102,6 +7199,7 @@
     "published": true,
     "sortOrder": 101,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-wine-red-5d51218dee.jpg",
@@ -7146,6 +7244,7 @@
     "published": true,
     "sortOrder": 102,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-wine-spritzer-5f0b9c390a.jpg",
@@ -7190,6 +7289,7 @@
     "published": true,
     "sortOrder": 103,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-aperol-f5d4445872.jpg",
@@ -7234,6 +7334,7 @@
     "published": true,
     "sortOrder": 104,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-aperol-prosecco-259b537301.jpg",
@@ -7278,6 +7379,7 @@
     "published": true,
     "sortOrder": 105,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-hugo-a41d8b7d8e.jpg",
@@ -7320,6 +7422,7 @@
     "published": true,
     "sortOrder": 106,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-sake-66698bf836.jpg",
@@ -7364,6 +7467,7 @@
     "published": true,
     "sortOrder": 107,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-coffee-espresso-cb9c281649.jpg",
@@ -7408,6 +7512,7 @@
     "published": true,
     "sortOrder": 108,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-coffee-cappuccino-51154a4c38.jpg",
@@ -7452,6 +7557,7 @@
     "published": true,
     "sortOrder": 109,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-coffee-latte-5b36a2bde3.jpg",
@@ -7494,6 +7600,7 @@
     "published": true,
     "sortOrder": 110,
     "printStation": "bar",
+    "printPrinterId": null,
     "media": [
       {
         "id": "seed-dish-photo-tea-8757a93211.jpg",
@@ -7557,6 +7664,7 @@
     "published": true,
     "sortOrder": 1000,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": []
   },
   {
@@ -7613,6 +7721,7 @@
     "published": true,
     "sortOrder": 1001,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": []
   },
   {
@@ -7669,6 +7778,7 @@
     "published": true,
     "sortOrder": 1003,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": []
   },
   {
@@ -7723,6 +7833,7 @@
     "published": true,
     "sortOrder": 1004,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": []
   },
   {
@@ -7792,6 +7903,7 @@
     "published": true,
     "sortOrder": 1005,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": []
   },
   {
@@ -7842,6 +7954,7 @@
     "published": true,
     "sortOrder": 1006,
     "printStation": "kitchen",
+    "printPrinterId": null,
     "media": []
   }
 ]
