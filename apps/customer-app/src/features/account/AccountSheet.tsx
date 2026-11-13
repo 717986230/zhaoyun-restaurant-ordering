@@ -254,7 +254,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
             {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => <option key={day} value={day}>{day}</option>)}
           </select>
         </label>
-        <button type="button" className="secondary" disabled={!bMonth || !bDay || (saved?.month === bMonth && saved?.day === bDay)} onClick={() => void saveBirthday()}>{g(language, "birthdaySave")}</button>
+        <button type="button" className="primary birthday-save" disabled={!bMonth || !bDay || (saved?.month === bMonth && saved?.day === bDay)} onClick={() => void saveBirthday()}>{g(language, "birthdaySave")}</button>
       </div>
     </section>}
 

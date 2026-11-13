@@ -242,6 +242,51 @@ button {
   touch-action: manipulation;
 }
 
+/* ---------------------------------------------------------------------------
+   Premium native controls — one look for every select, stepper and date/time
+   field across the customer app, matching the booking page. Native selects
+   and number spinners otherwise render as tiny system widgets that read as
+   cheap next to the rest of the UI.
+   ------------------------------------------------------------------------ */
+select,
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="month"],
+input[type="week"] {
+  min-height: 48px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background-color: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+select {
+  padding-right: 40px;
+  font-weight: 600;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa2a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 18px;
+}
+
+select:focus-visible,
+input[type="number"]:focus-visible,
+input[type="date"]:focus-visible,
+input[type="time"]:focus-visible,
+input[type="month"]:focus-visible,
+input[type="week"]:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
 .app-shell {
   width: 100vw;
   height: 100dvh;
@@ -4039,6 +4084,36 @@ button:focus-visible,
 
 .guest-section {
   margin-top: 16px;
+}
+
+/* Birthday: month and day sit side by side as a labelled row, with the save
+   button on its own full-width line below — not crammed inline. */
+.birthday-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.birthday-fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.birthday-fields label span {
+  font-weight: 600;
+}
+
+.birthday-fields select {
+  width: 100%;
+}
+
+.birthday-fields .birthday-save {
+  grid-column: 1 / -1;
+  margin-top: 2px;
 }
 
 .reward-list li,
