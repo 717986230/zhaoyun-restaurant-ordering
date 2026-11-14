@@ -236,6 +236,51 @@ function normalizeCashRegisterId(value) {
 export const DEFAULT_FLOOR_TABLES = 20;
 export const MAX_FLOOR_TABLES = 200;
 
+export const ANNOUNCEMENT_MAX_TITLE = 120;
+export const ANNOUNCEMENT_MAX_BODY = 2000;
+
+/**
+ * The owner's own text for the announcement popup, per language. Trimmed, and
+ * line breaks kept (a notice is often more than one line) while runs of other
+ * whitespace collapse to a single space. Only zh/en/de, only the languages the
+ * owner actually filled in, each bounded.
+ */
+function normalizeAnnouncementText(value, label, max) {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be given per language`);
+  const clean = {};
+  for (const [language, text] of Object.entries(value)) {
+    if (!MENU_LANGUAGES.includes(language)) throw new Error(`${label} is in zh, en or de`);
+    const trimmed = String(text ?? "").replace(/\r\n?/g, "\n").replace(/[^\S\n]+/g, " ").replace(/ *\n */g, "\n").trim();
+    if (trimmed.length > max) throw new Error(`${label} must be at most ${max} characters`);
+    if (trimmed) clean[language] = trimmed;
+  }
+  return clean;
+}
+
+export const ANNOUNCEMENT_DEFAULTS = { enabled: false, title: {}, body: {}, schedule: null };
+
+/**
+ * The guest menu's announcement popup (公告弹窗): whether it is on, its title
+ * and body per language, and when it shows (null: always). The owner edits and
+ * publishes it from the console; the menu shows it once per guest until the
+ * text changes, so editing the text is republishing it to everyone.
+ */
+export function normalizeAnnouncement(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Announcement must be an object");
+  return {
+    enabled: value.enabled === true,
+    title: normalizeAnnouncementText(value.title, "Announcement title", ANNOUNCEMENT_MAX_TITLE),
+    body: normalizeAnnouncementText(value.body, "Announcement text", ANNOUNCEMENT_MAX_BODY),
+    schedule: normalizeSchedule(value.schedule ?? null)
+  };
+}
+
+/** Whether the announcement has anything to show: on, and some body text. */
+export function announcementHasContent(announcement) {
+  return Boolean(announcement?.enabled) && Object.values(announcement?.body ?? {}).some((text) => String(text).trim());
+}
+
 export const APP_SETTINGS = {
   menuLanguages: { key: "menu_languages", fallback: () => [...DEFAULT_MENU_LANGUAGES], normalize: normalizeMenuLanguages },
   // The name on the admin console, the browser tab and the printed table card.
@@ -337,7 +382,10 @@ export const APP_SETTINGS = {
       if (!FEATURED_TEMPLATES.includes(value)) throw new Error("Unknown promotions template");
       return value;
     }
-  }
+  },
+  // 公告弹窗: the notice the menu greets guests with, edited and published from
+  // the console (normalizeAnnouncement).
+  announcement: { key: "announcement", fallback: () => ({ ...ANNOUNCEMENT_DEFAULTS }), normalize: normalizeAnnouncement }
 };
 
 function readAppSetting(definition, stored) {
@@ -410,6 +458,10 @@ export function menuSettingsView(settings) {
     // Only when switched on: a guest has no use for a list of ids otherwise.
     featured: settings.featuredEnabled
       ? { title: settings.featuredTitle, productIds: settings.featuredProductIds, template: settings.featuredTemplate, schedule: settings.featuredSchedule }
+      : null,
+    // 公告弹窗: only when on and it has text; the menu checks the hours itself.
+    announcement: announcementHasContent(settings.announcement)
+      ? { title: settings.announcement.title, body: settings.announcement.body, schedule: settings.announcement.schedule }
       : null
   };
 }

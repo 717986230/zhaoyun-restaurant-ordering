@@ -483,7 +483,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       // Ordering is on here only because the checks above switched it on (OPEN_ORDERING).
       // The cart's drink suggestions are checked on their own further down.
       const { ordering: _ordering, suggestions: _suggestions, ...fresh } = before.json.menu;
-      assert.deepEqual(fresh, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null, reservations: false },
+      assert.deepEqual(fresh, { title: "La Carte", restaurantName: "赵云", defaultScheme: "dark", showTableNumber: true, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, announcement: null, accounts: false, loyalty: null, reservations: false },
         "a fresh restaurant ships with these");
 
       assert.equal((await call("PUT", "/api/admin/settings", { body: { restaurantName: "Anyone" } })).status, 401);
@@ -500,7 +500,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(saved.json.restaurantName, "Goldener Drache", "names are trimmed and their spaces collapsed");
       const { ordering: _orderingNow, suggestions: _suggestionsNow, ...menu } = (await call("GET", "/api/catalog")).json.menu;
       assert.deepEqual(menu,
-        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, accounts: false, loyalty: null, reservations: false });
+        { title: "Speisekarte", restaurantName: "Goldener Drache", defaultScheme: "light", showTableNumber: false, timeZone: "Europe/Vienna", setsSchedule: null, navPinned: [], navLabels: {}, featured: null, announcement: null, accounts: false, loyalty: null, reservations: false });
       assert.equal(saved.json.showOrdering, false, "the ordering sections start hidden while the menu is view-only");
       // A save of one setting leaves the rest where they were.
       assert.equal(saved.json.menuTheme, "jade");

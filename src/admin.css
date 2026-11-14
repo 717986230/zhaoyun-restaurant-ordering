@@ -5170,3 +5170,83 @@ em.voided {
 
 /* A form says what blocks its save, in place. */
 .form-warning { color: var(--a-danger); font-weight: 600; }
+
+/* 公告弹窗 editor: a block per menu language, then one publish, the hours, and
+   a live preview of how the notice reads. */
+.announce-settings {
+  display: grid;
+  gap: 14px;
+}
+
+.announce-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.announce-lang {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--a-line);
+  border-radius: 10px;
+  background: var(--a-sunken);
+}
+
+.announce-lang-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.announce-lang-head img {
+  width: 22px;
+  height: 16px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.announce-lang label {
+  display: grid;
+  gap: 4px;
+}
+
+.announce-lang label span {
+  font-size: 13px;
+  color: var(--a-muted);
+}
+
+.announce-lang input,
+.announce-lang textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.announce-lang textarea {
+  resize: vertical;
+  min-height: 84px;
+  font: inherit;
+}
+
+.announce-preview {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid var(--a-line);
+  border-radius: 14px;
+  background: var(--a-sunken);
+  text-align: center;
+}
+
+.announce-preview strong {
+  font-family: Georgia, "Noto Serif SC", serif;
+  font-size: 19px;
+}
+
+.announce-preview p {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.6;
+  color: var(--a-ink);
+  text-align: left;
+}

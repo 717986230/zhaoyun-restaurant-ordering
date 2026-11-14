@@ -85,6 +85,7 @@ export function withSettingDefaults(settings: Partial<ApiSettings>): ApiSettings
     birthdayPerk: { ...BIRTHDAY_PERK_DEFAULTS },
     reservations: { ...RESERVATION_DEFAULTS, hours: RESERVATION_DEFAULTS.hours.map((range) => ({ ...range, days: [...range.days] })), closedDates: [], tables: [] },
     delivery: { lieferando: { ...DELIVERY_PLATFORM_DEFAULTS }, foodora: { ...DELIVERY_PLATFORM_DEFAULTS } },
+    announcement: { enabled: false, title: {}, body: {}, schedule: null },
     ...Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
   } as ApiSettings;
 }
