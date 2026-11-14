@@ -30,6 +30,7 @@ const BookingSheet = lazy(() => import("../booking/BookingSheet"));
 import { OrdersSheet } from "../features/orders/OrdersSheet";
 import { ReviewPrompt } from "../features/orders/ReviewPrompt";
 import { ServiceSheet } from "../features/service/ServiceSheet";
+import { AnnouncementPopup } from "../features/service/AnnouncementPopup";
 
 /**
  * The guest app is the menu. Everything else opens over it as a sheet, and
@@ -89,6 +90,10 @@ export function App() {
   const isOpen = (schedule: Parameters<typeof isOnSchedule>[0]) => isOnSchedule(schedule, new Date(minute * 60_000), timeZone);
   const setsOpen = isOpen(catalog.menu?.setsSchedule ?? null);
   const featuredOpen = isOpen(catalog.menu?.featured?.schedule ?? null);
+  // 公告弹窗: the owner's notice, within its hours (null: always). The popup
+  // itself shows it once per guest until the text changes.
+  const announcement = catalog.menu?.announcement ?? null;
+  const announcementOpen = announcement && isOpen(announcement.schedule ?? null);
   const products = useMemo(
     () => (setsOpen ? catalog.products : catalog.products.filter((product) => !product.bundleItems?.length)),
     [catalog.products, setsOpen]
@@ -119,6 +124,9 @@ export function App() {
   }, [featuredSettings, products]);
 
   return <main className="app-shell">
+    <AnimatePresence>
+      {announcement && announcementOpen && <AnnouncementPopup key="announce" announcement={announcement} language={language} />}
+    </AnimatePresence>
     {accountsOn && <MemberEntrance customer={account.customer} language={language} />}
     {!online && <div className="offline-bar" role="status">{t(language, "offlineMenu")}</div>}
     <CatalogScreen

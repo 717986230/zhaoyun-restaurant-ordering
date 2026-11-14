@@ -352,6 +352,58 @@ function SuggestDrinks({ settings, products, onSave }: { settings: ApiSettings; 
   </div>;
 }
 
+/**
+ * 公告弹窗: the notice the menu greets guests with. On or off, a title and body
+ * per menu language, and optional hours. The owner edits the text here and
+ * publishes it with one save; a guest who saw the old notice sees the new one
+ * once the text changes. The preview shows it in the console's own language.
+ */
+function AnnouncementEditor({ settings, onSave }: { settings: ApiSettings; onSave: (value: ApiSettings["announcement"]) => void }) {
+  const { t, language } = useI18n();
+  const announcement = settings.announcement;
+  const offered = settings.menuLanguages;
+  const [title, setTitle] = useState<Partial<Record<MenuLanguage, string>>>(announcement.title);
+  const [body, setBody] = useState<Partial<Record<MenuLanguage, string>>>(announcement.body);
+  // Keyed on the saved text so the fields reset to what the server kept once a
+  // save comes back (trimmed), and start from it after a reload.
+  const savedKey = JSON.stringify([announcement.title, announcement.body]);
+  const dirty = JSON.stringify([title, body]) !== savedKey;
+
+  const clean = (map: Partial<Record<MenuLanguage, string>>): Partial<Record<MenuLanguage, string>> => {
+    const out: Partial<Record<MenuLanguage, string>> = {};
+    for (const lang of offered) { const value = (map[lang] ?? "").trim(); if (value) out[lang] = value; }
+    return out;
+  };
+  const pick = (map: Partial<Record<MenuLanguage, string>>): string => map[language] ?? Object.values(map).find((value) => value) ?? "";
+
+  return <div className="announce-settings" key={savedKey}>
+    <Toggle checked={announcement.enabled} label={t("announceEnable")} hint={t("announceEnableHint")} onChange={(enabled) => onSave({ ...announcement, enabled })} />
+    <div className="announce-fields">
+      {offered.map((lang) => <div key={lang} className="announce-lang">
+        <div className="announce-lang-head"><img src={LANGUAGE_INFO[lang].flag} alt="" /><span>{LANGUAGE_INFO[lang].name}</span></div>
+        <label><span>{t("announceTitleLabel")}</span>
+          <input maxLength={120} value={title[lang] ?? ""} placeholder={t("announceTitlePlaceholder")}
+            onChange={(event) => setTitle((prev) => ({ ...prev, [lang]: event.target.value }))} />
+        </label>
+        <label><span>{t("announceBodyLabel")}</span>
+          <textarea rows={4} maxLength={2000} value={body[lang] ?? ""} placeholder={t("announceBodyPlaceholder")}
+            onChange={(event) => setBody((prev) => ({ ...prev, [lang]: event.target.value }))} />
+        </label>
+      </div>)}
+    </div>
+    <button type="button" className="primary-action" disabled={!dirty} onClick={() => onSave({ ...announcement, title: clean(title), body: clean(body) })}>
+      {dirty ? t("announcePublish") : t("announcePublished")}
+    </button>
+    <p className="settings-label">{t("announceHours")}</p>
+    <ScheduleEditor key={JSON.stringify(announcement.schedule)} value={announcement.schedule} timeZone={settings.timeZone} onSave={(schedule) => onSave({ ...announcement, schedule })} />
+    <p className="settings-label">{t("announcePreview")}</p>
+    {pick(body) ? <div className="announce-preview">
+      {pick(title) && <strong>{pick(title)}</strong>}
+      <p>{pick(body)}</p>
+    </div> : <p className="settings-hint">{t("announcePreviewEmpty")}</p>}
+  </div>;
+}
+
 /** The settings page's groups, for the chips at its top. */
 const SETTINGS_GROUPS: Array<["menu" | "business" | "account", CopyKey]> = [["menu", "groupMenu"], ["business", "groupBusiness"], ["account", "groupAccount"]];
 
@@ -579,6 +631,11 @@ export function SettingsPanel(props: Props) {
       </Section>
       <Section id="suggest" title={t("sectionSuggest")} summary={!settings.cartSuggestions.enabled ? t("foldOff") : settings.cartSuggestions.productIds.length ? t("suggestCount", { count: settings.cartSuggestions.productIds.length }) : t("suggestAutoShort")}>
         <SuggestDrinks settings={settings} products={props.products} onSave={(cartSuggestions) => void props.onSaveSettings({ cartSuggestions }, "suggestSaved")} />
+      </Section>
+      <Section id="announcement" title={t("sectionAnnouncement")} summary={settings.announcement.enabled && Object.values(settings.announcement.body).some(Boolean)
+        ? [t("foldOn"), settings.announcement.schedule ? describeSchedule(settings.announcement.schedule, t, language) : t("alwaysShown")].join(" · ")
+        : t("foldOff")}>
+        <AnnouncementEditor settings={settings} onSave={(announcement) => void props.onSaveSettings({ announcement }, "announcementSaved")} />
       </Section>
       <Section id="sets" title={t("sectionSets")} summary={settings.setsSchedule ? describeSchedule(settings.setsSchedule, t, language) : t("alwaysShown")}>
         <p className="settings-label">{t("pageHours")}</p>

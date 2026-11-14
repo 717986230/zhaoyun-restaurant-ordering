@@ -543,6 +543,20 @@ export interface ApiSettings {
   reservations: ApiReservationSettings;
   /** The delivery platforms: which are on, and how their orders come in (shared/delivery.mjs). */
   delivery: ApiDeliverySettings;
+  /** 公告弹窗: the notice the menu greets guests with (shared/settings.mjs). */
+  announcement: ApiAnnouncement;
+}
+
+/** The announcement popup, per-language text the owner edits and publishes. */
+export interface ApiAnnouncement {
+  /** Whether the menu shows it at all. */
+  enabled: boolean;
+  /** The heading, per language; a language left out is not shown. */
+  title: Partial<Record<MenuLanguage, string>>;
+  /** The body, per language; line breaks are kept. */
+  body: Partial<Record<MenuLanguage, string>>;
+  /** When it shows, by the restaurant's clock; null: always. */
+  schedule: ApiSchedule | null;
 }
 
 /** Lieferando (Just Eat Takeaway) and foodora (Delivery Hero). */
@@ -799,6 +813,9 @@ export interface ApiMenuSettings {
   /** The promotions page, when the owner switched it on. An empty title means
    *  the menu's own wording for it. */
   featured?: { title: string; productIds: string[]; template: FeaturedTemplateId; schedule?: ApiSchedule | null } | null;
+  /** 公告弹窗: the notice to greet guests with, when it is on and has text.
+   *  Per-language title and body, and its hours (null/absent: always). */
+  announcement?: { title: Partial<Record<MenuLanguage, string>>; body: Partial<Record<MenuLanguage, string>>; schedule?: ApiSchedule | null } | null;
   /** Guests can have accounts (favourites, pickup, points); absent from an older server. */
   accounts?: boolean;
   /** Ordering from the menu, when the owner switched it on. */

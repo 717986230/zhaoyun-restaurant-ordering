@@ -266,7 +266,24 @@ export const SettingsBody = Type.Object({
       de: Type.Optional(Type.String({ maxLength: 24 }))
     }),
     { maxProperties: 80 }
-  ))
+  )),
+  // 公告弹窗: on/off, title and body per language, and when it shows (null:
+  // always). The text is trimmed and bounded by shared/settings.mjs; the wire
+  // only caps the length so an oversized value is a 400 at the edge.
+  announcement: Type.Optional(Type.Object({
+    enabled: Type.Optional(Type.Boolean()),
+    title: Type.Optional(Type.Object({
+      zh: Type.Optional(Type.String({ maxLength: 240 })),
+      en: Type.Optional(Type.String({ maxLength: 240 })),
+      de: Type.Optional(Type.String({ maxLength: 240 }))
+    })),
+    body: Type.Optional(Type.Object({
+      zh: Type.Optional(Type.String({ maxLength: 4000 })),
+      en: Type.Optional(Type.String({ maxLength: 4000 })),
+      de: Type.Optional(Type.String({ maxLength: 4000 }))
+    })),
+    schedule: Type.Optional(Type.Union([Schedule, Type.Null()]))
+  }, { maxProperties: 4 }))
 }, { minProperties: 1, additionalProperties: false });
 
 // Every dish in one category moved to another name — a new one, or an

@@ -4794,3 +4794,94 @@ button:focus-visible,
   box-shadow: var(--shadow-1);
   pointer-events: none;
 }
+
+/* 公告弹窗 — the restaurant's notice, centred over a frosted scrim when the
+   menu opens. A floating card, lit from above like the promotions page, with
+   a hairline flourish; its text is the owner's, shown once per guest. */
+.announce-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.announce-card {
+  position: relative;
+  width: min(100%, 440px);
+  max-height: min(84dvh, 720px);
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  padding: 34px clamp(22px, 6vw, 34px) 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 70% at 50% -10%, var(--accent-wash), transparent 60%),
+    linear-gradient(170deg, var(--panel-2), var(--panel));
+  color: var(--ink);
+  box-shadow: var(--shadow-3);
+  outline: none;
+  text-align: center;
+}
+
+.announce-flourish {
+  justify-self: center;
+  width: 54px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.announce-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.announce-close:hover { color: var(--ink); }
+
+.announce-title {
+  margin: 0;
+  font-family: Georgia, "Noto Serif SC", serif;
+  font-size: clamp(20px, 5vw, 25px);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--ink);
+}
+
+.announce-body {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.announce-ok {
+  justify-self: center;
+  margin-top: 4px;
+  min-height: 42px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
