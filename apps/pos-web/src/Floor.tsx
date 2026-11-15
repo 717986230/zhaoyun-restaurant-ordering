@@ -299,13 +299,16 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const tile = (table: TableOverview) => {
     const claim = claimOf(table.table);
     const mine = claim && (deviceId ? claim.deviceId === deviceId : claim.staffId === pos.staff.id);
-    const busy = claim && !mine;
+    // A collaborative table (多人同桌) is open to every device, so it is never
+    // "busy" — any waiter may tap it to join and work it alongside the others.
+    const busy = claim && !mine && !claim.shared;
     return <button key={table.table} type="button" data-table={table.table}
-      className={`pos-table ${table.state} ${busy ? "claimed" : ""}`}
+      className={`pos-table ${table.state} ${busy ? "claimed" : ""} ${claim?.shared ? "shared" : ""}`}
       title={busy ? t("claimedBy", { table: table.table, name: claim.staffName ?? "?" }) : undefined}
       onClick={() => void openTable(pos, table.table, go, claims)}>
       <b>{busy && <i className="pos-lock" aria-label={t("lockedHere")}>🔒</i>}{table.table}</b>
       <span>{table.total > 0 ? money(Math.round(table.total * 100)) : t(table.state === "locked" ? "lockedByGuest" : "free")}</span>
+      {claim?.shared && <em className="pos-qr-badge pos-shared-badge">{t("sharedBadge")}</em>}
       {busy && <small>{t("openOn", { name: claim.staffName ?? "?" })}</small>}
       {calling.has(table.table.toUpperCase()) && <em className="pos-call-badge">🔔 {t("calling")}</em>}
       {table.orderingUntil && <em className="pos-qr-badge">{t("qrBadge")}</em>}

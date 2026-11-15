@@ -63,7 +63,10 @@ export function isTakeaway(table) {
 /**
  * Takes a table for a device, or renews its hold. A table held by another
  * device and not left alone past CLAIM_TTL_MS stays theirs: the row the
- * upsert leaves behind says who has it, and the caller compares.
+ * upsert leaves behind says who has it, and the caller compares. A second
+ * device joining a *shared* table does not match the WHERE, so the row is left
+ * untouched — joining does not take the table over, it rides alongside, and the
+ * write gate lets it in because the table is shared.
  */
 export const CLAIM_UPSERT_SQL = `INSERT INTO table_claims (table_no, device_id, staff_id, staff_name, expires_at)
   VALUES (?, ?, ?, ?, ?)
@@ -71,9 +74,40 @@ export const CLAIM_UPSERT_SQL = `INSERT INTO table_claims (table_no, device_id, 
     staff_name = excluded.staff_name, expires_at = excluded.expires_at
   WHERE table_claims.device_id = excluded.device_id OR table_claims.expires_at <= ?`;
 
+/**
+ * The live claim with its collaborative flag and fencing token, which live in
+ * table_claim_meta beside it (see server/database.mjs). The LEFT JOIN leaves a
+ * table that was never collaborative looking exactly as it did before: shared
+ * 0, epoch 1.
+ */
+export const CLAIM_WITH_META_SQL = `SELECT table_claims.*,
+    COALESCE(table_claim_meta.shared, 0) AS shared, COALESCE(table_claim_meta.epoch, 1) AS epoch
+  FROM table_claims LEFT JOIN table_claim_meta ON table_claim_meta.table_no = table_claims.table_no
+  WHERE table_claims.table_no = ?`;
+
+/** Live claims for the floor, each with its collaborative flag and fencing token. */
+export const LIVE_CLAIMS_SQL = `SELECT table_claims.*,
+    COALESCE(table_claim_meta.shared, 0) AS shared, COALESCE(table_claim_meta.epoch, 1) AS epoch
+  FROM table_claims LEFT JOIN table_claim_meta ON table_claim_meta.table_no = table_claims.table_no
+  WHERE table_claims.expires_at > ?`;
+
+/**
+ * Marks a table collaborative (or not) and bumps its fencing token when it
+ * changes hands. `shared` is the mode asked for; `epoch` climbs by one each
+ * time a *different* device takes the table, and holds steady while the same
+ * device renews.
+ */
+export const CLAIM_META_UPSERT_SQL = `INSERT INTO table_claim_meta (table_no, shared, epoch, updated_at)
+  VALUES (?, ?, 1, ?)
+  ON CONFLICT(table_no) DO UPDATE SET shared = excluded.shared, updated_at = excluded.updated_at,
+    epoch = table_claim_meta.epoch + CASE WHEN ? THEN 1 ELSE 0 END`;
+
 export function claimView(row, at = now()) {
   if (!row || row.expires_at <= at) return null;
-  return { table: row.table_no, deviceId: row.device_id, staffId: row.staff_id, staffName: row.staff_name, expiresAt: row.expires_at };
+  return {
+    table: row.table_no, deviceId: row.device_id, staffId: row.staff_id, staffName: row.staff_name,
+    expiresAt: row.expires_at, epoch: Number(row.epoch ?? 1), shared: Boolean(row.shared)
+  };
 }
 
 /** Whether this device already has the table open: keeping it is not news. */
@@ -81,10 +115,15 @@ export function holdsClaim(row, deviceId, at = now()) {
   return Boolean(row && row.device_id === deviceId && row.expires_at > at);
 }
 
-/** Throws when another device has the table open. */
+/**
+ * Throws when another device has the table open and the table is not shared.
+ * A shared table (多人同桌) is open to every signed-in device at once; it is
+ * the journal's optimistic lock, not this gate, that keeps their writes from
+ * stepping on each other.
+ */
 export function assertClaim(row, deviceId, at = now()) {
   const claim = claimView(row, at);
-  if (claim && claim.deviceId !== deviceId) {
+  if (claim && claim.deviceId !== deviceId && !claim.shared) {
     const error = new Error(`Table ${claim.table} is open on another device (${claim.staffName})`);
     error.code = "TABLE_CLAIMED";
     error.claim = claim;

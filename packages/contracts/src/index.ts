@@ -389,8 +389,12 @@ export interface AccountUpdateCommand { currentPassword: string; login?: string;
 
 export interface PosStaff { id: string; name: string; role: "staff" | "manager"; active?: boolean }
 export interface PosDevice { id: string; name: string; createdAt: string; lastSeenAt: string | null }
-/** A table open on a device, locked to it until closed or left alone. */
-export interface PosClaim { table: string; deviceId: string; staffId: string | null; staffName: string | null; expiresAt: string }
+/**
+ * A table open on a device, locked to it until closed or left alone. `epoch` is
+ * a fencing token that climbs each time the table changes hands; `shared` marks
+ * a collaborative table (多人同桌) that several devices may work at once.
+ */
+export interface PosClaim { table: string; deviceId: string; staffId: string | null; staffName: string | null; expiresAt: string; epoch: number; shared: boolean }
 /** A waiter as the manager watches the floor (GET /api/admin/staff/activity). */
 export interface PosStaffActivity extends PosStaff {
   online: boolean;
