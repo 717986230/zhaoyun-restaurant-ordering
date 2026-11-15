@@ -20,7 +20,7 @@
   --p-warn-wash: #f4dede;
   --p-seated: #e8a33d;
   --p-pay: #1d4ed8;
-/* Shared radius scale. The staff console and the POS agreed on different
+  /* Shared radius scale. The staff console and the POS agreed on different
      corner radii by accretion; these name one scale both use, so a card is a
      card on either surface. Outliers were snapped to the nearest step. */
   --r-hair: 3px;
@@ -31,9 +31,29 @@
   --r-xl: 14px;
   --r-2xl: 16px;
   --r-pill: 999px;
+  /* The wordmark's display serif, the guest menu's face, bundled below. Only
+     the POS masthead uses it; everything else stays the system sans. */
+  --font-display: "Cormorant Garamond", Georgia, "Noto Serif SC", serif;
 
-    color-scheme: light;
+  color-scheme: light;
   font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("./fonts/cormorant-garamond-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("./fonts/cormorant-garamond-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 * { box-sizing: border-box; }
@@ -108,7 +128,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   color: #fff;
 }
 
-.pos-head strong { letter-spacing: 0.08em; }
+.pos-head strong { font-family: var(--font-display); font-size: 21px; font-weight: 600; letter-spacing: 0.06em; }
 .pos-who { font-weight: 700; }
 /* The live channel: green while changes arrive as they happen, grey while the screens poll. */
 .pos-live { width: 9px; height: 9px; border-radius: 50%; background: var(--p-muted); flex-shrink: 0; }
