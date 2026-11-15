@@ -887,7 +887,7 @@ export function createStore(driver) {
     return { role: row.staff_role === "manager" ? "manager" : "staff", staff: { id: row.staff_id, name: row.staff_name }, deviceId: row.device_id };
   }
 
-  async function claimTable(tableInput, pos, { shared = false } = {}) {
+  async function claimTable(tableInput, pos, { shared } = {}) {
     const table = String(tableInput).trim().toUpperCase();
     const at = now();
     // Who held the table before this call decides the fence: a different device
@@ -904,11 +904,10 @@ export function createStore(driver) {
     const joiningShared = Boolean(row?.shared) && row.device_id !== pos.deviceId && row.expires_at > at;
     // A takeover (different device, or a free or lapsed table) that actually
     // changed the owner climbs the fence and starts the mode fresh, so a stale
-    // collaborative flag left by an earlier party is not inherited. Short of a
-    // takeover, the mode is sticky: a plain renewal keeps a collaborative table
-    // collaborative, and only releasing it clears the mode.
+    // collaborative flag left by an earlier party is not inherited. `shared`
+    // undefined (the hold heartbeat) keeps the current mode; true/false set it.
     const tookOver = row?.device_id === pos.deviceId && (!before || before.expires_at <= at || before.device_id !== pos.deviceId);
-    const sharedNow = tookOver ? (shared ? 1 : 0) : (shared || Boolean(row?.shared) ? 1 : 0);
+    const sharedNow = shared === undefined ? (tookOver ? 0 : Number(Boolean(row?.shared))) : (shared ? 1 : 0);
     await run(CLAIM_META_UPSERT_SQL, table, sharedNow, at, tookOver ? 1 : 0);
     if (joiningShared) {
       // Keep the shared table's hold from lapsing while this device is active.

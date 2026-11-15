@@ -47,9 +47,15 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const name = (product: Product) => product.names[language] || product.names.zh || product.names.de;
   // Open for its guests to order from their phones (开台), and until when.
   const [orderingUntil, setOrderingUntil] = useState<string | null>(null);
+  // 多人同桌: whether this table is open to several POS devices at once.
+  const [shared, setShared] = useState(false);
   const loadBill = useCallback(async () => {
     try { setBill((await api.bill(table)).bill); } catch (error) { pos.failed(error); }
-    api.floor().then((floor) => setOrderingUntil(floor.tables.find((entry) => entry.table === table)?.orderingUntil ?? null)).catch(() => undefined);
+    api.floor().then((floor) => {
+      const entry = floor.tables.find((row) => row.table === table);
+      setOrderingUntil(entry?.orderingUntil ?? null);
+      setShared(Boolean(entry?.openOn?.shared));
+    }).catch(() => undefined);
   }, [table, pos.failed]);
 
   useEffect(() => {
@@ -189,6 +195,15 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       pos.notify(t(session ? "guestOrderingOpened" : "guestOrderingClosed", { table }));
     } catch (error) { pos.failed(error); }
   }
+  // 多人同桌: open this table to several devices, or lock it back to this one.
+  async function toggleShared() {
+    try {
+      const next = !shared;
+      await api.claim(table, next);
+      setShared(next);
+      pos.notify(t(next ? "sharedOn" : "sharedOff", { table }));
+    } catch (error) { pos.failed(error); }
+  }
   async function move(to: string) {
     const target = to.trim().toUpperCase();
     if (!target) return;
@@ -242,6 +257,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         {!pickupNo && <button type="button" disabled={!bill?.items.length} onClick={() => setMoving(true)}>{t("moveTable")}</button>}
         {!pickupNo && !/^TA-/i.test(table) && <button type="button" className={orderingUntil ? "pos-on" : ""} onClick={() => void toggleGuestOrdering()}>
           {orderingUntil ? t("guestOrderingClose") : t("guestOrderingOpen")}
+        </button>}
+        {!pickupNo && !/^TA-/i.test(table) && <button type="button" className={shared ? "pos-on" : ""} onClick={() => void toggleShared()}>
+          {shared ? t("sharedClose") : t("sharedOpen")}
         </button>}
       </div>
       {orderingUntil && <p className="pos-muted pos-guest-ordering">{t("guestOrderingOn", { time: new Date(orderingUntil).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" }) })}</p>}

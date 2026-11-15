@@ -600,7 +600,12 @@ export class PosApi {
   setTableOrdering(table: string, open: boolean): Promise<{ session: ApiTableSession | null }> {
     return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/ordering`, { method: "POST", body: JSON.stringify({ open }) });
   }
-  claim(table: string): Promise<{ claim: PosClaim }> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim`, { method: "POST" }); }
+  // `shared` undefined keeps the table's current mode (what the hold heartbeat
+  // sends); true opens it to several devices (多人同桌), false makes it exclusive.
+  claim(table: string, shared?: boolean): Promise<{ claim: PosClaim }> {
+    const query = shared === undefined ? "" : `?shared=${shared ? 1 : 0}`;
+    return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim${query}`, { method: "POST" });
+  }
   release(table: string, force = false): Promise<void> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim${force ? "?force=1" : ""}`, { method: "DELETE" }); }
   order(command: CreateOrderCommand): Promise<{ order: ApiOrder }> { return this.#request("/api/pos/orders", { method: "POST", body: JSON.stringify(command) }); }
   takeaway(): Promise<{ table: string; pickupNo: number; claim: PosClaim }> { return this.#request("/api/pos/takeaway", { method: "POST" }); }
