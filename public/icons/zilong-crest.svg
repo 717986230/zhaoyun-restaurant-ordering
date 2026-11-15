@@ -1,0 +1,28 @@
+<!-- 子龙 · 游龙 — 赵云's brand crest. A single celadon 团龙 (coiled dragon),
+     named for Zhao Yun's courtesy name 子龙, chasing the pearl inside a
+     porcelain roundel. Ink-on-dark; holds to the menu's accent (#8fb0a3)
+     and porcelain (#e9edee). Reuse as a brand mark, member crest, menu
+     divider or receipt seal. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320" fill="none" role="img" aria-label="赵云 · 子龙">
+  <circle cx="160" cy="160" r="128" stroke="#8fb0a3" stroke-opacity=".38" stroke-width="1.6"/>
+  <circle cx="160" cy="160" r="116" stroke="#e9edee" stroke-opacity=".08" stroke-width="1"/>
+  <g stroke="#8fb0a3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="4.5">
+      <path d="M132.1 100.2 L127.0 89.3"/>
+      <path d="M102.8 127.0 L92.5 121.0"/>
+      <path d="M96.3 177.1 L84.7 180.2"/>
+      <path d="M127.0 217.2 L121.0 227.5"/>
+      <path d="M170 221 L172 233"/>
+    </g>
+    <path d="M182.6 98 A 66 66 0 1 0 222 137.4 C 231 130 236 122 233 113" stroke-width="8.5"/>
+    <path d="M150 222 C 160 236 176 238 186 230" stroke-width="6"/>
+    <path d="M186 230 l9 7 M188 224 l10 4 M182 236 l6 9" stroke-width="3.5"/>
+    <path d="M182.6 98 C 190 82 208 80 216 90 C 220 96 219 103 214 106" stroke-width="7.5"/>
+    <path d="M214 106 C 206 112 193 111 185 104" stroke-width="6.5"/>
+    <path d="M198 86 C 208 71 224 70 232 61" stroke-width="5.5"/>
+    <path d="M216 92 C 230 82 244 74 252 60" stroke-width="3.5"/>
+  </g>
+  <circle cx="199" cy="95" r="4.2" fill="#0f1113" stroke="#8fb0a3" stroke-width="2.2"/>
+  <circle cx="238" cy="52" r="12" stroke="#a9c7ba" stroke-width="3" fill="#8fb0a3" fill-opacity=".14"/>
+  <circle cx="234" cy="48" r="2.8" fill="#e9edee"/>
+</svg>
