@@ -112,12 +112,23 @@ function ProductMedia({ product, size = "feature" }: { product: Product; size?: 
   // gets a new URL — neither may inherit the old one's failure.
   const [loaded, setLoaded] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const reduced = useReducedMotion();
   const art = <div className={`art ${size === "thumb" ? "art-thumb " : ""}${product.appearance.pattern}`} style={{ "--art": product.appearance.art } as React.CSSProperties} />;
   const source = media ? restaurantApi.mediaUrl(media.url) : null;
   if (!media || !source || failed === source) return art;
   const className = `${size === "thumb" ? "dish-media dish-media-thumb" : "dish-media"} ${loaded === source ? "loaded" : ""}`;
   if (media.type === "video") {
-    return <video className={`${className} loaded`} src={source} poster={media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined} playsInline muted loop autoPlay preload="metadata" onError={() => setFailed(source)} />;
+    const poster = media.posterUrl ? restaurantApi.mediaUrl(media.posterUrl) : undefined;
+    // Respect a guest who asks for reduced motion (WCAG 2.2.2 "Pause, Stop,
+    // Hide"): never autoplay a looping dish video at them. Show its poster as a
+    // still if the dish has one, otherwise a video the guest starts themselves.
+    if (reduced) {
+      if (poster) {
+        return <img className={`${className} loaded`} src={poster} alt={size === "thumb" ? "" : product.names.zh || product.names.de} width={size === "thumb" ? 48 : 480} height={size === "thumb" ? 48 : 360} loading="lazy" decoding="async" onError={() => setFailed(source)} />;
+      }
+      return <video className={`${className} loaded`} src={source} poster={poster} playsInline muted loop controls preload="metadata" onError={() => setFailed(source)} />;
+    }
+    return <video className={`${className} loaded`} src={source} poster={poster} playsInline muted loop autoPlay preload="metadata" onError={() => setFailed(source)} />;
   }
   return <img
     className={className}
