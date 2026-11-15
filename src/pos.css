@@ -2,17 +2,22 @@
    targets, high contrast, one screen per job; the same on a phone, a tablet
    at the counter and the computer in the office. */
 :root {
+  /* The POS shares the staff console's palette: the same celadon family the
+     admin app established (apps/customer-app/test/styles.test.ts darkens the
+     guest accent until it holds on white), so the two staff surfaces — and the
+     guest app they both sit beside — read as one system. Keep these in step
+     with admin.css's --a-* tokens. */
   --p-bg: #eef1ef;
   --p-card: #ffffff;
-  --p-ink: #14201b;
-  --p-muted: #5d6b64;
-  --p-line: #d6ddd9;
-  --p-head: #14201b;
-  --p-accent: #1f6b4f;
+  --p-ink: #202623;
+  --p-muted: #5f6963;
+  --p-line: #d7ddda;
+  --p-head: #17221d;
+  --p-accent: #275f46;
   --p-accent-ink: #ffffff;
-  --p-accent-wash: #dcefe6;
-  --p-warn: #b3261e;
-  --p-warn-wash: #fbe9e7;
+  --p-accent-wash: #dfe7e2;
+  --p-warn: #9f3434;
+  --p-warn-wash: #f4dede;
   --p-seated: #e8a33d;
   --p-pay: #1d4ed8;
   color-scheme: light;
