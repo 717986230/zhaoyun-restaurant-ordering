@@ -1281,7 +1281,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       // The console sees the floor as it stands: who has P1 open, who took the
       // order, and each waiter — where signed in, which tables, the shift so far.
       const p1Now = (await call("GET", "/api/admin/tables/overview", { admin: true })).json.tables.find((entry) => entry.table === "P1");
-      assert.deepEqual(p1Now.openOn, { staffId: li.id, staffName: "Li" });
+      assert.deepEqual(p1Now.openOn, { staffId: li.id, staffName: "Li", shared: false });
       assert.equal(p1Now.orders[0].staffName, "Li");
       assert.equal((await call("GET", "/api/orders?limit=20", { admin: true })).json.orders.find((order) => order.id === ordered.json.order.id).staffName, "Li");
       const liNow = (await call("GET", "/api/admin/staff/activity", { admin: true })).json.staff.find((entry) => entry.id === li.id);

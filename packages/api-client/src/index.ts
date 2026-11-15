@@ -196,7 +196,7 @@ export interface TableOverview {
   total: number;
   since: string | null;
   /** Open on a POS right now, and by whom. */
-  openOn?: { staffId: string | null; staffName: string | null } | null;
+  openOn?: { staffId: string | null; staffName: string | null; shared?: boolean } | null;
   /** Open for its guests to order from their phones (开台), until then; null when not. */
   orderingUntil?: string | null;
 }

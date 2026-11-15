@@ -142,6 +142,12 @@ CREATE TABLE table_claims (
       staff_name TEXT,
       expires_at TEXT NOT NULL
     );
+CREATE TABLE table_claim_meta (
+      table_no TEXT PRIMARY KEY,
+      shared INTEGER NOT NULL DEFAULT 0,
+      epoch INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
 CREATE TABLE order_staff (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
       staff_id TEXT,

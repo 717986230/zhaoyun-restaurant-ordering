@@ -921,7 +921,10 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           if (method === "POST") {
             // A POS keeps its table every half minute; only taking it is news.
             const renewing = await store.holdsTable(path[3], pos.deviceId);
-            const response = json({ claim: await store.claimTable(path[3], pos) });
+            // `?shared=1` opens the table to several devices at once (多人同桌);
+            // without it the table stays locked to this one device as before.
+            const shared = url.searchParams.get("shared") === "1";
+            const response = json({ claim: await store.claimTable(path[3], pos, { shared }) });
             if (renewing) QUIET.add(response);
             return response;
           }

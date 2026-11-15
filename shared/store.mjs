@@ -37,7 +37,7 @@ import {
   receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
 } from "./register.mjs";
 import {
-  assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
+  assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, CLAIM_WITH_META_SQL, CLAIM_META_UPSERT_SQL, LIVE_CLAIMS_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
   normalizeStaffInput, OPEN_STAFF_RECEIPTS_SQL, POS_SESSION_TTL_MS, LIVE_POS_SESSIONS_SQL, OPEN_STAFF_VOIDS_SQL, SET_AVAILABLE_SQL, staffActivityView, settlementTotals, settlementView, staffView, TAKEAWAY_PREFIX
 } from "./pos.mjs";
 import {
@@ -459,7 +459,7 @@ export function createStore(driver) {
     const tableRow = await first("SELECT locked_at FROM restaurant_tables WHERE table_no = ?", String(table).toUpperCase());
     // The lock is against guests adding to a bill being paid; the floor staff
     // who set it may still add to it. Another device's open table is theirs.
-    if (pos) assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(table).toUpperCase()), pos.deviceId);
+    if (pos) assertClaim(await first(CLAIM_WITH_META_SQL, String(table).toUpperCase()), pos.deviceId);
     if (tableRow?.locked_at && !pos) {
       const error = new Error("This table is locked; please ask a waiter");
       error.code = "TABLE_LOCKED";
@@ -548,7 +548,7 @@ export function createStore(driver) {
       // Another device's open table is theirs to pay, before anything else is looked at.
       const openTable = input.table || itemRows[0]?.table_no;
       // The console has no table of its own: one open on a POS is that POS's.
-      if (openTable) assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(openTable).toUpperCase()), pos?.deviceId ?? null);
+      if (openTable) assertClaim(await first(CLAIM_WITH_META_SQL, String(openTable).toUpperCase()), pos?.deviceId ?? null);
       const settings = await getSettings();
       const plan = planCheckout({ ...input, clientRequestId: requestId }, {
         itemRows, voucherRows, memberRows, receiptNo: ((await first("SELECT MAX(receipt_no) AS no FROM receipts"))?.no ?? 0) + 1, settings, role, staff: pos?.staff ?? null
@@ -887,13 +887,34 @@ export function createStore(driver) {
     return { role: row.staff_role === "manager" ? "manager" : "staff", staff: { id: row.staff_id, name: row.staff_name }, deviceId: row.device_id };
   }
 
-  async function claimTable(tableInput, pos) {
+  async function claimTable(tableInput, pos, { shared = false } = {}) {
     const table = String(tableInput).trim().toUpperCase();
     const at = now();
+    // Who held the table before this call decides the fence: a different device
+    // taking a free or lapsed table bumps the epoch, while the same device
+    // renewing leaves it. Read before the upsert overwrites it.
+    const before = await first("SELECT device_id, expires_at FROM table_claims WHERE table_no = ?", table);
     await run(CLAIM_UPSERT_SQL, table, pos.deviceId, pos.staff?.id ?? null, pos.staff?.name ?? null, new Date(Date.now() + CLAIM_TTL_MS).toISOString(), at);
-    const row = await first("SELECT * FROM table_claims WHERE table_no = ?", table);
+    const row = await first(CLAIM_WITH_META_SQL, table);
+    // Another device's non-shared table is closed to this one: stop before
+    // touching anything. A shared table, or one this device now owns, reads on.
     assertClaim(row, pos.deviceId, at);
-    return claimView(row, at);
+    // A device joining a live shared table does not own the row, so the upsert
+    // left it untouched: it rides alongside the lead rather than taking over.
+    const joiningShared = Boolean(row?.shared) && row.device_id !== pos.deviceId && row.expires_at > at;
+    // A takeover (different device, or a free or lapsed table) that actually
+    // changed the owner climbs the fence and starts the mode fresh, so a stale
+    // collaborative flag left by an earlier party is not inherited. Short of a
+    // takeover, the mode is sticky: a plain renewal keeps a collaborative table
+    // collaborative, and only releasing it clears the mode.
+    const tookOver = row?.device_id === pos.deviceId && (!before || before.expires_at <= at || before.device_id !== pos.deviceId);
+    const sharedNow = tookOver ? (shared ? 1 : 0) : (shared || Boolean(row?.shared) ? 1 : 0);
+    await run(CLAIM_META_UPSERT_SQL, table, sharedNow, at, tookOver ? 1 : 0);
+    if (joiningShared) {
+      // Keep the shared table's hold from lapsing while this device is active.
+      await run("UPDATE table_claims SET expires_at = ? WHERE table_no = ?", new Date(Date.now() + CLAIM_TTL_MS).toISOString(), table);
+    }
+    return claimView(await first(CLAIM_WITH_META_SQL, table), at);
   }
 
   function tableConflict(message, code) {
@@ -938,14 +959,16 @@ export function createStore(driver) {
     if (from === to) throw new Error("That is the same table");
     return retrying(async () => {
       const last = await lastJournal();
-      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", from), pos.deviceId);
-      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", to), pos.deviceId);
+      assertClaim(await first(CLAIM_WITH_META_SQL, from), pos.deviceId);
+      assertClaim(await first(CLAIM_WITH_META_SQL, to), pos.deviceId);
       const open = (await first("SELECT COUNT(*) AS n FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", from))?.n ?? 0;
       if (!open) return null;
       const at = now();
       await batch([
         sql("UPDATE orders SET table_no = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", to, at, from),
         sql("DELETE FROM table_claims WHERE table_no = ? AND device_id = ?", from, pos.deviceId),
+        // The table the bill left behind lets go of its collaborative flag too.
+        sql("DELETE FROM table_claim_meta WHERE table_no = ?", from),
         ...(moveTableSessionStatements(from, to, await getSettings(), pos.staff?.name)),
         await journalStatement(last, "table.moved", from, { from, to, orders: open, staffName: pos.staff?.name ?? null }, at)
       ]);
@@ -975,7 +998,7 @@ export function createStore(driver) {
     const table = normalizeTableNo(tableInput);
     return retrying(async () => {
       const last = await lastJournal();
-      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", table), pos.deviceId);
+      assertClaim(await first(CLAIM_WITH_META_SQL, table), pos.deviceId);
       const at = now();
       const plan = planVoid(input, await first(VOID_ITEM_SQL, String(input?.orderItemId ?? "")), { table, staff: pos.staff, role, at });
       const entry = plan.void;
@@ -1187,9 +1210,15 @@ export function createStore(driver) {
     voidItem,
     reprintReceipt,
     setAvailable,
-    releaseTable: async (table, pos, force = false) =>
-      (await run("DELETE FROM table_claims WHERE table_no = ? AND (device_id = ? OR ? = 1)", String(table).trim().toUpperCase(), pos.deviceId, force ? 1 : 0)) > 0,
-    liveClaims: async () => (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row)),
+    releaseTable: async (table, pos, force = false) => {
+      const tableNo = String(table).trim().toUpperCase();
+      const released = (await run("DELETE FROM table_claims WHERE table_no = ? AND (device_id = ? OR ? = 1)", tableNo, pos.deviceId, force ? 1 : 0)) > 0;
+      // Letting the table go drops its collaborative flag and fencing token too,
+      // so the next party that sits there starts over.
+      if (released) await run("DELETE FROM table_claim_meta WHERE table_no = ?", tableNo);
+      return released;
+    },
+    liveClaims: async () => (await all(LIVE_CLAIMS_SQL, now())).map((row) => claimView(row)),
     newTakeaway,
     moveTable,
     settleStaff,
@@ -1427,7 +1456,7 @@ export function createStore(driver) {
     },
     /** Throws when another device has the table open: what the console and other POS may not touch. */
     assertTableFree: async (table, deviceId = null) =>
-      assertClaim(await first("SELECT * FROM table_claims WHERE table_no = ?", String(table).trim().toUpperCase()), deviceId),
+      assertClaim(await first(CLAIM_WITH_META_SQL, String(table).trim().toUpperCase()), deviceId),
     setTableLock: async (table, locked) => {
       const tableNo = normalizeTableNo(table);
       if (!await first("SELECT table_no FROM restaurant_tables WHERE table_no = ?", tableNo)) return null;
@@ -1446,7 +1475,7 @@ export function createStore(driver) {
     tablesOverview: async () => {
       const orders = [];
       for (const row of await all(OPEN_TABLE_ORDERS_SQL)) orders.push(await viewOrder(row));
-      const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
+      const claims = (await all(LIVE_CLAIMS_SQL, now())).map((row) => claimView(row));
       const { floorTables } = await getSettings();
       // Tables 1 to floorTables stand in until the manager sets the room up;
       // from then on the room is the tables they set up, added and taken away.
@@ -1457,7 +1486,7 @@ export function createStore(driver) {
       const staffRows = await all("SELECT * FROM staff ORDER BY active DESC, name");
       const shifts = new Map();
       for (const row of staffRows) shifts.set(row.id, settlementTotals(await all(OPEN_STAFF_RECEIPTS_SQL, row.id, row.id), await all(OPEN_STAFF_VOIDS_SQL, row.id, row.id)));
-      const claims = (await all("SELECT * FROM table_claims WHERE expires_at > ?", now())).map((row) => claimView(row));
+      const claims = (await all(LIVE_CLAIMS_SQL, now())).map((row) => claimView(row));
       return staffActivityView(staffRows, await all(LIVE_POS_SESSIONS_SQL, now()), claims, shifts);
     },
     openBillTables: async () =>

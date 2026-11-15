@@ -190,6 +190,21 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       expires_at TEXT NOT NULL
     );
 
+    -- Collaborative tables (many devices at one table) and the table lock's
+    -- fencing token, kept beside table_claims rather than on it: a deployed D1
+    -- takes a new table safely but not a new column (SQLite has no ADD COLUMN
+    -- IF NOT EXISTS), the way 0069/0072 do it. shared = 1 lets several devices
+    -- order and void on the table at once — correctness still comes from the
+    -- journal's optimistic lock (shared/store.mjs). epoch climbs by one each
+    -- time the table changes hands, so a device whose hold lapsed can be told
+    -- apart from the one that holds it now. See migrations/0108.
+    CREATE TABLE IF NOT EXISTS table_claim_meta (
+      table_no TEXT PRIMARY KEY,
+      shared INTEGER NOT NULL DEFAULT 0,
+      epoch INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS order_staff (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
       staff_id TEXT,

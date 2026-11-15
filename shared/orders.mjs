@@ -97,8 +97,9 @@ export function tableOverviewView(row, orders = [], fallbackTable = "", claim = 
     // What is still to pay: a line a receipt paid for is off the table's total.
     total: open.reduce((sum, order) => sum + order.items.reduce((part, item) => part + Math.round(item.unitPrice * 100) * (item.qty - (item.paid ?? 0) - (item.voided ?? 0)), 0), 0) / 100,
     since: open.length ? open.map((order) => order.createdAt).sort()[0] : null,
-    // Open on a POS right now, and by whom.
-    openOn: claim ? { staffId: claim.staffId, staffName: claim.staffName } : null,
+    // Open on a POS right now, and by whom; `shared` marks a collaborative
+    // table (多人同桌) that more than one device may work at once.
+    openOn: claim ? { staffId: claim.staffId, staffName: claim.staffName, shared: Boolean(claim.shared) } : null,
     // Open for the guests to order from their phones (开台), until when.
     orderingUntil: session?.expires_at ?? null
   };
