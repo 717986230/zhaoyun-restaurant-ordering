@@ -65,7 +65,19 @@
   --paper-line: #ded5cb;
   --paper-line-print: #c9c0b6;
 
-  color: var(--a-ink);
+/* Shared radius scale. The staff console and the POS agreed on different
+     corner radii by accretion; these name one scale both use, so a card is a
+     card on either surface. Outliers were snapped to the nearest step. */
+  --r-hair: 3px;
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 12px;
+  --r-xl: 14px;
+  --r-2xl: 16px;
+  --r-pill: 999px;
+
+    color: var(--a-ink);
   background: var(--a-bg);
   font-family: Inter, system-ui, -apple-system, "Noto Sans SC", sans-serif;
 }
@@ -129,7 +141,7 @@ button {
   flex-shrink: 0;
   padding: 3px 8px;
   border: 1px solid var(--a-head-line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--a-head-ink-2);
   font-size: 11px;
   font-weight: 650;
@@ -179,7 +191,7 @@ button {
   align-items: center;
   gap: 6px;
   border: 1px solid var(--a-head-line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: var(--a-head-ink);
   padding: 0 12px;
@@ -206,7 +218,7 @@ button {
   display: flex;
   padding: 2px;
   border: 1px solid var(--a-head-line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 
 .admin-languages button {
@@ -216,7 +228,7 @@ button {
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: transparent;
 }
 
@@ -237,7 +249,7 @@ button {
 .admin-languages img {
   width: 22px;
   height: 15px;
-  border-radius: 2px;
+  border-radius: var(--r-hair);
   object-fit: cover;
 }
 
@@ -393,7 +405,7 @@ h2 {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   padding: 10px 11px;
@@ -421,7 +433,7 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   padding: 3px;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-rail);
 }
 
@@ -446,7 +458,7 @@ h2 {
 .segmented span {
   display: block;
   padding: 9px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   text-align: center;
   color: var(--a-muted);
   font-size: 13px;
@@ -464,7 +476,7 @@ h2 {
   place-items: center;
   align-content: center;
   border: 1px dashed var(--a-line-dash);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-sunken);
   text-align: center;
 }
@@ -509,7 +521,7 @@ h2 {
   place-items: center;
   width: 64px;
   height: 64px;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   overflow: hidden;
   background: var(--a-tint);
 }
@@ -552,7 +564,7 @@ h2 {
 .primary-action,
 .discover-action {
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-accent);
   color: var(--a-on-accent);
   padding: 12px 18px;
@@ -563,7 +575,7 @@ h2 {
   width: 38px;
   height: 38px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink-2);
   font-size: 22px;
@@ -577,7 +589,7 @@ h2 {
 
 .filter-tabs button {
   padding: 7px 12px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   font-size: 12px;
 }
 
@@ -650,7 +662,7 @@ h2 {
   margin-bottom: 10px;
   padding: 10px 12px;
   border: 1px solid var(--a-accent-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-accent-wash);
 }
 
@@ -674,7 +686,7 @@ h2 {
   min-height: 36px;
   padding: 4px 8px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font-size: 13px;
@@ -702,7 +714,7 @@ h2 {
   margin-bottom: 10px;
   padding: 10px 12px;
   border: 1px solid var(--a-accent-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-accent-wash);
 }
 
@@ -728,7 +740,7 @@ h2 {
   gap: 10px;
   padding: 8px 10px;
   border: 1px solid var(--a-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   cursor: grab;
 }
@@ -778,7 +790,7 @@ h2 {
   overflow: hidden;
   display: grid;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--a-tint);
 }
 
@@ -836,7 +848,7 @@ h2 {
   justify-self: start;
   padding: 2px 6px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--a-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -861,7 +873,7 @@ h2 {
 .danger-action {
   margin-top: 18px;
   border: 1px solid var(--a-danger-line);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--a-danger);
   padding: 9px 12px;
@@ -904,7 +916,7 @@ h2 {
   align-items: center;
   padding: 10px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
 }
 
@@ -922,7 +934,7 @@ h2 {
 .discovered-row button,
 .test-printer {
   border: 1px solid var(--a-accent-line);
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--a-accent-ink);
   padding: 7px 10px;
@@ -942,7 +954,7 @@ h2 {
   height: 38px;
   display: grid;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--a-accent-wash);
   color: var(--a-accent-ink);
 }
@@ -979,7 +991,7 @@ h2 {
 
 .ghost-action {
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink-2);
   padding: 11px 16px;
@@ -1023,13 +1035,13 @@ h2 {
 
 .board-list .admin-empty {
   border: 1px dashed var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   padding: 22px 12px;
 }
 
 .board-card {
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 12px 14px;
 }
@@ -1068,7 +1080,7 @@ h2 {
 }
 
 .board-card-head .status {
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-accent-wash);
   color: var(--a-accent-ink);
   padding: 3px 10px;
@@ -1114,7 +1126,7 @@ h2 {
   display: grid;
   gap: 4px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 10px 12px;
 }
@@ -1164,7 +1176,7 @@ em.voided {
 
 .table-open-on {
   align-self: flex-start;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-accent-wash);
   color: var(--a-accent-ink);
   padding: 2px 8px;
@@ -1184,7 +1196,7 @@ em.voided {
   gap: 8px;
   border: 1px solid var(--a-line);
   border-left: 3px solid var(--a-line-2);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 12px 14px;
 }
@@ -1225,7 +1237,7 @@ em.voided {
   gap: 10px;
   margin-bottom: 14px;
   border: 1px dashed var(--a-line-2);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-sunken);
   padding: 12px 14px;
 }
@@ -1283,7 +1295,7 @@ em.voided {
 }
 
 .table-tile-head .status {
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-rail);
   color: var(--a-muted);
   padding: 3px 10px;
@@ -1329,7 +1341,7 @@ em.voided {
 }
 
 .table-tile-order-head .status {
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-rail);
   color: var(--a-muted);
   padding: 2px 8px;
@@ -1381,7 +1393,7 @@ em.voided {
 .bill-sheet {
   margin-top: 10px;
   border: 1px solid var(--a-line-2);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 14px;
 }
@@ -1449,7 +1461,7 @@ em.voided {
   margin-top: 20px;
   padding: 12px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-danger);
   font-size: 12px;
@@ -1472,7 +1484,7 @@ em.voided {
   align-items: baseline;
   padding: 8px 10px;
   border: 1px solid var(--a-line-soft);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
 }
 
@@ -1521,7 +1533,7 @@ em.voided {
   flex-wrap: wrap;
   gap: 10px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 10px 12px;
 }
@@ -1541,7 +1553,7 @@ em.voided {
 
 .allergen-picker {
   border: 1px solid var(--a-line);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   padding: 10px 12px 12px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -1569,7 +1581,7 @@ em.voided {
 /* 颜色标签: the dish's POS colour — a swatch row, or "default" to follow its category. */
 .tag-colour-picker {
   border: 1px solid var(--a-line);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   padding: 10px 12px 12px;
   display: flex;
   flex-wrap: wrap;
@@ -1593,7 +1605,7 @@ em.voided {
 
 .bundle-picker {
   border: 1px solid var(--a-line);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   padding: 10px 12px 12px;
 }
 
@@ -1635,7 +1647,7 @@ em.voided {
   max-width: calc(100vw - 36px);
   transform: translate(-50%, 12px);
   opacity: 0;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-head);
   color: var(--a-head-ink);
   padding: 11px 16px;
@@ -1751,7 +1763,7 @@ em.voided {
   gap: 8px;
   padding: 8px 14px 8px 8px;
   border: 1px solid var(--a-line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-card);
   color: var(--a-ink);
   font-size: 13px;
@@ -1781,7 +1793,7 @@ em.voided {
   row-gap: 2px;
   padding: 0 14px 10px 10px;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: var(--r-xl);
   background-size: 60px 60px;
 }
 
@@ -1835,7 +1847,7 @@ em.voided {
 .table-cards-warning {
   margin: 0 0 14px;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-danger-wash);
   color: var(--a-danger);
   font-size: 13px;
@@ -1853,7 +1865,7 @@ em.voided {
   justify-items: center;
   padding: 16px 14px 18px;
   border: 1px solid var(--paper-line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-card);
   break-inside: avoid;
 }
@@ -1906,7 +1918,7 @@ em.voided {
 
 .gate-form {
   border: 1px solid var(--a-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   padding: clamp(22px, 5vw, 32px);
   box-shadow: 0 10px 30px -18px var(--a-shadow-1);
@@ -1943,7 +1955,7 @@ em.voided {
   gap: 8px;
   padding: 8px 14px 8px 8px;
   border: 1px solid var(--a-line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-card);
   color: var(--a-muted);
   font-size: 13px;
@@ -1953,7 +1965,7 @@ em.voided {
 .language-toggle img {
   width: 24px;
   height: 16px;
-  border-radius: 2px;
+  border-radius: var(--r-hair);
   object-fit: cover;
   opacity: 0.45;
   filter: grayscale(1);
@@ -1991,7 +2003,7 @@ em.voided {
 /* The rarely-touched part of a dish: numbering, station, tax, raw options. */
 .form-advanced {
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   padding: 10px 12px;
   background: var(--a-shell);
 }
@@ -2080,7 +2092,7 @@ em.voided {
   gap: 10px;
   padding: 14px;
   border: 1px solid var(--a-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
 }
 
@@ -2101,7 +2113,7 @@ em.voided {
 .theme-season {
   margin-top: 10px;
   padding: 9px 12px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   border: 1px solid var(--a-line);
   background: var(--a-accent-wash);
   color: var(--a-ink);
@@ -2127,7 +2139,7 @@ em.voided {
 .app-icon-list img {
   width: 56px;
   height: 56px;
-  border-radius: 13px;
+  border-radius: var(--r-lg);
   border: 1px solid var(--a-line-2);
   object-fit: cover;
   flex: none;
@@ -2177,14 +2189,14 @@ em.voided {
   justify-self: start;
   padding: 3px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 
 .scheme-picker button {
   min-height: 34px;
   padding: 0 16px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: var(--a-muted);
   font-size: 13px;
@@ -2212,7 +2224,7 @@ em.voided {
   width: 44px;
   height: 26px;
   margin: 0;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-line-2);
   cursor: pointer;
   transition: background 0.2s ease;
@@ -2279,7 +2291,7 @@ em.voided {
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink-2);
   font-weight: 600;
@@ -2302,7 +2314,7 @@ em.voided {
   margin-left: 8px;
   padding: 1px 7px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--a-muted);
   font-size: 11px;
   font-style: normal;
@@ -2330,7 +2342,7 @@ em.voided {
   gap: 10px;
   padding: 8px 10px;
   border: 1px solid var(--a-line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-sunken);
 }
 
@@ -2354,7 +2366,7 @@ em.voided {
   width: 34px;
   height: 34px;
   border: 1px solid var(--a-line-2);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   color: var(--a-ink-2);
   cursor: pointer;
@@ -2378,7 +2390,7 @@ em.voided {
   justify-items: start;
   padding: 10px;
   border: 1px solid var(--a-line);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--a-card);
   color: var(--a-ink);
   text-align: left;
@@ -2406,13 +2418,13 @@ em.voided {
   gap: 3px;
   padding: 5px;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-head);
 }
 
 .template-thumb i {
   min-height: 0;
-  border-radius: 3px;
+  border-radius: var(--r-hair);
   background: var(--a-head-muted);
 }
 
@@ -2516,7 +2528,7 @@ em.voided {
     margin: 0 auto;
     overflow: hidden;
     border: 1px solid var(--a-line);
-    border-radius: 16px;
+    border-radius: var(--r-2xl);
     background: var(--a-shell);
     box-shadow: 0 18px 50px var(--a-shadow-1);
   }
@@ -2542,7 +2554,7 @@ em.voided {
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid var(--a-line);
-    border-radius: 12px;
+    border-radius: var(--r-lg);
     background: var(--a-card);
   }
 
@@ -2572,7 +2584,7 @@ em.voided {
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font: inherit;
@@ -2595,7 +2607,7 @@ em.voided {
   min-height: 34px;
   padding: 0 14px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-card);
   color: var(--a-ink-2);
   font-size: 13px;
@@ -2624,7 +2636,7 @@ em.voided {
 .schedule-status {
   margin: 0;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-sunken);
   color: var(--a-muted);
   font-size: 13px;
@@ -2709,7 +2721,7 @@ em.voided {
   min-height: 52px;
   padding: 5px 8px;
   border: 1px solid var(--a-line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-card);
 }
 
@@ -2742,7 +2754,7 @@ em.voided {
   width: 38px;
   height: 38px;
   border: 1px solid var(--a-line-2);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   color: var(--a-ink-2);
 }
@@ -2783,7 +2795,7 @@ em.voided {
   gap: 10px;
   min-width: 0;
   border: 1px solid var(--a-line);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   padding: 10px 12px 12px;
 }
 
@@ -2806,7 +2818,7 @@ em.voided {
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--a-accent-line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-accent-wash);
 }
 
@@ -2847,7 +2859,7 @@ em.voided {
   margin: 0;
   padding: 6px 10px;
   border: 1px solid var(--a-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   font-size: 13px;
   cursor: pointer;
@@ -2888,7 +2900,7 @@ em.voided {
   min-height: 32px;
   padding: 4px 8px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font-size: 13px;
@@ -2935,7 +2947,7 @@ em.voided {
   width: 36px;
   height: 36px;
   border: 1px solid var(--a-line-2);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   color: var(--a-ink-2);
   cursor: pointer;
@@ -3162,7 +3174,7 @@ em.voided {
 .settings-section > summary:focus-visible {
   outline: 2px solid var(--a-focus-ring);
   outline-offset: -2px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 
 .settings-section > summary h2 {
@@ -3234,7 +3246,7 @@ em.voided {
   min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font: inherit;
@@ -3266,7 +3278,7 @@ em.voided {
 .nav-order-preview li {
   padding: 5px 12px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--a-muted);
   font-size: 13px;
   counter-increment: tab;
@@ -3314,7 +3326,7 @@ em.voided {
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--a-line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-sunken);
 }
 
@@ -3356,7 +3368,7 @@ em.voided {
   width: 22px;
   height: 16px;
   flex: none;
-  border-radius: 2px;
+  border-radius: var(--r-hair);
   object-fit: cover;
 }
 
@@ -3366,7 +3378,7 @@ em.voided {
   min-height: 40px;
   padding: 0 10px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font: inherit;
@@ -3421,7 +3433,7 @@ em.voided {
   gap: 8px 12px;
   padding: 10px 12px;
   border: 1px solid var(--a-line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-sunken);
 }
 
@@ -3462,7 +3474,7 @@ em.voided {
   min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink-2);
   font-size: 13px;
@@ -3512,7 +3524,7 @@ em.voided {
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--a-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-sunken);
 }
 
@@ -3530,7 +3542,7 @@ em.voided {
 .staff-list select {
   min-height: 36px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font: inherit;
@@ -3582,7 +3594,7 @@ em.voided {
   min-height: 40px;
   padding: 0 10px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font: inherit;
@@ -3607,7 +3619,7 @@ em.voided {
 .table-ordering {
   align-self: flex-start;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--a-accent-ink);
   padding: 2px 8px;
   font-size: 12px;
@@ -3635,7 +3647,7 @@ em.voided {
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--a-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-sunken);
 }
 
@@ -3652,7 +3664,7 @@ em.voided {
 .customer-search {
   min-height: 36px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
   font: inherit;
@@ -3857,7 +3869,7 @@ em.voided {
   margin-top: 12px;
   padding: 12px;
   border: 1px solid var(--a-accent-line);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   font-size: 13px;
 }
@@ -3866,7 +3878,7 @@ em.voided {
   display: block;
   overflow-wrap: anywhere;
   padding: 10px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--a-sunken);
   color: var(--a-ink);
   font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -4000,7 +4012,7 @@ em.voided {
   gap: 6px;
   padding: 12px 14px 12px 50px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   counter-increment: bridge-step;
 }
@@ -4167,7 +4179,7 @@ em.voided {
   display: grid;
   gap: 4px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 12px 14px;
 }
@@ -4206,7 +4218,7 @@ em.voided {
   gap: 10px;
   min-width: 0;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 14px;
 }
@@ -4256,7 +4268,7 @@ em.voided {
   width: 100%;
   max-width: 36px;
   min-height: 0;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
   background: var(--a-accent);
 }
 
@@ -4273,7 +4285,7 @@ em.voided {
   left: 50%;
   z-index: 2;
   transform: translateX(-50%);
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--a-head);
   color: var(--a-head-ink);
   padding: 4px 8px;
@@ -4352,7 +4364,7 @@ em.voided {
   align-items: center;
   gap: 12px;
   border: 1px solid var(--a-line);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   padding: 10px 14px;
 }
@@ -4418,7 +4430,7 @@ em.voided {
 }
 
 .res-pill {
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-tint);
   color: var(--a-ink-2);
   padding: 2px 10px;
@@ -4575,7 +4587,7 @@ em.voided {
   width: min(520px, 100%);
   max-height: 90vh;
   overflow: auto;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   padding: 20px;
 }
@@ -4674,11 +4686,11 @@ em.voided {
 /* Delivery platforms: the totals per platform, each platform's switches, its connection. */
 #deliveryPanel .settings-page { grid-template-columns: minmax(0, 1fr); }
 .dl-totals { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
-.dl-totals li { padding: 6px 12px; border: 1px solid var(--a-line); border-radius: 999px; background: var(--a-card); font-size: 13px; }
+.dl-totals li { padding: 6px 12px; border: 1px solid var(--a-line); border-radius: var(--r-pill); background: var(--a-card); font-size: 13px; }
 .dl-items { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .dl-items li { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; }
 .dl-items small { grid-column: 1 / -1; color: var(--a-muted); }
-.dl-platform { display: grid; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--a-line); border-radius: 10px; }
+.dl-platform { display: grid; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--a-line); border-radius: var(--r-md); }
 .dl-platform legend { padding: 0 6px; font-weight: 700; }
 .dl-connection { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
 .dl-connection .ok { color: var(--a-accent-ink); }
@@ -4695,7 +4707,7 @@ em.voided {
   margin: 0;
   padding: 10px 12px;
   border-left: 3px solid var(--a-warn-solid);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: var(--a-danger-wash-soft);
   color: var(--a-warn-solid);
   font-size: 13px;
@@ -4709,7 +4721,7 @@ em.voided {
   min-height: 40px;
   padding: 0 10px;
   border: 1px solid var(--a-line-2);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--a-card);
   color: var(--a-ink);
 }
@@ -4821,7 +4833,7 @@ em.voided {
 /* Inside a page (not across the top of the console) a banner is a card. */
 .settings-page > .admin-banner {
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
 }
 
 .res-views,
@@ -4954,7 +4966,7 @@ em.voided {
    - an icon: a 40px square with the same corners.
    Each answers the pointer and the keyboard the same way. */
 .admin-shell :where(.primary-action, .ghost-action, .danger-action, .icon-action, .test-printer) {
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   font-weight: 600;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -5008,7 +5020,7 @@ em.voided {
   max-width: 100%;
   gap: 2px;
   padding: 3px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-rail);
 }
 
@@ -5016,7 +5028,7 @@ em.voided {
   min-height: 36px;
   padding: 0 16px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--a-muted);
   font-weight: 600;
@@ -5033,7 +5045,7 @@ em.voided {
   min-height: 32px;
   padding: 0 14px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-card);
   color: var(--a-ink-2);
   font-size: 13px;
@@ -5064,7 +5076,7 @@ em.voided {
   min-height: 36px;
   padding: 0 16px;
   border: 1px solid var(--a-line-2);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--a-card);
   color: var(--a-ink-2);
   font-weight: 600;
@@ -5098,7 +5110,7 @@ em.voided {
   min-height: 64px;
   padding: 12px 16px;
   border: 1px solid var(--a-line-2);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--a-card);
   color: var(--a-head);
   text-decoration: none;
@@ -5188,7 +5200,7 @@ em.voided {
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--a-line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--a-sunken);
 }
 
@@ -5202,7 +5214,7 @@ em.voided {
 .announce-lang-head img {
   width: 22px;
   height: 16px;
-  border-radius: 2px;
+  border-radius: var(--r-hair);
   object-fit: cover;
 }
 
@@ -5233,7 +5245,7 @@ em.voided {
   gap: 8px;
   padding: 18px 20px;
   border: 1px solid var(--a-line);
-  border-radius: 14px;
+  border-radius: var(--r-xl);
   background: var(--a-sunken);
   text-align: center;
 }
