@@ -1,12 +1,15 @@
-/* The POS (apps/pos-web): used standing, in a hurry, with a thumb. Big
-   targets, high contrast, one screen per job; the same on a phone, a tablet
-   at the counter and the computer in the office. */
 :root {
-  /* The POS shares the staff console's palette: the same celadon family the
-     admin app established (apps/customer-app/test/styles.test.ts darkens the
-     guest accent until it holds on white), so the two staff surfaces — and the
-     guest app they both sit beside — read as one system. Keep these in step
-     with admin.css's --a-* tokens. */
+  /* The POS (apps/pos-web): used standing, in a hurry, with a thumb. Big
+     targets, high contrast, one screen per job; the same on a phone, a tablet
+     at the counter and the computer in the office.
+
+     Every colour in this file is declared here and nowhere else —
+     apps/customer-app/test/styles.test.ts fails on a raw colour in the body,
+     the same discipline the guest and admin sheets keep. The POS shares the
+     staff console's palette: the same celadon family the admin app darkens
+     until it holds on white, so the two staff surfaces — and the guest app
+     they sit beside — read as one system. Keep these in step with admin.css's
+     --a-* tokens. */
   --p-bg: #eef1ef;
   --p-card: #ffffff;
   --p-ink: #202623;
@@ -16,10 +19,28 @@
   --p-accent: #275f46;
   --p-accent-ink: #ffffff;
   --p-accent-wash: #dfe7e2;
-  --p-warn: #9f3434;
+  --p-warn: #8d3232;
   --p-warn-wash: #f4dede;
   --p-seated: #e8a33d;
   --p-pay: #1d4ed8;
+  /* The dark chrome: the header's selected pill and its hairlines. */
+  --p-head-2: #344b40;
+  --p-head-line: #3c4a44;
+  /* The live channel — green while changes arrive, grey while the screens poll. */
+  --p-live: #3ecf8e;
+  --p-live-ring: rgba(62, 207, 142, 0.25);
+  /* The offline queue badge, and the washes behind a seated / locked table. */
+  --p-queue: #d98324;
+  --p-queue-ink: #1b211e;
+  --p-seated-wash: #fff6e8;
+  --p-pay-wash: #e8efff;
+  --p-stripe: rgb(0 0 0 / 4%);
+  /* Scrims behind a dialog or sheet, and the two sheet shadows. */
+  --p-scrim: rgba(10, 16, 13, 0.55);
+  --p-scrim-strong: rgba(10, 16, 13, 0.6);
+  --p-scrim-soft: rgba(10, 16, 13, 0.4);
+  --p-sheet-shadow: 0 -12px 34px rgba(10, 16, 13, 0.3);
+  --p-sheet-shadow-soft: 0 -6px 20px rgba(10, 16, 13, 0.12);
   /* Shared radius scale. The staff console and the POS agreed on different
      corner radii by accretion; these name one scale both use, so a card is a
      card on either surface. Outliers were snapped to the nearest step. */
@@ -108,7 +129,7 @@ select {
 label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 .pos-primary { border-color: var(--p-accent); background: var(--p-accent); color: var(--p-accent-ink); font-weight: 700; }
-.pos-pay { border-color: var(--p-pay); background: var(--p-pay); color: #fff; font-weight: 700; }
+.pos-pay { border-color: var(--p-pay); background: var(--p-pay); color: var(--p-accent-ink); font-weight: 700; }
 .pos-link { border: 0; background: none; color: var(--p-muted); text-decoration: underline; }
 .pos-muted { color: var(--p-muted); }
 .pos-error { color: var(--p-warn); font-weight: 600; }
@@ -125,23 +146,23 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   padding: 8px 16px;
   padding-top: max(8px, env(safe-area-inset-top));
   background: var(--p-head);
-  color: #fff;
+  color: var(--p-accent-ink);
 }
 
 .pos-head strong { font-family: var(--font-display); font-size: 21px; font-weight: 600; letter-spacing: 0.06em; }
 .pos-who { font-weight: 700; }
-/* The live channel: green while changes arrive as they happen, grey while the screens poll. */
+/* The live channel — green while changes arrive as they happen, grey while the screens poll. */
 .pos-live { width: 9px; height: 9px; border-radius: 50%; background: var(--p-muted); flex-shrink: 0; }
-.pos-live.on { background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.25); }
+.pos-live.on { background: var(--p-live); box-shadow: 0 0 0 3px var(--p-live-ring); }
 /* 待补发: orders held on this device while offline, waiting to send again. */
-.pos-queue { align-self: center; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: var(--r-pill); background: #d98324; color: #1b211e; font-weight: 700; font-size: 13px; white-space: nowrap; }
+.pos-queue { align-self: center; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: var(--r-pill); background: var(--p-queue); color: var(--p-queue-ink); font-weight: 700; font-size: 13px; white-space: nowrap; }
 .pos-head-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
-.pos-head-actions button { min-height: 40px; border-color: #3c4a44; background: transparent; color: #fff; }
+.pos-head-actions button { min-height: 40px; border-color: var(--p-head-line); background: transparent; color: var(--p-accent-ink); }
 /* The language picker is the guest menu's flag capsule, the same one the admin
    console wears, so all three surfaces switch language the same way. */
-.pos-languages { display: flex; padding: 2px; border: 1px solid #3c4a44; border-radius: var(--r-pill); }
+.pos-languages { display: flex; padding: 2px; border: 1px solid var(--p-head-line); border-radius: var(--r-pill); }
 .pos-languages button { width: 38px; min-height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; }
-.pos-languages button.on { background: #344b40; }
+.pos-languages button.on { background: var(--p-head-2); }
 .pos-languages img { width: 22px; height: 15px; border-radius: var(--r-hair); object-fit: cover; }
 
 .pos-main { min-width: 0; padding: 16px; }
@@ -187,11 +208,11 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 .pos-table b { font-size: 24px; }
 .pos-table span { color: var(--p-muted); font-variant-numeric: tabular-nums; }
-.pos-table.seated { border-color: var(--p-seated); background: #fff6e8; }
+.pos-table.seated { border-color: var(--p-seated); background: var(--p-seated-wash); }
 .pos-table.seated span { color: var(--p-ink); font-weight: 700; }
-.pos-table.locked { border-color: var(--p-pay); background: #e8efff; }
+.pos-table.locked { border-color: var(--p-pay); background: var(--p-pay-wash); }
 /* Open on another device: locked here until that waiter is done. */
-.pos-table.claimed { border-style: dashed; border-color: var(--p-warn); background: repeating-linear-gradient(135deg, transparent 0 10px, rgb(0 0 0 / 4%) 10px 20px); }
+.pos-table.claimed { border-style: dashed; border-color: var(--p-warn); background: repeating-linear-gradient(135deg, transparent 0 10px, var(--p-stripe) 10px 20px); }
 .pos-table.claimed b, .pos-table.claimed span { opacity: .6; }
 .pos-table .pos-lock { margin-right: 4px; font-size: 18px; font-style: normal; }
 .pos-table small { color: var(--p-warn); font-size: 12px; font-weight: 700; }
@@ -285,7 +306,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-dishes button:has(.pos-dish-count) .pos-stock-left { top: 28px; }
 .pos-soldout-mode.on { border-color: var(--p-warn); background: var(--p-warn-wash); color: var(--p-warn); font-weight: 700; }
 
-.pos-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.55); }
+.pos-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: var(--p-scrim); }
 .pos-modal .pos-card { width: min(520px, 100%); max-height: 90vh; overflow-y: auto; }
 .pos-modal fieldset { margin: 0; padding: 0; border: 0; }
 .pos-modal legend { margin-bottom: 6px; font-weight: 700; }
@@ -319,14 +340,14 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 /* Pay-by-transfer GiroCode: a button under the pay types, and its QR dialog. */
 .pos-sepa-btn { width: 100%; margin-top: 6px; }
-.pos-sepa-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 13, 0.6); }
-.pos-sepa-dialog { width: min(380px, 100%); max-height: 92vh; overflow-y: auto; text-align: center; background: var(--p-card, #fff); color: var(--p-ink, #12201a); border-radius: var(--r-lg); padding: 20px; display: grid; gap: 10px; justify-items: center; }
+.pos-sepa-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: var(--p-scrim-strong); }
+.pos-sepa-dialog { width: min(380px, 100%); max-height: 92vh; overflow-y: auto; text-align: center; background: var(--p-card); color: var(--p-ink); border-radius: var(--r-lg); padding: 20px; display: grid; gap: 10px; justify-items: center; }
 .pos-sepa-dialog h2 { margin: 0; font-size: 1.1rem; }
 .pos-sepa-amount { margin: 0; font-size: 1.8rem; font-weight: 700; }
 .pos-sepa-qr { width: 320px; height: 320px; max-width: 100%; height: auto; aspect-ratio: 1; image-rendering: pixelated; }
 .pos-sepa-to { margin: 0; line-height: 1.5; }
 .pos-sepa-to code { word-break: break-all; }
-.pos-sepa-error { margin: 0; color: var(--p-danger, #b3261e); }
+.pos-sepa-error { margin: 0; color: var(--p-warn); }
 .pos-payments { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .pos-payments li { display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 6px; padding: 10px; border-radius: var(--r-md); background: var(--p-bg); }
 .pos-payments li > :not(button) { grid-column: 1; }
@@ -378,7 +399,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   padding: 12px 18px;
   border-radius: var(--r-lg);
   background: var(--p-head);
-  color: #fff;
+  color: var(--p-accent-ink);
   font-weight: 600;
   opacity: 0;
   pointer-events: none;
@@ -400,7 +421,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
      the sheet can slide clean off-screen whatever the bar's height. */
   .pos-order { position: relative; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
 
-  .pos-sheet-scrim { position: fixed; inset: 0; z-index: 38; background: rgba(10, 16, 13, 0.4); }
+  .pos-sheet-scrim { position: fixed; inset: 0; z-index: 38; background: var(--p-scrim-soft); }
 
   .pos-ticket {
     position: fixed;
@@ -410,7 +431,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
     max-height: min(84vh, 680px);
     border-radius: var(--r-2xl) var(--r-2xl) 0 0;
     border-bottom: 0;
-    box-shadow: 0 -12px 34px rgba(10, 16, 13, 0.3);
+    box-shadow: var(--p-sheet-shadow);
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
@@ -432,7 +453,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--p-line);
     background: var(--p-card);
-    box-shadow: 0 -6px 20px rgba(10, 16, 13, 0.12);
+    box-shadow: var(--p-sheet-shadow-soft);
   }
   .pos-order.sheet-open .pos-sheet-bar { display: none; }
   .pos-sheet-toggle {
@@ -519,7 +540,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   border: 0;
   border-radius: var(--r-sm);
   background: var(--p-warn);
-  color: #fff;
+  color: var(--p-accent-ink);
   font-weight: 650;
 }
 
@@ -910,7 +931,7 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(10, 16, 13, 0.55);
+  background: var(--p-scrim);
   animation: pos-scan-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 

@@ -25,7 +25,7 @@ import { MENU_THEMES, themeGarland, themePattern } from "@zhaoyun/domain";
 // Vitest runs from the repository root, and under the jsdom environment
 // `import.meta.url` is an http: URL rather than a file one.
 const sheet = (name: string) => readFileSync(resolve(process.cwd(), "src", name), "utf8");
-const sheets = { guest: sheet("styles.css"), admin: sheet("admin.css") };
+const sheets = { guest: sheet("styles.css"), admin: sheet("admin.css"), pos: sheet("pos.css") };
 
 /** Everything after the `:root` block — the part that may only use tokens. */
 function body(css: string): string {
@@ -85,7 +85,7 @@ describe.each(Object.entries(sheets))("%s stylesheet", (_name, css) => {
     const referenced = new Set([...body(css).matchAll(/var\((--[a-z0-9-]+)/g)].map((match) => match[1]));
     // `--art` and `--swatch` are the exceptions: each product, and each menu
     // style swatch, sets its own colour inline rather than through a token.
-    const inlineExceptions = new Set(["--art", "--swatch"]);
+    const inlineExceptions = new Set(["--art", "--swatch", "--tag"]);
     const missing = [...referenced].filter((token) => !inlineExceptions.has(token) && !defined.has(token));
     expect(missing).toEqual([]);
   });
@@ -114,6 +114,7 @@ describe("iPhones render the menu as Android phones do", () => {
 describe("contrast", () => {
   const guest = tokens(sheets.guest);
   const admin = tokens(sheets.admin);
+  const pos = tokens(sheets.pos);
   const pairs: Array<[string, string, string, number]> = [
     // Guest app. The allergen list and the ingredient text are read off a
     // tablet in a dim room; 4.5 is the floor for anything smaller than 18px.
@@ -139,7 +140,14 @@ describe("contrast", () => {
     ["admin header labels", admin.get("--a-head-muted")!, admin.get("--a-head")!, 4.5],
     // The printed table card. Ink on paper, and it still has to survive a copier.
     ["table card heading", admin.get("--paper-ink")!, admin.get("--paper")!, 7],
-    ["table card caption", admin.get("--paper-muted")!, admin.get("--paper")!, 4.5]
+    ["table card caption", admin.get("--paper-muted")!, admin.get("--paper")!, 4.5],
+    // The POS, held at arm's length over a counter. Same floors as the admin console.
+    ["pos body text", pos.get("--p-ink")!, pos.get("--p-card")!, 7],
+    ["pos muted text", pos.get("--p-muted")!, pos.get("--p-card")!, 4.5],
+    ["pos accent text", pos.get("--p-accent")!, pos.get("--p-accent-wash")!, 4.5],
+    ["label on the pos accent button", pos.get("--p-accent-ink")!, pos.get("--p-accent")!, 4.5],
+    ["pos error text on its wash", pos.get("--p-warn")!, pos.get("--p-warn-wash")!, 4.5],
+    ["pos header text", pos.get("--p-accent-ink")!, pos.get("--p-head")!, 7]
   ];
 
   it.each(pairs)("%s clears %s on %s at %d:1", (_what, foreground, background, floor) => {
