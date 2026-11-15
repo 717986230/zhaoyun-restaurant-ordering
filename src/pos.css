@@ -2,17 +2,22 @@
    targets, high contrast, one screen per job; the same on a phone, a tablet
    at the counter and the computer in the office. */
 :root {
+  /* The POS shares the staff console's palette: the same celadon family the
+     admin app established (apps/customer-app/test/styles.test.ts darkens the
+     guest accent until it holds on white), so the two staff surfaces — and the
+     guest app they both sit beside — read as one system. Keep these in step
+     with admin.css's --a-* tokens. */
   --p-bg: #eef1ef;
   --p-card: #ffffff;
-  --p-ink: #14201b;
-  --p-muted: #5d6b64;
-  --p-line: #d6ddd9;
-  --p-head: #14201b;
-  --p-accent: #1f6b4f;
+  --p-ink: #202623;
+  --p-muted: #5f6963;
+  --p-line: #d7ddda;
+  --p-head: #17221d;
+  --p-accent: #275f46;
   --p-accent-ink: #ffffff;
-  --p-accent-wash: #dcefe6;
-  --p-warn: #b3261e;
-  --p-warn-wash: #fbe9e7;
+  --p-accent-wash: #dfe7e2;
+  --p-warn: #9f3434;
+  --p-warn-wash: #f4dede;
   --p-seated: #e8a33d;
   --p-pay: #1d4ed8;
   color-scheme: light;
@@ -100,9 +105,12 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-queue { align-self: center; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; background: #d98324; color: #1b211e; font-weight: 700; font-size: 13px; white-space: nowrap; }
 .pos-head-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .pos-head-actions button { min-height: 40px; border-color: #3c4a44; background: transparent; color: #fff; }
-.pos-languages { display: flex; gap: 2px; }
-.pos-languages button { min-height: 40px; padding: 0 10px; font-size: 13px; }
-.pos-languages button.on { background: #fff; color: var(--p-head); }
+/* The language picker is the guest menu's flag capsule, the same one the admin
+   console wears, so all three surfaces switch language the same way. */
+.pos-languages { display: flex; padding: 2px; border: 1px solid #3c4a44; border-radius: 999px; }
+.pos-languages button { width: 38px; min-height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: transparent; }
+.pos-languages button.on { background: #344b40; }
+.pos-languages img { width: 22px; height: 15px; border-radius: 2px; object-fit: cover; }
 
 .pos-main { min-width: 0; padding: 16px; }
 

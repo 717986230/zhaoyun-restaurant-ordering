@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { PosApi, toProduct } from "@zhaoyun/api-client";
 import type { CreateOrderCommand, PosStaff, RealtimeEnvelope } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { serverErrorText } from "@zhaoyun/domain";
+import { LANGUAGE_INFO, serverErrorText } from "@zhaoyun/domain";
 import { formatEuro, initialLanguage, POS_LANGUAGES, translator } from "./i18n";
 import type { PosKey, PosLanguage } from "./i18n";
 import { enqueue, flushOutbox, readOutbox } from "./offline-queue";
@@ -60,8 +60,6 @@ export type Screen =
   | { name: "pay"; table: string }
   | { name: "topup" }
   | { name: "records" };
-
-const LANGUAGE_NAMES: Record<PosLanguage, string> = { zh: "中文", de: "Deutsch", en: "English" };
 
 /**
  * The standalone screens (no table) are kept in the URL hash, so a deep link
@@ -185,8 +183,8 @@ export function App() {
   }, [staff, loadCatalog]);
 
   const languages = <div className="pos-languages" role="group" aria-label="Language">{POS_LANGUAGES.map((option) => <button
-    key={option} type="button" className={option === language ? "on" : ""} aria-pressed={option === language} onClick={() => setLanguage(option)}
-  >{LANGUAGE_NAMES[option]}</button>)}</div>;
+    key={option} type="button" className={option === language ? "on" : ""} aria-pressed={option === language} aria-label={LANGUAGE_INFO[option].name} onClick={() => setLanguage(option)}
+  ><img src={LANGUAGE_INFO[option].flag} alt="" /></button>)}</div>;
 
   let body;
   if (!paired) body = <Pair t={t} onPaired={() => setPaired(true)} />;
