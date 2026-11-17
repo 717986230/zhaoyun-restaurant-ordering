@@ -324,6 +324,13 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-move .pos-modal-actions { grid-template-columns: 1fr; }
 .pos-move-grid button.pos-seat-booked { display: grid; gap: 2px; border-color: var(--p-accent); color: var(--p-accent); }
 .pos-move-grid button.pos-seat-booked small { font-size: 11px; font-weight: 600; }
+.pos-move h3 { margin: 4px 0 0; font-size: 13px; font-weight: 700; color: var(--p-muted); }
+.pos-move-grid button small { display: block; font-size: 11px; font-weight: 600; color: var(--p-muted); }
+.pos-move-grid button.on { border-color: var(--p-accent); color: var(--p-accent); background: color-mix(in srgb, var(--p-accent) 10%, transparent); }
+.pos-move-grid button.on small { color: inherit; }
+.pos-merge-confirm { display: grid; gap: 8px; padding: 10px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--p-accent) 8%, var(--p-bg)); }
+.pos-merge-confirm > span { font-size: 14px; }
+.pos-merge-confirm .pos-modal-actions { grid-template-columns: 1fr 1fr; }
 
 .pos-stock-form { display: grid; gap: 12px; }
 .pos-stock-form input { min-height: 52px; font-size: 22px; text-align: center; }
