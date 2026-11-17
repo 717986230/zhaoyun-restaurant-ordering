@@ -123,3 +123,28 @@ test("the fencing token climbs when a lapsed table is taken over", async (contex
   assert.equal(taken.deviceId, deviceB.deviceId, "device B takes the lapsed table");
   assert.equal(taken.epoch, 2, "taking the table over bumps the fencing token");
 });
+
+test("并台: moving an open table onto an occupied one combines both bills", async (context) => {
+  const { store } = makeStore(context);
+  const product = await aProduct(store);
+
+  // Two tables, both open on the same device (so the merge passes both locks),
+  // each with its own order.
+  await store.claimTable("11", deviceA);
+  await store.createOrder({ table: "11", items: [{ id: product.id, qty: 2 }] }, deviceA);
+  await store.claimTable("12", deviceA);
+  await store.createOrder({ table: "12", items: [{ id: product.id, qty: 1 }] }, deviceA);
+
+  // 并台: table 11 onto the occupied table 12.
+  const moved = await store.moveTable("11", "12", deviceA);
+  assert.equal(moved.to, "12");
+  assert.equal(moved.moved, 1, "the one open order on table 11 is carried over");
+
+  // Table 12 now carries both orders' portions (2 + 1); table 11 is empty.
+  const billB = await store.billForTable("12");
+  const qtyB = billB.items.reduce((sum, item) => sum + item.qty, 0);
+  assert.equal(qtyB, 3, "both bills are combined on the target table");
+
+  const billA = await store.billForTable("11");
+  assert.equal(billA.items.length, 0, "the source table is left with nothing open");
+});
