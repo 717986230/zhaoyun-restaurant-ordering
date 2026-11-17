@@ -170,3 +170,21 @@ test("催菜: urging a sent dish queues a kitchen reminder, the bill untouched",
   const after = await store.billForTable("14");
   assert.equal(after.items.reduce((sum, item) => sum + item.qty, 0), 2);
 });
+
+test("逐菜备注: a per-dish note rides the kitchen ticket and the bill, not the price", async (context) => {
+  const { store } = makeStore(context);
+  const product = await aProduct(store);
+  await store.claimTable("16", deviceA);
+  await store.createOrder({ table: "16", items: [{ id: product.id, qty: 1, note: "少盐 不要香菜" }] }, deviceA);
+
+  // The order's kitchen ticket carries the note under the dish.
+  const order = (await store.listPrintJobs("queued", 100)).find((entry) => (entry.payload.kind ?? "order") === "order");
+  assert.ok(order, "the order queued a kitchen ticket");
+  assert.equal(order.payload.items[0].note, "少盐 不要香菜");
+
+  // The bill shows the note, and the line total is still just the unit price.
+  const bill = await store.billForTable("16");
+  assert.equal(bill.items[0].note, "少盐 不要香菜");
+  assert.equal(bill.items[0].lineTotal, bill.items[0].unitPrice);
+  assert.ok(bill.items[0].lineTotal > 0);
+});

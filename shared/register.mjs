@@ -45,9 +45,10 @@ const VOIDED_QUANTITY = `(SELECT COALESCE(SUM(order_item_voids.quantity), 0) FRO
     WHERE order_item_voids.order_item_id = order_items.id)`;
 
 /** An order's lines, with their VAT split and how much of each is paid, and voided. */
-export const ORDER_ITEMS_SQL = `SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity,
+export const ORDER_ITEMS_SQL = `SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json, order_item_notes.note AS item_note, ${PAID_QUANTITY} AS paid_quantity,
   ${VOIDED_QUANTITY} AS voided_quantity
 FROM order_items LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id
+LEFT JOIN order_item_notes ON order_item_notes.order_item_id = order_items.id
 WHERE order_items.order_id = ?`;
 
 /**
@@ -183,6 +184,7 @@ export function orderJournalPayload(plan) {
       unitPriceCents: item.unitPriceCents,
       vatPercent: item.vatPercent,
       ...(item.vatSplitJson ? { vatSplit: JSON.parse(item.vatSplitJson) } : {}),
+      ...(item.note ? { note: item.note } : {}),
       modifiers: parseJson(item.modifiersJson, []).map((modifier) => modifier.name)
     }))
   };

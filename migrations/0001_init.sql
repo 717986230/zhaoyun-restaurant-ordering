@@ -66,6 +66,10 @@ CREATE TABLE order_item_vat_splits (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
       split_json TEXT NOT NULL
     );
+CREATE TABLE order_item_notes (
+      order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      note TEXT NOT NULL
+    );
 CREATE TABLE receipts (
       id TEXT PRIMARY KEY,
       receipt_no INTEGER NOT NULL UNIQUE,

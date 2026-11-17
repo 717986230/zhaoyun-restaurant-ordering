@@ -365,3 +365,10 @@ test("催菜: the urge ticket is a kitchen ticket marked 催菜", () => {
   assert.match(printed, /催菜/, "the ticket is marked 催菜");
   assert.match(printed, /2 x 蔬菜拉面/, "and lists the dish to hurry, not voided (no minus)");
 });
+
+test("逐菜备注: a dish's note prints under it on the kitchen ticket", () => {
+  const withNote = { orderNo: "A2", table: "08", staffName: "Li",
+    items: [{ quantity: 1, name: "蔬菜拉面", names: { zh: "蔬菜拉面", de: "Gemüse-Ramen", en: "Veggie ramen" }, modifiers: [], note: "少盐 不要香菜" }] };
+  const printed = plain(renderTickets(withNote, { capabilities: { printLanguage: "zh", encoding: "utf8" } }, { station: "kitchen" }));
+  assert.match(printed, /备注: 少盐 不要香菜/, "the cook sees the note under the dish");
+});
