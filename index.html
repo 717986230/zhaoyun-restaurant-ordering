@@ -13,85 +13,90 @@
     <link rel="apple-touch-icon" href="/icons/menu-180.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Menu" />
-    <!-- 子龙 · the brand's opening mark. A celadon 团龙 crest shown on the bare
-         dark screen while the menu's bundle loads on a cold visit; the app
-         replaces it the moment it mounts (createRoot clears #app). All inline,
-         so it needs neither the stylesheet nor a web font to paint, and it
-         holds to the one accent and the porcelain the rest of the app uses.
-         It is only ever shown, never touched — pointer-events: none. -->
+    <!-- 子龙 · the brand's opening mark. A celadon 团龙 crest over the dark room
+         while the menu comes up. It is a sibling of #app, not a child, so the
+         app mounting into #app never clears it; it holds for a moment (so the
+         dragon finishes drawing even when the menu paints at once from cache)
+         and then, on a pure-CSS timer, fades and takes itself out of the way
+         (visibility: hidden). No script — the page's Content-Security-Policy
+         is script-src 'self', so the mark is style and markup only. It paints
+         without the stylesheet or a web font, holds to the one accent and the
+         porcelain, and is never touched — pointer-events: none. -->
     <style>
-      .zy-splash{position:fixed;inset:0;z-index:40;display:grid;place-items:center;
+      .zy-splash{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
         background:#0f1113;pointer-events:none;
-        font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif}
+        font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;
+        animation:zy-out .55s ease 1.95s forwards}
+      @keyframes zy-out{from{opacity:1}to{opacity:0;visibility:hidden}}
       .zy-splash .zy-in{display:flex;flex-direction:column;align-items:center;gap:30px}
-      .zy-crest{width:min(42vw,160px);height:min(42vw,160px)}
+      .zy-crest{width:min(42vw,164px);height:min(42vw,164px)}
       .zy-ring{transform-origin:160px 160px;animation:zy-turn 4.5s linear infinite}
       @keyframes zy-turn{to{transform:rotate(360deg)}}
       .zy-draw{stroke-dasharray:1400;stroke-dashoffset:1400;
-        animation:zy-ink 2.1s cubic-bezier(.2,.8,.2,1) .15s forwards}
+        animation:zy-ink 1.6s cubic-bezier(.2,.8,.2,1) .1s forwards}
       @keyframes zy-ink{to{stroke-dashoffset:0}}
-      .zy-fx{opacity:0;animation:zy-in 1s ease .95s forwards}
+      .zy-fx{opacity:0;animation:zy-in .9s ease .75s forwards}
       @keyframes zy-in{to{opacity:1}}
-      .zy-pearl{transform-origin:238px 52px;animation:zy-breathe 2.6s ease-in-out 1.6s infinite}
+      .zy-pearl{transform-origin:238px 52px;animation:zy-breathe 2.6s ease-in-out 1.5s infinite}
       @keyframes zy-breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.14);opacity:1}}
       .zy-name{display:flex;flex-direction:column;align-items:center;gap:12px}
       .zy-word{font-weight:600;font-size:32px;letter-spacing:.34em;line-height:1;
         color:#e9edee;padding-left:.34em}
-      .zy-word,.zy-sub{opacity:0;animation:zy-in 1s ease 1.2s forwards}
+      .zy-word,.zy-sub{opacity:0;animation:zy-in .9s ease 1.05s forwards}
       .zy-sub{font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;font-size:10px;
         letter-spacing:.44em;text-transform:uppercase;line-height:1;color:#8d9497;
-        padding-left:.44em;animation-delay:1.4s}
+        padding-left:.44em;animation-delay:1.25s}
       @media (prefers-reduced-motion:reduce){
         .zy-ring,.zy-pearl{animation:none}
         .zy-draw{stroke-dashoffset:0;animation:none}
         .zy-fx,.zy-word,.zy-sub{opacity:1;animation:none}
+        .zy-splash{animation:zy-out .4s ease 1.4s forwards}
       }
     </style>
   </head>
   <body>
-    <div id="app">
-      <div class="zy-splash" role="status" aria-label="赵云">
-        <div class="zy-in">
-          <svg class="zy-crest" viewBox="0 0 320 320" fill="none" aria-hidden="true">
-            <circle cx="160" cy="160" r="128" stroke="rgba(233,238,240,.11)" stroke-width="1.4"/>
-            <g class="zy-ring">
-              <circle cx="160" cy="160" r="128" stroke="rgba(143,176,163,.55)" stroke-width="1.6"
-                      stroke-dasharray="64 740" stroke-linecap="round"/>
-            </g>
-            <circle cx="160" cy="160" r="116" stroke="rgba(233,238,240,.05)" stroke-width="1"/>
-            <!-- 团龙: a single celadon ribbon, coiled, chasing the pearl -->
-            <g stroke="#8fb0a3" fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <g class="zy-draw">
-                <path d="M182.6 98 A 66 66 0 1 0 222 137.4 C 231 130 236 122 233 113" stroke-width="8.5"/>
-              </g>
-              <g class="zy-fx">
-                <g stroke-width="4.5">
-                  <path d="M132.1 100.2 L127.0 89.3"/>
-                  <path d="M102.8 127.0 L92.5 121.0"/>
-                  <path d="M96.3 177.1 L84.7 180.2"/>
-                  <path d="M127.0 217.2 L121.0 227.5"/>
-                  <path d="M170 221 L172 233"/>
-                </g>
-                <path d="M150 222 C 160 236 176 238 186 230" stroke-width="6"/>
-                <path d="M186 230 l9 7 M188 224 l10 4 M182 236 l6 9" stroke-width="3.5"/>
-                <path d="M182.6 98 C 190 82 208 80 216 90 C 220 96 219 103 214 106" stroke-width="7.5"/>
-                <path d="M214 106 C 206 112 193 111 185 104" stroke-width="6.5"/>
-                <path d="M198 86 C 208 71 224 70 232 61" stroke-width="5.5"/>
-                <path d="M216 92 C 230 82 244 74 252 60" stroke-width="3.5"/>
-              </g>
+    <div id="app"></div>
+    <div class="zy-splash" id="zy-splash" role="status" aria-label="赵云">
+      <div class="zy-in">
+        <svg class="zy-crest" viewBox="0 0 320 320" fill="none" aria-hidden="true">
+          <circle cx="160" cy="160" r="128" stroke="rgba(233,238,240,.11)" stroke-width="1.4"/>
+          <g class="zy-ring">
+            <circle cx="160" cy="160" r="128" stroke="rgba(143,176,163,.55)" stroke-width="1.6"
+                    stroke-dasharray="64 740" stroke-linecap="round"/>
+          </g>
+          <circle cx="160" cy="160" r="116" stroke="rgba(233,238,240,.05)" stroke-width="1"/>
+          <!-- 团龙: a single celadon ribbon, coiled, chasing the pearl -->
+          <g stroke="#8fb0a3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <g class="zy-draw">
+              <path d="M182.6 98 A 66 66 0 1 0 222 137.4 C 231 130 236 122 233 113" stroke-width="8.5"/>
             </g>
             <g class="zy-fx">
-              <circle cx="199" cy="95" r="4.2" fill="#0f1113" stroke="#8fb0a3" stroke-width="2.2"/>
+              <g stroke-width="4.5">
+                <path d="M132.1 100.2 L127.0 89.3"/>
+                <path d="M102.8 127.0 L92.5 121.0"/>
+                <path d="M96.3 177.1 L84.7 180.2"/>
+                <path d="M127.0 217.2 L121.0 227.5"/>
+                <path d="M170 221 L172 233"/>
+              </g>
+              <path d="M150 222 C 160 236 176 238 186 230" stroke-width="6"/>
+              <path d="M186 230 l9 7 M188 224 l10 4 M182 236 l6 9" stroke-width="3.5"/>
+              <path d="M182.6 98 C 190 82 208 80 216 90 C 220 96 219 103 214 106" stroke-width="7.5"/>
+              <path d="M214 106 C 206 112 193 111 185 104" stroke-width="6.5"/>
+              <path d="M198 86 C 208 71 224 70 232 61" stroke-width="5.5"/>
+              <path d="M216 92 C 230 82 244 74 252 60" stroke-width="3.5"/>
             </g>
-            <g class="zy-pearl zy-fx">
-              <circle cx="238" cy="52" r="12" stroke="#a9c7ba" stroke-width="3" fill="rgba(143,176,163,.14)"/>
-              <circle cx="234" cy="48" r="2.8" fill="#e9edee"/>
-            </g>
-          </svg>
-          <div class="zy-name">
-            <div class="zy-word">赵云</div>
-            <div class="zy-sub">常山 · 子龙</div>
-          </div>
+          </g>
+          <g class="zy-fx">
+            <circle cx="199" cy="95" r="4.2" fill="#0f1113" stroke="#8fb0a3" stroke-width="2.2"/>
+          </g>
+          <g class="zy-pearl zy-fx">
+            <circle cx="238" cy="52" r="12" stroke="#a9c7ba" stroke-width="3" fill="rgba(143,176,163,.14)"/>
+            <circle cx="234" cy="48" r="2.8" fill="#e9edee"/>
+          </g>
+        </svg>
+        <div class="zy-name">
+          <div class="zy-word">赵云</div>
+          <div class="zy-sub">常山 · 子龙</div>
         </div>
       </div>
     </div>
