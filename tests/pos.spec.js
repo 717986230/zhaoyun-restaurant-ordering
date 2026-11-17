@@ -77,11 +77,11 @@ test("a waiter orders by number, the kitchen gets it, and the table pays separat
   await expect(page.locator(".pos-ticket h1")).toHaveText("桌 5");
 
   // By number, the way the menu is read out; and by tapping.
-  await page.getByLabel("菜号 / 搜索").fill(first.sku.toLowerCase());
-  await page.getByLabel("菜号 / 搜索").press("Enter");
+  await page.getByLabel("菜号 ×份数 / 搜索").fill(first.sku.toLowerCase());
+  await page.getByLabel("菜号 ×份数 / 搜索").press("Enter");
   await confirmOptions(page);
-  await page.getByLabel("菜号 / 搜索").fill(first.sku);
-  await page.getByLabel("菜号 / 搜索").press("Enter");
+  await page.getByLabel("菜号 ×份数 / 搜索").fill(first.sku);
+  await page.getByLabel("菜号 ×份数 / 搜索").press("Enter");
   await confirmOptions(page);
   await page.locator(`.pos-dishes button[data-sku="${second.sku}"]`).click();
   await confirmOptions(page);
@@ -127,6 +127,33 @@ test("a waiter orders by number, the kitchen gets it, and the table pays separat
   const receipts = (await (await admin(request, "get", "/api/admin/receipts?limit=10")).json()).receipts;
   expect(receipts.map((receipt) => receipt.staffName)).toEqual(["Li", "Li"]);
   expect(receipts[1].payments[0]).toMatchObject({ type: "cash", tenderedCents: 5000 });
+});
+
+test("点菜一次点多份：菜号×份数，规格弹窗带份数", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const products = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => !product.bundleItems?.length);
+  const [first] = products.filter((product) => product.kind === "food");
+
+  // The unsent-order guard asks to confirm leaving; accept it at the end.
+  page.on("dialog", (dialog) => void dialog.accept());
+  await pairAndSignIn(page, "Tablet qty", "Li", "1234");
+  await page.getByLabel("打开桌号").fill("6");
+  await page.getByRole("button", { name: "打开", exact: true }).click();
+  await expect(page.locator(".pos-ticket h1")).toHaveText("桌 6");
+
+  // 菜号×份数：一次点 3 份，不用点三次。规格弹窗里份数也带过去。
+  // (Client-side only: no 送厨/结账, so the shared server's receipt journal
+  // that a later test checks is left exactly as it was.)
+  await page.getByLabel("菜号 ×份数 / 搜索").fill(`${first.sku}*3`);
+  await page.getByLabel("菜号 ×份数 / 搜索").press("Enter");
+  await confirmOptions(page);
+  await expect(page.locator(".pos-lines.new li")).toHaveCount(1);
+  await expect(page.locator(".pos-lines.new li").first().locator(".pos-stepper b")).toHaveText("3");
+  await expect(page.locator(`.pos-dishes button[data-sku="${first.sku}"] .pos-dish-count`)).toHaveText("3");
+
+  // Leave the table so its claim is released and no order is left on the server.
+  await page.getByRole("button", { name: "← 返回" }).click();
+  await expect(page.locator(".pos-floor")).toBeVisible();
 });
 
 test("a table open on one device is locked to it; the manager may take it over", async ({ browser }, testInfo) => {
