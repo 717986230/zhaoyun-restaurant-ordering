@@ -34,6 +34,11 @@ const reportError = reportClientErrors("menu", apiBaseUrl);
 // Before the first render, so a guest who picked light never sees a dark flash.
 applyColorScheme(storedColorScheme() ?? cachedMenuSettings()?.defaultScheme ?? "dark");
 
+// The opening mark (index.html) names the restaurant; fill it from the last
+// menu settings this phone saw, so a returning guest sees the name at once.
+const cachedName = cachedMenuSettings()?.restaurantName;
+if (cachedName) { const w = document.getElementById("zy-word"); if (w) w.textContent = cachedName; }
+
 const root = document.getElementById("app");
 if (!root) throw new Error("Customer app root was not found");
 

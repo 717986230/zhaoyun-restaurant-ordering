@@ -56,6 +56,8 @@ export function App() {
     document.title = name ? `${name} · ${menuTitle}` : menuTitle;
     // What an iPhone writes under the icon when the menu is added to the home screen.
     if (name) document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", name);
+    // The opening mark (index.html) shows the restaurant's name, once it is known.
+    if (name) { const splashWord = document.getElementById("zy-word"); if (splashWord) splashWord.textContent = name; }
   }, [catalog.menu?.restaurantName, menuTitle]);
   // When the owner has the menu dress itself for the season, a festive style
   // whose window covers today is worn in place of the chosen one; off-season,
