@@ -14,21 +14,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Menu" />
     <!-- 子龙 · the brand's opening mark. A celadon 团龙 crest over the dark room
-         while the menu comes up. It is a sibling of #app, not a child, so the
-         app mounting into #app never clears it; it holds for a moment (so the
-         dragon finishes drawing even when the menu paints at once from cache)
-         and then, on a pure-CSS timer, fades and takes itself out of the way
-         (visibility: hidden). No script — the page's Content-Security-Policy
-         is script-src 'self', so the mark is style and markup only. It paints
-         without the stylesheet or a web font, holds to the one accent and the
-         porcelain, and is never touched — pointer-events: none. -->
+         while the menu comes up, with the restaurant's own name beneath it —
+         the name is filled in by the app (main.tsx / App.tsx) from the menu
+         settings this phone last saw, so it is the owner's name, never a
+         hard-coded one. The mark is a sibling of #app, not a child, so the app
+         mounting never clears it; it holds while the dragon draws, then fades
+         itself out on a pure-CSS timer (no script — the page's CSP is
+         script-src 'self'). It paints without the stylesheet or a web font,
+         holds to the one accent and the porcelain, and is never touched —
+         pointer-events: none. -->
     <style>
       .zy-splash{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
         background:#0f1113;pointer-events:none;
         font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;
         animation:zy-out .55s ease 1.95s forwards}
       @keyframes zy-out{from{opacity:1}to{opacity:0;visibility:hidden}}
-      .zy-splash .zy-in{display:flex;flex-direction:column;align-items:center;gap:30px}
+      .zy-splash .zy-in{display:flex;flex-direction:column;align-items:center;gap:28px}
       .zy-crest{width:min(42vw,164px);height:min(42vw,164px)}
       .zy-ring{transform-origin:160px 160px;animation:zy-turn 4.5s linear infinite}
       @keyframes zy-turn{to{transform:rotate(360deg)}}
@@ -39,26 +40,23 @@
       @keyframes zy-in{to{opacity:1}}
       .zy-pearl{transform-origin:238px 52px;animation:zy-breathe 2.6s ease-in-out 1.5s infinite}
       @keyframes zy-breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.14);opacity:1}}
-      .zy-name{display:flex;flex-direction:column;align-items:center;gap:12px}
-      .zy-word{font-weight:600;font-size:32px;letter-spacing:.34em;line-height:1;
-        color:#e9edee;padding-left:.34em}
-      .zy-word,.zy-sub{opacity:0;animation:zy-in .9s ease 1.05s forwards}
-      .zy-sub{font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;font-size:10px;
-        letter-spacing:.44em;text-transform:uppercase;line-height:1;color:#8d9497;
-        padding-left:.44em;animation-delay:1.25s}
+      .zy-word{max-width:84vw;font-weight:600;font-size:clamp(22px,6.2vw,31px);letter-spacing:.14em;
+        line-height:1.2;text-align:center;text-wrap:balance;color:#e9edee;padding-left:.14em;
+        opacity:0;animation:zy-in .9s ease 1.05s forwards}
+      .zy-word:empty{display:none}
       @media (prefers-reduced-motion:reduce){
         .zy-ring,.zy-pearl{animation:none}
         .zy-draw{stroke-dashoffset:0;animation:none}
-        .zy-fx,.zy-word,.zy-sub{opacity:1;animation:none}
+        .zy-fx,.zy-word{opacity:1;animation:none}
         .zy-splash{animation:zy-out .4s ease 1.4s forwards}
       }
     </style>
   </head>
   <body>
     <div id="app"></div>
-    <div class="zy-splash" id="zy-splash" role="status" aria-label="赵云">
+    <div class="zy-splash" id="zy-splash" aria-hidden="true">
       <div class="zy-in">
-        <svg class="zy-crest" viewBox="0 0 320 320" fill="none" aria-hidden="true">
+        <svg class="zy-crest" viewBox="0 0 320 320" fill="none">
           <circle cx="160" cy="160" r="128" stroke="rgba(233,238,240,.11)" stroke-width="1.4"/>
           <g class="zy-ring">
             <circle cx="160" cy="160" r="128" stroke="rgba(143,176,163,.55)" stroke-width="1.6"
@@ -94,10 +92,7 @@
             <circle cx="234" cy="48" r="2.8" fill="#e9edee"/>
           </g>
         </svg>
-        <div class="zy-name">
-          <div class="zy-word">赵云</div>
-          <div class="zy-sub">常山 · 子龙</div>
-        </div>
+        <div class="zy-word" id="zy-word"></div>
       </div>
     </div>
     <script type="module" src="/apps/customer-app/src/main.tsx"></script>
