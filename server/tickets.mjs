@@ -32,7 +32,7 @@ export const labels = {
     voucherCode: "代金券码", closing: "日结", sales: "销售", stornos: "冲销", receipts: "小票", vouchersSold: "售出代金券", uid: "UID",
     waiter: "服务员", pickup: "外带 取餐号", settlement: "跑堂结算", discount: "折扣", tip: "小费", tips: "小费（不计营业额）", handIn: "应交现金",
     drawer: "点钞 · 交班", float: "备用金", cashSales: "现金收入", payIn: "存入", payOut: "取出", cardTips: "卡付小费（付给员工）", expected: "应有现金", counted: "实点现金", difference: "差额", opened: "开班", countedBy: "点钞",
-    voidTicket: "*** 退菜 · 停止制作 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***",
+    voidTicket: "*** 退菜 · 停止制作 ***", urgeTicket: "*** 催菜 · 加急出餐 ***", reason: "原因", voids: "退菜", receiptCopy: "*** 小票副本 ***",
     guestDineIn: "*** 顾客扫码点餐 ***", guestPickup: "*** 线上自取 ***",
     deliveryDelivery: "外送", deliveryPickup: "到店自取", due: "取餐时间",
     stations: { kitchen: "厨房", bar: "吧台", sushi: "寿司台", front: "前台" },
@@ -49,7 +49,7 @@ export const labels = {
     voucherCode: "Gutschein-Code", closing: "TAGESABSCHLUSS", sales: "Verkäufe", stornos: "Stornos", receipts: "Belege", vouchersSold: "Gutscheine verkauft", uid: "UID",
     waiter: "Kellner", pickup: "ABHOLUNG Nr.", settlement: "KELLNERABRECHNUNG", discount: "Rabatt", tip: "Trinkgeld", tips: "Trinkgeld (kein Umsatz)", handIn: "Abzugeben bar",
     drawer: "KASSENSTURZ", float: "Wechselgeld Anfang", cashSales: "Bareinnahmen", payIn: "Einlage", payOut: "Entnahme", cardTips: "Kartentrinkgeld ausbezahlt", expected: "Soll", counted: "Ist (gezählt)", difference: "Differenz", opened: "Geöffnet", countedBy: "Gezählt",
-    voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***",
+    voidTicket: "*** STORNO – NICHT ZUBEREITEN ***", urgeTicket: "*** BITTE BEEILEN – NACHSCHUB ***", reason: "Grund", voids: "Stornos", receiptCopy: "*** BELEGKOPIE ***",
     guestDineIn: "*** GAST-BESTELLUNG (QR) ***", guestPickup: "*** ONLINE – ABHOLUNG ***",
     deliveryDelivery: "LIEFERUNG", deliveryPickup: "ABHOLUNG", due: "Fertig um",
     stations: { kitchen: "KÜCHE", bar: "BAR", sushi: "SUSHI", front: "KASSE" },
@@ -66,7 +66,7 @@ export const labels = {
     voucherCode: "Voucher code", closing: "DAY CLOSING", sales: "sales", stornos: "cancellations", receipts: "Receipts", vouchersSold: "Vouchers sold", uid: "UID",
     waiter: "Waiter", pickup: "TAKEAWAY No.", settlement: "WAITER SETTLEMENT", discount: "Discount", tip: "Tip", tips: "Tips (not takings)", handIn: "Cash to hand in",
     drawer: "CASH COUNT", float: "Float", cashSales: "Cash sales", payIn: "Paid in", payOut: "Paid out", cardTips: "Card tips paid out", expected: "Expected", counted: "Counted", difference: "Difference", opened: "Opened", countedBy: "Counted",
-    voidTicket: "*** VOID – STOP COOKING ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***",
+    voidTicket: "*** VOID – STOP COOKING ***", urgeTicket: "*** RUSH – PLEASE HURRY ***", reason: "Reason", voids: "Voids", receiptCopy: "*** RECEIPT COPY ***",
     guestDineIn: "*** GUEST ORDER (QR) ***", guestPickup: "*** ONLINE PICKUP ***",
     deliveryDelivery: "DELIVERY", deliveryPickup: "COLLECTION", due: "Ready by",
     stations: { kitchen: "KITCHEN", bar: "BAR", sushi: "SUSHI", front: "FRONT" },
@@ -212,9 +212,12 @@ function orderLines(payload, context, part = null) {
   const { copy, rule } = context;
   // A void: the same ticket, marked, the quantities taken back, and why.
   const voiding = payload.kind === "void";
+  // 催菜: the same ticket, marked, to hurry a dish already sent.
+  const urging = payload.kind === "urge";
   const dish = context.largeText ? { size: "tall", bold: true } : {};
   const lines = [
     ...(voiding ? [{ text: copy.voidTicket, bold: true, center: true }] : []),
+    ...(urging ? [{ text: copy.urgeTicket, bold: true, center: true }] : []),
     // A guest ordered it from their phone: nobody at the pass took it down.
     ...(payload.guest ? [{ text: payload.guest.channel === "pickup" ? copy.guestPickup : copy.guestDineIn, bold: true, center: true }] : []),
     ...(context.standInFor ? [{ text: copy.standIn.replace("{name}", context.standInFor), bold: true, center: true }] : []),
@@ -440,7 +443,7 @@ function testLines(payload, context) {
 }
 
 const BUILDERS = { bill: billLines, receipt: receiptLines, closing: closingLines, settlement: settlementLines, drawer: drawerLines, test: testLines };
-const KITCHEN = new Set([undefined, "order", "void"]);
+const KITCHEN = new Set([undefined, "order", "void", "urge"]);
 
 /**
  * The bytes for one print job on one printer. `station` is the station the

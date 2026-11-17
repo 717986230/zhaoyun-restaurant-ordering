@@ -252,7 +252,8 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-lines small { color: var(--p-muted); }
 .pos-lines b { text-align: right; font-variant-numeric: tabular-nums; }
 /* A sent line: the dish, its amount and 退菜. */
-.pos-lines.sent li { grid-template-columns: minmax(0, 1fr) auto auto; }
+.pos-lines.sent li { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+.pos-urge { min-height: 36px; padding: 4px 10px; border-color: var(--p-accent); color: var(--p-accent); background: transparent; font-size: 14px; }
 .pos-void { min-height: 36px; padding: 4px 10px; border-color: var(--p-warn); color: var(--p-warn); background: transparent; font-size: 14px; }
 .pos-danger { border-color: var(--p-warn); background: var(--p-warn); }
 .pos-void-form { display: grid; gap: 12px; }

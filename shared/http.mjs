@@ -16,7 +16,7 @@
 import { Value } from "@sinclair/typebox/value";
 import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, EmailCodeBody, EmailVerifyBody, MailTestBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
-  SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, AvailabilityBody,
+  SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, UrgeBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody
@@ -952,6 +952,16 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           if (invalid) return invalid;
           try {
             return json({ void: await store.voidItem(path[3], value, pos, role) }, 201);
+          } catch (error) {
+            if (error.code === "NOT_FOUND") return fail(error.message, 404);
+            throw error;
+          }
+        }
+        if (path.length === 5 && path[2] === "tables" && path[4] === "urge" && method === "POST") {
+          const { value, invalid } = await body(request, UrgeBody);
+          if (invalid) return invalid;
+          try {
+            return json({ urged: await store.urgeItem(path[3], value.orderItemId, pos) }, 201);
           } catch (error) {
             if (error.code === "NOT_FOUND") return fail(error.message, 404);
             throw error;
