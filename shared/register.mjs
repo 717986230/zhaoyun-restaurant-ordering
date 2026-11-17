@@ -142,6 +142,31 @@ export function planVoid(input, row, { table, staff = null, role, at = now() }) 
   };
 }
 
+/**
+ * 催菜: a reminder ticket to the station cooking a dish already sent, to hurry
+ * it. Nothing is written — not the order, the bill, or the stock — it is only a
+ * printed nudge, so it carries no journal entry. Only a dish still open (sent,
+ * not paid, not voided) can be urged.
+ */
+export function planUrge(row, { table, staff = null, at = now() }) {
+  const open = row && row.table_no === table && !row.billed_at && row.status !== "cancelled" ? openQuantity(row) : 0;
+  if (open < 1) throw Object.assign(new Error("That dish is not open on this table"), { code: "NOT_FOUND" });
+  const staffName = staff?.name ?? null;
+  const modifiers = parseJson(row.modifiers_json, []);
+  return {
+    printJob: {
+      id: uuid(),
+      orderId: row.order_id,
+      printerRole: row.print_station,
+      payloadJson: JSON.stringify({
+        kind: "urge", orderNo: row.order_no, table, at,
+        items: [{ name: row.product_name, names: { zh: row.name_zh, de: row.name_de, en: row.name_en }, quantity: open, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names })) }],
+        ...(staffName ? { staffName } : {})
+      })
+    }
+  };
+}
+
 /** What the journal keeps of a new order: every line, at its price and rates. */
 export function orderJournalPayload(plan) {
   return {

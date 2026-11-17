@@ -130,6 +130,14 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       await loadBill();
     } catch (error) { pos.failed(error); }
   }
+
+  /** 催菜: print a hurry-up ticket to the station cooking this sent dish. */
+  async function urge(item: ApiBill["items"][number]) {
+    try {
+      await api.urge(table, item.orderItemId);
+      pos.notify(t("urgeDone", { name: item.names?.[language] || item.name }));
+    } catch (error) { pos.failed(error); }
+  }
   // 长按菜品 = 弹数量键盘点几份；短按仍是 +1。沽清/限量模式下不触发。
   const press = useRef<{ timer: number; fired: boolean }>({ timer: 0, fired: false });
   const startPress = (product: Product) => {
@@ -262,6 +270,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       {bill?.items.length ? <ul className="pos-lines sent">{bill.items.map((item) => <li key={item.orderItemId}>
         <span>{item.qty} × {item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}</span>
         <b>{money(Math.round(item.lineTotal * 100))}</b>
+        <button type="button" className="pos-urge" aria-label={t("urgeOf", { name: item.names?.[language] || item.name })} onClick={() => void urge(item)}>{t("urge")}</button>
         <button type="button" className="pos-void" aria-label={t("voidOf", { name: item.names?.[language] || item.name })} onClick={() => setVoiding(item)}>{t("void")}</button>
       </li>)}</ul> : <p className="pos-muted">{t("nothingSent")}</p>}
       <h2>{t("newItems")} <span>{money(cartCents)}</span></h2>

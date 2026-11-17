@@ -148,3 +148,25 @@ test("并台: moving an open table onto an occupied one combines both bills", as
   const billA = await store.billForTable("11");
   assert.equal(billA.items.length, 0, "the source table is left with nothing open");
 });
+
+test("催菜: urging a sent dish queues a kitchen reminder, the bill untouched", async (context) => {
+  const { store } = makeStore(context);
+  const product = await aProduct(store);
+  await store.claimTable("14", deviceA);
+  await store.createOrder({ table: "14", items: [{ id: product.id, qty: 2 }] }, deviceA);
+  const bill = await store.billForTable("14");
+  const itemId = bill.items[0].orderItemId;
+
+  const urged = await store.urgeItem("14", itemId, deviceA);
+  assert.equal(urged.orderItemId, itemId);
+
+  const job = (await store.listPrintJobs("queued", 100)).find((entry) => entry.id === urged.printJobId);
+  assert.ok(job, "a print job was queued for the urge");
+  assert.equal(job.payload.kind, "urge");
+  assert.equal(job.payload.table, "14");
+  assert.equal(job.payload.items[0].quantity, 2);
+
+  // 催菜 changes nothing on the bill: still two of the dish, nothing voided.
+  const after = await store.billForTable("14");
+  assert.equal(after.items.reduce((sum, item) => sum + item.qty, 0), 2);
+});

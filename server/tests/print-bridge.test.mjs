@@ -357,3 +357,11 @@ test("the automatic encoding: GB18030 in Chinese mode where Chinese is printed, 
   const both = renderTickets(order, { capabilities: { printLanguage: "de", secondLanguage: "zh" } });
   assert.match(iconv.decode(both, "gb18030"), /\(蔬菜拉面\)/, "Chinese under the German needs the Chinese printer");
 });
+
+test("催菜: the urge ticket is a kitchen ticket marked 催菜", () => {
+  const urge = { kind: "urge", orderNo: "A1", table: "08", staffName: "Li", at: "2026-09-27T10:00:00.000Z",
+    items: [{ quantity: 2, name: "蔬菜拉面", names: { zh: "蔬菜拉面", de: "Gemüse-Ramen", en: "Veggie ramen" }, modifiers: [] }] };
+  const printed = plain(renderTickets(urge, { capabilities: { printLanguage: "zh", encoding: "utf8" } }, { station: "kitchen" }));
+  assert.match(printed, /催菜/, "the ticket is marked 催菜");
+  assert.match(printed, /2 x 蔬菜拉面/, "and lists the dish to hurry, not voided (no minus)");
+});

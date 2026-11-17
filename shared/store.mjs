@@ -34,7 +34,7 @@ import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
   ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, planTopUp, receiptPrintPayload,
-  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid
+  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid, planUrge
 } from "./register.mjs";
 import {
   assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, CLAIM_WITH_META_SQL, CLAIM_META_UPSERT_SQL, LIVE_CLAIMS_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
@@ -1015,6 +1015,22 @@ export function createStore(driver) {
     });
   }
 
+  /**
+   * 催菜: queue a reminder ticket to the kitchen for a dish already sent on this
+   * table. No journal entry — it changes nothing, it only prints (shared/register.mjs,
+   * planUrge).
+   */
+  async function urgeItem(tableInput, orderItemId, pos) {
+    const table = normalizeTableNo(tableInput);
+    assertClaim(await first(CLAIM_WITH_META_SQL, table), pos.deviceId);
+    const plan = planUrge(await first(VOID_ITEM_SQL, String(orderItemId ?? "")), { table, staff: pos.staff, at: now() });
+    const at = now();
+    await batch([
+      sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)", plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at)
+    ]);
+    return { orderItemId: String(orderItemId), printJobId: plan.printJob.id };
+  }
+
   async function settleStaff(staffId, role) {
     return retrying(async () => {
       const last = await lastJournal();
@@ -1207,6 +1223,7 @@ export function createStore(driver) {
     claimTable,
     holdsTable,
     voidItem,
+    urgeItem,
     reprintReceipt,
     setAvailable,
     releaseTable: async (table, pos, force = false) => {

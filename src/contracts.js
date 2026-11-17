@@ -377,6 +377,10 @@ export const VoidBody = Type.Object({
   quantity: Type.Integer({ minimum: 1, maximum: 999 }),
   reason: Type.String({ minLength: 1, maxLength: 200 })
 }, { additionalProperties: false });
+// 催菜: a reminder ticket to the kitchen to hurry a dish already sent.
+export const UrgeBody = Type.Object({
+  orderItemId: Type.String({ minLength: 1, maxLength: 64 })
+}, { additionalProperties: false });
 // Sold out (沽清), or back on.
 export const AvailabilityBody = Type.Object({ available: Type.Boolean() }, { additionalProperties: false });
 /** A dish's portions (每日限量; shared/stock.mjs): each day's, today's, or both; null for no limit. */
