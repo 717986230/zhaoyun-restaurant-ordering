@@ -15,17 +15,19 @@
     <meta name="apple-mobile-web-app-title" content="Menu" />
     <!-- 子龙 · the brand's opening mark. A celadon 团龙 crest over the dark room
          while the menu comes up. It is a sibling of #app, not a child, so the
-         app mounting into #app never clears it; a small script below holds it
-         for a moment (so the dragon finishes drawing even when the menu paints
-         at once from cache) and then fades it out. All inline, so it needs
-         neither the stylesheet nor a web font to paint, holds to the one accent
-         and the porcelain the rest of the app uses, and is never touched —
-         pointer-events: none. -->
+         app mounting into #app never clears it; it holds for a moment (so the
+         dragon finishes drawing even when the menu paints at once from cache)
+         and then, on a pure-CSS timer, fades and takes itself out of the way
+         (visibility: hidden). No script — the page's Content-Security-Policy
+         is script-src 'self', so the mark is style and markup only. It paints
+         without the stylesheet or a web font, holds to the one accent and the
+         porcelain, and is never touched — pointer-events: none. -->
     <style>
       .zy-splash{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
-        background:#0f1113;pointer-events:none;opacity:1;transition:opacity .46s ease;
-        font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif}
-      .zy-splash.zy-hide{opacity:0}
+        background:#0f1113;pointer-events:none;
+        font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;
+        animation:zy-out .55s ease 1.95s forwards}
+      @keyframes zy-out{from{opacity:1}to{opacity:0;visibility:hidden}}
       .zy-splash .zy-in{display:flex;flex-direction:column;align-items:center;gap:30px}
       .zy-crest{width:min(42vw,164px);height:min(42vw,164px)}
       .zy-ring{transform-origin:160px 160px;animation:zy-turn 4.5s linear infinite}
@@ -48,6 +50,7 @@
         .zy-ring,.zy-pearl{animation:none}
         .zy-draw{stroke-dashoffset:0;animation:none}
         .zy-fx,.zy-word,.zy-sub{opacity:1;animation:none}
+        .zy-splash{animation:zy-out .4s ease 1.4s forwards}
       }
     </style>
   </head>
@@ -97,25 +100,6 @@
         </div>
       </div>
     </div>
-    <script>
-      // Hold the opening mark long enough to be seen (the menu often paints at
-      // once from cache), then fade it. A hard cap makes sure it never lingers
-      // if something above it stalls.
-      (function () {
-        var el = document.getElementById("zy-splash");
-        if (!el) return;
-        var MIN = 1850, FADE = 520, CAP = 6000, start = Date.now(), done = false;
-        function hide() {
-          if (done || !el) return; done = true;
-          el.classList.add("zy-hide");
-          setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); el = null; }, FADE + 80);
-        }
-        function schedule() { setTimeout(hide, Math.max(0, MIN - (Date.now() - start))); }
-        if (document.readyState === "complete") schedule();
-        else window.addEventListener("load", schedule, { once: true });
-        setTimeout(hide, CAP);
-      })();
-    </script>
     <script type="module" src="/apps/customer-app/src/main.tsx"></script>
   </body>
 </html>
