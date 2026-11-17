@@ -27,7 +27,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const [note, setNote] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
-  const [choosing, setChoosing] = useState<Product | null>(null);
+  const [choosing, setChoosing] = useState<{ product: Product; qty: number } | null>(null);
+  // 长按菜品：弹数量键盘问「点几份」。
+  const [qtyFor, setQtyFor] = useState<Product | null>(null);
   // 退菜: the sent line being voided. 沽清: tapping a dish switches it off or on instead of adding it.
   const [voiding, setVoiding] = useState<ApiBill["items"][number] | null>(null);
   const [soldOutMode, setSoldOutMode] = useState(false);
@@ -79,19 +81,26 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       && (!text || product.sku.toLowerCase().startsWith(text) || Object.values(product.names).some((value) => value?.toLowerCase().includes(text))));
   }, [menu, category, query]);
 
-  function add(product: Product, modifiers: CartLine["modifiers"] = []) {
+  function add(product: Product, modifiers: CartLine["modifiers"] = [], qty = 1) {
     const key = lineKey(product, modifiers);
     setCart((current) => current.some((line) => line.key === key)
-      ? current.map((line) => (line.key === key ? { ...line, quantity: Math.min(99, line.quantity + 1) } : line))
-      : [...current, { key, product, quantity: 1, modifiers }]);
+      ? current.map((line) => (line.key === key ? { ...line, quantity: Math.min(99, line.quantity + qty) } : line))
+      : [...current, { key, product, quantity: Math.min(99, qty), modifiers }]);
   }
-  const pick = (product: Product) => {
+  /**
+   * Put `qty` of a dish on the order — ask for its options first, and never
+   * more than there are portions left today (限量): what won't fit is said.
+   */
+  const pick = (product: Product, qty = 1) => {
     if (!product.available) return pos.notify(t("soldOutNote", { name: name(product) }), "error");
     // 每日限量: no more on the order than there are portions left today.
     const left = product.leftToday ?? null;
     const inCart = cart.filter((line) => line.product.id === product.id).reduce((sum, line) => sum + line.quantity, 0);
-    if (left !== null && inCart >= left) return pos.notify(left ? t("stockShort", { name: name(product), left }) : t("stockOutNote", { name: name(product) }), "error");
-    return product.modifiers?.length ? setChoosing(product) : add(product);
+    const room = left === null ? qty : Math.max(0, left - inCart);
+    if (room <= 0) return pos.notify(left ? t("stockShort", { name: name(product), left }) : t("stockOutNote", { name: name(product) }), "error");
+    const take = Math.min(qty, room);
+    if (take < qty) pos.notify(t("stockShort", { name: name(product), left: left ?? take }), "error");
+    return product.modifiers?.length ? setChoosing({ product, qty: take }) : add(product, [], take);
   };
 
   /** "How many are left today?": a number, or null for no limit today. */
@@ -121,20 +130,35 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       await loadBill();
     } catch (error) { pos.failed(error); }
   }
+  // 长按菜品 = 弹数量键盘点几份；短按仍是 +1。沽清/限量模式下不触发。
+  const press = useRef<{ timer: number; fired: boolean }>({ timer: 0, fired: false });
+  const startPress = (product: Product) => {
+    if (soldOutMode || stockMode) return;
+    press.current.fired = false;
+    press.current.timer = window.setTimeout(() => { press.current.fired = true; setQtyFor(product); }, 500);
+  };
+  const endPress = () => { if (press.current.timer) { window.clearTimeout(press.current.timer); press.current.timer = 0; } };
+
   const change = (key: string, by: number) => setCart((current) => current.flatMap((line) => {
     if (line.key !== key) return [line];
     const quantity = line.quantity + by;
     return quantity > 0 ? [{ ...line, quantity }] : [];
   }));
 
-  /** A dish number and Enter: straight onto the order. */
+  /**
+   * A dish number and Enter: straight onto the order — "45" for one, "45×3",
+   * "45*3" or "45 3" for three (点菜改数量 the way it is said at the table).
+   */
   function byNumber(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const code = query.trim().toLowerCase();
-    if (!code) return;
+    const raw = query.trim();
+    if (!raw) return;
+    const parts = raw.match(/^(.+?)\s*(?:[*xX×＊]\s*|\s+)(\d{1,2})$/);
+    const code = (parts ? parts[1]! : raw).trim().toLowerCase();
+    const qty = parts ? Math.max(1, Math.min(99, Number(parts[2]))) : 1;
     const match = menu.find((product) => product.sku.toLowerCase() === code);
-    if (!match) return pos.notify(t("notFound", { code: query.trim() }), "error");
-    pick(match);
+    if (!match) return pos.notify(t("notFound", { code: parts ? parts[1]!.trim() : raw }), "error");
+    pick(match, qty);
     setQuery("");
   }
 
@@ -299,7 +323,8 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         return <button key={product.id} type="button" data-sku={product.sku}
           style={{ "--tag": product.tagColor || catColor(product.category) } as CSSProperties}
           className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
-          onClick={() => void (soldOutMode ? toggleSoldOut(product) : stockMode ? setStockFor(product) : pick(product))}>
+          onPointerDown={() => startPress(product)} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress}
+          onClick={() => { if (press.current.fired) { press.current.fired = false; return; } void (soldOutMode ? toggleSoldOut(product) : stockMode ? setStockFor(product) : pick(product)); }}>
           <small>{product.sku}</small>
           <b>{name(product)}</b>
           <span>{!product.available ? t("soldOut") : left === 0 ? t("stockOut") : money(product.priceCents)}</span>
@@ -312,7 +337,8 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     {moving && <MoveDialog pos={pos} from={table} onCancel={() => setMoving(false)} onMove={(to) => void move(to)} />}
     {stockFor && <StockDialog pos={pos} product={stockFor} onCancel={() => setStockFor(null)} onSet={(leftToday) => void askStock(stockFor, leftToday)} />}
     {voiding && <VoidDialog pos={pos} item={voiding} onCancel={() => setVoiding(null)} onVoid={(quantity, reason) => void voidLine(voiding, quantity, reason)} />}
-    {choosing && <ModifierPicker pos={pos} product={choosing} onCancel={() => setChoosing(null)} onAdd={(modifiers) => { add(choosing, modifiers); setChoosing(null); }} />}
+    {qtyFor && <QtyDialog pos={pos} product={qtyFor} onCancel={() => setQtyFor(null)} onPick={(qty) => { setQtyFor(null); pick(qtyFor, qty); }} />}
+    {choosing && <ModifierPicker pos={pos} product={choosing.product} initialQty={choosing.qty} onCancel={() => setChoosing(null)} onAdd={(modifiers, qty) => { add(choosing.product, modifiers, qty); setChoosing(null); }} />}
   </section>;
 }
 
@@ -391,10 +417,34 @@ function StockDialog({ pos, product, onSet, onCancel }: { pos: Pos; product: Pro
   </div>;
 }
 
+/** 点几份: a quick quantity keypad for a long-pressed dish. */
+function QtyDialog({ pos, product, onPick, onCancel }: { pos: Pos; product: Product; onPick: (qty: number) => void; onCancel: () => void }) {
+  const { t, language } = pos;
+  const name = product.names[language] || product.names.zh || product.names.de;
+  const [qty, setQty] = useState(1);
+  const quick = [2, 3, 4, 5, 6, 10];
+  return <div className="pos-modal" role="dialog" aria-label={t("qtyTitle", { name })}>
+    <div className="pos-card pos-qty-form">
+      <h2>{t("qtyTitle", { name })}</h2>
+      <span className="pos-stepper pos-qty-stepper">
+        <button type="button" aria-label="−" disabled={qty <= 1} onClick={() => setQty(qty - 1)}>−</button>
+        <b>{qty}</b>
+        <button type="button" aria-label="+" disabled={qty >= 99} onClick={() => setQty(qty + 1)}>+</button>
+      </span>
+      <div className="pos-options pos-qty-quick">{quick.map((n) => <button key={n} type="button" className={qty === n ? "on" : ""} aria-pressed={qty === n} onClick={() => setQty(n)}>{n}</button>)}</div>
+      <div className="pos-modal-actions">
+        <button type="button" onClick={onCancel}>{t("cancel")}</button>
+        <button type="button" className="pos-primary" onClick={() => onPick(qty)}>{t("qtyAdd", { n: qty })}</button>
+      </div>
+    </div>
+  </div>;
+}
+
 /** A dish's options: one of a "single" group, any of a "multi" group. */
-function ModifierPicker({ pos, product, onAdd, onCancel }: { pos: Pos; product: Product; onAdd: (modifiers: CartLine["modifiers"]) => void; onCancel: () => void }) {
+function ModifierPicker({ pos, product, initialQty, onAdd, onCancel }: { pos: Pos; product: Product; initialQty: number; onAdd: (modifiers: CartLine["modifiers"], qty: number) => void; onCancel: () => void }) {
   const { t, money, language } = pos;
   const [chosen, setChosen] = useState<Record<string, string[]>>({});
+  const [qty, setQty] = useState(Math.max(1, initialQty));
   const toggle = (group: ModifierGroup, optionId: string) => setChosen((current) => {
     const had = current[group.id] ?? [];
     const next = group.selection === "single" ? (had.includes(optionId) ? [] : [optionId]) : had.includes(optionId) ? had.filter((id) => id !== optionId) : [...had, optionId];
@@ -415,8 +465,13 @@ function ModifierPicker({ pos, product, onAdd, onCancel }: { pos: Pos; product: 
         </button>)}</div>
       </fieldset>)}
       <div className="pos-modal-actions">
+        <span className="pos-stepper pos-qty-stepper">
+          <button type="button" aria-label="−" disabled={qty <= 1} onClick={() => setQty(qty - 1)}>−</button>
+          <b>{qty}</b>
+          <button type="button" aria-label="+" disabled={qty >= 99} onClick={() => setQty(qty + 1)}>+</button>
+        </span>
         <button type="button" onClick={onCancel}>{t("cancel")}</button>
-        <button type="button" className="pos-primary" onClick={() => onAdd(selected)}>{t("add")}</button>
+        <button type="button" className="pos-primary" onClick={() => onAdd(selected, qty)}>{t("add")}</button>
       </div>
     </div>
   </div>;

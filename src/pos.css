@@ -329,6 +329,15 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-stock-form input { min-height: 52px; font-size: 22px; text-align: center; }
 .pos-stock-form .pos-primary { min-height: 52px; font-size: 18px; }
 
+/* 点几份: the quantity keypad for a long-pressed dish. */
+.pos-qty-form { display: grid; gap: 14px; justify-items: center; text-align: center; }
+.pos-qty-form h2 { margin: 0; }
+.pos-qty-stepper button { width: 56px; min-height: 56px; font-size: 26px; }
+.pos-qty-stepper b { min-width: 56px; font-size: 26px; }
+.pos-qty-quick { justify-content: center; }
+.pos-qty-quick button { min-width: 56px; min-height: 52px; font-size: 20px; }
+.pos-qty-form .pos-modal-actions { justify-self: stretch; }
+
 .pos-pay-screen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
 .pos-pay-lines { display: grid; gap: 10px; min-width: 0; }
 .pos-unsigned { margin: 0; padding: 10px 12px; border-radius: var(--r-md); background: var(--p-warn-wash); color: var(--p-warn); font-weight: 600; font-size: 14px; }
