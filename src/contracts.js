@@ -306,10 +306,16 @@ export const CheckoutBody = Type.Object({
   table: Type.Optional(Type.String({ maxLength: 8 })),
   items: Type.Optional(Type.Array(Type.Object({
     orderItemId: Type.String({ minLength: 1, maxLength: 128 }),
-    quantity: Type.Integer({ minimum: 1, maximum: 99 })
+    quantity: Type.Integer({ minimum: 1, maximum: 99 }),
+    // 单品折扣: this line only, 1–100%. The receipt gets a scoped discount
+    // line off this dish's VAT rates; needs a discountReason on the checkout.
+    discountPercent: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 }))
   }), { maxItems: 200 })),
   vouchers: Type.Optional(Type.Array(Type.Object({ amount: Type.Number() }), { maxItems: 10 })),
   discountPercent: Type.Optional(Type.Number()),
+  // Why a discount (whole-bill or per-dish) was given; required when any
+  // per-dish discount is applied, and kept in the journal for the audit.
+  discountReason: Type.Optional(Type.String({ maxLength: 200 })),
   payments: Type.Array(Type.Object({
     type: Type.String({ maxLength: 16 }),
     amount: Type.Number(),
