@@ -107,6 +107,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       note TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS order_item_holds (
+      order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      held_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS receipts (
       id TEXT PRIMARY KEY,
       receipt_no INTEGER NOT NULL UNIQUE,

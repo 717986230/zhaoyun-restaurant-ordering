@@ -34,7 +34,7 @@ import {
   CHECKOUT_ITEMS_SQL, closingPrintPayload, closingTotals, closingView, companyOf, CREDIT_VOUCHER_SQL, DEBIT_VOUCHER_SQL, INSERT_JOURNAL_SQL,
   INSERT_RECEIPT_SQL, INSERT_VOUCHER_SQL, journalEntry, journalText, journalView, normalizeVoucherCode, OPEN_RECEIPTS_SQL,
   ORDER_ITEMS_SQL, ORDER_PAID_SQL, orderJournalPayload, planCheckout, plannedReceiptView, planStorno, planTopUp, receiptPrintPayload,
-  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid, planUrge
+  receiptRow, receiptView, REOPEN_ORDERS_SQL, SETTLE_PAID_TABLE_SQL, sha256Hex, UNLOCK_PAID_TABLE_SQL, verifyJournal, VOID_VOUCHER_SQL, VOID_ITEM_SQL, INSERT_VOID_SQL, planVoid, planUrge, planFire
 } from "./register.mjs";
 import {
   assertClaim, claimView, CLAIM_TTL_MS, holdsClaim, CLAIM_UPSERT_SQL, CLAIM_WITH_META_SQL, CLAIM_META_UPSERT_SQL, LIVE_CLAIMS_SQL, deviceView, isTakeaway, NEXT_PICKUP_SQL, normalizeDeviceName,
@@ -475,6 +475,7 @@ export function createStore(driver) {
       ...plan.items.map((item) => sql("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", item.id, item.orderId, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson, item.vatPercent)),
       ...plan.items.filter((item) => item.vatSplitJson).map((item) => sql("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)", item.id, item.vatSplitJson)),
       ...plan.items.filter((item) => item.note).map((item) => sql("INSERT INTO order_item_notes (order_item_id, note) VALUES (?, ?)", item.id, item.note)),
+      ...plan.items.filter((item) => item.held).map((item) => sql("INSERT INTO order_item_holds (order_item_id, held_at) VALUES (?, ?)", item.id, timestamp)),
       ...plan.printJobs.map((job) => sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)", job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp)),
       ...(pos ? [sql("INSERT INTO order_staff (order_id, staff_id, staff_name, pickup_no, created_at) VALUES (?, ?, ?, ?, ?)", id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp)] : []),
       // The guests are seated: their phones may order too.
@@ -1032,6 +1033,22 @@ export function createStore(driver) {
     return { orderItemId: String(orderItemId), printJobId: plan.printJob.id };
   }
 
+  /**
+   * 叫起: fire a held (等叫) dish — clear its hold and print it to the kitchen
+   * now. Only the device that holds the table may fire. Nothing fiscal changes.
+   */
+  async function fireItem(tableInput, orderItemId, pos) {
+    const table = normalizeTableNo(tableInput);
+    assertClaim(await first(CLAIM_WITH_META_SQL, table), pos.deviceId);
+    const plan = planFire(await first(VOID_ITEM_SQL, String(orderItemId ?? "")), { table, staff: pos.staff, at: now() });
+    const at = now();
+    await batch([
+      sql("DELETE FROM order_item_holds WHERE order_item_id = ?", String(orderItemId)),
+      sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)", plan.printJob.id, plan.printJob.orderId, plan.printJob.printerRole, plan.printJob.payloadJson, at, at)
+    ]);
+    return { orderItemId: String(orderItemId), printJobId: plan.printJob.id };
+  }
+
   async function settleStaff(staffId, role) {
     return retrying(async () => {
       const last = await lastJournal();
@@ -1225,6 +1242,7 @@ export function createStore(driver) {
     holdsTable,
     voidItem,
     urgeItem,
+    fireItem,
     reprintReceipt,
     setAvailable,
     releaseTable: async (table, pos, force = false) => {

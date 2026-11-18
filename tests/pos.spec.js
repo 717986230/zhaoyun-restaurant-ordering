@@ -181,6 +181,33 @@ test("逐菜备注：给单道菜写备注，备注跟着这一行", async ({ pa
   await expect(page.locator(".pos-floor")).toBeVisible();
 });
 
+test("等叫：点菜时把一道菜标成等叫", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const products = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => !product.bundleItems?.length);
+  const [first] = products.filter((product) => product.kind === "food");
+
+  page.on("dialog", (dialog) => void dialog.accept());
+  await pairAndSignIn(page, "Tablet hold", "Li", "1234");
+  await page.getByLabel("打开桌号").fill("10");
+  await page.getByRole("button", { name: "打开", exact: true }).click();
+  await expect(page.locator(".pos-ticket h1")).toHaveText("桌 10");
+
+  // Client-side only: add a dish, mark it 等叫, never 送厨 — the shared server's
+  // receipt journal and the live-ordering test stay untouched.
+  await page.getByLabel("菜号 ×份数 / 搜索").fill(first.sku);
+  await page.getByLabel("菜号 ×份数 / 搜索").press("Enter");
+  await confirmOptions(page);
+  const line = page.locator(".pos-lines.new li").first();
+  await line.getByRole("button", { name: "等叫" }).click();
+  await expect(line.locator(".pos-line-hold")).toContainText("等叫");
+  // Tapping again clears it.
+  await line.getByRole("button", { name: "等叫" }).click();
+  await expect(line.locator(".pos-line-hold")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "← 返回" }).click();
+  await expect(page.locator(".pos-floor")).toBeVisible();
+});
+
 test("a table open on one device is locked to it; the manager may take it over", async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
   const counter = await browser.newPage({ locale: "zh-CN" });

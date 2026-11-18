@@ -70,6 +70,10 @@ CREATE TABLE order_item_notes (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
       note TEXT NOT NULL
     );
+CREATE TABLE order_item_holds (
+      order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      held_at TEXT NOT NULL
+    );
 CREATE TABLE receipts (
       id TEXT PRIMARY KEY,
       receipt_no INTEGER NOT NULL UNIQUE,

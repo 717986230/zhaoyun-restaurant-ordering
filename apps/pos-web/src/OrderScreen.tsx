@@ -10,7 +10,7 @@ import type { Pos, Screen } from "./App";
 /** How often an open table tells the server this device still has it. */
 const HOLD_MS = 30_000;
 
-interface CartLine { key: string; product: Product; quantity: number; modifiers: Array<{ id: string; name: string; priceCents: number }>; note?: string }
+interface CartLine { key: string; product: Product; quantity: number; modifiers: Array<{ id: string; name: string; priceCents: number }>; note?: string; hold?: boolean }
 
 const lineKey = (product: Product, modifiers: CartLine["modifiers"]) => `${product.id}|${modifiers.map((modifier) => modifier.id).sort().join(",")}`;
 
@@ -140,6 +140,14 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       pos.notify(t("urgeDone", { name: item.names?.[language] || item.name }));
     } catch (error) { pos.failed(error); }
   }
+  // 叫起: fire a held (等叫) dish to the kitchen now, then refresh the bill.
+  async function fire(item: ApiBill["items"][number]) {
+    try {
+      await api.fire(table, item.orderItemId);
+      pos.notify(t("fireDone", { name: item.names?.[language] || item.name }));
+      await loadBill();
+    } catch (error) { pos.failed(error); }
+  }
   // 长按菜品 = 弹数量键盘点几份；短按仍是 +1。沽清/限量模式下不触发。
   const press = useRef<{ timer: number; fired: boolean }>({ timer: 0, fired: false });
   const startPress = (product: Product) => {
@@ -161,6 +169,13 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     const note = text.slice(0, 120);
     const { note: _drop, ...rest } = line;
     return note.trim() ? { ...rest, note } : rest;
+  }));
+
+  // 等叫：把某行标成「等叫」或取消；等叫的菜落单后不立即进厨房。
+  const toggleHold = (key: string) => setCart((current) => current.map((line) => {
+    if (line.key !== key) return line;
+    if (line.hold) { const { hold: _drop, ...rest } = line; return rest; }
+    return { ...line, hold: true };
   }));
 
   /**
@@ -187,7 +202,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       clientRequestId: requestId.current,
       table,
       note: note.trim(),
-      items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}), ...(line.note?.trim() ? { note: line.note.trim() } : {}) }))
+      items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}), ...(line.note?.trim() ? { note: line.note.trim() } : {}), ...(line.hold ? { hold: true } : {}) }))
     };
     const limited = cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined);
     setBusy(true);
@@ -279,16 +294,19 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       </div>
       <h2>{t("sent")} <span>{money(sentCents)}</span></h2>
       {bill?.items.length ? <ul className="pos-lines sent">{bill.items.map((item) => <li key={item.orderItemId}>
-        <span>{item.qty} × {item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}{item.note ? <small className="pos-line-note">✎ {item.note}</small> : null}</span>
+        <span>{item.qty} × {item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}{item.note ? <small className="pos-line-note">✎ {item.note}</small> : null}{item.held ? <small className="pos-line-hold">{t("holdBadge")}</small> : null}</span>
         <b>{money(Math.round(item.lineTotal * 100))}</b>
-        <button type="button" className="pos-urge" aria-label={t("urgeOf", { name: item.names?.[language] || item.name })} onClick={() => void urge(item)}>{t("urge")}</button>
+        {item.held
+          ? <button type="button" className="pos-fire" aria-label={t("fireOf", { name: item.names?.[language] || item.name })} onClick={() => void fire(item)}>{t("fire")}</button>
+          : <button type="button" className="pos-urge" aria-label={t("urgeOf", { name: item.names?.[language] || item.name })} onClick={() => void urge(item)}>{t("urge")}</button>}
         <button type="button" className="pos-void" aria-label={t("voidOf", { name: item.names?.[language] || item.name })} onClick={() => setVoiding(item)}>{t("void")}</button>
       </li>)}</ul> : <p className="pos-muted">{t("nothingSent")}</p>}
       <h2>{t("newItems")} <span>{money(cartCents)}</span></h2>
       {cart.length ? <ul className="pos-lines new">{cart.map((line) => <li key={line.key} className="pos-line-notable">
         <div className="pos-line-main">
-          <span>{name(line.product)}{line.modifiers.length ? <small>{line.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}{line.note ? <small className="pos-line-note">✎ {line.note}</small> : null}</span>
+          <span>{name(line.product)}{line.modifiers.length ? <small>{line.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}{line.note ? <small className="pos-line-note">✎ {line.note}</small> : null}{line.hold ? <small className="pos-line-hold">{t("holdBadge")}</small> : null}</span>
           <span className="pos-stepper">
+            <button type="button" className="pos-line-holdbtn" aria-label={t("hold")} aria-pressed={line.hold === true} onClick={() => toggleHold(line.key)}>{t("holdShort")}</button>
             <button type="button" className="pos-line-notebtn" aria-label={t("itemNote")} aria-pressed={noteFor === line.key} onClick={() => setNoteFor(noteFor === line.key ? null : line.key)}>✎</button>
             <button type="button" aria-label="−" onClick={() => change(line.key, -1)}>−</button>
             <b>{line.quantity}</b>

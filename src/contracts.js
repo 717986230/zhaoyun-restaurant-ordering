@@ -71,7 +71,9 @@ export const CreateOrderBody = Type.Object({
     qty: Type.Integer({ minimum: 1, maximum: 99 }),
     modifiers: Type.Optional(Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }) }), { maxItems: 32 })),
     // 逐菜备注: a free note for this line, printed under the dish.
-    note: Type.Optional(Type.String({ maxLength: 120 }))
+    note: Type.Optional(Type.String({ maxLength: 120 })),
+    // 等叫: hold this dish — recorded on the bill now, printed to the kitchen only when 叫起.
+    hold: Type.Optional(Type.Boolean())
   }), { minItems: 1, maxItems: 100 })
 });
 
@@ -395,6 +397,10 @@ export const VoidBody = Type.Object({
 }, { additionalProperties: false });
 // 催菜: a reminder ticket to the kitchen to hurry a dish already sent.
 export const UrgeBody = Type.Object({
+  orderItemId: Type.String({ minLength: 1, maxLength: 64 })
+}, { additionalProperties: false });
+// 叫起: fire a held (等叫) dish — print it to the kitchen now.
+export const FireBody = Type.Object({
   orderItemId: Type.String({ minLength: 1, maxLength: 64 })
 }, { additionalProperties: false });
 // Sold out (沽清), or back on.

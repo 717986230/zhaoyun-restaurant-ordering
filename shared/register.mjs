@@ -47,10 +47,11 @@ const VOIDED_QUANTITY = `(SELECT COALESCE(SUM(order_item_voids.quantity), 0) FRO
     WHERE order_item_voids.order_item_id = order_items.id)`;
 
 /** An order's lines, with their VAT split and how much of each is paid, and voided. */
-export const ORDER_ITEMS_SQL = `SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json, order_item_notes.note AS item_note, ${PAID_QUANTITY} AS paid_quantity,
+export const ORDER_ITEMS_SQL = `SELECT order_items.*, order_item_vat_splits.split_json AS vat_split_json, order_item_notes.note AS item_note, order_item_holds.held_at AS held_at, ${PAID_QUANTITY} AS paid_quantity,
   ${VOIDED_QUANTITY} AS voided_quantity
 FROM order_items LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id
 LEFT JOIN order_item_notes ON order_item_notes.order_item_id = order_items.id
+LEFT JOIN order_item_holds ON order_item_holds.order_item_id = order_items.id
 WHERE order_items.order_id = ?`;
 
 /**
@@ -59,10 +60,13 @@ WHERE order_items.order_id = ?`;
  * while the kitchen ticket was in the kitchen's.
  */
 export const CHECKOUT_ITEMS_SQL = `SELECT order_items.*, orders.table_no, orders.status, orders.billed_at, orders.order_no,
-  order_item_vat_splits.split_json AS vat_split_json, ${PAID_QUANTITY} AS paid_quantity, ${VOIDED_QUANTITY} AS voided_quantity,
+  order_item_vat_splits.split_json AS vat_split_json, order_item_notes.note AS item_note, order_item_holds.held_at AS held_at,
+  ${PAID_QUANTITY} AS paid_quantity, ${VOIDED_QUANTITY} AS voided_quantity,
   products.name_zh AS name_zh, products.name_de AS name_de, products.name_en AS name_en
 FROM order_items JOIN orders ON orders.id = order_items.order_id
 LEFT JOIN order_item_vat_splits ON order_item_vat_splits.order_item_id = order_items.id
+LEFT JOIN order_item_notes ON order_item_notes.order_item_id = order_items.id
+LEFT JOIN order_item_holds ON order_item_holds.order_item_id = order_items.id
 LEFT JOIN products ON products.id = order_items.product_id
 WHERE order_items.id IN (?)`;
 
@@ -164,6 +168,37 @@ export function planUrge(row, { table, staff = null, at = now() }) {
       payloadJson: JSON.stringify({
         kind: "urge", orderNo: row.order_no, table, at,
         items: [{ name: row.product_name, names: { zh: row.name_zh, de: row.name_de, en: row.name_en }, quantity: open, modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names })) }],
+        ...(staffName ? { staffName } : {})
+      })
+    }
+  };
+}
+
+/**
+ * 叫起: fire a held (等叫) dish. The dish was written to the order and the bill
+ * but never sent to the kitchen; firing prints it now as an ordinary kitchen
+ * ticket, carrying its per-dish note. Only a held dish still open (not paid, not
+ * voided, not billed) can be fired. Nothing fiscal changes — no receipt, no
+ * journal — so it is just a print job, like 催菜.
+ */
+export function planFire(row, { table, staff = null, at = now() }) {
+  const held = row && row.held_at && row.table_no === table && !row.billed_at && row.status !== "cancelled";
+  const open = held ? openQuantity(row) : 0;
+  if (open < 1) throw Object.assign(new Error("That dish is not held on this table"), { code: "NOT_FOUND" });
+  const staffName = staff?.name ?? null;
+  const modifiers = parseJson(row.modifiers_json, []);
+  return {
+    printJob: {
+      id: uuid(),
+      orderId: row.order_id,
+      printerRole: row.print_station,
+      payloadJson: JSON.stringify({
+        kind: "order", orderNo: row.order_no, table, at,
+        items: [{
+          name: row.product_name, names: { zh: row.name_zh, de: row.name_de, en: row.name_en }, quantity: open,
+          modifiers: modifiers.map((modifier) => ({ name: modifier.name, names: modifier.names })),
+          ...(row.item_note ? { note: row.item_note } : {})
+        }],
         ...(staffName ? { staffName } : {})
       })
     }

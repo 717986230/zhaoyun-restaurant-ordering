@@ -19,6 +19,8 @@ export interface CreateOrderCommand {
     modifiers?: Array<{ id: string }>;
     /** 逐菜备注: a free note for this line, e.g. "少盐" — printed under the dish. */
     note?: string;
+    /** 等叫: hold this dish; it reaches the kitchen only when 叫起 (fired). */
+    hold?: boolean;
   }>;
 }
 
@@ -248,6 +250,8 @@ export interface ApiBill {
     modifiers?: Array<{ name: string }>;
     /** 逐菜备注: the line's free note, e.g. "少盐". */
     note?: string;
+    /** 等叫: the dish is held, not yet sent to the kitchen (叫起 to fire it). */
+    held?: boolean;
   }>;
   vatBreakdown: Array<{ percent: VatPercent; gross: number; net: number; vat: number }>;
   total: number;

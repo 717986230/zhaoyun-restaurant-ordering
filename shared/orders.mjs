@@ -225,13 +225,15 @@ export function planOrder(input, productRows, hours = {}, meta = {}) {
     // A kitchen note the server keeps next to the line; it never touches price,
     // VAT or the receipt, only the kitchen ticket and the internal bill.
     const itemNote = String(item.note || "").trim().slice(0, 120);
-    if (!item.reward) return { product, quantity, modifiers, unitPriceCents: product.price_cents + modifierTotalCents, note: itemNote };
+    // 等叫: a held dish is on the bill at once but reaches the kitchen only when 叫起.
+    const hold = item.hold === true;
+    if (!item.reward) return { product, quantity, modifiers, unitPriceCents: product.price_cents + modifierTotalCents, note: itemNote, hold };
     const points = meta.rewards?.get(String(product.id));
     if (!meta.rewards) throw new Error("Sign in to order a reward");
     if (!points) throw new Error(`${product.sku} is not a reward`);
     pointsSpent += points * quantity;
     rewardCount += quantity;
-    return { product, quantity, modifiers: [...modifiers, REWARD_MODIFIER], unitPriceCents: modifierTotalCents, note: itemNote };
+    return { product, quantity, modifiers: [...modifiers, REWARD_MODIFIER], unitPriceCents: modifierTotalCents, note: itemNote, hold };
   });
   if (rewardCount > (meta.maxRewards ?? 1)) throw new Error(`At most ${meta.maxRewards ?? 1} reward${(meta.maxRewards ?? 1) > 1 ? "s" : ""} per order`);
 
@@ -243,11 +245,12 @@ export function planOrder(input, productRows, hours = {}, meta = {}) {
 
   const items = [];
   const stations = new Map();
-  for (const { product, quantity, modifiers, unitPriceCents, note: itemNote } of resolved) {
+  for (const { product, quantity, modifiers, unitPriceCents, note: itemNote, hold } of resolved) {
     const productName = product.name_zh || product.name_de || product.name_en;
     const split = vatSplit(product, productRows, unitPriceCents);
+    const itemId = uuid();
     items.push({
-      id: uuid(),
+      id: itemId,
       orderId: id,
       productId: product.id,
       productName,
@@ -259,8 +262,12 @@ export function planOrder(input, productRows, hours = {}, meta = {}) {
       // Kept only for a line over more than one rate (order_item_vat_splits).
       vatSplitJson: split.length > 1 ? JSON.stringify(split) : null,
       // A per-dish kitchen note (order_item_notes); null when none was written.
-      note: itemNote || null
+      note: itemNote || null,
+      // 等叫 (order_item_holds): true means this line is NOT printed to the kitchen yet.
+      held: hold
     });
+    // A held dish prints nothing now; 叫起 (fireItem) sends it to the kitchen later.
+    if (hold) continue;
     // A dish pinned to one printer (print_printer_id) prints on its own ticket,
     // apart from the rest of its station; dishes with no pin share one ticket
     // per station as before. The station is the claim role either way.
@@ -351,6 +358,7 @@ export function billView(tableNo, orderRows, itemsByOrderId, productsById, issue
         // A set menu over more than one rate shows each part.
         ...(split.length > 1 ? { vatSplit: split.map((part) => ({ percent: part.percent, amount: (part.cents * quantity) / 100 })) } : {}),
         ...(row.item_note ? { note: row.item_note } : {}),
+        ...(row.held_at ? { held: true } : {}),
         modifiers: parseJson(row.modifiers_json, []).map((modifier) => ({ name: modifier.name, names: modifier.names }))
       });
       for (const part of split) groups.set(part.percent, (groups.get(part.percent) || 0) + part.cents * quantity);
