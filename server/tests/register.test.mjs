@@ -89,3 +89,44 @@ test("a tip stays out of the takings, and a storno takes it back", () => {
   const both = closingTotals([sale, { receipt_no: 2, type: "storno", total_cents: storno.totalCents, vat_json: JSON.stringify(storno.vat), payments_json: JSON.stringify(storno.payments), lines_json: JSON.stringify(storno.lines) }]);
   assert.equal(both.tipsCents, 0);
 });
+
+/**
+ * 单品折扣: a discount on one dish comes off only that dish's VAT rate, as a
+ * negative line of its own that carries the dish and the reason — so the
+ * receipt total and the tax split stay exact, and a discounted line must say
+ * why (like a void).
+ */
+test("a per-item discount is scoped to its own dish and VAT rate, and says why", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 2000, vat_percent: 10, product_name: "Suppe", modifiers_json: "[]" },
+    { id: "i2", product_id: "p2", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 500, vat_percent: 20, product_name: "Bier", modifiers_json: "[]" }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+
+  const { receipt } = planCheckout({
+    discountReason: "Stammgast",
+    items: [{ orderItemId: "i1", quantity: 1, discountPercent: 50 }, { orderItemId: "i2", quantity: 1 }],
+    payments: [{ type: "cash", amount: 15 }]
+  }, common);
+
+  // 20.00 soup less 50% = 10.00, plus 5.00 beer: 15.00 to the cent.
+  assert.equal(receipt.totalCents, 1500);
+  // The 10€ off lands only on the 10% rate; the 20% beer is untouched.
+  assert.deepEqual(receipt.vat, [
+    { percent: 10, grossCents: 1000, netCents: 909, vatCents: 91 },
+    { percent: 20, grossCents: 500, netCents: 417, vatCents: 83 }
+  ]);
+  const discount = receipt.lines.find((line) => line.kind === "discount");
+  assert.equal(discount.orderItemId, "i1");
+  assert.equal(discount.percent, 50);
+  assert.equal(discount.reason, "Stammgast");
+  assert.equal(discount.totalCents, -1000);
+  assert.deepEqual(discount.vatSplit, [{ percent: 10, cents: -1000 }]);
+
+  // A discounted line with no reason is refused.
+  assert.throws(() => planCheckout({
+    items: [{ orderItemId: "i1", quantity: 1, discountPercent: 50 }],
+    payments: [{ type: "cash", amount: 10 }]
+  }, common), /says why/);
+});
