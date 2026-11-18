@@ -1,9 +1,9 @@
 # 目标系统架构
 
-状态：v0.4 生产候选收口中；顾客端、管理台（含后端订单看板）、领域契约、离线订单重试、
-SQLite 备份和 LAN 打印代理已实现。服务端仍是带模块化边界的 ESM JavaScript，完整 API
+状态：v0.6.0；顾客端、管理台（含后端订单看板）、领域契约、离线订单重试、
+SQLite 备份和 LAN 打印代理已实现；CI 已配置（见第 10 节），三角色认证与控制台密码会话已实现（见第 5 节）。服务端仍是带模块化边界的 ESM JavaScript，完整 API
 TypeScript 迁移、实体打印机和 Device Owner 验证仍需单独完成。
-更新：2026-09-02
+更新：2026-11-18
 
 ## 1. 架构结论
 
@@ -124,8 +124,7 @@ queued -> claimed -> printing -> printed
 
 ### Identity And Device
 
-- 目标：管理员认证使用服务端会话/短期 token 和角色权限。当前实现仍是单一静态 `ADMIN_TOKEN`
-  经 `x-admin-token` 头校验，常量时间比较 + 来源限流，没有角色区分；会话化和 RBAC 未完成。
+- 目标：管理员认证使用服务端会话/短期 token 和角色权限。当前实现（`shared/auth.mjs`）是三角色共享令牌 + 控制台密码会话：经理（`ADMIN_TOKEN`）、服务员（`STAFF_TOKEN`，可选）、厨房（`KITCHEN_TOKEN`，可选），按角色等级（经理 > 服务员 > 厨房）授权，只配 `ADMIN_TOKEN` 时只有一个经理角色；控制台密码首次打开时设定，PBKDF2-SHA256（10 万次迭代）存哈希，登录换 12 小时会话令牌（库里只存令牌的 SHA-256），以同一 `x-admin-token` 头提交；`ADMIN_TOKEN` 仍可直接当经理用，也是忘密码时的恢复途径。所有带令牌的写操作和被拒绝的越权尝试都记进操作记录。
 - kiosk 管理员 PIN 只负责本机退出授权，使用 PBKDF2（SHA-256，20 万次迭代；API 26 以下回退
   PBKDF2-SHA1）加随机盐存放在应用私有 SharedPreferences；旧版单轮 SHA-256 哈希在下次成功
   解锁时自动升级。迁移到 Android Keystore 仍是后续工程。
@@ -182,8 +181,9 @@ queued -> claimed -> printing -> printed
 - `customer/admin`：React Testing Library 组件测试。
 - 关键流程：Playwright 覆盖下单、服务呼叫、后台上架、翻转、横竖屏。
 - Android：原生插件单测、instrumented test、真机打印 smoke test。
-- 本地质量门禁：`npm run typecheck`、`npm run unit`、`npm run server:test`、`npm test`、`npm run build`。
-- 仓库尚未配置 CI workflow 与 lint/format 工具，这是发布前要补的工程项，不能当成已完成。
+- 本地质量门禁：`npm run typecheck`、`npm run unit`、`npm run server:test`、`npm run worker:test`、`npm test`、`npm run build`。
+- CI 已配置（`.github/workflows/ci.yml`，push 到 main、pull request 和手动触发时运行）：`checks` 任务跑 typecheck、领域单元测试、Fastify/SQLite 集成测试、Web 构建、Worker 在本地 D1 上的契约测试（`npm run worker:test`，用 workerd 和真实 D1 引擎，无需 Cloudflare 凭证）和生产依赖审计（`npm audit --omit=dev`）；`e2e` 任务把 Playwright 浏览器测试分 3 个分片并行跑；另有 GitHub Pages 发布和 Worker/D1 部署任务（仅 main 分支的 push，部署前跑全部检查并做上线冒烟测试，失败自动回滚）。
+- lint/format 工具尚未配好：`eslint` / `prettier` 依赖已在 `package.json` 的 devDependencies 里（另一并行任务加入，不属本文档改动），但仓库仍无配置文件和对应的 npm 脚本，CI 也不跑它们；配好之前不能算已完成。
 
 ## 11. 运行与部署边界
 
