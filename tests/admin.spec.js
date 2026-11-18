@@ -506,10 +506,12 @@ test("orders, tables and printers stay out of the way until ordering is switched
   appSettings.showOrdering = false;
   await page.reload();
   const nav = page.getByRole("navigation", { name: "管理模块" });
-  await expect(nav).toHaveText("今日菜品预约候位外卖顾客会员设置跳转");
+  // 报表 (money view) and 桌位 (table status) stay within reach even with the
+  // board/printer toggle off — a manager needs them every service.
+  await expect(nav).toHaveText("今日报表桌位菜品预约候位外卖顾客会员设置跳转");
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
-  await page.getByRole("switch", { name: "显示订单、桌位和打印" }).click();
+  await page.getByRole("switch", { name: "显示实时订单看板和打印机" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
   await expect(nav).toHaveText("今日菜品订单桌位预约候位外卖报表打印顾客会员设置跳转");
 });
