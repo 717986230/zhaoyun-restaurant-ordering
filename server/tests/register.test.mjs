@@ -181,3 +181,60 @@ test("a comped dish is taken off in full at its own VAT rate, and says why", () 
     payments: [{ type: "cash", amount: 5 }]
   }, common), /says why/);
 });
+
+/**
+ * 单品改价: the waiter sets a dish's unit price for this bill (a market price).
+ * The new price is the line's own VAT base — a single-rate dish only — and a
+ * later 单品折扣 comes off it; the list price and reason go to the journal. A
+ * set menu's mixed rates are not the dish's to re-split.
+ */
+test("a dish is repriced at its own VAT rate, keeps its list price, and says why", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 2000, vat_percent: 10, product_name: "Fisch", modifiers_json: "[]" },
+    { id: "i2", product_id: "p2", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 500, vat_percent: 20, product_name: "Bier", modifiers_json: "[]" },
+    { id: "i3", product_id: "p3", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 1500, vat_percent: 10, product_name: "Menü", modifiers_json: "[]", vat_split_json: JSON.stringify([{ percent: 10, cents: 1000 }, { percent: 20, cents: 500 }]) }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+
+  const { receipt } = planCheckout({
+    discountReason: "Marktpreis",
+    items: [{ orderItemId: "i1", quantity: 1, overridePriceCents: 2500 }, { orderItemId: "i2", quantity: 1 }],
+    payments: [{ type: "cash", amount: 30 }]
+  }, common);
+
+  // The fish now charges 25.00; plus 5.00 beer: 30.00.
+  assert.equal(receipt.totalCents, 3000);
+  const fish = receipt.lines.find((line) => line.orderItemId === "i1" && line.kind === "item");
+  assert.equal(fish.unitPriceCents, 2500);
+  assert.equal(fish.totalCents, 2500);
+  assert.equal(fish.listPriceCents, 2000);
+  assert.equal(fish.reason, "Marktpreis");
+  assert.deepEqual(fish.vatSplit, [{ percent: 10, cents: 2500 }]);
+  assert.deepEqual(receipt.vat, [
+    { percent: 10, grossCents: 2500, netCents: 2273, vatCents: 227 },
+    { percent: 20, grossCents: 500, netCents: 417, vatCents: 83 }
+  ]);
+
+  // A 单品折扣 comes off the new price: 20% off 25.00 = a −5.00 line.
+  const { receipt: cut } = planCheckout({
+    discountReason: "Marktpreis, Stammgast",
+    items: [{ orderItemId: "i1", quantity: 1, overridePriceCents: 2500, discountPercent: 20 }],
+    payments: [{ type: "cash", amount: 20 }]
+  }, common);
+  assert.equal(cut.totalCents, 2000);
+  assert.equal(cut.lines.find((line) => line.kind === "discount").totalCents, -500);
+
+  // A price change with no reason is refused.
+  assert.throws(() => planCheckout({
+    items: [{ orderItemId: "i1", quantity: 1, overridePriceCents: 2500 }],
+    payments: [{ type: "cash", amount: 25 }]
+  }, common), /says why/);
+
+  // A set menu's mixed rates are not repriced per dish.
+  assert.throws(() => planCheckout({
+    discountReason: "x",
+    items: [{ orderItemId: "i3", quantity: 1, overridePriceCents: 1200 }],
+    payments: [{ type: "cash", amount: 12 }]
+  }, common), /set menu/);
+});
