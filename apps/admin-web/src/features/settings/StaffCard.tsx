@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import type { AdminApi } from "@zhaoyun/api-client";
 import type { PosDevice, PosStaff } from "@zhaoyun/contracts";
 import { formatTime, useI18n } from "../../app/i18n";
+import { jumpLinkProps } from "../../app/pwa";
 
 /**
  * The POS's people and devices, kept by the manager: each waiter with a PIN
@@ -59,7 +60,7 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
   }
 
   return <div className="staff-card">
-    <a className="ghost-action staff-open-pos" href="pos.html" target="_blank" rel="noopener">{t("openPos")} ↗</a>
+    <a className="ghost-action staff-open-pos" {...jumpLinkProps("pos.html")}>{t("openPos")} ↗</a>
     {staff.length ? <ul className="staff-list">{staff.map((person) => <li key={person.id} data-staff={person.name} className={person.active ? "" : "inactive"}>
       <b>{person.name}</b>
       <select aria-label={t("staffRole")} value={person.role} onChange={(event) => void save(person, { role: event.target.value === "manager" ? "manager" : "staff" })}>

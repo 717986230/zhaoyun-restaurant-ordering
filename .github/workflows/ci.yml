@@ -113,14 +113,24 @@ jobs:
       # The system libraries the browsers need, from apt, whether or not they
       # came from the cache. The Azure apt mirror stalls on the odd package,
       # and a single run past six minutes failed the whole shard before a test
-      # ran; so, like the download above, each attempt is given room and tried
-      # again, refreshing the package lists between tries.
+      # ran; so, like the download above, each attempt is cut off with its own
+      # `timeout` and tried again, refreshing the package lists between tries.
+      # Without the per-attempt timeout one stalled apt call ate the whole
+      # 15-minute step before the loop could retry — which is what timed the
+      # step out. A cut-off apt can leave its lock and a half-configured dpkg
+      # behind, so both are cleared before the next try.
       - name: Install the browsers' system libraries
-        timeout-minutes: 15
+        timeout-minutes: 18
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
+          sudo apt-get update || true
           for attempt in 1 2 3; do
-            if npx playwright install-deps chromium webkit; then exit 0; fi
+            if sudo timeout 300 npx playwright install-deps chromium webkit; then exit 0; fi
             echo "::warning::apt stalled installing browser libraries (attempt $attempt of 3)"
+            sudo pkill -9 -f 'apt-get|apt\.systemd|dpkg' || true
+            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend || true
+            sudo dpkg --configure -a || true
             sudo apt-get update || true
           done
           exit 1
