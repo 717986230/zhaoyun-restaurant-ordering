@@ -13,6 +13,18 @@ const toCents = (text: string) => Math.round(Number(String(text).replace(",", ".
 const toAmount = (cents: number) => (cents / 100).toFixed(2);
 
 /**
+ * AA 均分: split a total into n equal shares to the cent. The base is the floor
+ * of total/n; the odd cents go one each to the first shares, so the shares add
+ * back to the total exactly, none differing from another by more than a cent.
+ */
+export function splitCents(totalCents: number, n: number): number[] {
+  const count = Math.max(1, Math.floor(n));
+  const base = Math.floor(totalCents / count);
+  const remainder = totalCents - base * count;
+  return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+/**
  * "Zusammen oder getrennt?" — the question every table in Austria is asked.
  * Together: one receipt for everything. Separately: each guest's own lines,
  * one receipt each, until the table is paid. Cash (with the change worked
@@ -38,6 +50,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [busy, setBusy] = useState(false);
   const [sepa, setSepa] = useState<ApiSepaPayment | null>(null);
   const [showSepa, setShowSepa] = useState(false);
+  // AA 均分: how many people share this bill equally.
+  const [splitN, setSplitN] = useState(2);
   const requestId = useRef(crypto.randomUUID());
 
   /**
@@ -159,6 +173,14 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     return { ...current, [id]: text };
   });
   const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }]);
+  // AA 均分: split the amount due into n equal cash shares on this one receipt.
+  // Each person pays their share (the waiter may switch a share to card); the
+  // odd cents go one each to the first shares, so they add back to the total.
+  const splitEvenly = (n: number) => {
+    const count = Math.max(2, Math.min(20, Math.round(n || 0)));
+    if (totalCents <= 0) return;
+    setPayments(splitCents(totalCents, count).map((share) => ({ type: "cash" as PaymentType, amount: toAmount(share), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 })));
+  };
   const edit = (index: number, change: Partial<Payment>) => setPayments((current) => current.map((payment, at) => (at === index ? { ...payment, ...change } : payment)));
   /** Aufrunden: the tip that brings amount and tip to the next whole euro — again for the one after. */
   const roundUp = (index: number) => {
@@ -287,6 +309,12 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       {reduced && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>
       <div className="pos-pay-types">{(["cash", "card", "voucher", "balance"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
+      <div className="pos-split">
+        <span>{t("splitEvenly")}</span>
+        <input type="number" min={2} max={20} step={1} inputMode="numeric" aria-label={t("splitPeople")} value={splitN} onChange={(event) => setSplitN(Math.max(2, Math.min(20, Math.round(Number(event.target.value) || 2))))} />
+        <span>{t("splitPeople")}</span>
+        <button type="button" disabled={!totalCents} onClick={() => splitEvenly(splitN)}>{t("splitDo", { n: splitN })}</button>
+      </div>
       {sepa?.enabled && sepa.iban && totalCents > 0 && <button type="button" className="pos-sepa-btn" onClick={() => setShowSepa(true)}>⃔ {t("sepaScan")}</button>}
       <ul className="pos-payments">{payments.map((payment, index) => <li key={index}>
         <b>{t(PAY_KEYS[payment.type])}</b>
