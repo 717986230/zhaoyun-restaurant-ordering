@@ -1367,3 +1367,31 @@ test("the photo field shows the current picture, the 待上传 gap, and the file
   await expect(field.locator(".upload-preview")).toHaveAttribute("src", /^blob:/);
   await expect(field).toContainText("已选好");
 });
+
+// Regression: the 跳转 panel's「在线预约」and「POS 收银」opened a black screen
+// when the console runs as a home-screen app on iOS — a standalone web app gets
+// no second tab there, so a same-origin target="_blank" link opens a blank.
+test("跳转 opens the booking and POS pages in a new tab in a browser", async ({ page }) => {
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "跳转", exact: true }).click();
+  const booking = page.locator('a[data-link="booking"]');
+  const pos = page.locator('a[data-link="pos"]');
+  await expect(booking).toHaveAttribute("href", /book\.html$/);
+  await expect(pos).toHaveAttribute("href", /pos\.html$/);
+  // A browser tab keeps the console open and opens the app beside it.
+  await expect(booking).toHaveAttribute("target", "_blank");
+  await expect(pos).toHaveAttribute("target", "_blank");
+});
+
+test("跳转 navigates in place when installed, so iOS does not open a black screen", async ({ page }) => {
+  // The iOS home-screen app sets navigator.standalone; dropping target lets the
+  // tap navigate, and iOS hands these out-of-scope pages to Safari.
+  await page.addInitScript(() => Object.defineProperty(window.navigator, "standalone", { value: true, configurable: true }));
+  await page.reload();
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "跳转", exact: true }).click();
+  const booking = page.locator('a[data-link="booking"]');
+  const pos = page.locator('a[data-link="pos"]');
+  await expect(booking).toHaveAttribute("href", /book\.html$/);
+  await expect(pos).toHaveAttribute("href", /pos\.html$/);
+  await expect(booking).not.toHaveAttribute("target", /.*/);
+  await expect(pos).not.toHaveAttribute("target", /.*/);
+});

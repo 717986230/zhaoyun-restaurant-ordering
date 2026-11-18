@@ -5,6 +5,7 @@ import type { ApiBill, PosStaffActivity } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { ORDER_STATUS_KEYS } from "../board/BoardPanel";
+import { jumpLinkProps } from "../../app/pwa";
 
 const STATE_KEYS: Record<TableOverview["state"], CopyKey> = {
   free: "tableFree",
@@ -216,7 +217,7 @@ export function TablesPanel(props: Props) {
         <div className="board-actions">
           <button className="ghost-action" disabled={props.busy} onClick={() => void props.onPrintBill(props.bill!.table)}>{t("billPrint")}</button>
           {/* Paying is at the POS, where the waiter's receipt is theirs. */}
-          <a className="primary-action" href="pos.html" target="_blank" rel="noopener">{t("billTakePayment")}</a>
+          <a className="primary-action" {...jumpLinkProps("pos.html")}>{t("billTakePayment")}</a>
         </div>
       </> : <div className="admin-empty">{t("billEmpty")}</div>}
     </div>}
