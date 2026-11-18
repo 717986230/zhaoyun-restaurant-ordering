@@ -62,7 +62,13 @@ const LIVE_SETTLE_MS = 250;
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
   if (role === "staff") return ["board", "tables", "reservations", "waitlist", "delivery", "links"];
-  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "printers", "guests", "members", "system", "links"] : ["today", "catalog", "reservations", "waitlist", "delivery", "guests", "members", "system", "links"];
+  // 报表 is the money view — takings, Z-report parity, VAT, per-dish, CSV — and
+  // a restaurant ringing up sales on the POS needs it whether or not the live
+  // orders board, floor and printers are shown. It reads the receipts the POS
+  // writes, not the guest-ordering flow, so it stays out of the showOrdering
+  // gate (whose label only ever promised orders, tables and printers) and is
+  // always within a manager's reach.
+  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "printers", "guests", "members", "system", "links"] : ["today", "reports", "catalog", "reservations", "waitlist", "delivery", "guests", "members", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {

@@ -687,6 +687,7 @@ export function SettingsPanel(props: Props) {
       </Section>
       <Section id="modules" title={t("sectionModules")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
         <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
+        <small className="settings-hint">{t("showOrderingHint")}</small>
       </Section>
       <Section id="staff" title={t("sectionStaff")}>
         <StaffCard api={props.api} notify={props.notify} failed={props.failed} />
