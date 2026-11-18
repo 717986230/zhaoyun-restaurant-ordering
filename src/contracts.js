@@ -312,7 +312,10 @@ export const CheckoutBody = Type.Object({
     discountPercent: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
     // 赠菜: this line is comped (free). A scoped negative line at this dish's
     // VAT rates takes its whole price off; needs a discountReason (the gift's).
-    comp: Type.Optional(Type.Boolean())
+    comp: Type.Optional(Type.Boolean()),
+    // 单品改价: a new unit price (cents) for this dish on this bill; single-rate
+    // dishes only, needs a discountReason. 0–1000 euros.
+    overridePriceCents: Type.Optional(Type.Integer({ minimum: 0, maximum: 100000 }))
   }), { maxItems: 200 })),
   vouchers: Type.Optional(Type.Array(Type.Object({ amount: Type.Number() }), { maxItems: 10 })),
   discountPercent: Type.Optional(Type.Number()),

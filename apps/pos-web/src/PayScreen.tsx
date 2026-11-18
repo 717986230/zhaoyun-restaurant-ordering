@@ -43,6 +43,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [itemDiscount, setItemDiscount] = useState<Record<string, number>>({});
   // 赠菜: the lines comped (free); the same reason covers them and the discounts.
   const [comped, setComped] = useState<Record<string, boolean>>({});
+  // 单品改价: orderItemId → the new unit price as typed (euros), for this bill.
+  const [override, setOverride] = useState<Record<string, string>>({});
   const [discountReason, setDiscountReason] = useState("");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [busy, setBusy] = useState(false);
@@ -84,17 +86,36 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   useLiveReload(pos, (event) => event.type === "floor.changed" && event.table === table, () => void load(separate ? "keep" : "all"));
 
   const lines = bill?.items ?? [];
-  const itemsCents = lines.reduce((sum, item) => sum + Math.round(item.unitPrice * 100) * (picks[item.orderItemId] ?? 0), 0);
-  // Net per VAT rate, after each line's own 单品折扣 — that net is the base the
-  // whole-bill discount then comes off, exactly as the server works it out
-  // (shared/register.mjs): per-dish discounts first, whole-bill on the rest.
+  // 单品改价: what one line's price is, read from the (euro) text the waiter
+  // typed. Only a single-rate dish may be repriced (a set menu's mixed rates
+  // are not the dish's to re-split). `bad` is a non-empty but unusable entry.
+  const priceInfo = (item: ApiBill["items"][number]) => {
+    const menuUnit = Math.round(item.unitPrice * 100);
+    const singleRate = !(item.vatSplit && item.vatSplit.length > 1);
+    const raw = override[item.orderItemId] ?? "";
+    const has = raw.trim() !== "";
+    const cents = has ? Math.round(Number(raw) * 100) : NaN;
+    const valid = has && Number.isFinite(cents) && cents >= 0 && cents <= 100000;
+    const overridden = singleRate && valid && cents !== menuUnit;
+    return { menuUnit, singleRate, raw, has, cents, overridden, bad: singleRate && has && !valid, effUnit: overridden ? cents : menuUnit };
+  };
+  // Net per VAT rate, after each line's own 单品改价 (new price) and 单品折扣 —
+  // that net is the base the whole-bill discount then comes off, exactly as the
+  // server works it out (shared/register.mjs): the dish's own price and discount
+  // first, the whole-bill discount on the rest.
   const byRate = new Map<number, number>();
+  let itemsCents = 0;
   let itemOffCents = 0;
   for (const item of lines) {
     const count = picks[item.orderItemId] ?? 0;
     if (!count) continue;
-    const cents = Math.round(item.unitPrice * 100) * count;
-    const parts = item.vatSplit?.length ? item.vatSplit.map((part) => ({ percent: part.percent, cents: Math.round((part.amount * 100 * count) / item.qty) })) : [{ percent: item.vatPercent, cents }];
+    const price = priceInfo(item);
+    const gross = price.effUnit * count;
+    itemsCents += gross;
+    // An overridden single-rate line prices at its new unit; else its menu split.
+    const parts = price.overridden
+      ? [{ percent: item.vatPercent, cents: gross }]
+      : (item.vatSplit?.length ? item.vatSplit.map((part) => ({ percent: part.percent, cents: Math.round((part.amount * 100 * count) / item.qty) })) : [{ percent: item.vatPercent, cents: gross }]);
     // 赠菜 takes the whole line off (like 100% off); otherwise its own discount.
     const isComp = comped[item.orderItemId] === true;
     const pct = isComp ? 100 : (itemDiscount[item.orderItemId] ?? 0);
@@ -116,15 +137,18 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const picked = Object.values(picks).some((count) => count > 0);
   // A balance payment needs a member found, and may not draw more than their stored value.
   const memberOk = payments.every((payment) => payment.type !== "balance" || (payment.memberId && payment.balanceCents !== null && toCents(payment.amount) <= payment.balanceCents));
-  // 单品折扣/赠菜 on a picked line needs a reason before the receipt may issue.
-  const reduced = lines.some((item) => (picks[item.orderItemId] ?? 0) > 0 && ((itemDiscount[item.orderItemId] ?? 0) > 0 || comped[item.orderItemId] === true));
-  const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && memberOk && (!reduced || discountReason.trim().length > 0) && !busy;
+  // 单品折扣/赠菜/单品改价 on a picked line needs a reason before issuing.
+  const reduced = lines.some((item) => (picks[item.orderItemId] ?? 0) > 0 && ((itemDiscount[item.orderItemId] ?? 0) > 0 || comped[item.orderItemId] === true || priceInfo(item).overridden));
+  // A price box with something unusable in it blocks the receipt.
+  const badPrice = lines.some((item) => (picks[item.orderItemId] ?? 0) > 0 && priceInfo(item).bad);
+  const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && memberOk && (!reduced || discountReason.trim().length > 0) && !badPrice && !busy;
 
   const setMode = (next: boolean) => {
     setSeparate(next);
     setPayments([]);
     setItemDiscount({});
     setComped({});
+    setOverride({});
     setDiscountReason("");
     setPicks(next ? {} : Object.fromEntries(lines.map((item) => [item.orderItemId, item.qty])));
   };
@@ -143,6 +167,11 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     });
     setItemDiscount((current) => { const { [id]: _drop, ...rest } = current; return rest; });
   };
+  // 单品改价: set (or clear, when emptied) a line's new unit price as typed.
+  const setPrice = (id: string, text: string) => setOverride((current) => {
+    if (text.trim() === "") { const { [id]: _drop, ...rest } = current; return rest; }
+    return { ...current, [id]: text };
+  });
   const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }]);
   // AA 均分: split the amount due into n equal cash shares on this one receipt.
   // Each person pays their share (the waiter may switch a share to card); the
@@ -197,7 +226,14 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
         table,
         items: lines.filter((item) => (picks[item.orderItemId] ?? 0) > 0).map((item) => {
           const linePct = itemDiscount[item.orderItemId] ?? 0;
-          return { orderItemId: item.orderItemId, quantity: picks[item.orderItemId] ?? 0, ...(comped[item.orderItemId] ? { comp: true } : linePct > 0 ? { discountPercent: linePct } : {}) };
+          const price = priceInfo(item);
+          return {
+            orderItemId: item.orderItemId,
+            quantity: picks[item.orderItemId] ?? 0,
+            ...(comped[item.orderItemId]
+              ? { comp: true }
+              : { ...(price.overridden ? { overridePriceCents: price.cents } : {}), ...(linePct > 0 ? { discountPercent: linePct } : {}) })
+          };
         }),
         ...(discount ? { discountPercent: discount } : {}),
         ...(reduced ? { discountReason: discountReason.trim() } : {}),
@@ -245,11 +281,15 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
         const count = picks[item.orderItemId] ?? 0;
         const isComp = comped[item.orderItemId] === true;
         const pct = itemDiscount[item.orderItemId] ?? 0;
-        const gross = Math.round(item.unitPrice * 100) * count;
+        const price = priceInfo(item);
+        const menuGross = price.menuUnit * count;
+        const gross = price.effUnit * count;
         const net = isComp ? 0 : pct > 0 ? gross - Math.round((gross * pct) / 100) : gross;
+        const changed = isComp || pct > 0 || price.overridden;
         return <li key={item.orderItemId} className={count ? "picked" : ""}>
           <span>{item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}
             {count > 0 && <span className="pos-line-reduce">
+              {!isComp && price.singleRate && <label className={price.bad ? "pos-line-price bad" : "pos-line-price"}><span>{t("newPrice")}</span><input inputMode="decimal" value={price.raw} placeholder={(price.menuUnit / 100).toFixed(2)} onChange={(event) => setPrice(item.orderItemId, event.target.value)} /></label>}
               {!isComp && <label className="pos-line-discount"><span>{t("itemDiscount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={pct || ""} placeholder="0" onChange={(event) => setItemPct(item.orderItemId, Number(event.target.value))} />%</label>}
               <button type="button" className={isComp ? "pos-comp on" : "pos-comp"} aria-pressed={isComp} onClick={() => toggleComp(item.orderItemId)}>{t("comp")}</button>
             </span>}
@@ -259,7 +299,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
             <b>{count}/{item.qty}</b>
             <button type="button" aria-label="+" disabled={count >= item.qty} onClick={() => pick(item.orderItemId, count + 1, item.qty)}>+</button>
           </span> : <span>{item.qty} ×</span>}
-          <b>{isComp || pct > 0 ? <><s className="pos-line-was">{money(gross)}</s> {money(net)}</> : money(gross)}</b>
+          <b>{changed ? <><s className="pos-line-was">{money(menuGross)}</s> {money(net)}</> : money(gross)}</b>
         </li>;
       })}</ul>
     </div>

@@ -307,8 +307,8 @@ export interface CheckoutCommand {
   discountPercent?: number;
   /** Why a line was reduced; required when any dish is discounted or comped. */
   discountReason?: string;
-  /** 单品折扣 scopes a discount to one line; 赠菜 (comp) gives it for free. */
-  items?: Array<{ orderItemId: string; quantity: number; discountPercent?: number; comp?: boolean }>;
+  /** 单品折扣 scopes a discount to one line; 赠菜 (comp) gives it free; 单品改价 sets a new unit price (cents). */
+  items?: Array<{ orderItemId: string; quantity: number; discountPercent?: number; comp?: boolean; overridePriceCents?: number }>;
   vouchers?: Array<{ amount: number }>;
   payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number; memberId?: string }>;
 }
