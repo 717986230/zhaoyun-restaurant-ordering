@@ -31,6 +31,8 @@ export const GENESIS_HASH = "0".repeat(64);
 export const MAX_VOUCHER_CENTS = 100_000;
 /** A tip is at most this much on one payment: a slip of the finger, not a guest's generosity. */
 export const MAX_TIP_CENTS = 50_000;
+/** 单品改价: a dish's new price is at most this much — a guard against a slip. */
+export const MAX_OVERRIDE_CENTS = 100_000;
 
 /**
  * How much of an order line receipts have paid for. A receipt cancelled by
@@ -307,12 +309,12 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
   const vatParts = [];
   // The table as its orders were written; compared without case.
   let table = input.table ? String(input.table).trim() : null;
-  // 单品折扣/赠菜: a discount or a comp on one dish says why, so the journal
-  // keeps the reason next to it (like a void). Whole-bill discountPercent keeps
-  // its old behaviour.
+  // 单品折扣/赠菜/单品改价: a discount, a comp or a price change on one dish
+  // says why, so the journal keeps the reason next to it (like a void).
+  // Whole-bill discountPercent keeps its old behaviour.
   const discountReason = String(input.discountReason ?? "").trim().slice(0, 200);
-  if (requested.some((request) => Number(request.discountPercent) > 0 || request.comp === true) && !discountReason) {
-    throw new Error("A dish discount or comp says why");
+  if (requested.some((request) => Number(request.discountPercent) > 0 || request.comp === true || given(request.overridePriceCents)) && !discountReason) {
+    throw new Error("A dish discount, comp or price change says why");
   }
   const seen = new Set();
   for (const request of requested) {
@@ -327,7 +329,25 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
     const open = openQuantity(row);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > open) throw new Error(`Only ${open} of ${row.product_name} are left to pay`);
     const unitSplit = parseJson(row.vat_split_json, null) ?? [{ percent: row.vat_percent, cents: row.unit_price_cents }];
-    const split = unitSplit.map((part) => ({ percent: part.percent, cents: part.cents * quantity }));
+    // 单品改价: the waiter sets this dish's unit price for this bill (a market
+    // price, a haggle). A single-rate dish only — a set menu's mixed rates are
+    // not the dish's to re-split. The new price is this line's VAT base, and a
+    // later 单品折扣 then comes off it; the list price and reason go to the
+    // journal (like a void). An override equal to the menu price is a no-op.
+    let unitCents = row.unit_price_cents;
+    let effSplit = unitSplit;
+    let overridden = false;
+    if (given(request.overridePriceCents)) {
+      const value = Number(request.overridePriceCents);
+      if (!Number.isInteger(value) || value < 0 || value > MAX_OVERRIDE_CENTS) throw new Error("A new price is 0 to 1000 euros");
+      if (unitSplit.length !== 1) throw new Error("A set menu's price is not changed per dish");
+      if (value !== row.unit_price_cents) {
+        unitCents = value;
+        effSplit = [{ percent: unitSplit[0].percent, cents: value }];
+        overridden = true;
+      }
+    }
+    const split = effSplit.map((part) => ({ percent: part.percent, cents: part.cents * quantity }));
     vatParts.push(...split);
     lines.push({
       kind: "item",
@@ -337,9 +357,10 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
       ...(row.name_de || row.name_en || row.name_zh ? { names: { zh: row.name_zh || row.product_name, de: row.name_de || row.product_name, en: row.name_en || row.product_name } } : {}),
       modifiers: parseJson(row.modifiers_json, []).map((modifier) => modifier.name),
       quantity,
-      unitPriceCents: row.unit_price_cents,
-      totalCents: row.unit_price_cents * quantity,
-      vatSplit: split
+      unitPriceCents: unitCents,
+      totalCents: unitCents * quantity,
+      vatSplit: split,
+      ...(overridden ? { listPriceCents: row.unit_price_cents, reason: discountReason } : {})
     });
     receiptItems.push({ orderItemId: id, quantity });
 
