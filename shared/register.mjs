@@ -342,6 +342,12 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
   const vatParts = [];
   // The table as its orders were written; compared without case.
   let table = input.table ? String(input.table).trim() : null;
+  // 单品折扣: a discount on one dish says why, so the journal keeps the reason
+  // next to it (like a void). Whole-bill discountPercent keeps its old behaviour.
+  const discountReason = String(input.discountReason ?? "").trim().slice(0, 200);
+  if (requested.some((request) => Number(request.discountPercent) > 0) && !discountReason) {
+    throw new Error("A dish discount says why");
+  }
   const seen = new Set();
   for (const request of requested) {
     const id = String(request.orderItemId ?? "");
@@ -370,6 +376,29 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
       vatSplit: split
     });
     receiptItems.push({ orderItemId: id, quantity });
+
+    // 单品折扣: a discount scoped to this dish, taken off its own VAT rates so
+    // the receipt and the tax split stay exact. It is a negative line of its
+    // own (kind "discount"), with the dish it is for and the reason.
+    const itemPercent = Number(request.discountPercent ?? 0);
+    if (itemPercent > 0) {
+      if (!Number.isInteger(itemPercent) || itemPercent > 100) throw new Error("A discount is 0 to 100 percent");
+      const itemSplit = split.map((part) => ({ percent: part.percent, cents: -Math.round((part.cents * itemPercent) / 100) })).filter((part) => part.cents !== 0);
+      const off = itemSplit.reduce((sum, part) => sum + part.cents, 0);
+      if (off) {
+        vatParts.push(...itemSplit);
+        lines.push({
+          kind: "discount", percent: itemPercent, orderItemId: id, reason: discountReason,
+          name: `Rabatt ${itemPercent}% · ${row.product_name}`,
+          names: {
+            zh: `折扣 ${itemPercent}% · ${row.name_zh || row.product_name}`,
+            de: `Rabatt ${itemPercent}% · ${row.name_de || row.product_name}`,
+            en: `Discount ${itemPercent}% · ${row.name_en || row.product_name}`
+          },
+          quantity: 1, unitPriceCents: off, totalCents: off, vatSplit: itemSplit
+        });
+      }
+    }
   }
 
   const percent = Number(input.discountPercent ?? 0);

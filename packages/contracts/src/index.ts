@@ -309,7 +309,10 @@ export interface CheckoutCommand {
   table?: string;
   /** Off the dishes, per VAT rate: a takeaway's pickup discount, say. */
   discountPercent?: number;
-  items?: Array<{ orderItemId: string; quantity: number }>;
+  /** Why a discount was given; required when any per-dish discount is applied. */
+  discountReason?: string;
+  /** 单品折扣: discountPercent scopes a discount to that one line. */
+  items?: Array<{ orderItemId: string; quantity: number; discountPercent?: number }>;
   vouchers?: Array<{ amount: number }>;
   payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number; memberId?: string }>;
 }
