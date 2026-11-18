@@ -305,10 +305,10 @@ export interface CheckoutCommand {
   table?: string;
   /** Off the dishes, per VAT rate: a takeaway's pickup discount, say. */
   discountPercent?: number;
-  /** Why a discount was given; required when any per-dish discount is applied. */
+  /** Why a line was reduced; required when any dish is discounted or comped. */
   discountReason?: string;
-  /** 单品折扣: discountPercent scopes a discount to that one line. */
-  items?: Array<{ orderItemId: string; quantity: number; discountPercent?: number }>;
+  /** 单品折扣 scopes a discount to one line; 赠菜 (comp) gives it for free. */
+  items?: Array<{ orderItemId: string; quantity: number; discountPercent?: number; comp?: boolean }>;
   vouchers?: Array<{ amount: number }>;
   payments: Array<{ type: PaymentType; amount: number; tendered?: number; voucherCode?: string; tip?: number; memberId?: string }>;
 }

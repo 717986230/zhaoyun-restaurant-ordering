@@ -29,6 +29,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [discount, setDiscount] = useState(0);
   // 单品折扣: orderItemId → percent off that one line, and why (one reason per receipt).
   const [itemDiscount, setItemDiscount] = useState<Record<string, number>>({});
+  // 赠菜: the lines comped (free); the same reason covers them and the discounts.
+  const [comped, setComped] = useState<Record<string, boolean>>({});
   const [discountReason, setDiscountReason] = useState("");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [busy, setBusy] = useState(false);
@@ -79,9 +81,11 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     if (!count) continue;
     const cents = Math.round(item.unitPrice * 100) * count;
     const parts = item.vatSplit?.length ? item.vatSplit.map((part) => ({ percent: part.percent, cents: Math.round((part.amount * 100 * count) / item.qty) })) : [{ percent: item.vatPercent, cents }];
-    const pct = itemDiscount[item.orderItemId] ?? 0;
+    // 赠菜 takes the whole line off (like 100% off); otherwise its own discount.
+    const isComp = comped[item.orderItemId] === true;
+    const pct = isComp ? 100 : (itemDiscount[item.orderItemId] ?? 0);
     for (const part of parts) {
-      const off = pct > 0 ? Math.round((part.cents * pct) / 100) : 0;
+      const off = isComp ? part.cents : (pct > 0 ? Math.round((part.cents * pct) / 100) : 0);
       itemOffCents += off;
       byRate.set(part.percent, (byRate.get(part.percent) ?? 0) + part.cents - off);
     }
@@ -98,14 +102,15 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const picked = Object.values(picks).some((count) => count > 0);
   // A balance payment needs a member found, and may not draw more than their stored value.
   const memberOk = payments.every((payment) => payment.type !== "balance" || (payment.memberId && payment.balanceCents !== null && toCents(payment.amount) <= payment.balanceCents));
-  // 单品折扣 on a picked line needs a reason before the receipt may issue.
-  const itemDiscounted = lines.some((item) => (picks[item.orderItemId] ?? 0) > 0 && (itemDiscount[item.orderItemId] ?? 0) > 0);
-  const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && memberOk && (!itemDiscounted || discountReason.trim().length > 0) && !busy;
+  // 单品折扣/赠菜 on a picked line needs a reason before the receipt may issue.
+  const reduced = lines.some((item) => (picks[item.orderItemId] ?? 0) > 0 && ((itemDiscount[item.orderItemId] ?? 0) > 0 || comped[item.orderItemId] === true));
+  const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && memberOk && (!reduced || discountReason.trim().length > 0) && !busy;
 
   const setMode = (next: boolean) => {
     setSeparate(next);
     setPayments([]);
     setItemDiscount({});
+    setComped({});
     setDiscountReason("");
     setPicks(next ? {} : Object.fromEntries(lines.map((item) => [item.orderItemId, item.qty])));
   };
@@ -116,6 +121,14 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     if (!value) { const { [id]: _drop, ...rest } = current; return rest; }
     return { ...current, [id]: value };
   });
+  // 赠菜: toggle a line free. A comp replaces any discount on the same line.
+  const toggleComp = (id: string) => {
+    setComped((current) => {
+      if (current[id]) { const { [id]: _drop, ...rest } = current; return rest; }
+      return { ...current, [id]: true };
+    });
+    setItemDiscount((current) => { const { [id]: _drop, ...rest } = current; return rest; });
+  };
   const addPayment = (type: PaymentType) => setPayments((current) => [...current, { type, amount: toAmount(Math.max(0, totalCents - current.reduce((sum, payment) => sum + toCents(payment.amount), 0))), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }]);
   const edit = (index: number, change: Partial<Payment>) => setPayments((current) => current.map((payment, at) => (at === index ? { ...payment, ...change } : payment)));
   /** Aufrunden: the tip that brings amount and tip to the next whole euro — again for the one after. */
@@ -160,9 +173,12 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       const { receipt } = await api.checkout({
         clientRequestId: requestId.current,
         table,
-        items: lines.filter((item) => (picks[item.orderItemId] ?? 0) > 0).map((item) => ({ orderItemId: item.orderItemId, quantity: picks[item.orderItemId] ?? 0, ...(itemDiscount[item.orderItemId] ? { discountPercent: itemDiscount[item.orderItemId] } : {}) })),
+        items: lines.filter((item) => (picks[item.orderItemId] ?? 0) > 0).map((item) => {
+          const linePct = itemDiscount[item.orderItemId] ?? 0;
+          return { orderItemId: item.orderItemId, quantity: picks[item.orderItemId] ?? 0, ...(comped[item.orderItemId] ? { comp: true } : linePct > 0 ? { discountPercent: linePct } : {}) };
+        }),
         ...(discount ? { discountPercent: discount } : {}),
-        ...(itemDiscounted ? { discountReason: discountReason.trim() } : {}),
+        ...(reduced ? { discountReason: discountReason.trim() } : {}),
         payments: payments.map((payment) => ({
           type: payment.type,
           amount: toCents(payment.amount) / 100,
@@ -205,26 +221,30 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       {separate && <p className="pos-muted">{t("separateHint")}</p>}
       <ul className="pos-lines pay">{lines.map((item) => {
         const count = picks[item.orderItemId] ?? 0;
+        const isComp = comped[item.orderItemId] === true;
         const pct = itemDiscount[item.orderItemId] ?? 0;
         const gross = Math.round(item.unitPrice * 100) * count;
-        const net = pct > 0 ? gross - Math.round((gross * pct) / 100) : gross;
+        const net = isComp ? 0 : pct > 0 ? gross - Math.round((gross * pct) / 100) : gross;
         return <li key={item.orderItemId} className={count ? "picked" : ""}>
           <span>{item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}
-            {count > 0 && <label className="pos-line-discount"><span>{t("itemDiscount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={pct || ""} placeholder="0" onChange={(event) => setItemPct(item.orderItemId, Number(event.target.value))} />%</label>}
+            {count > 0 && <span className="pos-line-reduce">
+              {!isComp && <label className="pos-line-discount"><span>{t("itemDiscount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={pct || ""} placeholder="0" onChange={(event) => setItemPct(item.orderItemId, Number(event.target.value))} />%</label>}
+              <button type="button" className={isComp ? "pos-comp on" : "pos-comp"} aria-pressed={isComp} onClick={() => toggleComp(item.orderItemId)}>{t("comp")}</button>
+            </span>}
           </span>
           {separate ? <span className="pos-stepper">
             <button type="button" aria-label="−" disabled={!count} onClick={() => pick(item.orderItemId, count - 1, item.qty)}>−</button>
             <b>{count}/{item.qty}</b>
             <button type="button" aria-label="+" disabled={count >= item.qty} onClick={() => pick(item.orderItemId, count + 1, item.qty)}>+</button>
           </span> : <span>{item.qty} ×</span>}
-          <b>{pct > 0 ? <><s className="pos-line-was">{money(gross)}</s> {money(net)}</> : money(gross)}</b>
+          <b>{isComp || pct > 0 ? <><s className="pos-line-was">{money(gross)}</s> {money(net)}</> : money(gross)}</b>
         </li>;
       })}</ul>
     </div>
 
     <div className="pos-pay-panel">
       <label className="pos-discount"><span>{t("discount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={discount} onChange={(event) => setDiscount(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
-      {itemDiscounted && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
+      {reduced && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>
       <div className="pos-pay-types">{(["cash", "card", "voucher", "balance"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
       {sepa?.enabled && sepa.iban && totalCents > 0 && <button type="button" className="pos-sepa-btn" onClick={() => setShowSepa(true)}>⃔ {t("sepaScan")}</button>}

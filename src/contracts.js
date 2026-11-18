@@ -309,12 +309,16 @@ export const CheckoutBody = Type.Object({
     quantity: Type.Integer({ minimum: 1, maximum: 99 }),
     // 单品折扣: this line only, 1–100%. The receipt gets a scoped discount
     // line off this dish's VAT rates; needs a discountReason on the checkout.
-    discountPercent: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 }))
+    discountPercent: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
+    // 赠菜: this line is comped (free). A scoped negative line at this dish's
+    // VAT rates takes its whole price off; needs a discountReason (the gift's).
+    comp: Type.Optional(Type.Boolean())
   }), { maxItems: 200 })),
   vouchers: Type.Optional(Type.Array(Type.Object({ amount: Type.Number() }), { maxItems: 10 })),
   discountPercent: Type.Optional(Type.Number()),
-  // Why a discount (whole-bill or per-dish) was given; required when any
-  // per-dish discount is applied, and kept in the journal for the audit.
+  // Why a line was reduced (per-dish discount or a comp) — or a whole-bill
+  // discount; required when any dish is discounted or comped, kept in the
+  // journal for the audit (like a void's reason).
   discountReason: Type.Optional(Type.String({ maxLength: 200 })),
   payments: Type.Array(Type.Object({
     type: Type.String({ maxLength: 16 }),

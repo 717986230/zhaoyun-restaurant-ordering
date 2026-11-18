@@ -130,3 +130,54 @@ test("a per-item discount is scoped to its own dish and VAT rate, and says why",
     payments: [{ type: "cash", amount: 10 }]
   }, common), /says why/);
 });
+
+/**
+ * 赠菜: a comped dish is free — a negative line of its own (kind "comp") takes
+ * its whole price off, at its own VAT rate, so the rest of the bill and the tax
+ * split stay exact. A comp says why (like a void), and stands in for a discount
+ * on the same line.
+ */
+test("a comped dish is taken off in full at its own VAT rate, and says why", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 2000, vat_percent: 10, product_name: "Suppe", modifiers_json: "[]" },
+    { id: "i2", product_id: "p2", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 1500, vat_percent: 10, product_name: "Schnitzel", modifiers_json: "[]" },
+    { id: "i3", product_id: "p3", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 500, vat_percent: 20, product_name: "Bier", modifiers_json: "[]" }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+
+  const { receipt } = planCheckout({
+    discountReason: "Küche entschuldigt sich",
+    items: [{ orderItemId: "i1", quantity: 1, comp: true }, { orderItemId: "i2", quantity: 1 }, { orderItemId: "i3", quantity: 1 }],
+    payments: [{ type: "cash", amount: 20 }]
+  }, common);
+
+  // The 20€ soup is free; 15€ schnitzel + 5€ beer remain: 20.00.
+  assert.equal(receipt.totalCents, 2000);
+  // The comp comes off only the 10% rate (the soup); the 20% beer is untouched.
+  assert.deepEqual(receipt.vat, [
+    { percent: 10, grossCents: 1500, netCents: 1364, vatCents: 136 },
+    { percent: 20, grossCents: 500, netCents: 417, vatCents: 83 }
+  ]);
+  const comp = receipt.lines.find((line) => line.kind === "comp");
+  assert.equal(comp.orderItemId, "i1");
+  assert.equal(comp.reason, "Küche entschuldigt sich");
+  assert.equal(comp.totalCents, -2000);
+  assert.deepEqual(comp.vatSplit, [{ percent: 10, cents: -2000 }]);
+
+  // A comp stands in for a discount on the same line: one comp line, no discount line.
+  const { receipt: both } = planCheckout({
+    discountReason: "gratis",
+    items: [{ orderItemId: "i1", quantity: 1, comp: true, discountPercent: 50 }, { orderItemId: "i3", quantity: 1 }],
+    payments: [{ type: "cash", amount: 5 }]
+  }, common);
+  assert.equal(both.lines.filter((line) => line.kind === "comp").length, 1);
+  assert.equal(both.lines.filter((line) => line.kind === "discount").length, 0);
+  assert.equal(both.totalCents, 500);
+
+  // A comped line with no reason is refused.
+  assert.throws(() => planCheckout({
+    items: [{ orderItemId: "i1", quantity: 1, comp: true }, { orderItemId: "i3", quantity: 1 }],
+    payments: [{ type: "cash", amount: 5 }]
+  }, common), /says why/);
+});
