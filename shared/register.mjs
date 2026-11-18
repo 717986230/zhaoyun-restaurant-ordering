@@ -307,11 +307,12 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
   const vatParts = [];
   // The table as its orders were written; compared without case.
   let table = input.table ? String(input.table).trim() : null;
-  // 单品折扣: a discount on one dish says why, so the journal keeps the reason
-  // next to it (like a void). Whole-bill discountPercent keeps its old behaviour.
+  // 单品折扣/赠菜: a discount or a comp on one dish says why, so the journal
+  // keeps the reason next to it (like a void). Whole-bill discountPercent keeps
+  // its old behaviour.
   const discountReason = String(input.discountReason ?? "").trim().slice(0, 200);
-  if (requested.some((request) => Number(request.discountPercent) > 0) && !discountReason) {
-    throw new Error("A dish discount says why");
+  if (requested.some((request) => Number(request.discountPercent) > 0 || request.comp === true) && !discountReason) {
+    throw new Error("A dish discount or comp says why");
   }
   const seen = new Set();
   for (const request of requested) {
@@ -341,6 +342,29 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
       vatSplit: split
     });
     receiptItems.push({ orderItemId: id, quantity });
+
+    // 赠菜: this dish is comped (free). A negative line of its own (kind
+    // "comp") takes its whole price off, at its own VAT rates, so the receipt
+    // and the tax split stay exact. A comp is all-or-nothing, so it stands in
+    // for a discount on the same line.
+    if (request.comp === true) {
+      const compSplit = split.map((part) => ({ percent: part.percent, cents: -part.cents })).filter((part) => part.cents !== 0);
+      const off = compSplit.reduce((sum, part) => sum + part.cents, 0);
+      if (off) {
+        vatParts.push(...compSplit);
+        lines.push({
+          kind: "comp", orderItemId: id, reason: discountReason,
+          name: `Gratis · ${row.product_name}`,
+          names: {
+            zh: `赠 · ${row.name_zh || row.product_name}`,
+            de: `Gratis · ${row.name_de || row.product_name}`,
+            en: `Comp · ${row.name_en || row.product_name}`
+          },
+          quantity: 1, unitPriceCents: off, totalCents: off, vatSplit: compSplit
+        });
+      }
+      continue;
+    }
 
     // 单品折扣: a discount scoped to this dish, taken off its own VAT rates so
     // the receipt and the tax split stay exact. It is a negative line of its

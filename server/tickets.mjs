@@ -306,7 +306,7 @@ function receiptLines(payload, context) {
   for (const line of receipt.lines) {
     // The dish in the front printer's language: German on the guest's receipt.
     const name = line.names?.[language] || line.name;
-    lines.push(line.kind === "discount" ? { left: name, right: euros(line.totalCents) } : { left: `${line.quantity} x ${name}`, right: euros(line.totalCents) });
+    lines.push(line.kind === "discount" || line.kind === "comp" ? { left: name, right: euros(line.totalCents) } : { left: `${line.quantity} x ${name}`, right: euros(line.totalCents) });
     for (const modifier of line.modifiers || []) lines.push(`  - ${modifier}`);
     lines.push(`    ${line.vatSplit.map((part) => `${part.percent}%`).join("/")}${line.quantity !== 1 && line.quantity !== -1 ? `  à ${euros(line.unitPriceCents)}` : ""}`);
   }

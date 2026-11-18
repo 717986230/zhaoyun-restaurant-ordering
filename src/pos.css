@@ -250,6 +250,10 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 /* 单品折扣: the per-line discount input and the struck-through original price. */
 .pos-line-discount { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-line-discount input { width: 52px; min-height: 36px; padding: 2px 6px; text-align: right; }
+/* 赠菜: the per-line discount input sits beside the comp toggle. */
+.pos-line-reduce { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.pos-comp { min-height: 36px; padding: 2px 10px; border: 1px solid var(--p-line); border-radius: 8px; background: var(--p-card); color: var(--p-muted); font-size: 13px; }
+.pos-comp.on { border-color: var(--p-accent); background: var(--p-accent-wash); color: var(--p-ink); font-weight: 600; }
 .pos-line-was { color: var(--p-muted); margin-right: 4px; font-weight: 400; }
 .pos-discount-reason { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .pos-discount-reason input { flex: 1; min-width: 0; min-height: 44px; }
