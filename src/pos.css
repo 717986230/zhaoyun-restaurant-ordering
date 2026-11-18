@@ -271,6 +271,11 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-line-notebtn { width: 44px; min-height: 44px; padding: 0; font-size: 18px; border-color: var(--p-accent); color: var(--p-accent); background: transparent; }
 .pos-line-notebtn[aria-pressed="true"] { background: var(--p-accent-wash); }
 .pos-line-noteinput { margin-top: 6px; }
+/* 等叫/叫起: a held line's toggle, badge and the 叫起 button on a sent line. */
+.pos-line-holdbtn { min-height: 44px; padding: 0 10px; font-size: 14px; border-color: var(--p-warn); color: var(--p-warn); background: transparent; }
+.pos-line-holdbtn[aria-pressed="true"] { color: var(--p-bg); background: var(--p-warn); }
+.pos-line-hold { color: var(--p-warn); font-weight: 700; }
+.pos-fire { min-height: 36px; padding: 4px 10px; border-color: var(--p-warn); color: var(--p-bg); background: var(--p-warn); font-size: 14px; }
 
 .pos-ticket-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
 .pos-ticket-actions .pos-primary { grid-column: 1 / -1; min-height: 56px; font-size: 18px; }

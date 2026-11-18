@@ -188,3 +188,41 @@ test("逐菜备注: a per-dish note rides the kitchen ticket and the bill, not t
   assert.equal(bill.items[0].lineTotal, bill.items[0].unitPrice);
   assert.ok(bill.items[0].lineTotal > 0);
 });
+
+test("等叫/叫起: a held dish is on the bill but reaches the kitchen only when fired", async (context) => {
+  const { store } = makeStore(context);
+  const product = await aProduct(store);
+  await store.claimTable("17", deviceA);
+  // One dish held (等叫), one ordered normally.
+  await store.createOrder({ table: "17", items: [
+    { id: product.id, qty: 1, hold: true },
+    { id: product.id, qty: 2 }
+  ] }, deviceA);
+
+  // Only the normal dish printed; the held dish queued no kitchen ticket.
+  const printed = (await store.listPrintJobs("queued", 100)).filter((entry) => (entry.payload.kind ?? "order") === "order");
+  assert.equal(printed.length, 1, "the held dish does not print at order time");
+  assert.equal(printed[0].payload.items.reduce((sum, line) => sum + line.quantity, 0), 2);
+
+  // Both dishes are on the bill; the held one is marked held.
+  const bill = await store.billForTable("17");
+  assert.equal(bill.items.reduce((sum, item) => sum + item.qty, 0), 3, "both dishes count on the bill");
+  const heldItem = bill.items.find((item) => item.held);
+  assert.ok(heldItem, "the held dish is marked held");
+  assert.equal(heldItem.qty, 1);
+
+  // 叫起: firing prints it now and clears the hold.
+  const fired = await store.fireItem("17", heldItem.orderItemId, deviceA);
+  assert.equal(fired.orderItemId, heldItem.orderItemId);
+  const fireJob = (await store.listPrintJobs("queued", 100)).find((entry) => entry.id === fired.printJobId);
+  assert.ok(fireJob, "firing queued a kitchen ticket");
+  assert.equal(fireJob.payload.kind, "order");
+  assert.equal(fireJob.payload.items[0].quantity, 1);
+
+  const after = await store.billForTable("17");
+  assert.ok(!after.items.some((item) => item.held), "nothing is held after firing");
+
+  // A dish not held cannot be fired.
+  const normal = after.items.find((item) => item.qty === 2);
+  await assert.rejects(() => store.fireItem("17", normal.orderItemId, deviceA), /not held/);
+});

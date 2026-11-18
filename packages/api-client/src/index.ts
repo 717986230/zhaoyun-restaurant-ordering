@@ -577,6 +577,10 @@ export class PosApi {
   urge(table: string, orderItemId: string): Promise<{ urged: { orderItemId: string; printJobId: string } }> {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/urge`, { method: "POST", body: JSON.stringify({ orderItemId }) });
   }
+  // 叫起: fire a held (等叫) dish — send it to the kitchen now.
+  fire(table: string, orderItemId: string): Promise<{ fired: { orderItemId: string; printJobId: string } }> {
+    return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/fire`, { method: "POST", body: JSON.stringify({ orderItemId }) });
+  }
   floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number; sepaPayment?: ApiSepaPayment }> { return this.#request("/api/pos/floor"); }
   deliveryAction(id: string, action: DeliveryAction, options: { prepMinutes?: number; reason?: DeliveryRejectReason } = {}): Promise<{ order: ApiDeliveryOrder }> {
     return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });

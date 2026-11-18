@@ -62,7 +62,8 @@ const incremental = [
   { file: "0074_reservation_reminders.sql", drop: "DROP TABLE reservation_reminders;" },
   // The collaborative-table flag and the table lock's fencing token.
   { file: "0108_shared_table_claims.sql", drop: "DROP TABLE table_claim_meta;" },
-  { file: "0109_order_item_notes.sql", drop: "DROP TABLE order_item_notes;" }
+  { file: "0109_order_item_notes.sql", drop: "DROP TABLE order_item_notes;" },
+  { file: "0110_order_item_holds.sql", drop: "DROP TABLE order_item_holds;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")
