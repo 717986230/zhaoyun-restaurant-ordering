@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitCents } from "../src/PayScreen";
+import { splitCents, splitPaymentAmounts } from "../src/PayScreen";
 
 describe("AA 均分: splitting a bill by headcount", () => {
   it("splits to the cent, the shares adding back to the total", () => {
@@ -19,5 +19,24 @@ describe("AA 均分: splitting a bill by headcount", () => {
     expect(splitCents(1000, 3)).toEqual([334, 333, 333]);
     const shares = splitCents(9998, 7);
     expect(Math.max(...shares) - Math.min(...shares)).toBeLessThanOrEqual(1);
+  });
+
+  it("is ONE receipt split into N payments — not N receipts", () => {
+    // The口径 from PR #173: AA 均分 turns one bill into one checkout whose
+    // `payments` list has N shares. So the split is a single list of payment
+    // amounts for a single receipt: N entries, adding back to the total.
+    // 30.01 three ways, as the one receipt's three payments:
+    const payments = splitPaymentAmounts(3001, 3);
+    expect(payments).toEqual(["10.01", "10.00", "10.00"]);
+    expect(payments).toHaveLength(3);
+    expect(payments.reduce((sum, amount) => sum + Math.round(Number(amount) * 100), 0)).toBe(3001);
+    // And in general: one list, N shares, exact total — never N totals.
+    for (const total of [100, 1000, 9999, 12345]) {
+      for (const n of [2, 3, 4, 7, 20]) {
+        const list = splitPaymentAmounts(total, n);
+        expect(list).toHaveLength(n);
+        expect(list.reduce((sum, amount) => sum + Math.round(Number(amount) * 100), 0)).toBe(total);
+      }
+    }
   });
 });

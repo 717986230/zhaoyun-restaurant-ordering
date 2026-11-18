@@ -1,0 +1,19 @@
+# Generated, vendored or binary content: never hand-formatted.
+node_modules/
+.npm-cache/
+dist/
+apps/*/dist/
+packages/*/dist/
+android/
+.wrangler/
+test-results/
+playwright-report/
+server/data/
+server/uploads/
+server/dish-photos/
+migrations/
+sources/
+*.tsbuildinfo
+
+# Generated from server/dish-photos/ by scripts/export-d1-migrations.mjs.
+apps/customer-app/src/app/bundled-catalog.json

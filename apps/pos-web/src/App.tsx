@@ -8,6 +8,7 @@ import { formatEuro, initialLanguage, POS_LANGUAGES, translator } from "./i18n";
 import type { PosKey, PosLanguage } from "./i18n";
 import { enqueue, flushOutbox, readOutbox } from "./offline-queue";
 import { Floor } from "./Floor";
+import { Kitchen } from "./Kitchen";
 import { OrderScreen } from "./OrderScreen";
 import { PayScreen } from "./PayScreen";
 import { Records } from "./Records";
@@ -185,6 +186,14 @@ export function App() {
   const languages = <div className="pos-languages" role="group" aria-label="Language">{POS_LANGUAGES.map((option) => <button
     key={option} type="button" className={option === language ? "on" : ""} aria-pressed={option === language} aria-label={LANGUAGE_INFO[option].name} onClick={() => setLanguage(option)}
   ><img src={LANGUAGE_INFO[option].flag} alt="" /></button>)}</div>;
+
+  // The kitchen display: pos.html?view=kitchen, before pairing or PIN sign-in
+  // — the kitchen tablet signs in with its own role token, not a waiter's PIN
+  // (apps/pos-web/src/Kitchen.tsx). It renders instead of the POS, never
+  // alongside it, so the floor's pairing and sign-in are untouched.
+  if (typeof location !== "undefined" && new URLSearchParams(location.search).get("view") === "kitchen") {
+    return <Kitchen />;
+  }
 
   let body;
   if (!paired) body = <Pair t={t} onPaired={() => setPaired(true)} />;

@@ -105,12 +105,14 @@ test("a receipt prints who issued it, its number, each rate and the change — a
     }
   };
   const printed = renderReceipt(receipt, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");
+  // eslint-disable-next-line no-control-regex -- ESC/POS init sequence: the test asserts the printer actually receives it.
   assert.match(printed, /^\u001b@TESTBELEG – NICHT SIGNIERT/);
   assert.match(printed, /Zhao Yun GmbH\nMariahilfer Straße 1, 1060 Wien\nUID: ATU12345678/);
   assert.match(printed, /Beleg 12 {2}Kasse KASSE-1/);
   assert.match(printed, /2 x Ramen {18}20\.00/);
   assert.match(printed, /10% Netto 18\.18 MwSt 1\.82 {2}20\.00/);
   assert.match(printed, /gegeben 50\.00 {2}Rückgeld 30\.00/);
+  // eslint-disable-next-line no-control-regex -- stripping the ESC/POS init/cut sequences to measure printable width.
   for (const line of printed.split("\n")) assert.ok(line.replace(/^\u001b@/, "").replace(/\u001dV\u0000$/, "").length <= 32, `too wide: ${line}`);
 
   const signed = renderReceipt({ ...receipt, receipt: { ...receipt.receipt, fiscalStatus: "signed" } }, { capabilities: { printLanguage: "de", encoding: "utf8" } }).toString("utf8");

@@ -73,13 +73,19 @@ export function roleAllows(role, minimumRole) {
  * five minutes, and guessing offline needs the database first. Each stored
  * hash records its own iteration count, so raising this later re-hashes on
  * the next password change without invalidating anything.
+ *
+ * The minimum length is 8, not 6: a 6-character password falls to an offline
+ * guess far too fast for a hash this cheap, and the iteration count cannot be
+ * raised past the Workers ceiling above — so length and the login throttle
+ * carry the weight instead.
  */
 export const PASSWORD_ITERATIONS = 100_000;
 /** The ceiling deployed Workers put on PBKDF2. Not a setting — a fact about
  *  the runtime, stated once so the test can hold PASSWORD_ITERATIONS to it. */
 export const WORKERS_PBKDF2_MAX_ITERATIONS = 100_000;
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const PASSWORD_MIN = 6;
+/** The console's (and a guest's) password must be at least this long. */
+export const PASSWORD_MIN = 8;
 
 function base64(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes)));
@@ -142,8 +148,28 @@ export function adminGateView(row) {
 }
 
 export function auditView(row) {
+  const detail = parseJson(row.detail_json, {});
   return {
     id: row.id, at: row.at, role: row.role, ip: row.ip, method: row.method,
-    route: row.route, status: row.status, detail: parseJson(row.detail_json, {})
+    route: row.route, status: row.status,
+    // Who, as a person: a waiter's PIN session carries their staff id, and
+    // the audit writer records it in the detail (see auditActor) — the role
+    // alone only says which shared token was used. A fixed-token tablet login
+    // has no person behind it, so this stays null for those entries.
+    staffId: detail.staffId ?? null,
+    detail
+  };
+}
+
+/**
+ * The personal half of an audit entry's detail, from a PIN session's staff
+ * (`{ id, name }`) — the shape `roleForSession` already returns for a waiter.
+ * A shared-token login has no staff, so it contributes nothing and the entry
+ * keeps only its role, exactly as before.
+ */
+export function auditActor(staff) {
+  return {
+    ...(staff?.id ? { staffId: staff.id } : {}),
+    ...(staff?.name ? { actor: staff.name } : {})
   };
 }

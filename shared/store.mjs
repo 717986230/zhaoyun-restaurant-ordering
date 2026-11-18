@@ -25,7 +25,7 @@
 import { bool, boundedLimit, now, parseJson, uuid } from "./core.mjs";
 import { assertPassword, auditView, hashPassword, hashSessionToken, newSessionToken, PASSWORD_ITERATIONS, verifyPassword } from "./auth.mjs";
 import { bundleComponentIds, duplicateInput, mapProduct, normalizeProduct, normalizeVatPercent } from "./products.mjs";
-import { normalizeCategoryName, normalizeMenuTheme, normalizeSettingsInput, renamedCategorySettings, settingsView } from "./settings.mjs";
+import { normalizeCategoryName, normalizeSettingsInput, renamedCategorySettings, settingsView } from "./settings.mjs";
 import {
   assertOrderTransition, assertRequestTransition, billView, normalizeTableNo, OPEN_TABLE_ORDERS_SQL, ORDER_BY_ID_SQL, ORDER_BY_REQUEST_SQL, orderProductIds, orderView, planOrder, RECENT_ORDERS_SQL, serviceRequestView, tablesOverviewView, tableView
 } from "./orders.mjs";
@@ -620,7 +620,7 @@ export function createStore(driver) {
         ]);
       } catch (error) {
         // The member spent the top-up before it was cancelled: their balance would go below zero.
-        if (isOverdrawn(error) && plan.balanceReversals.length) throw new Error("This top-up has been spent and cannot be cancelled");
+        if (isOverdrawn(error) && plan.balanceReversals.length) throw new Error("This top-up has been spent and cannot be cancelled", { cause: error });
         throw error;
       }
       return receiptDetail(await first("SELECT * FROM receipts WHERE id = ?", plan.receipt.id));
@@ -860,7 +860,7 @@ export function createStore(driver) {
         newId, staff.name, staff.role, hash, salt, iterations, staff.active ? 1 : 0, at, at);
       return staffView(await first("SELECT * FROM staff WHERE id = ?", newId));
     } catch (error) {
-      if (/UNIQUE constraint failed: staff\.name/.test(String(error?.message))) throw new Error("There is already a waiter of that name");
+      if (/UNIQUE constraint failed: staff\.name/.test(String(error?.message))) throw new Error("There is already a waiter of that name", { cause: error });
       throw error;
     }
   }

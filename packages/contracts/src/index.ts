@@ -211,7 +211,7 @@ export interface ApiOrder {
   status: OrderStatus;
   note: string;
   total: number;
-  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for, and was voided. */ paid?: number; voided?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; modifiers?: Array<{ id: string; name: string; names?: { zh: string; de: string; en: string }; price: number }> }>;
+  items: Array<{ id: string; name?: string; qty: number; /** How much of the line receipts paid for, and was voided. */ paid?: number; voided?: number; unitPrice?: number; vatPercent?: VatPercent; printStation?: PrintStationName; /** 等叫: held, on the bill but not sent to the kitchen yet. */ held?: boolean; modifiers?: Array<{ id: string; name: string; names?: { zh: string; de: string; en: string }; price: number }> }>;
   createdAt: string;
   updatedAt?: string;
   billedAt?: string | null;

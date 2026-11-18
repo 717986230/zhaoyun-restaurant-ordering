@@ -25,6 +25,16 @@ export function splitCents(totalCents: number, n: number): number[] {
 }
 
 /**
+ * AA 均分的口径: ONE receipt, N payments — not N receipts. `splitEvenly`
+ * below turns one bill into one checkout whose `payments` list has N shares
+ * (each switchable to card); the receipt is still issued once, for the whole
+ * table. These are the N payment amounts, as euros, in share order.
+ */
+export function splitPaymentAmounts(totalCents: number, n: number): string[] {
+  return splitCents(totalCents, n).map((share) => toAmount(share));
+}
+
+/**
  * "Zusammen oder getrennt?" — the question every table in Austria is asked.
  * Together: one receipt for everything. Separately: each guest's own lines,
  * one receipt each, until the table is paid. Cash (with the change worked
@@ -179,7 +189,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const splitEvenly = (n: number) => {
     const count = Math.max(2, Math.min(20, Math.round(n || 0)));
     if (totalCents <= 0) return;
-    setPayments(splitCents(totalCents, count).map((share) => ({ type: "cash" as PaymentType, amount: toAmount(share), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 })));
+    setPayments(splitPaymentAmounts(totalCents, count).map((amount) => ({ type: "cash" as PaymentType, amount, tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 })));
   };
   const edit = (index: number, change: Partial<Payment>) => setPayments((current) => current.map((payment, at) => (at === index ? { ...payment, ...change } : payment)));
   /** Aufrunden: the tip that brings amount and tip to the next whole euro — again for the one after. */

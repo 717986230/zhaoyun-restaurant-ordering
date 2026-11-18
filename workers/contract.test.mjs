@@ -37,7 +37,7 @@ test("Worker on D1 satisfies the API contract", { skip: baseUrl ? false : "set W
       ...(options.raw ? { body: options.raw.body } : {})
     });
     const bytes = Buffer.from(await response.arrayBuffer());
-    let json = {};
+    let json;
     try { json = bytes.length ? JSON.parse(bytes.toString("utf8")) : {}; } catch { json = {}; }
     return { status: response.status, json, bytes, headers: Object.fromEntries(response.headers) };
   };

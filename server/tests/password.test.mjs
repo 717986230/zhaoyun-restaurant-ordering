@@ -25,7 +25,7 @@ test("a stored hash verifies the password it was made from, and nothing else", a
   assert.equal(await verifyPassword("kueche-passwort!", stored), false);
 });
 
-test("six characters is enough for the console's password, five is not", () => {
-  assert.equal(assertPassword("123456"), "123456");
-  assert.throws(() => assertPassword("12345"), /at least 6 characters/);
+test("eight characters is enough for the console's password, seven is not", () => {
+  assert.equal(assertPassword("12345678"), "12345678");
+  assert.throws(() => assertPassword("1234567"), /at least 8 characters/);
 });

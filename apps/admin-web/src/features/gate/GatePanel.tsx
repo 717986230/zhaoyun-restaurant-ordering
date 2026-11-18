@@ -17,7 +17,7 @@ export interface GatePanelProps {
   onRegister: (command: RegisterCommand) => void;
 }
 
-const PASSWORD_MIN = 6;
+const PASSWORD_MIN = 8;
 const LOGIN_PATTERN = /^[a-z0-9][a-z0-9._@-]{2,63}$/;
 
 export function GatePanel({ registered, busy, error, onSignIn, onRegister }: GatePanelProps) {
@@ -84,6 +84,8 @@ export function GatePanel({ registered, busy, error, onSignIn, onRegister }: Gat
       {tooShort && <p className="gate-note">{t("gateTooShort", { min: PASSWORD_MIN })}</p>}
       {mismatch && <p className="gate-note">{t("gateMismatch")}</p>}
       {error && <p className="gate-note error" role="alert">{error}</p>}
+
+      {!registered && <p className="gate-note" role="note">{t("gateFirstOwnerWarning")}</p>}
 
       <button type="submit" className="primary-action" disabled={!ready || busy}>
         {busy ? t("gateWait") : t(registered ? "gateEnter" : "gateRegister")}

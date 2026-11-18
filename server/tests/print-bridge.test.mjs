@@ -51,6 +51,7 @@ const until = async (check, ms = 5_000) => {
 };
 
 // A German or English printer on the automatic encoding gets code page 437.
+// eslint-disable-next-line no-control-regex -- stripping ESC/POS command bytes to compare printable text.
 const text = (bytes) => iconv.decode(bytes, "cp437").replace(/\u001b[@EadB][\s\S]?|\u001d[!V][\s\S]/g, "");
 
 test("each station's ticket reaches its own printer, in that printer's language, the moment it is ordered", async (context) => {
@@ -173,6 +174,7 @@ test("a failed delivery is reported with every printer tried, and the console he
   assert.deepEqual(report, { bridgeId: "b1", name: "b1", version: "3", printers: [{ id: "k1", ok: true }] });
 });
 
+// eslint-disable-next-line no-control-regex -- stripping ESC/POS command bytes to compare printable text.
 const plain = (bytes, encoding = "utf8") => iconv.decode(bytes, encoding).replace(/\u001b[@EadB][\s\S]?|\u001d[!V][\s\S]/g, "");
 const order = {
   orderNo: "A1", table: "08", staffName: "Li",

@@ -140,6 +140,7 @@ function amountRows(left, right, width) {
 const UMLAUTS = { Ä: "Ae", Ö: "Oe", Ü: "Ue", ä: "ae", ö: "oe", ü: "ue", ß: "ss" };
 
 function forEncoding(text, encoding) {
+  // eslint-disable-next-line no-control-regex -- control characters cannot be printed on a receipt; strip them before encoding.
   const plain = String(text).replace(/[\u0000-\u0009\u000b-\u001f]/g, "");
   if (encoding === "utf8") return plain;
   const ascii = plain.replace(/–/g, "-").replace(/€/g, "EUR").replace(/[„“”]/g, "\"").replace(/[‚‘’]/g, "'");

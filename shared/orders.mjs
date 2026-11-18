@@ -141,6 +141,9 @@ export function orderView(row, itemRows = []) {
       unitPrice: item.unit_price_cents / 100,
       printStation: item.print_station,
       vatPercent: item.vat_percent,
+      // 等叫: this line is held (order_item_holds.held_at) — on the bill, but
+      // not sent to the kitchen yet. The KDS shows it as 等叫, not to cook.
+      held: Boolean(item.held_at),
       modifiers: parseJson(item.modifiers_json, []).map((modifier) => ({ ...modifier, price: modifier.priceCents / 100 }))
     })),
     billedAt: row.billed_at ?? null,

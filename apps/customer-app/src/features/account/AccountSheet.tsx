@@ -28,7 +28,7 @@ interface Props {
   signupPoints: number;
 }
 
-const PASSWORD_MIN = 6;
+const PASSWORD_MIN = 8;
 
 type Language = CustomerState["language"];
 

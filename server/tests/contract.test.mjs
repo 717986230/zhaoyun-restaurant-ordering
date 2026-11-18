@@ -54,7 +54,7 @@ test("Node server satisfies the API contract", async (context) => {
       ...(options.body ? { payload: options.body } : {}),
       ...(options.raw ? { payload: options.raw.body } : {})
     });
-    let json = {};
+    let json;
     try { json = response.body ? response.json() : {}; } catch { json = {}; }
     return { status: response.statusCode, json, bytes: response.rawPayload, headers: response.headers };
   };
