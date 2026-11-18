@@ -117,7 +117,10 @@ export function drawerView(row, totals, movementRows) {
 /** A drawer, and the one before it: its receipts start after the last receipt when it opened. */
 export const DRAWER_RECEIPTS_SQL = "SELECT * FROM receipts WHERE receipt_no > ? ORDER BY receipt_no";
 export const OPEN_DRAWER_SQL = "SELECT * FROM drawer_sessions WHERE open_flag = 1";
-export const DRAWER_MOVEMENTS_SQL = "SELECT * FROM drawer_movements WHERE session_id = ? ORDER BY created_at, id";
+// Tie-break on rowid, not the random uuid id: two movements in the same
+// millisecond must still come back in the order they were entered, both on the
+// drawer-close report and in the tests.
+export const DRAWER_MOVEMENTS_SQL = "SELECT * FROM drawer_movements WHERE session_id = ? ORDER BY created_at, rowid";
 /** open_flag is UNIQUE: a second open drawer is refused by the database, even from two devices at once. */
 export const INSERT_DRAWER_SQL = `INSERT INTO drawer_sessions (id, open_flag, after_receipt_no, float_cents, opened_by, opened_at)
   VALUES (?, 1, COALESCE((SELECT MAX(receipt_no) FROM receipts), 0), ?, ?, ?)`;
