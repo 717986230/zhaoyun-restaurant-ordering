@@ -474,6 +474,7 @@ export function createStore(driver) {
       sql("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, created_at, updated_at) VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?)", id, orderNo, clientRequestId, table, note, totalCents, timestamp, timestamp),
       ...plan.items.map((item) => sql("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", item.id, item.orderId, item.productId, item.productName, item.quantity, item.unitPriceCents, item.printStation, item.modifiersJson, item.vatPercent)),
       ...plan.items.filter((item) => item.vatSplitJson).map((item) => sql("INSERT INTO order_item_vat_splits (order_item_id, split_json) VALUES (?, ?)", item.id, item.vatSplitJson)),
+      ...plan.items.filter((item) => item.note).map((item) => sql("INSERT INTO order_item_notes (order_item_id, note) VALUES (?, ?)", item.id, item.note)),
       ...plan.printJobs.map((job) => sql("INSERT INTO print_jobs (id, order_id, printer_role, payload_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)", job.id, job.orderId, job.printerRole, job.payloadJson, timestamp, timestamp)),
       ...(pos ? [sql("INSERT INTO order_staff (order_id, staff_id, staff_name, pickup_no, created_at) VALUES (?, ?, ?, ?, ?)", id, pos.staff?.id ?? null, pos.staff?.name ?? null, pickupNo, timestamp)] : []),
       // The guests are seated: their phones may order too.

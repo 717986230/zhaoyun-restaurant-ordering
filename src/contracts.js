@@ -69,7 +69,9 @@ export const CreateOrderBody = Type.Object({
   items: Type.Array(Type.Object({
     id: ProductId,
     qty: Type.Integer({ minimum: 1, maximum: 99 }),
-    modifiers: Type.Optional(Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }) }), { maxItems: 32 }))
+    modifiers: Type.Optional(Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }) }), { maxItems: 32 })),
+    // 逐菜备注: a free note for this line, printed under the dish.
+    note: Type.Optional(Type.String({ maxLength: 120 }))
   }), { minItems: 1, maxItems: 100 })
 });
 
@@ -88,7 +90,8 @@ export const GuestOrderBody = Type.Object({
     id: ProductId,
     qty: Type.Integer({ minimum: 1, maximum: 99 }),
     modifiers: Type.Optional(Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }) }), { maxItems: 32 })),
-    reward: Type.Optional(Type.Boolean())
+    reward: Type.Optional(Type.Boolean()),
+    note: Type.Optional(Type.String({ maxLength: 120 }))
   }), { minItems: 1, maxItems: 100 })
 }, { additionalProperties: false });
 

@@ -250,6 +250,8 @@ function orderLines(payload, context, part = null) {
       const option = named(modifier, context);
       lines.push({ text: `  - ${option.main}${option.second ? ` / ${option.second}` : ""}`, indent: "    " });
     }
+    // The per-dish kitchen note, printed bold so the cook can't miss it.
+    if (item.note) lines.push({ text: `  ${copy.note}: ${item.note}`, bold: true, indent: "    " });
   }
   if (payload.note) lines.push({ text: `${copy.note}: ${payload.note}`, bold: true });
   if (voiding && payload.reason) lines.push(`${copy.reason}: ${payload.reason}`);

@@ -10,7 +10,7 @@ import type { Pos, Screen } from "./App";
 /** How often an open table tells the server this device still has it. */
 const HOLD_MS = 30_000;
 
-interface CartLine { key: string; product: Product; quantity: number; modifiers: Array<{ id: string; name: string; priceCents: number }> }
+interface CartLine { key: string; product: Product; quantity: number; modifiers: Array<{ id: string; name: string; priceCents: number }>; note?: string }
 
 const lineKey = (product: Product, modifiers: CartLine["modifiers"]) => `${product.id}|${modifiers.map((modifier) => modifier.id).sort().join(",")}`;
 
@@ -25,6 +25,8 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const [bill, setBill] = useState<ApiBill | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [note, setNote] = useState("");
+  // 逐菜备注: the cart line whose per-dish note is open for editing.
+  const [noteFor, setNoteFor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [choosing, setChoosing] = useState<{ product: Product; qty: number } | null>(null);
@@ -153,6 +155,14 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     return quantity > 0 ? [{ ...line, quantity }] : [];
   }));
 
+  // 逐菜备注：把某行的备注写上（空串则清掉）。
+  const setLineNote = (key: string, text: string) => setCart((current) => current.map((line) => {
+    if (line.key !== key) return line;
+    const note = text.slice(0, 120);
+    const { note: _drop, ...rest } = line;
+    return note.trim() ? { ...rest, note } : rest;
+  }));
+
   /**
    * A dish number and Enter: straight onto the order — "45" for one, "45×3",
    * "45*3" or "45 3" for three (点菜改数量 the way it is said at the table).
@@ -177,7 +187,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       clientRequestId: requestId.current,
       table,
       note: note.trim(),
-      items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}) }))
+      items: cart.map((line) => ({ id: line.product.id, qty: line.quantity, ...(line.modifiers.length ? { modifiers: line.modifiers.map((modifier) => ({ id: modifier.id })) } : {}), ...(line.note?.trim() ? { note: line.note.trim() } : {}) }))
     };
     const limited = cart.some((line) => line.product.leftToday !== null && line.product.leftToday !== undefined);
     setBusy(true);
@@ -187,6 +197,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       requestId.current = crypto.randomUUID();
       setCart([]);
       setNote("");
+      setNoteFor(null);
       setSheetOpen(false);
       await loadBill();
       // The counts of limited dishes went down.
@@ -268,19 +279,23 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       </div>
       <h2>{t("sent")} <span>{money(sentCents)}</span></h2>
       {bill?.items.length ? <ul className="pos-lines sent">{bill.items.map((item) => <li key={item.orderItemId}>
-        <span>{item.qty} × {item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}</span>
+        <span>{item.qty} × {item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}{item.note ? <small className="pos-line-note">✎ {item.note}</small> : null}</span>
         <b>{money(Math.round(item.lineTotal * 100))}</b>
         <button type="button" className="pos-urge" aria-label={t("urgeOf", { name: item.names?.[language] || item.name })} onClick={() => void urge(item)}>{t("urge")}</button>
         <button type="button" className="pos-void" aria-label={t("voidOf", { name: item.names?.[language] || item.name })} onClick={() => setVoiding(item)}>{t("void")}</button>
       </li>)}</ul> : <p className="pos-muted">{t("nothingSent")}</p>}
       <h2>{t("newItems")} <span>{money(cartCents)}</span></h2>
-      {cart.length ? <ul className="pos-lines new">{cart.map((line) => <li key={line.key}>
-        <span>{name(line.product)}{line.modifiers.length ? <small>{line.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}</span>
-        <span className="pos-stepper">
-          <button type="button" aria-label="−" onClick={() => change(line.key, -1)}>−</button>
-          <b>{line.quantity}</b>
-          <button type="button" aria-label="+" onClick={() => change(line.key, 1)}>+</button>
-        </span>
+      {cart.length ? <ul className="pos-lines new">{cart.map((line) => <li key={line.key} className="pos-line-notable">
+        <div className="pos-line-main">
+          <span>{name(line.product)}{line.modifiers.length ? <small>{line.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}{line.note ? <small className="pos-line-note">✎ {line.note}</small> : null}</span>
+          <span className="pos-stepper">
+            <button type="button" className="pos-line-notebtn" aria-label={t("itemNote")} aria-pressed={noteFor === line.key} onClick={() => setNoteFor(noteFor === line.key ? null : line.key)}>✎</button>
+            <button type="button" aria-label="−" onClick={() => change(line.key, -1)}>−</button>
+            <b>{line.quantity}</b>
+            <button type="button" aria-label="+" onClick={() => change(line.key, 1)}>+</button>
+          </span>
+        </div>
+        {noteFor === line.key ? <input className="pos-note pos-line-noteinput" autoFocus value={line.note ?? ""} maxLength={120} placeholder={t("itemNotePlaceholder")} onChange={(event) => setLineNote(line.key, event.target.value)} onBlur={() => setNoteFor(null)} onKeyDown={(event) => { if (event.key === "Enter") setNoteFor(null); }} /> : null}
       </li>)}</ul> : <p className="pos-muted">{t("cartEmpty")}</p>}
       <input className="pos-note" value={note} maxLength={500} placeholder={t("note")} onChange={(event) => setNote(event.target.value)} />
       <div className="pos-ticket-actions">

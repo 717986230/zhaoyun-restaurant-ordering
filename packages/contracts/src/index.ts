@@ -17,6 +17,8 @@ export interface CreateOrderCommand {
     id: string;
     qty: number;
     modifiers?: Array<{ id: string }>;
+    /** 逐菜备注: a free note for this line, e.g. "少盐" — printed under the dish. */
+    note?: string;
   }>;
 }
 
@@ -244,6 +246,8 @@ export interface ApiBill {
     /** A set menu over more than one rate: how its line divides. */
     vatSplit?: Array<{ percent: VatPercent; amount: number }>;
     modifiers?: Array<{ name: string }>;
+    /** 逐菜备注: the line's free note, e.g. "少盐". */
+    note?: string;
   }>;
   vatBreakdown: Array<{ percent: VatPercent; gross: number; net: number; vat: number }>;
   total: number;
