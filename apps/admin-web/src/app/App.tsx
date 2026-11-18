@@ -62,13 +62,13 @@ const LIVE_SETTLE_MS = 250;
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
   if (role === "staff") return ["board", "tables", "reservations", "waitlist", "delivery", "links"];
-  // 报表 is the money view — takings, Z-report parity, VAT, per-dish, CSV — and
-  // a restaurant ringing up sales on the POS needs it whether or not the live
-  // orders board, floor and printers are shown. It reads the receipts the POS
-  // writes, not the guest-ordering flow, so it stays out of the showOrdering
-  // gate (whose label only ever promised orders, tables and printers) and is
-  // always within a manager's reach.
-  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "printers", "guests", "members", "system", "links"] : ["today", "reports", "catalog", "reservations", "waitlist", "delivery", "guests", "members", "system", "links"];
+  // 报表 (the money view) and 桌位 (table status — who is seated, which bills are
+  // open) are what a manager needs every service, whether or not the live orders
+  // board and the printer setup are shown. The POS opens tables and writes the
+  // receipts both read, so they do not belong behind the guest-ordering-era
+  // gate; only the realtime 订单 board and 打印 setup stay behind showOrdering,
+  // and the toggle's label now says exactly those two.
+  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "printers", "guests", "members", "system", "links"] : ["today", "reports", "tables", "catalog", "reservations", "waitlist", "delivery", "guests", "members", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
