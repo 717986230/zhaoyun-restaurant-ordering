@@ -372,7 +372,13 @@ export const StaffBody = Type.Object({
 }, { additionalProperties: false });
 export const DeviceBody = Type.Object({ name: Type.String({ maxLength: 64 }) }, { additionalProperties: false });
 export const PosSignInBody = Type.Object({ staffId: Type.String({ minLength: 1, maxLength: 64 }), pin: Type.String({ maxLength: 12 }) }, { additionalProperties: false });
-export const MoveTableBody = Type.Object({ to: Type.String({ minLength: 1, maxLength: 8 }) }, { additionalProperties: false });
+export const MoveTableBody = Type.Object(
+  {
+    to: Type.String({ minLength: 1, maxLength: 8 }),
+    merge: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
 export const SettlementBody = Type.Object({ staffId: Type.Optional(Type.String({ maxLength: 64 })) }, { additionalProperties: false });
 
 // The cash drawer (shared/drawer.mjs): opened with a float, money in and out with why, counted at the end.

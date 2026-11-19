@@ -54,6 +54,9 @@ const incremental = [
   { file: "0066_email_verification.sql", drop: "DROP TABLE mail_outbox; DROP TABLE customer_verified_emails; DROP INDEX idx_email_codes_customer; DROP TABLE email_codes;" },
   // Data only: it changes no table, on any database.
   { file: "0068_hide_hot_pot.sql", drop: "" },
+  // Data only: the category tidy (CHIRI ROLLS -> URAMAKI ROLLS, TEA ->
+  // NON-ALCOHOLIC); the seed already says it, this moves deployed rows.
+  { file: "0111_category_cleanup.sql", drop: "" },
   { file: "0069_member_balance.sql", drop: "DROP INDEX idx_balance_ledger_ref; DROP INDEX idx_balance_ledger_customer; DROP TABLE balance_ledger; DROP TABLE member_balances;" },
   { file: "0070_member_birthday.sql", drop: "DROP TABLE member_birthdays;" },
   { file: "0071_birthday_greetings.sql", drop: "DROP TABLE birthday_greetings;" },
@@ -286,6 +289,34 @@ test("the incremental migrations are no-ops on a fresh database and bring a depl
     });
     assert.deepEqual(deployed, expected, `${migration.file} must give an already-deployed database what it adds`);
   }
+});
+
+/**
+ * 0111 renames the two tidied categories, nothing else.
+ */
+test("0111 renames the two tidied categories, nothing else", () => {
+  const sql = committed();
+  const result = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    db.exec(sql.sets);
+    // A deployed database still carries the old names (the seed it was built
+    // from said CHIRI ROLLS / TEA); put them back before the tidy runs.
+    db.exec("UPDATE products SET category = 'CHIRI ROLLS' WHERE category = 'URAMAKI ROLLS'");
+    db.exec("UPDATE products SET category = 'TEA' WHERE id = 'photo-tea'");
+    db.exec(readFileSync(path.join(migrationsDir, "0111_category_cleanup.sql"), "utf8"));
+    const rows = db.prepare("SELECT id, category FROM products").all();
+    db.close();
+    return rows;
+  });
+  assert.deepEqual(result.filter((row) => row.category === "URAMAKI ROLLS").map((row) => row.id).sort(),
+    ["photo-x1", "photo-x2", "photo-x3", "photo-x4", "photo-x5", "photo-x6", "photo-x7", "photo-x8", "photo-x9"]);
+  assert.deepEqual(result.filter((row) => row.category === "TEA").map((row) => row.id), []);
+  assert.equal(result.find((row) => row.id === "photo-tea")?.category, "NON-ALCOHOLIC");
+  assert.ok(result.every((row) => row.category !== "CHIRI ROLLS"));
+  // A category the owner renamed by hand is not touched by the tidy.
+  assert.ok(result.some((row) => row.category === "HOT POT"));
 });
 
 /**

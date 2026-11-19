@@ -117,15 +117,15 @@ export const photoMenuDishes = [
   item("S2-18", "sushi", "SASHIMI", "Sake Maguro Set 18 Stück", "Salmon Tuna Sashimi 18 pcs", "三文鱼金枪鱼刺身 18个", 29.9, ["D"], "Lachs, Thunfisch"),
   item("S3-9", "sushi", "SASHIMI", "Mix Set 9 Stück", "Mixed Sashimi Set 9 pcs", "混合刺身 9个", 17.9, ["B", "D"], "Lachs, Thunfisch, Hamachi"),
   item("S3-18", "sushi", "SASHIMI", "Mix Set 18 Stück", "Mixed Sashimi Set 18 pcs", "混合刺身 18个", 29.9, ["B", "D"], "Lachs, Thunfisch, Hamachi"),
-  item("X1", "sushi", "CHIRI ROLLS", "Rainbow Roll 8 Stück", "Rainbow Roll 8 pcs", "彩虹卷 8个", 15.9, ["C", "F", "D"], "Lachs, Thunfisch, Hamachi, Avocado, Kresse"),
-  item("X2", "sushi", "CHIRI ROLLS", "Crunchy Salmon Roll 8 Stück", "Crunchy Salmon Roll 8 pcs", "脆皮三文鱼卷 8个", 14.9, ["A", "C", "D", "F"], "Lachstempura, Salat, Crispy Panko, Mayo, Teriyaki"),
-  item("X3", "sushi", "CHIRI ROLLS", "Pink Alaska 8 Stück", "Pink Alaska Roll 8 pcs", "粉色阿拉斯加卷 8个", 12.9, ["D", "N"], "Lachs, Cream Cheese, Avocado, Masago"),
-  item("X4", "sushi", "CHIRI ROLLS", "Spicy Tuna 8 Stück", "Spicy Tuna Roll 8 pcs", "辣金枪鱼卷 8个", 15.9, ["D", "N"], "Thunfisch, Avocado, Masago, Spicy Mayo"),
-  item("X5", "sushi", "CHIRI ROLLS", "Dragon Roll 8 Stück", "Dragon Roll 8 pcs", "龙卷 8个", 16.9, ["A", "C", "D"], "Garnelen, Avocado, flambierter Aal, Sushi-Soße"),
-  item("X6", "sushi", "CHIRI ROLLS", "Agamo Roll 8 Stück", "Agamo Roll 8 pcs", "鸭肉卷 8个", 12.9, ["A", "F"], "Knusperente, Gurken, Jungzwiebel, Teriyaki"),
-  item("X7", "sushi", "CHIRI ROLLS", "Sweet Power 8 Stück", "Sweet Power Roll 8 pcs", "甜力卷 8个", 13.9, ["D", "F"], "Avocado, Mango, flambierter Lachs"),
-  item("X8", "sushi", "CHIRI ROLLS", "Sweet Green 8 Stück", "Sweet Green Roll 8 pcs", "甜绿卷 8个", 12.9, ["C", "F"], "Süßkartoffeltempura, Mango, Gurke, Basilikum"),
-  item("X9", "sushi", "CHIRI ROLLS", "Mikado Roll 8 Stück", "Mikado Roll 8 pcs", "御卷 8个", 12.9, ["A", "E", "F"], "Erdnuss, Avocado, Kresse"),
+  item("X1", "sushi", "URAMAKI ROLLS", "Rainbow Roll 8 Stück", "Rainbow Roll 8 pcs", "彩虹卷 8个", 15.9, ["C", "F", "D"], "Lachs, Thunfisch, Hamachi, Avocado, Kresse"),
+  item("X2", "sushi", "URAMAKI ROLLS", "Crunchy Salmon Roll 8 Stück", "Crunchy Salmon Roll 8 pcs", "脆皮三文鱼卷 8个", 14.9, ["A", "C", "D", "F"], "Lachstempura, Salat, Crispy Panko, Mayo, Teriyaki"),
+  item("X3", "sushi", "URAMAKI ROLLS", "Pink Alaska 8 Stück", "Pink Alaska Roll 8 pcs", "粉色阿拉斯加卷 8个", 12.9, ["D", "N"], "Lachs, Cream Cheese, Avocado, Masago"),
+  item("X4", "sushi", "URAMAKI ROLLS", "Spicy Tuna 8 Stück", "Spicy Tuna Roll 8 pcs", "辣金枪鱼卷 8个", 15.9, ["D", "N"], "Thunfisch, Avocado, Masago, Spicy Mayo"),
+  item("X5", "sushi", "URAMAKI ROLLS", "Dragon Roll 8 Stück", "Dragon Roll 8 pcs", "龙卷 8个", 16.9, ["A", "C", "D"], "Garnelen, Avocado, flambierter Aal, Sushi-Soße"),
+  item("X6", "sushi", "URAMAKI ROLLS", "Agamo Roll 8 Stück", "Agamo Roll 8 pcs", "鸭肉卷 8个", 12.9, ["A", "F"], "Knusperente, Gurken, Jungzwiebel, Teriyaki"),
+  item("X7", "sushi", "URAMAKI ROLLS", "Sweet Power 8 Stück", "Sweet Power Roll 8 pcs", "甜力卷 8个", 13.9, ["D", "F"], "Avocado, Mango, flambierter Lachs"),
+  item("X8", "sushi", "URAMAKI ROLLS", "Sweet Green 8 Stück", "Sweet Green Roll 8 pcs", "甜绿卷 8个", 12.9, ["C", "F"], "Süßkartoffeltempura, Mango, Gurke, Basilikum"),
+  item("X9", "sushi", "URAMAKI ROLLS", "Mikado Roll 8 Stück", "Mikado Roll 8 pcs", "御卷 8个", 12.9, ["A", "E", "F"], "Erdnuss, Avocado, Kresse"),
   item("B1", "food", "MAIN DISHES", "Sesam Chicken", "Sesame Chicken", "芝麻鸡", 13.9, ["A", "C", "F", "N"], "Hühnerstreifen, Gemüse, Sesam"),
   item("B2", "food", "MAIN DISHES", "Red Thai Curry Chicken", "Red Thai Curry Chicken", "红咖喱鸡", 13.9, [], "Hühnerfleisch, Kokosmilch, Gemüse, Basilikum"),
   item("B3", "food", "MAIN DISHES", "Hawaii Chicken", "Hawaii Chicken", "夏威夷鸡", 13.9, ["A"], "Ananas, Mango, Hühnerfleisch, Gemüse, Kokosmilch"),
@@ -190,7 +190,7 @@ export const photoMenuDishes = [
   item("COFFEE-ESPRESSO", "drink", "COFFEE", "Espresso", "Espresso", "浓缩咖啡", 2.9, ["G"], "Kaffee"),
   item("COFFEE-CAPPUCCINO", "drink", "COFFEE", "Cappuccino", "Cappuccino", "卡布奇诺", 4.2, ["G"], "Kaffee, Milch"),
   item("COFFEE-LATTE", "drink", "COFFEE", "Latte Macchiato", "Latte Macchiato", "拿铁咖啡", 4.5, ["G"], "Kaffee, Milch"),
-  item("TEA", "drink", "TEA", "Jasmintee, Grüntee, Schwarztee", "Jasmine, Green or Black Tea", "茉莉花茶、绿茶、红茶", 3.5, [], "Tee")
+  item("TEA", "drink", "NON-ALCOHOLIC", "Jasmintee, Grüntee, Schwarztee", "Jasmine, Green or Black Tea", "茉莉花茶、绿茶、红茶", 3.5, [], "Tee")
 // Hot pot is off the menu for now (migrations/0068_hide_hot_pot.sql): its
 // dishes are kept, unpublished, for the day it comes back.
 ].map((dish) => (dish.cat === "HOT POT" ? { ...dish, published: false } : dish));

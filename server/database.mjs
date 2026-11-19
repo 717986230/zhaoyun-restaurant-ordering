@@ -792,6 +792,11 @@ function seedDishes(sql, db) {
   const isLegacyDemoCatalog = existing.length > 0 && existing.length <= 15 && existing.every((row) => row.sku.startsWith("FOOD-"));
   if (isLegacyDemoCatalog) db.exec("DELETE FROM products");
   if (sql.get("SELECT COUNT(*) AS count FROM products").count) {
+    // The category tidy (migrations/0111_category_cleanup.sql): a database
+    // seeded before it still carries CHIRI ROLLS and TEA. Only rows still
+    // under the old names move — a category the owner renamed stays renamed.
+    sql.run("UPDATE products SET category = 'URAMAKI ROLLS', updated_at = ? WHERE category = 'CHIRI ROLLS'", now());
+    sql.run("UPDATE products SET category = 'NON-ALCOHOLIC', updated_at = ? WHERE category = 'TEA'", now());
     // A catalogue from before the dishes had options gets them.
     const ramen = sql.get("SELECT * FROM products WHERE sku = ?", "R1");
     if (ramen && !parseJson(ramen.modifiers_json, []).length) {

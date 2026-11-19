@@ -38,6 +38,26 @@ test("order writes wait for a busy write lock instead of failing immediately", a
   assert.equal((await order("busy-order-0002")).table, "05");
 });
 
+test("starting the server renames the two tidied categories on an old catalogue", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-cat-"));
+  const databasePath = path.join(directory, "restaurant.sqlite");
+  const first = createDatabase(databasePath);
+  first.close();
+  // A database seeded before the tidy still says CHIRI ROLLS / TEA.
+  const raw = new DatabaseSync(databasePath);
+  raw.exec("UPDATE products SET category = 'CHIRI ROLLS' WHERE category = 'URAMAKI ROLLS'");
+  raw.exec("UPDATE products SET category = 'TEA' WHERE id = 'photo-tea'");
+  raw.close();
+
+  const database = createDatabase(databasePath);
+  context.after(() => { database.close(); rmSync(directory, { recursive: true, force: true }); });
+  const categories = new Set((await database.listProducts(true)).map((product) => product.category));
+  assert.ok(!categories.has("CHIRI ROLLS"), "the old roll name is gone");
+  assert.ok(!categories.has("TEA"), "the one-dish tea category is gone");
+  assert.ok(categories.has("URAMAKI ROLLS"));
+  assert.equal((await database.listProducts(true)).find((product) => product.id === "photo-tea")?.category, "NON-ALCOHOLIC");
+});
+
 test("a dish keeps a palette colour tag, and anything off-palette clears it", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-tagcolor-"));
   const database = createDatabase(path.join(directory, "restaurant.sqlite"));

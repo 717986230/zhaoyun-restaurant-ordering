@@ -954,7 +954,14 @@ export function createStore(driver) {
     }
   }
 
-  async function moveTable(fromInput, toInput, pos) {
+  /**
+   * 转桌 / 并台: an open table's unbilled orders move to another table.
+   * Onto a free table it is a plain move; onto a table with its own open
+   * bill it is a merge, and that takes saying so — a typed number or a stale
+   * client must never silently fold two bills into one. Null when the source
+   * has nothing open.
+   */
+  async function moveTable(fromInput, toInput, pos, { merge = false } = {}) {
     const from = normalizeTableNo(fromInput);
     const to = normalizeTableNo(toInput);
     if (from === to) throw new Error("That is the same table");
@@ -964,6 +971,16 @@ export function createStore(driver) {
       assertClaim(await first(CLAIM_WITH_META_SQL, to), pos.deviceId);
       const open = (await first("SELECT COUNT(*) AS n FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", from))?.n ?? 0;
       if (!open) return null;
+      if (!merge) {
+        const targetOpen = (await first("SELECT COUNT(*) AS n FROM orders WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", to))?.n ?? 0;
+        if (targetOpen) {
+          const error = new Error(
+            `Table ${to} already has an open bill — merge the tables to combine them`,
+          );
+          error.code = "TABLE_OCCUPIED";
+          throw error;
+        }
+      }
       const at = now();
       await batch([
         sql("UPDATE orders SET table_no = ?, updated_at = ? WHERE table_no = ? AND billed_at IS NULL AND status <> 'cancelled'", to, at, from),

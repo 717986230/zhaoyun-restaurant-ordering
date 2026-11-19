@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
-import type { ApiBill } from "@zhaoyun/contracts";
+import type { ApiBill, PosClaim } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
 import { ApiError } from "@zhaoyun/api-client";
 import { TAG_COLORS } from "../../../src/tag-colors.js";
@@ -267,7 +267,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     if (!target) return;
     setMoving(false);
     try {
-      await api.move(table, target);
+      await api.move(table, target, merge);
       pos.notify(t(merge ? "mergedTo" : "moved", { to: target }));
       go({ name: "floor" });
     } catch (error) { pos.failed(error); }
@@ -416,29 +416,71 @@ function VoidDialog({ pos, item, onVoid, onCancel }: { pos: Pos; item: ApiBill["
  */
 function MoveDialog({ pos, from, onMove, onCancel }: { pos: Pos; from: string; onMove: (to: string, merge: boolean) => void; onCancel: () => void }) {
   const { t, money } = pos;
-  const [tables, setTables] = useState<{ table: string; state: string; total: number }[] | null>(null);
+  // The floor as it stands, with who has each table open: a table another
+  // waiter is working on is not a target, here or by typing its number.
+  const [floor, setFloor] = useState<{
+    tables: { table: string; state: string; total: number }[];
+    claims: PosClaim[];
+    deviceId: string;
+  } | null>(null);
   const [other, setOther] = useState("");
   // 并台: the occupied table a merge is about to go to, awaiting confirm.
   const [mergeTo, setMergeTo] = useState<string | null>(null);
   useEffect(() => {
-    api.floor().then((floor) => setTables(floor.tables)).catch(() => setTables([]));
+    api.floor().then((data) => setFloor({ tables: data.tables, claims: data.claims, deviceId: data.deviceId })).catch(() => setFloor({ tables: [], claims: [], deviceId: "" }));
   }, []);
   const up = from.toUpperCase();
-  const room = (tables ?? []).filter((entry) => !/^TA-/i.test(entry.table) && entry.table.toUpperCase() !== up);
+  const room = (floor?.tables ?? []).filter((entry) => !/^TA-/i.test(entry.table) && entry.table.toUpperCase() !== up);
+  // Seated is the floor's word for a table with an open bill; "occupied" never
+  // was one, so the merge grid below used to come up empty.
   const free = room.filter((entry) => entry.state === "free");
-  const busy = room.filter((entry) => entry.state === "occupied");
+  const busy = room.filter((entry) => entry.state === "seated");
+  const claimOf = (table: string) => floor?.claims.find((claim) => claim.table === table.toUpperCase());
+  const heldByOther = (table: string) => {
+    const claim = claimOf(table);
+    return claim && claim.deviceId !== floor?.deviceId && !claim.shared ? claim.staffName ?? "?" : null;
+  };
+  // A typed number is routed the same way the grids are: onto a table with an
+  // open bill it is a merge, so it waits for the same confirm instead of
+  // folding two bills together unasked; onto a table another waiter holds,
+  // it is refused at once, not after the confirm.
+  function moveTyped() {
+    const target = other.trim().toUpperCase();
+    if (!target) return;
+    const entry = room.find((item) => item.table.toUpperCase() === target);
+    if (entry?.state === "seated") {
+      const holder = heldByOther(entry.table);
+      if (holder) pos.failed(new Error(t("claimedBy", { table: entry.table, name: holder })));
+      else setMergeTo(entry.table);
+      return;
+    }
+    if (entry) {
+      const holder = heldByOther(entry.table);
+      if (holder) { pos.failed(new Error(t("claimedBy", { table: entry.table, name: holder }))); return; }
+    }
+    onMove(other, false);
+  }
   return <div className="pos-modal" role="dialog" aria-label={t("moveTitle", { from })}>
     <div className="pos-card pos-move">
       <h2>{t("moveTitle", { from })}</h2>
-      {tables === null ? <p className="pos-muted">{t("moveLoading")}</p> : <>
+      {floor === null ? <p className="pos-muted">{t("moveLoading")}</p> : <>
         <h3>{t("moveFreeHeading")}</h3>
-        {free.length ? <div className="pos-move-grid">{free.map((entry) => <button key={entry.table} type="button" onClick={() => onMove(entry.table, false)}>{entry.table}</button>)}</div>
+        {free.length ? <div className="pos-move-grid">{free.map((entry) => {
+          const holder = heldByOther(entry.table);
+          return <button key={entry.table} type="button" disabled={Boolean(holder)} title={holder ? t("claimedBy", { table: entry.table, name: holder }) : undefined} onClick={() => onMove(entry.table, false)}>
+            {entry.table}{holder && <small>{t("openOn", { name: holder })}</small>}
+          </button>;
+        })}</div>
           : <p className="pos-muted">{t("moveNoFree")}</p>}
         {busy.length > 0 && <>
           <h3>{t("mergeHeading")}</h3>
-          <div className="pos-move-grid">{busy.map((entry) => <button key={entry.table} type="button" className={mergeTo === entry.table ? "on" : ""} aria-pressed={mergeTo === entry.table} onClick={() => setMergeTo(entry.table)}>
-            {entry.table}{entry.total > 0 && <small>{money(Math.round(entry.total * 100))}</small>}
-          </button>)}</div>
+          <div className="pos-move-grid">{busy.map((entry) => {
+            const holder = heldByOther(entry.table);
+            return <button key={entry.table} type="button" className={mergeTo === entry.table ? "on" : ""} aria-pressed={mergeTo === entry.table}
+              disabled={Boolean(holder)} title={holder ? t("claimedBy", { table: entry.table, name: holder }) : undefined} onClick={() => setMergeTo(entry.table)}>
+              {entry.table}{entry.total > 0 && <small>{money(Math.round(entry.total * 100))}</small>}{holder && <small>{t("openOn", { name: holder })}</small>}
+            </button>;
+          })}</div>
         </>}
       </>}
       {mergeTo && <div className="pos-merge-confirm" role="group">
@@ -448,7 +490,7 @@ function MoveDialog({ pos, from, onMove, onCancel }: { pos: Pos; from: string; o
           <button type="button" className="pos-primary" onClick={() => onMove(mergeTo, true)}>{t("mergeGo")}</button>
         </div>
       </div>}
-      <form className="pos-move-other" onSubmit={(event) => { event.preventDefault(); if (other.trim()) onMove(other, false); }}>
+      <form className="pos-move-other" onSubmit={(event) => { event.preventDefault(); moveTyped(); }}>
         <input value={other} maxLength={8} autoCapitalize="characters" placeholder={t("moveOther")} aria-label={t("moveOther")} onChange={(event) => setOther(event.target.value)} />
         <button type="submit" disabled={!other.trim()}>{t("moveGo")}</button>
       </form>

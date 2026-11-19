@@ -1,15 +1,13 @@
 import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
-import type { AdminApi, AdminStorage, AuditEntry, RestaurantTable, StaffRole } from "@zhaoyun/api-client";
+import type { AdminApi, AdminStorage, AuditEntry, StaffRole } from "@zhaoyun/api-client";
 import type { AccountUpdateCommand, ApiAccount, ApiSettings, ColorScheme, MenuLanguage, NavLabels, VatPercent } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
 import { DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME, drinkTabs, FEATURED_TEMPLATES, festiveThemeInSeason, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themeOutOfSeason, themePattern } from "@zhaoyun/domain";
 import { translate, useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
-import { TableCards } from "./TableCards";
 import { StaffCard } from "./StaffCard";
 import { AppIcons } from "./AppIcons";
-import { downloadQrCard } from "../qr/qrCard";
 import { describeSchedule, ScheduleEditor } from "./ScheduleEditor";
 
 // The time zones on offer: where a restaurant like this one is. A short list
@@ -39,7 +37,6 @@ interface Props {
   settings: ApiSettings | null;
   /** For the promotions card, which lists the chosen dishes by name. */
   products: Product[];
-  tables: RestaurantTable[];
   auditEntries: AuditEntry[];
   onSaveSettings: (change: Partial<ApiSettings>, done: CopyKey) => Promise<void>;
   /** Moves a category's dishes to a new or existing one; true when it did. */
@@ -47,10 +44,6 @@ interface Props {
   /** Puts every dish of a category (set menus aside) at one VAT rate. */
   onSetCategoryVat: (category: string, vatPercent: VatPercent) => Promise<void>;
   onSaveConnection: (storage: AdminStorage) => Promise<void>;
-  onSaveTable: (input: { table: string; label?: string; rotateToken?: boolean }) => Promise<boolean>;
-  onDeleteTable: (table: string) => Promise<void>;
-  /** Tables 1 to count set up for their cards; the ones set up, or null when it failed. */
-  onRegisterNumberedTables: (count: number) => Promise<RestaurantTable[] | null>;
   /** The account signed in; null on a device opened with a configured token. */
   account: ApiAccount | null;
   onUpdateAccount: (command: AccountUpdateCommand) => Promise<boolean>;
@@ -71,15 +64,6 @@ function detailSummary(entry: AuditEntry): string {
 /** The waiter who did it, when the action came from a signed-in POS device. */
 function actorOf(entry: AuditEntry): string {
   return typeof entry.detail.actor === "string" ? entry.detail.actor : "";
-}
-
-/** The guest menu's address: where this console's API lives, else this site. */
-function menuUrl(baseUrl: string): string {
-  return `${(baseUrl || window.location.origin).replace(/\/+$/, "")}/`;
-}
-
-function entryUrl(baseUrl: string, table: RestaurantTable): string {
-  return `${menuUrl(baseUrl)}?table=${encodeURIComponent(table.table)}&k=${encodeURIComponent(table.token)}`;
 }
 
 /** Which settings cards the owner has opened, remembered on this device. */
@@ -409,18 +393,6 @@ const SETTINGS_GROUPS: Array<["menu" | "business" | "account", CopyKey]> = [["me
 
 export function SettingsPanel(props: Props) {
   const { t, language } = useI18n();
-  const [showCards, setShowCards] = useState(false);
-  // The cards on screen: every table, or just the ones set up in one go.
-  const [cardTables, setCardTables] = useState<RestaurantTable[] | null>(null);
-  const floorCount = props.settings?.floorTables || 20;
-
-  async function registerNumbered() {
-    if (!window.confirm(t("numberedTablesConfirm", { count: floorCount }))) return;
-    const made = await props.onRegisterNumberedTables(floorCount);
-    if (!made) return;
-    setCardTables(made);
-    setShowCards(true);
-  }
   const [passwordNote, setPasswordNote] = useState("");
   const settings = props.settings;
 
@@ -476,13 +448,6 @@ export function SettingsPanel(props: Props) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     void props.onSaveConnection({ baseUrl: String(data.get("baseUrl")), token: String(data.get("token")) });
-  }
-
-  async function addTable(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    if (await props.onSaveTable({ table: String(data.get("table") || ""), label: String(data.get("label") || "") })) form.reset();
   }
 
   const themeName = (theme: (typeof MENU_THEMES)[keyof typeof MENU_THEMES]) =>
@@ -664,8 +629,8 @@ export function SettingsPanel(props: Props) {
             <label><span>{t("companyUid")}</span><input name="companyUid" maxLength={16} defaultValue={settings.companyUid} placeholder="ATU12345678" pattern="(ATU|atu)[0-9]{8}" /></label>
             <label><span>{t("cashRegisterId")}</span><input name="cashRegisterId" required maxLength={32} defaultValue={settings.cashRegisterId} /></label>
           </div>
-          {/* Only while no table is set up: from then on the room is edited under Tables. */}
-          {props.tables.length === 0 && <label><span>{t("floorTables")}</span><input name="floorTables" type="number" min={0} max={200} step={1} inputMode="numeric" defaultValue={settings.floorTables} /></label>}
+          {/* The room's size: how many numbered tables the floor stands in with before the room is set up under Tables. */}
+          <label><span>{t("floorTables")}</span><input name="floorTables" type="number" min={0} max={200} step={1} inputMode="numeric" defaultValue={settings.floorTables} /></label>
           <label><span>{t("takeawayDiscount")}</span><input name="takeawayDiscountPercent" type="number" min={0} max={50} step={1} inputMode="numeric" defaultValue={settings.takeawayDiscountPercent} /></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
@@ -693,35 +658,11 @@ export function SettingsPanel(props: Props) {
         <StaffCard api={props.api} notify={props.notify} failed={props.failed} />
       </Section>
       </>}
-      <Section id="tables" title={t("sectionTables")} summary={t("tableCount", { count: props.tables.length })}>
-        <form className="editor-form" onSubmit={(event) => void addTable(event)}>
-          <div className="field-grid">
-            <label><span>{t("tableNumber")}</span><input name="table" required maxLength={8} placeholder="12 / T-3" /></label>
-            <label><span>{t("tableNote")}</span><input name="label" maxLength={64} placeholder={t("tableNotePlaceholder")} /></label>
-          </div>
-          <button className="primary-action" type="submit">{t("registerTable")}</button>
-        </form>
-        {/* The menu's own code, with no table in it: for the door, a flyer, social media. */}
+      <Section id="tables" title={t("sectionTables")}>
+        <p className="settings-hint">{t("tablesMovedTo")}</p>
         <div className="qr-actions">
-          <button className="ghost-action" type="button" onClick={() => void downloadQrCard({ url: menuUrl(props.storage.baseUrl), restaurantName: settings?.restaurantName ?? "", menuLanguages: offered })}>⬇ {t("downloadMenuQr")}</button>
-          {props.tables.length === 0 && <button className="ghost-action" type="button" onClick={() => void registerNumbered()}>{t("numberedTables", { count: floorCount })}</button>}
-          {props.tables.length > 0 && <button className="ghost-action" onClick={() => { setCardTables(null); setShowCards(true); }}>{t("printCards")}</button>}
+          <a className="primary-action" href="#tables">{t("tabTables")}</a>
         </div>
-        {showCards && <TableCards
-          tables={cardTables ?? props.tables}
-          restaurantName={settings?.restaurantName ?? ""}
-          menuLanguages={offered}
-          entryUrl={(table) => entryUrl(props.storage.baseUrl, table)}
-          onClose={() => { setShowCards(false); setCardTables(null); }}
-        />}
-        <div className="table-list">{props.tables.length ? props.tables.map((table) => <div className="table-row" key={table.table}>
-          <div><b>{t("table", { table: table.table })}</b>{table.label && <small> · {table.label}</small>}<code>{entryUrl(props.storage.baseUrl, table)}</code></div>
-          <div className="table-row-actions">
-            <button className="ghost-action" onClick={() => void downloadQrCard({ url: entryUrl(props.storage.baseUrl, table), restaurantName: settings?.restaurantName ?? "", menuLanguages: offered, table: table.table, label: table.label })}>⬇ {t("qrShort")}</button>
-            <button className="ghost-action" onClick={() => void props.onSaveTable({ table: table.table, label: table.label, rotateToken: true })}>{t("rotateToken")}</button>
-            <button className="ghost-action" onClick={() => void props.onDeleteTable(table.table)}>{t("delete")}</button>
-          </div>
-        </div>) : <div className="admin-empty">{t("noTables")}</div>}</div>
       </Section>
     </div>
 

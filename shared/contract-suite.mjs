@@ -1322,6 +1322,22 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal(p2.items.length, 1);
       assert.equal((await call("POST", "/api/pos/tables/P1/move", { ...asWang, body: { to: "P3" } })).status, 404, "nothing left on P1");
 
+      // Onto a table with its own open bill, a plain move is refused — only a
+      // merge said as one combines the bills.
+      assert.equal((await call("POST", "/api/pos/tables/P3/claim", asWang)).status, 200);
+      assert.equal((await posOrder(asWang, "P3", "contract-pos-3", [{ id: food.id, qty: 1 }])).status, 201);
+      assert.equal((await call("POST", "/api/pos/tables/P4/claim", asWang)).status, 200);
+      assert.equal((await posOrder(asWang, "P4", "contract-pos-4", [{ id: food.id, qty: 1 }])).status, 201);
+      const refusedMerge = await call("POST", "/api/pos/tables/P3/move", { ...asWang, body: { to: "P4" } });
+      assert.equal(refusedMerge.status, 409, JSON.stringify(refusedMerge.json));
+      assert.match(refusedMerge.json.error, /P4/);
+      assert.equal((await call("GET", "/api/admin/tables/P3/bill", asWang)).json.bill.items.length, 1, "the refused move leaves P3's bill alone");
+      const merged = await call("POST", "/api/pos/tables/P3/move", { ...asWang, body: { to: "P4", merge: true } });
+      assert.equal(merged.status, 200, JSON.stringify(merged.json));
+      assert.deepEqual(merged.json, { from: "P3", to: "P4", moved: 1 });
+      assert.equal((await call("GET", "/api/admin/tables/P4/bill", asWang)).json.bill.items.length, 2, "both bills are on P4 after the merge");
+      assert.equal((await call("GET", "/api/admin/tables/P3/bill", asWang)).json.bill.items.length, 0);
+
       // Takeaway: the next pickup number, as a table of its own; the ticket carries it.
       const takeaway = await call("POST", "/api/pos/takeaway", asLi);
       assert.equal(takeaway.status, 201, JSON.stringify(takeaway.json));
@@ -1430,9 +1446,11 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("GET", "/api/pos/floor", asLi)).status, 401);
 
       // Leave the room as it was found.
-      for (const table of ["P1", "P2", takeaway.json.table, second.table]) await call("DELETE", `/api/pos/tables/${table}/claim?force=1`, asWang);
+      for (const table of ["P1", "P2", "P3", "P4", takeaway.json.table, second.table]) await call("DELETE", `/api/pos/tables/${table}/claim?force=1`, asWang);
       const p2Left = (await call("GET", "/api/admin/tables/P2/bill", asWang)).json.bill;
       await call("POST", "/api/admin/checkout", { ...asWang, body: { table: "P2", items: p2Left.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "card", amount: p2Left.total }] } });
+      const p4Left = (await call("GET", "/api/admin/tables/P4/bill", asWang)).json.bill;
+      await call("POST", "/api/admin/checkout", { ...asWang, body: { table: "P4", items: p4Left.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.qty })), payments: [{ type: "card", amount: p4Left.total }] } });
       await call("PUT", `/api/admin/staff/${wang.id}`, { admin: true, body: { active: false } });
       for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) {
         assert.equal((await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true })).status, 204);

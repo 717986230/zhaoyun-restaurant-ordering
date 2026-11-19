@@ -2258,7 +2258,7 @@
     "id": "photo-x1",
     "sku": "X1",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "彩虹卷 8个",
       "de": "Rainbow Roll 8 Stück",
@@ -2305,7 +2305,7 @@
     "id": "photo-x2",
     "sku": "X2",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "脆皮三文鱼卷 8个",
       "de": "Crunchy Salmon Roll 8 Stück",
@@ -2353,7 +2353,7 @@
     "id": "photo-x3",
     "sku": "X3",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "粉色阿拉斯加卷 8个",
       "de": "Pink Alaska 8 Stück",
@@ -2399,7 +2399,7 @@
     "id": "photo-x4",
     "sku": "X4",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "辣金枪鱼卷 8个",
       "de": "Spicy Tuna 8 Stück",
@@ -2445,7 +2445,7 @@
     "id": "photo-x5",
     "sku": "X5",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "龙卷 8个",
       "de": "Dragon Roll 8 Stück",
@@ -2492,7 +2492,7 @@
     "id": "photo-x6",
     "sku": "X6",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "鸭肉卷 8个",
       "de": "Agamo Roll 8 Stück",
@@ -2538,7 +2538,7 @@
     "id": "photo-x7",
     "sku": "X7",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "甜力卷 8个",
       "de": "Sweet Power 8 Stück",
@@ -2584,7 +2584,7 @@
     "id": "photo-x8",
     "sku": "X8",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "甜绿卷 8个",
       "de": "Sweet Green 8 Stück",
@@ -2630,7 +2630,7 @@
     "id": "photo-x9",
     "sku": "X9",
     "kind": "sushi",
-    "category": "CHIRI ROLLS",
+    "category": "URAMAKI ROLLS",
     "names": {
       "zh": "御卷 8个",
       "de": "Mikado Roll 8 Stück",
@@ -7573,7 +7573,7 @@
     "id": "photo-tea",
     "sku": "TEA",
     "kind": "drink",
-    "category": "TEA",
+    "category": "NON-ALCOHOLIC",
     "names": {
       "zh": "茉莉花茶、绿茶、红茶",
       "de": "Jasmintee, Grüntee, Schwarztee",

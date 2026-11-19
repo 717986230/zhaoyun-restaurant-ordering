@@ -304,18 +304,36 @@ button {
   box-shadow: 0 6px 18px var(--a-shadow-1);
 }
 
+/* The sections, grouped by the job and wrapping onto as many rows as they
+   need, so every one is on screen at once — no sideways scroll hiding the
+   later tabs. */
 .admin-tabs {
   display: flex;
-  gap: 4px;
-  padding: 0 clamp(10px, 4vw, 48px);
+  flex-wrap: wrap;
+  gap: 2px 20px;
+  padding: 4px clamp(10px, 4vw, 48px);
   border-bottom: 1px solid var(--a-line);
   background: var(--a-card);
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.admin-tabs::-webkit-scrollbar {
-  display: none;
+/* One group: its name, then its tabs — wrapping inside the group too, so a
+   long group (the floor's six) folds onto a second line on a phone instead
+   of pushing its last tab off the screen. */
+.admin-tab-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-tab-group-label {
+  color: var(--a-faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  padding-right: 6px;
+  white-space: nowrap;
 }
 
 .admin-tabs button,

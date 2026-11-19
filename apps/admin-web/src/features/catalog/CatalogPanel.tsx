@@ -114,6 +114,51 @@ function readBundleItems(form: FormData): BundleItem[] {
  * It remounts (and its state resets) with the rest of the form whenever the
  * admin switches which product they are editing, via the form's own `key`.
  */
+/**
+ * The dish's category, picked from the categories the menu already has — in
+ * the order they appear on the menu — instead of typed freehand, which is how
+ * a typo became a category of its own. A genuinely new category is still
+ * possible, typed once under "+ New category"; the server normalises its
+ * name, so "ramen" and "RAMEN" do not become two tabs.
+ */
+function CategoryField({ products, current }: { products: Product[]; current: string | null }) {
+  const { t } = useI18n();
+  const NEW = "__new__";
+  // The categories as the menu shows them: first appearance wins, so the list
+  // is the menu's own order, and a dish's own category is always in it.
+  const categories = useMemo(() => {
+    const seen = [...new Set(products.map((product) => product.category).filter(Boolean))];
+    return current && !seen.includes(current) ? [current, ...seen] : seen;
+  }, [products, current]);
+  const [choice, setChoice] = useState(current ?? "");
+  const [typed, setTyped] = useState("");
+  if (choice === NEW) {
+    // What the server will file it under, so a merge is known before it is
+    // sent: "ramen" joins RAMEN, and ALLE is the all-dishes page, not a name.
+    const key = typed.trim().replace(/\s+/g, " ").toUpperCase();
+    const existing = key && categories.includes(key) ? key : null;
+    return <label><span>{t("fieldCategory")}</span>
+      <input name="category" required autoFocus placeholder="RAMEN" value={typed} onChange={(event) => setTyped(event.target.value.toUpperCase())} />
+      {existing && (
+        <small className="settings-hint">
+          {t("categoryMergeHint", { category: existing })}
+        </small>
+      )}
+      {key === "ALLE" && (
+        <small className="settings-hint">{t("categoryAlleHint")}</small>
+      )}
+      <button type="button" className="ghost-action" onClick={() => setChoice(current ?? "")}>{t("categoryChoose")}</button>
+    </label>;
+  }
+  return <label><span>{t("fieldCategory")}</span>
+    <select name="category" required value={choice} onChange={(event) => setChoice(event.target.value)}>
+      <option value="" disabled>{t("categoryChoose")}</option>
+      {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+      <option value={NEW}>{t("categoryNew")}</option>
+    </select>
+  </label>;
+}
+
 /** A dish's picture at list size; a set shows up to four of its dishes. */
 function ProductThumb({ product, byId, mediaUrl }: { product: Product; byId: Map<string, Product>; mediaUrl: (path: string) => string }) {
   const { t } = useI18n();
@@ -510,7 +555,7 @@ export function CatalogPanel(props: Props) {
           {!product && <option value="">{t("vatByKind")}</option>}
           {[["10", t("vatFood")], ["13", "13%"], ["20", t("vatDrink")]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <label><span>{t("fieldCategory")}</span><input name="category" required defaultValue={product?.category ?? ""} placeholder="RAMEN" /></label>
+        <CategoryField products={props.products} current={product?.category ?? null} />
       </div>
       
       <label><span>{t("fieldDescription")}</span><textarea name="description" rows={3} defaultValue={product?.description ?? ""} /></label>

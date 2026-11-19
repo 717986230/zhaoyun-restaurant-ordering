@@ -90,6 +90,21 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
 const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "roleStaff", kitchen: "roleKitchen" };
 
 /**
+ * The tabs, grouped by the job they belong to: the floor, the menu, the
+ * business, the guests. The strip wraps instead of scrolling sideways, so
+ * every section is on screen at once — the old single row hid the later tabs
+ * behind a scrollbar nobody could see, which is how the tables page went
+ * missing on a tablet. The order inside a group follows tabsFor; a role that
+ * does not get a tab does not get its group either.
+ */
+const TAB_GROUPS: Array<{ label: CopyKey; tabs: AdminTab[] }> = [
+  { label: "navGroupFloor", tabs: ["today", "board", "tables", "reservations", "waitlist", "delivery"] },
+  { label: "navGroupMenu", tabs: ["catalog", "printers"] },
+  { label: "navGroupBusiness", tabs: ["reports", "system"] },
+  { label: "navGroupGuests", tabs: ["guests", "members", "links"] }
+];
+
+/**
  * The open tab is kept in the URL hash (#members, #reports, …) so a deep link
  * opens straight to it — a staff member can save admin.html#members to the home
  * screen and land on the 会员 page every time. Unknown or empty hash: no change.
@@ -255,7 +270,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (state.tab !== "system") return;
+    if (state.tab !== "system" && state.tab !== "tables") return;
     void loadTables();
   }, [state.tab, loadTables]);
 
@@ -603,26 +618,6 @@ export function App() {
     }
   }
 
-  async function registerNumberedTables(count: number) {
-    try {
-      const { tables, created } = await adminApi.registerNumberedTables(count);
-      await loadTables();
-      notify(t("numberedTablesDone", { count: tables.length, created }));
-      return tables;
-    } catch (error) {
-      failed(error, "tableSaveFailed");
-      return null;
-    }
-  }
-
-  async function deleteTable(table: string) {
-    try {
-      await adminApi.deleteTable(table);
-      await loadTables();
-      notify(t("tableDeleted"));
-    } catch (error) { tableFailed(error, "deleteFailed"); }
-  }
-
   async function openMenu() {
     if (kiosk.isNative()) { try { await kiosk.plugin.lock(); } catch { /* Navigation remains available in test mode. */ } }
     window.location.href = "index.html";
@@ -686,7 +681,14 @@ export function App() {
       </div>
     </header>
     <nav className="admin-tabs" aria-label={t("modules")}>
-      {tabs.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}
+      {TAB_GROUPS.map((group) => {
+        const visible = group.tabs.filter((tab) => tabs.includes(tab));
+        if (!visible.length) return null;
+        return <div key={group.label} className="admin-tab-group" role="group" aria-label={t(group.label)}>
+          <span className="admin-tab-group-label" aria-hidden="true">{t(group.label)}</span>
+          {visible.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}
+        </div>;
+      })}
     </nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     </div>
@@ -711,6 +713,11 @@ export function App() {
         bill={state.bill}
         role={state.role}
         busy={state.boardBusy}
+        registeredTables={state.tables}
+        restaurantName={state.settings?.restaurantName ?? ""}
+        menuLanguages={state.settings?.menuLanguages ?? []}
+        apiBase={adminApi.storage.baseUrl}
+        onRotateToken={async (table: string, label: string) => { await saveTable({ table, label, rotateToken: true }); }}
         onRefresh={() => loadBoard()}
         onLock={lockTable}
         onOpenBill={openBill}
@@ -730,7 +737,7 @@ export function App() {
       {state.tab === "waitlist" && <WaitlistPanel api={adminApi} notify={notify} failed={reportFailed} liveTick={reservationTick} />}
       {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
       {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} />}
-      {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} />}
+      {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} restaurantName={state.settings?.restaurantName ?? ""} menuLanguages={state.settings?.menuLanguages ?? []} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "members" && <MembersPanel api={adminApi} settings={state.settings} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel
@@ -740,15 +747,11 @@ export function App() {
         storage={storage}
         settings={state.settings}
         products={state.products}
-        tables={state.tables}
         auditEntries={state.auditEntries}
         onSaveSettings={saveSettings}
         onRenameCategory={renameCategory}
         onSetCategoryVat={setCategoryVat}
         onSaveConnection={saveConnection}
-        onSaveTable={saveTable}
-        onDeleteTable={deleteTable}
-        onRegisterNumberedTables={registerNumberedTables}
         account={state.account}
         onUpdateAccount={updateAccount}
         onRecoverAccount={recoverAccount}

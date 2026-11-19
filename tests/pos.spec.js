@@ -129,6 +129,112 @@ test("a waiter orders by number, the kitchen gets it, and the table pays separat
   expect(receipts[1].payments[0]).toMatchObject({ type: "cash", tenderedCents: 5000 });
 });
 
+test("a table moves to a free table, then merges onto an occupied one — each step tapped, not typed", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const products = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => !product.bundleItems?.length);
+  const [first, second] = products.filter((product) => product.kind === "food");
+  const bill = async (table) => (await (await admin(request, "get", `/api/admin/tables/${table}/bill`)).json()).bill;
+
+  await pairAndSignIn(page, "Tablet move", "Li", "1234");
+  const orderOn = async (table, dish) => {
+    await page.getByLabel("打开桌号").fill(table);
+    await page.getByRole("button", { name: "打开", exact: true }).click();
+    await expect(page.locator(".pos-ticket h1")).toHaveText(`桌 ${table}`);
+    await page.getByLabel("菜号 ×份数 / 搜索").fill(dish.sku);
+    await page.getByLabel("菜号 ×份数 / 搜索").press("Enter");
+    await confirmOptions(page);
+    await page.getByRole("button", { name: "送厨" }).click();
+    await expect(page.locator(".pos-toast")).toContainText("已送厨：1 道菜");
+  };
+  const backToFloor = async () => {
+    await page.getByRole("button", { name: "← 返回" }).click();
+    await expect(page.locator(".pos-floor")).toBeVisible();
+  };
+
+  // Two tables, each with its own bill.
+  await orderOn("21", first);
+  await backToFloor();
+  await orderOn("22", second);
+  expect((await bill("21")).items).toHaveLength(1);
+  expect((await bill("22")).items).toHaveLength(1);
+
+  // 换桌: table 22 moves to free table 1, tapped in the grid.
+  await page.getByRole("button", { name: "转桌" }).click();
+  const move = page.getByRole("dialog", { name: /桌 22 转到哪张桌/ });
+  await expect(move).toBeVisible();
+  await move.getByRole("button", { name: "1", exact: true }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已转到桌 1");
+  await expect(page.locator(".pos-floor")).toBeVisible();
+  expect((await bill("1")).items).toHaveLength(1);
+  expect((await bill("22")).items).toHaveLength(0);
+
+  // 并台: table 1 merges onto occupied table 21 — tapped, then confirmed.
+  await page.getByLabel("打开桌号").fill("1");
+  await page.getByRole("button", { name: "打开", exact: true }).click();
+  await page.getByRole("button", { name: "转桌" }).click();
+  const merge = page.getByRole("dialog", { name: /桌 1 转到哪张桌/ });
+  await expect(merge.locator("h3", { hasText: "并台" })).toBeVisible();
+  await merge.locator(".pos-move-grid").last().getByRole("button", { name: /^21/ }).click();
+  await expect(merge.locator(".pos-merge-confirm")).toContainText(
+    "并到桌 21？两桌账单会合并到一起。",
+  );
+  await merge.getByRole("button", { name: "确认并台" }).click();
+  await expect(page.locator(".pos-toast")).toContainText("已并到桌 21");
+  await expect(page.locator(".pos-floor")).toBeVisible();
+  expect((await bill("21")).items).toHaveLength(2);
+  expect((await bill("1")).items).toHaveLength(0);
+
+  // A typed number onto an occupied table is a merge too: it waits for the
+  // same confirm instead of folding the bills together unasked.
+  await orderOn("24", first);
+  await page.getByRole("button", { name: "转桌" }).click();
+  const typed = page.getByRole("dialog", { name: /桌 24 转到哪张桌/ });
+  await typed.locator(".pos-move-other input").fill("21");
+  await typed.getByRole("button", { name: "转桌", exact: true }).click();
+  await expect(typed.locator(".pos-merge-confirm")).toContainText(
+    "并到桌 21？两桌账单会合并到一起。",
+  );
+  await typed.locator(".pos-merge-confirm").getByRole("button", { name: "取消" }).click();
+  await expect(typed.locator(".pos-merge-confirm")).toHaveCount(0);
+  await typed.getByRole("button", { name: "取消" }).click();
+  await expect(typed).toHaveCount(0);
+  expect((await bill("24")).items).toHaveLength(1);
+  expect((await bill("21")).items).toHaveLength(2);
+});
+
+test("a merge onto a table another waiter holds is shown blocked, not offered", async ({ browser, request }, testInfo) => {
+  test.skip(testInfo.project.name !== PROJECT, "one server, one project");
+  const products = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => !product.bundleItems?.length);
+  const [first] = products.filter((product) => product.kind === "food");
+
+  const wang = await browser.newPage({ locale: "zh-CN" });
+  await pairAndSignIn(wang, "Tablet wang", "Wang", "9876");
+  await wang.getByLabel("打开桌号").fill("27");
+  await wang.getByRole("button", { name: "打开", exact: true }).click();
+  await wang.getByLabel("菜号 ×份数 / 搜索").fill(first.sku);
+  await wang.getByLabel("菜号 ×份数 / 搜索").press("Enter");
+  await confirmOptions(wang);
+  await wang.getByRole("button", { name: "送厨" }).click();
+  await expect(wang.locator(".pos-toast")).toContainText("已送厨");
+
+  const li = await browser.newPage({ locale: "zh-CN" });
+  await pairAndSignIn(li, "Tablet li", "Li", "1234");
+  await li.getByLabel("打开桌号").fill("26");
+  await li.getByRole("button", { name: "打开", exact: true }).click();
+  await li.getByLabel("菜号 ×份数 / 搜索").fill(first.sku);
+  await li.getByLabel("菜号 ×份数 / 搜索").press("Enter");
+  await confirmOptions(li);
+  await li.getByRole("button", { name: "送厨" }).click();
+  await expect(li.locator(".pos-toast")).toContainText("已送厨");
+
+  await li.getByRole("button", { name: "转桌" }).click();
+  const move = li.getByRole("dialog", { name: /桌 26 转到哪张桌/ });
+  await expect(move.locator("h3", { hasText: "并台" })).toBeVisible();
+  const target = move.getByRole("button", { name: /27/ });
+  await expect(target).toBeDisabled();
+  await expect(target).toContainText("Wang 正在操作");
+});
+
 test("点菜一次点多份：菜号×份数，规格弹窗带份数", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
   const products = (await (await request.get(`${API}/api/catalog`)).json()).products.filter((product) => !product.bundleItems?.length);

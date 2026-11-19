@@ -799,7 +799,15 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       const { denied, role, pos } = await gate("staff");
       if (denied) return denied;
       if (!pos) return fail("Sign in on a POS device", 403);
-      const claimed = (error) => (error.code === "SOLD_OUT" || error.code === "BAD_STOCK" ? coded(error) : fail(error.message, error.code === "TABLE_CLAIMED" ? 409 : 400));
+      const claimed = (error) =>
+        error.code === "SOLD_OUT" || error.code === "BAD_STOCK"
+          ? coded(error)
+          : fail(
+              error.message,
+              error.code === "TABLE_CLAIMED" || error.code === "TABLE_OCCUPIED"
+                ? 409
+                : 400,
+            );
       try {
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
@@ -845,7 +853,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (path.length === 5 && path[2] === "tables" && path[4] === "move" && method === "POST") {
           const { value, invalid } = await body(request, MoveTableBody);
           if (invalid) return invalid;
-          const moved = await store.moveTable(path[3], value.to, pos);
+          const moved = await store.moveTable(path[3], value.to, pos, {
+            merge: value.merge === true,
+          });
           return moved ? json(moved) : fail("Nothing open on that table", 404);
         }
         if (path.length === 5 && path[2] === "tables" && path[4] === "void" && method === "POST") {

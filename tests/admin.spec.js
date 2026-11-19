@@ -339,7 +339,7 @@ test("a waiter tablet only gets the board, never the catalog", async ({ page }) 
   await expect(page.getByText("服务员")).toBeVisible();
   // A waiter runs the floor, so the board and the room are theirs; the menu,
   // the printers and the table tokens are not. Taking payment is the POS's.
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单桌位预约候位外卖跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("堂食订单桌位预约候位外卖顾客跳转");
   await expect(page.getByRole("button", { name: "菜品", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打印", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
@@ -372,7 +372,8 @@ test("a table card carries the entry link a guest phone will scan", async ({ pag
     { table: "07", label: "", token: "tok-07-secret", enabled: true }
   ] }) }));
   await page.goto("/admin.html");
-  await page.getByRole("button", { name: "设置", exact: true }).click();
+  // The cards live on the tables page now, not under settings.
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "桌位", exact: true }).click();
   await page.getByRole("button", { name: /生成桌卡/ }).click();
 
   const cards = page.locator(".table-card");
@@ -467,11 +468,69 @@ test("a table's bill prints for the guest, and payment is taken at the POS", asy
   await expect(bill.getByRole("link", { name: "去收银" })).toHaveAttribute("href", "pos.html");
 });
 
+test("the tables page filters by state, and its cards print from the room", async ({ page }) => {
+  const overview = [
+    {
+      table: "07", label: "窗边", enabled: true, locked: false, lockedAt: null, registered: true,
+      state: "seated", total: 27.4, since: new Date().toISOString(),
+      orders: [{
+        id: "order-1", clientRequestId: "c1", no: "260902-001", table: "07", status: "preparing",
+        note: "", total: 27.4, createdAt: new Date().toISOString(),
+        items: [{ id: "photo-r1", name: "蔬菜拉面", qty: 2 }]
+      }]
+    },
+    { table: "08", label: "", enabled: true, locked: false, lockedAt: null, registered: true, state: "free", total: 0, since: null, orders: [] },
+    { table: "09", label: "", enabled: true, locked: true, lockedAt: new Date().toISOString(), registered: true, state: "locked", total: 9.9, since: new Date().toISOString(), orders: [] }
+  ];
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: overview }) }));
+  await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
+  await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
+    { table: "12", label: "窗边", token: "tok-12-secret", enabled: true },
+    { table: "07", label: "", token: "tok-07-secret", enabled: true }
+  ] }) }));
+  await page.goto("/admin.html");
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "桌位", exact: true }).click();
+
+  // The counts are on the chips; the room is one tap away from one state.
+  await expect(page.getByRole("button", { name: "空闲 · 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "用餐中 · 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "已锁定 · 1" })).toBeVisible();
+  await page.getByRole("button", { name: "用餐中 · 1" }).click();
+  await expect(page.locator(".table-tile")).toHaveCount(1);
+  await expect(page.locator(".table-tile")).toContainText("桌 07");
+  await page.getByRole("button", { name: "全部 · 3" }).click();
+  await expect(page.locator(".table-tile")).toHaveCount(3);
+
+  // The cards live here now, not under settings.
+  await page.getByRole("button", { name: /生成桌卡/ }).click();
+  await expect(page.locator(".table-card")).toHaveCount(2);
+  await expect(page.locator(".table-card").first()).toContainText("Table · Tisch 12");
+});
+
+test("a dish's category is picked from the menu's categories, not typed", async ({ page }) => {
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "菜品", exact: true }).click();
+  await page.locator(".product-row").first().click({ force: true });
+  const category = page.locator('select[name="category"]');
+  await expect(category).toBeVisible();
+  await expect(category.locator("option")).toHaveText(["选择分类", "MAIN", "＋ 新分类"]);
+  await category.selectOption("__new__");
+  await expect(page.locator('input[name="category"]')).toBeVisible();
+  await expect(page.locator('select[name="category"]')).toHaveCount(0);
+  // A name the menu already has, typed any way, is a merge — said before saving.
+  const typed = page.locator('input[name="category"]');
+  const field = page.locator("label", { has: typed });
+  await typed.fill("main");
+  await expect(field.locator(".settings-hint")).toHaveText("将并入已有分类 MAIN");
+  await typed.fill("alle");
+  await expect(field.locator(".settings-hint")).toHaveText("ALLE 是全部菜品页，不能用作分类");
+});
+
 test("the console says Admin, and switches its own language without touching the menu's", async ({ page }) => {
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日菜品订单桌位预约候位外卖报表打印顾客会员设置跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("堂食今日订单桌位预约候位外卖菜品菜品打印经营报表设置顾客顾客会员跳转");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
@@ -508,12 +567,12 @@ test("orders, tables and printers stay out of the way until ordering is switched
   const nav = page.getByRole("navigation", { name: "管理模块" });
   // 报表 (money view) and 桌位 (table status) stay within reach even with the
   // board/printer toggle off — a manager needs them every service.
-  await expect(nav).toHaveText("今日报表桌位菜品预约候位外卖顾客会员设置跳转");
+  await expect(nav).toHaveText("堂食今日桌位预约候位外卖菜品菜品经营报表设置顾客顾客会员跳转");
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示实时订单看板和打印机" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("今日菜品订单桌位预约候位外卖报表打印顾客会员设置跳转");
+  await expect(nav).toHaveText("堂食今日订单桌位预约候位外卖菜品菜品打印经营报表设置顾客顾客会员跳转");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
@@ -1144,30 +1203,44 @@ test("a station with dishes and no printer is called out, and the setup steps sh
 });
 
 test("tables 1–20 get their QR cards in one go, each with its own code, ready to print", async ({ page }) => {
-  await page.route("**/api/admin/audit*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ entries: [] }) }));
-  let tables = [];
+  const tile = (table) => ({ table, label: "", enabled: true, locked: false, lockedAt: null, registered: false, state: "free", total: 0, since: null, orders: [], openOn: null, orderingUntil: null });
+  // The floor before anyone set it up: the default tables 1–20, none registered yet.
+  let room = Array.from({ length: 20 }, (_, index) => tile(String(index + 1)));
   let asked = null;
-  await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables }) }));
+  const reply = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  await page.route("**/api/admin/audit*", (route) => reply(route, { entries: [] }));
+  await page.route("**/api/admin/tables", (route) => reply(route, { tables: room.filter((table) => table.registered).map(({ table, label }) => ({ table, label, token: `tok-${table}-secret`, enabled: true })) }));
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => reply(route, { tables: room }));
   await page.route("**/api/admin/tables/numbered", (route) => {
     asked = route.request().postDataJSON();
-    tables = Array.from({ length: asked.count }, (_, index) => ({ table: String(index + 1), label: "", token: `tok-${index + 1}-secret`, enabled: true }));
-    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ tables, created: asked.count }) });
+    room = room.map((table) => ({ ...table, registered: true }));
+    return reply(route, { tables: [], created: asked.count }, 201);
   });
-  await page.goto("/admin.html");
-  await page.getByRole("button", { name: "设置", exact: true }).click();
-  page.once("dialog", (dialog) => {
-    expect(dialog.message()).toContain("顾客扫码点餐必须用桌上的二维码");
-    void dialog.accept();
-  });
-  await page.getByRole("button", { name: "一键生成 1–20 号桌的二维码" }).click();
-  await expect.poll(() => asked).toEqual({ count: 20 });
+  const dialogs = [];
+  page.on("dialog", (dialog) => { dialogs.push(dialog.message()); void dialog.accept(); });
 
+  await page.goto("/admin.html");
+  await page.getByRole("button", { name: "桌位" }).click();
+
+  // The defaults are set up once, from the Tables page's own edit button —
+  // not from settings, where the one-click setup used to live.
+  await page.getByRole("button", { name: "编辑桌台" }).click();
+  await expect.poll(() => asked).toEqual({ count: 20 });
+  expect(dialogs[0]).toContain("1–20");
+
+  // Registered now, the cards open from the same page.
+  await page.getByRole("button", { name: /生成桌卡/ }).click();
   const cards = page.locator(".table-card");
   await expect(cards).toHaveCount(20);
   await expect(cards.first().locator(".table-card-qr svg")).toBeVisible();
-  await expect(page.locator(".table-row")).toHaveCount(20);
-  await expect(page.locator(".table-row code").nth(6)).toContainText("table=7");
-  await expect(page.locator(".table-row code").nth(6)).toContainText("tok-7-secret");
+  // One card per table, in order, each with its own code: the feet read
+  // 1–20, and the seventh card's QR is not the first card's.
+  const feet = await cards.locator(".table-card-foot b").allTextContents();
+  expect(feet.map((text) => text.trim().split(" ").pop())).toEqual(Array.from({ length: 20 }, (_, index) => String(index + 1)));
+  const firstCode = await cards.first().locator(".table-card-qr svg").innerHTML();
+  const seventhCode = await cards.nth(6).locator(".table-card-qr svg").innerHTML();
+  expect(seventhCode).not.toEqual(firstCode);
 });
 
 test("the manager adds, renumbers and removes tables, and a table open on a POS is locked here", async ({ page }) => {

@@ -37,6 +37,14 @@ const EXACT: Record<string, Text> = {
 };
 
 const PATTERNS: Array<[RegExp, (match: RegExpMatchArray) => Text]> = [
+  [
+    /^Table (\S+) already has an open bill — merge the tables to combine them$/,
+    (m) => ({
+      zh: `桌 ${m[1]} 已有未结账单，要合并请用「并台」`,
+      de: `Tisch ${m[1]} hat eine offene Rechnung – zum Vereinen bitte zusammenlegen`,
+      en: `Table ${m[1]} already has an open bill — merge the tables to combine them`,
+    }),
+  ],
   [/^At most (\d+) member tiers$/, (m) => ({ zh: `最多 ${m[1]} 个会员等级`, de: `Höchstens ${m[1]} Stufen`, en: `At most ${m[1]} member tiers` })],
   [/^At most (\d+) rewards$/, (m) => ({ zh: `最多 ${m[1]} 个兑换菜品`, de: `Höchstens ${m[1]} Prämien`, en: `At most ${m[1]} rewards` })],
   [/^At most (\d+) top-up tiers$/, (m) => ({ zh: `最多 ${m[1]} 个充值档位`, de: `Höchstens ${m[1]} Bonusstufen`, en: `At most ${m[1]} bonus tiers` })],

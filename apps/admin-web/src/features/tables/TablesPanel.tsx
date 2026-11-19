@@ -1,11 +1,14 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { StaffRole, TableOverview } from "@zhaoyun/api-client";
-import type { ApiBill, PosStaffActivity } from "@zhaoyun/contracts";
+import type { RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
+import type { ApiBill, MenuLanguage, PosStaffActivity } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { ORDER_STATUS_KEYS } from "../board/BoardPanel";
 import { jumpLinkProps } from "../../app/pwa";
+import { TableCards } from "./TableCards";
+import { entryUrl } from "./tableLinks";
+import { downloadQrCard } from "../qr/qrCard";
 
 const STATE_KEYS: Record<TableOverview["state"], CopyKey> = {
   free: "tableFree",
@@ -22,6 +25,13 @@ interface Props {
   bill: ApiBill | null;
   role: StaffRole | null;
   busy: boolean;
+  /** The registered tables with their codes, for the printable cards. */
+  registeredTables: RestaurantTable[];
+  restaurantName: string;
+  menuLanguages: MenuLanguage[];
+  apiBase: string;
+  /** A table's code changed: its old card stops working. */
+  onRotateToken: (table: string, label: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onLock: (table: string, locked: boolean) => Promise<void>;
   onOpenBill: (table: string) => Promise<void>;
@@ -75,6 +85,13 @@ export function TablesPanel(props: Props) {
   const [editing, setEditing] = useState(false);
   // The table whose number and label are being changed, in its own card.
   const [renaming, setRenaming] = useState<string | null>(null);
+  // Which tables the grid shows: everything, or one state at a time.
+  const [filter, setFilter] = useState<"all" | TableOverview["state"]>("all");
+  // The printable QR cards for the room.
+  const [showCards, setShowCards] = useState(false);
+  // A registered table's code: the overview carries no token, the registry does.
+  const registeredOf = (table: string) => props.registeredTables.find((entry) => entry.table === table);
+  const visible = props.tables.filter((table) => filter === "all" || table.state === filter);
   const room = props.tables.filter((table) => !table.table.startsWith("TA-"));
 
   async function startEditing() {
@@ -107,10 +124,18 @@ export function TablesPanel(props: Props) {
         <p>{t("tablesLead", { seated: seated.length, total: takings.toFixed(2) })}</p>
       </div>
       <div className="list-head-actions">
+        {manager && <button className="ghost-action" disabled={props.busy || !props.registeredTables.length} onClick={() => setShowCards(true)}>{t("printCards")}</button>}
         {manager && <button className={editing ? "primary-action" : "ghost-action"} data-action="edit-tables" disabled={props.busy}
           onClick={() => { if (editing) { setEditing(false); setRenaming(null); } else void startEditing(); }}>{t(editing ? "tablesEditDone" : "tablesEdit")}</button>}
         <button className="ghost-action" onClick={() => void props.onRefresh()} disabled={props.busy}>{t("refresh")}</button>
       </div>
+    </div>
+
+    <div className="filter-tabs" role="group" aria-label={t("tablesTitle")}>
+      {(["all", "free", "seated", "locked"] as const).map((value) => {
+        const count = value === "all" ? props.tables.length : props.tables.filter((table) => table.state === value).length;
+        return <button key={value} className={filter === value ? "active" : ""} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === "all" ? t("filterAll") : t(STATE_KEYS[value])} · {count}</button>;
+      })}
     </div>
 
     {editing && <section className="table-editor" aria-label={t("tablesEdit")}>
@@ -139,7 +164,7 @@ export function TablesPanel(props: Props) {
       </article>)}
     </section>}
 
-    <div className="table-grid">{props.tables.length ? props.tables.map((table) => {
+    <div className="table-grid">{visible.length ? visible.map((table) => {
       // Open on a POS: that device's table. The console looks, and touches nothing.
       const held = Boolean(table.openOn);
       const holder = table.openOn?.staffName ?? "?";
@@ -188,6 +213,8 @@ export function TablesPanel(props: Props) {
         </form>
         : <div className="board-actions">
           {inUse(table) && <small className="table-in-use">{t("tableInUseHint")}</small>}
+          {registeredOf(table.table) && <button className="ghost-action" disabled={props.busy} onClick={() => void downloadQrCard({ url: entryUrl(props.apiBase, registeredOf(table.table)!), restaurantName: props.restaurantName, menuLanguages: props.menuLanguages, table: table.table, label: table.label })}>⬇ {t("qrShort")}</button>}
+          <button className="ghost-action" data-action="rotate-token" disabled={props.busy || !table.registered} onClick={() => void props.onRotateToken(table.table, table.label)}>{t("rotateToken")}</button>
           <button className="ghost-action" data-action="rename" disabled={props.busy || !table.registered || held} onClick={() => setRenaming(table.table)}>{t("tableRename")}</button>
           <button className="danger-action" data-action="remove" disabled={props.busy || !table.registered || inUse(table)}
             onClick={() => { if (window.confirm(t("tableRemoveConfirm", { table: table.table }))) void props.onDeleteTable(table.table); }}>{t("delete")}</button>
@@ -221,5 +248,13 @@ export function TablesPanel(props: Props) {
         </div>
       </> : <div className="admin-empty">{t("billEmpty")}</div>}
     </div>}
+
+    {showCards && <TableCards
+      tables={props.registeredTables}
+      restaurantName={props.restaurantName}
+      menuLanguages={props.menuLanguages}
+      entryUrl={(table) => entryUrl(props.apiBase, table)}
+      onClose={() => setShowCards(false)}
+    />}
   </section>;
 }

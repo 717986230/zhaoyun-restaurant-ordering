@@ -617,7 +617,7 @@ export class PosApi {
   release(table: string, force = false): Promise<void> { return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/claim${force ? "?force=1" : ""}`, { method: "DELETE" }); }
   order(command: CreateOrderCommand): Promise<{ order: ApiOrder }> { return this.#request("/api/pos/orders", { method: "POST", body: JSON.stringify(command) }); }
   takeaway(): Promise<{ table: string; pickupNo: number; claim: PosClaim }> { return this.#request("/api/pos/takeaway", { method: "POST" }); }
-  move(from: string, to: string): Promise<{ from: string; to: string; moved: number }> { return this.#request(`/api/pos/tables/${encodeURIComponent(from)}/move`, { method: "POST", body: JSON.stringify({ to }) }); }
+  move(from: string, to: string, merge = false): Promise<{ from: string; to: string; moved: number }> { return this.#request(`/api/pos/tables/${encodeURIComponent(from)}/move`, { method: "POST", body: JSON.stringify({ to, merge }) }); }
   bill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill`); }
   printBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/print`, { method: "POST" }); }
   checkout(command: CheckoutCommand): Promise<{ receipt: ApiReceipt }> { return this.#request("/api/admin/checkout", { method: "POST", body: JSON.stringify(command) }); }

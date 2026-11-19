@@ -1,14 +1,17 @@
+import type { MenuLanguage } from "@zhaoyun/contracts";
 import { useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { inventoryAddress } from "../../app/inventory";
 import { jumpLinkProps } from "../../app/pwa";
+import { menuUrl } from "../tables/tableLinks";
+import { downloadQrCard } from "../qr/qrCard";
 
 /**
  * 跳转: the other apps the restaurant runs, one tap each, every one in a tab
  * of its own — the stock app (its own project and sign-in) and this
  * system's own guest menu, booking page and POS.
  */
-export function LinksPanel({ apiBase }: { apiBase: string }) {
+export function LinksPanel({ apiBase, restaurantName = "", menuLanguages = [] }: { apiBase: string; restaurantName?: string; menuLanguages?: MenuLanguage[] }) {
   const { t } = useI18n();
   const here = (page: string) => new URL(page, window.location.href).href;
   const links: Array<{ id: string; name: CopyKey; note: CopyKey; href: string }> = [
@@ -26,6 +29,10 @@ export function LinksPanel({ apiBase }: { apiBase: string }) {
           <span aria-hidden="true">↗</span>
         </a>
       </li>)}</ul>
+      {/* The menu's own code, with no table in it: for the door, a flyer, social media. */}
+      <div className="qr-actions">
+        <button className="ghost-action" type="button" onClick={() => void downloadQrCard({ url: menuUrl(apiBase), restaurantName, menuLanguages })}>⬇ {t("downloadMenuQr")}</button>
+      </div>
     </div>
   </section>;
 }

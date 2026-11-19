@@ -135,8 +135,8 @@ test("并台: moving an open table onto an occupied one combines both bills", as
   await store.claimTable("12", deviceA);
   await store.createOrder({ table: "12", items: [{ id: product.id, qty: 1 }] }, deviceA);
 
-  // 并台: table 11 onto the occupied table 12.
-  const moved = await store.moveTable("11", "12", deviceA);
+  // 并台: table 11 onto the occupied table 12, said as a merge.
+  const moved = await store.moveTable("11", "12", deviceA, { merge: true });
   assert.equal(moved.to, "12");
   assert.equal(moved.moved, 1, "the one open order on table 11 is carried over");
 
@@ -147,6 +147,35 @@ test("并台: moving an open table onto an occupied one combines both bills", as
 
   const billA = await store.billForTable("11");
   assert.equal(billA.items.length, 0, "the source table is left with nothing open");
+});
+
+test("a move onto an occupied table without saying merge is refused, bills untouched", async (context) => {
+  const { store } = makeStore(context);
+  const product = await aProduct(store);
+
+  await store.claimTable("21", deviceA);
+  await store.createOrder({ table: "21", items: [{ id: product.id, qty: 2 }] }, deviceA);
+  await store.claimTable("22", deviceA);
+  await store.createOrder({ table: "22", items: [{ id: product.id, qty: 1 }] }, deviceA);
+
+  // A plain move must never silently fold two bills into one: a typed number,
+  // a stale client, any caller that did not ask for a merge.
+  await assert.rejects(
+    () => store.moveTable("21", "22", deviceA),
+    (error) => error.code === "TABLE_OCCUPIED",
+    "the occupied target refuses a plain move"
+  );
+
+  // Neither bill moved: 2 on 21, 1 on 22, as before.
+  const qty = async (table) => (await store.billForTable(table)).items.reduce((sum, item) => sum + item.qty, 0);
+  assert.equal(await qty("21"), 2);
+  assert.equal(await qty("22"), 1);
+
+  // Said as a merge, the same move combines them.
+  const merged = await store.moveTable("21", "22", deviceA, { merge: true });
+  assert.equal(merged.to, "22");
+  assert.equal(await qty("22"), 3);
+  assert.equal(await qty("21"), 0);
 });
 
 test("催菜: urging a sent dish queues a kitchen reminder, the bill untouched", async (context) => {
