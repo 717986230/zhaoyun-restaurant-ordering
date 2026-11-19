@@ -42,6 +42,10 @@ interface Props {
   onOrdering: (table: string, open: boolean) => Promise<void>;
   /** The manager's: the default tables 1 to count set up, so they can be edited. */
   onSetUpTables: (count: number) => Promise<boolean>;
+  /** One click: create the tables 1 … count. */
+  onGenerateNumbered: (count: number) => Promise<boolean>;
+  /** One click: create A1 … A{perLetter}, B1 … for `letters` zones. */
+  onGenerateLettered: (letters: number, perLetter: number) => Promise<boolean>;
   onAddTable: (table: string) => Promise<boolean>;
   onRenameTable: (table: string, input: { table?: string; label?: string }) => Promise<boolean>;
   onDeleteTable: (table: string) => Promise<void>;
@@ -49,6 +53,25 @@ interface Props {
 
 /** Someone is at the table: its number waits until they are gone. */
 const inUse = (table: TableOverview) => table.orders.length > 0 || Boolean(table.openOn) || Boolean(table.orderingUntil);
+
+/** The names a lettered run would make, so the preview and the server agree. Capped at 400. */
+function letteredNames(letters: number, perLetter: number): string[] {
+  const names: string[] = [];
+  for (let zone = 0; zone < letters && names.length < 400; zone += 1) {
+    const letter = String.fromCharCode(65 + zone);
+    for (let n = 1; n <= perLetter && names.length < 400; n += 1) names.push(`${letter}${n}`);
+  }
+  return names;
+}
+function numberedNames(count: number): string[] {
+  return Array.from({ length: Math.max(0, Math.min(200, count)) }, (_, index) => String(index + 1));
+}
+/** A short "A1, A2 … C4" for the preview: the first two and the last. */
+function sampleOf(names: string[]): string {
+  if (names.length <= 3) return names.join(", ");
+  return `${names[0]}, ${names[1]} … ${names[names.length - 1]}`;
+}
+const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(value || lo)));
 
 /** The default tables standing in until the room is set up: 1, 2, 3 … with none missing. */
 function defaultCount(tables: TableOverview[]) {
@@ -89,6 +112,25 @@ export function TablesPanel(props: Props) {
   const [filter, setFilter] = useState<"all" | TableOverview["state"]>("all");
   // The printable QR cards for the room.
   const [showCards, setShowCards] = useState(false);
+  // The one-click generator (shown in edit mode): by letter (A1, A2 …) or by number.
+  const [genMode, setGenMode] = useState<"letter" | "number">("letter");
+  const [genLetters, setGenLetters] = useState(4);
+  const [genPerLetter, setGenPerLetter] = useState(4);
+  const [genCount, setGenCount] = useState(20);
+  const [generating, setGenerating] = useState(false);
+  const genNames = genMode === "letter" ? letteredNames(genLetters, genPerLetter) : numberedNames(genCount);
+  const existingNames = new Set(props.tables.map((table) => table.table));
+  const genSkip = genNames.filter((name) => existingNames.has(name)).length;
+  async function generate() {
+    if (!genNames.length || generating) return;
+    setGenerating(true);
+    try {
+      if (genMode === "letter") await props.onGenerateLettered(genLetters, genPerLetter);
+      else await props.onGenerateNumbered(genCount);
+    } finally {
+      setGenerating(false);
+    }
+  }
   // A registered table's code: the overview carries no token, the registry does.
   const registeredOf = (table: string) => props.registeredTables.find((entry) => entry.table === table);
   const visible = props.tables.filter((table) => filter === "all" || table.state === filter);
@@ -139,7 +181,25 @@ export function TablesPanel(props: Props) {
     </div>
 
     {editing && <section className="table-editor" aria-label={t("tablesEdit")}>
-      
+      <div className="table-generator">
+        <h3>{t("genHeading")}</h3>
+        <div className="report-presets" role="group" aria-label={t("genHeading")}>
+          <button type="button" className={genMode === "letter" ? "primary-action" : "ghost-action"} aria-pressed={genMode === "letter"} onClick={() => setGenMode("letter")}>{t("genModeLetter")}</button>
+          <button type="button" className={genMode === "number" ? "primary-action" : "ghost-action"} aria-pressed={genMode === "number"} onClick={() => setGenMode("number")}>{t("genModeNumber")}</button>
+        </div>
+        <div className="field-grid">
+          {genMode === "letter" ? <>
+            <label><span>{t("genLetterZones")}</span><input type="number" min={1} max={26} value={genLetters} onChange={(event) => setGenLetters(clamp(Number(event.target.value), 1, 26))} /></label>
+            <label><span>{t("genPerLetter")}</span><input type="number" min={1} max={99} value={genPerLetter} onChange={(event) => setGenPerLetter(clamp(Number(event.target.value), 1, 99))} /></label>
+          </> : <label><span>{t("genNumberCount")}</span><input type="number" min={1} max={200} value={genCount} onChange={(event) => setGenCount(clamp(Number(event.target.value), 1, 200))} /></label>}
+        </div>
+        <p className="settings-hint" aria-live="polite">
+          {t("genPreview", { count: genNames.length, sample: sampleOf(genNames) })}
+          {genSkip > 0 && <> {t("genPreviewSkip", { skip: genSkip })}</>}
+        </p>
+        <button type="button" className="primary-action" disabled={props.busy || generating || !genNames.length} onClick={() => void generate()}>{t("genCreate")}</button>
+      </div>
+
       <form className="table-editor-add" onSubmit={(event) => void addTable(event)}>
         <label><span>{t("tableNumber")}</span>
           <input key={nextNumber(room)} name="table" required maxLength={8} pattern="[A-Za-z0-9][A-Za-z0-9\-]{0,7}" autoCapitalize="characters" defaultValue={nextNumber(room)} />

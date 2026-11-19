@@ -389,6 +389,7 @@ export class AdminApi {
   }
   /** Tables 1 to count set up at once, each with its own code; those already there keep theirs. */
   registerNumberedTables(count: number): Promise<{ tables: RestaurantTable[]; created: number }> { return this.#request("/api/admin/tables/numbered", { method: "POST", body: JSON.stringify({ count }) }); }
+  registerLetteredTables(letters: number, perLetter: number): Promise<{ tables: RestaurantTable[]; created: number }> { return this.#request("/api/admin/tables/lettered", { method: "POST", body: JSON.stringify({ letters, perLetter }) }); }
   saveTable(input: { table: string; label?: string; enabled?: boolean; rotateToken?: boolean }): Promise<{ table: RestaurantTable }> { return this.#request("/api/admin/tables", { method: "POST", body: JSON.stringify(input) }); }
   /** Another number or label for a table; its card keeps the same code. */
   renameTable(table: string, input: { table?: string; label?: string }): Promise<{ table: RestaurantTable }> {

@@ -650,6 +650,32 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("DELETE", "/api/admin/tables/C7", { admin: true })).status, 404);
     }],
 
+    ["the by-letter generator makes A1, A2 … in one call and skips what exists", async () => {
+      // Two zones of three: A1 A2 A3 B1 B2 B3, in that order so the cards print
+      // the way the room was laid out — A2 before A10, never alphabetically.
+      const made = await call("POST", "/api/admin/tables/lettered", { admin: true, body: { letters: 2, perLetter: 3 } });
+      assert.equal(made.status, 201);
+      assert.equal(made.json.created, 6, "all six are new");
+      assert.deepEqual(made.json.tables.map((table) => table.table), ["A1", "A2", "A3", "B1", "B2", "B3"]);
+      assert.ok(made.json.tables.every((table) => table.token), "each carries a token for its card");
+      assert.equal(made.json.tables[0].table_no, undefined, "row columns must not leak");
+
+      // A second run with an overlapping range creates only the missing ones and
+      // keeps the existing cards' codes.
+      const firstToken = made.json.tables.find((table) => table.table === "A1").token;
+      const again = await call("POST", "/api/admin/tables/lettered", { admin: true, body: { letters: 3, perLetter: 3 } });
+      assert.equal(again.json.created, 3, "only zone C is new");
+      assert.equal(again.json.tables.find((table) => table.table === "A1").token, firstToken, "an existing table keeps its code");
+      assert.deepEqual(again.json.tables.map((table) => table.table), ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3"]);
+
+      assert.equal((await call("GET", "/api/admin/tables", { role: "staff" })).status, 403);
+      assert.equal((await call("POST", "/api/admin/tables/lettered", { role: "staff", body: { letters: 1, perLetter: 1 } })).status, 403, "generating tables is manager-only");
+      assert.equal((await call("POST", "/api/admin/tables/lettered", { admin: true, body: { letters: 0, perLetter: 3 } })).status, 400, "zones must be at least one");
+      assert.equal((await call("POST", "/api/admin/tables/lettered", { admin: true, body: { letters: 27, perLetter: 1 } })).status, 400, "no more than 26 zones");
+
+      for (const name of ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3"]) await call("DELETE", `/api/admin/tables/${name}`, { admin: true });
+    }],
+
     ["a locked table stops taking orders, and settling is what frees it", async () => {
       // The lock is service state, not configuration: `enabled` takes a table
       // out of the room, this one stops it adding to a bill that is being
