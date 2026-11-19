@@ -65,6 +65,11 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   useEffect(() => {
     void loadBill();
     // Keep the table this device's while it is open; let it go on the way out.
+    // Claim on mount too, not only via Floor.openTable: a remount (React, or a
+    // StrictMode re-run whose cleanup already released the table) would otherwise
+    // leave the table unclaimed until the first interval fired, so another device
+    // would be free to merge onto it. PayScreen keeps the same pattern.
+    void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
     return () => { window.clearInterval(hold); void api.release(table).catch(() => undefined); };
   }, [table, loadBill, pos.failed]);
