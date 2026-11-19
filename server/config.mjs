@@ -41,6 +41,10 @@ export const config = {
   adminToken: process.env.ADMIN_TOKEN || "local-dev-admin",
   staffToken: process.env.STAFF_TOKEN || "",
   kitchenToken: process.env.KITCHEN_TOKEN || "",
+  // The key that encrypts the owner's copy of an account password (shared/tenant.mjs):
+  // base64 of 32 bytes, in the env/secret only, never in code or git. Without
+  // it, passwords set while it is missing have no owner-visible copy.
+  passwordViewKey: process.env.PASSWORD_VIEW_KEY || null,
   corsOrigin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean) : false,
   databasePath: process.env.DATABASE_PATH || path.join(serverDir, "data", "restaurant.sqlite"),
   uploadDir: process.env.UPLOAD_DIR || path.join(serverDir, "uploads"),

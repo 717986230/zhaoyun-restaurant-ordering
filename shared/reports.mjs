@@ -31,35 +31,53 @@ function reportError(message) {
 export function reportRange(fromInput, toInput) {
   const from = String(fromInput ?? "");
   const to = String(toInput ?? "");
-  if (!DATE.test(from) || !DATE.test(to)) throw reportError("from and to are dates: YYYY-MM-DD");
+  if (!DATE.test(from) || !DATE.test(to))
+    throw reportError("from and to are dates: YYYY-MM-DD");
   const start = Date.parse(`${from}T00:00:00Z`);
   const end = Date.parse(`${to}T00:00:00Z`);
   if (Number.isNaN(start) || Number.isNaN(end)) throw reportError("Not a date");
   if (end < start) throw reportError("to comes before from");
   const days = Math.round((end - start) / 86_400_000) + 1;
-  if (days > MAX_REPORT_DAYS) throw reportError(`At most ${MAX_REPORT_DAYS} days at once`);
+  if (days > MAX_REPORT_DAYS)
+    throw reportError(`At most ${MAX_REPORT_DAYS} days at once`);
   return {
     from,
     to,
     days,
     readFrom: new Date(start - 86_400_000).toISOString(),
-    readTo: new Date(end + 2 * 86_400_000).toISOString()
+    readTo: new Date(end + 2 * 86_400_000).toISOString(),
   };
 }
 
 /** A moment as the restaurant's calendar day and hour. */
 function localParts(timeZone) {
-  const format = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
+  const format = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
   return (iso) => {
-    const parts = Object.fromEntries(format.formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
-    return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+    const parts = Object.fromEntries(
+      format
+        .formatToParts(new Date(iso))
+        .map((part) => [part.type, part.value]),
+    );
+    return {
+      date: `${parts.year}-${parts.month}-${parts.day}`,
+      hour: Number(parts.hour),
+    };
   };
 }
 
 /** Every day from `from` to `to`, so a day with no sales shows as a zero, not a gap. */
 function eachDay(from, days) {
   const start = Date.parse(`${from}T00:00:00Z`);
-  return Array.from({ length: days }, (_, index) => new Date(start + index * 86_400_000).toISOString().slice(0, 10));
+  return Array.from({ length: days }, (_, index) =>
+    new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+  );
 }
 
 /**
@@ -76,8 +94,17 @@ export function salesReport(rows, range, timeZone) {
   }
   const totals = closingTotals(inRange.map(({ row }) => row));
 
-  const byDay = new Map(eachDay(range.from, range.days).map((date) => [date, { date, receipts: 0, grossCents: 0 }]));
-  const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, receipts: 0, grossCents: 0 }));
+  const byDay = new Map(
+    eachDay(range.from, range.days).map((date) => [
+      date,
+      { date, receipts: 0, grossCents: 0 },
+    ]),
+  );
+  const byHour = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    receipts: 0,
+    grossCents: 0,
+  }));
   const byItem = new Map();
   const byStaff = new Map();
   for (const { row, at } of inRange) {
@@ -90,18 +117,29 @@ export function salesReport(rows, range, timeZone) {
     byHour[at.hour].grossCents += row.total_cents;
 
     const staffName = row.staff_name || "";
-    const staff = byStaff.get(staffName) ?? { name: staffName, receipts: 0, grossCents: 0, tipsCents: 0 };
+    const staff = byStaff.get(staffName) ?? {
+      name: staffName,
+      receipts: 0,
+      grossCents: 0,
+      tipsCents: 0,
+    };
     staff.receipts += count;
     staff.grossCents += row.total_cents;
     // Each waiter's tips, for the owner who pays out the card tips.
-    for (const payment of parseJson(row.payments_json, [])) staff.tipsCents += payment.tipCents ?? 0;
+    for (const payment of parseJson(row.payments_json, []))
+      staff.tipsCents += payment.tipCents ?? 0;
     byStaff.set(staffName, staff);
 
     for (const line of parseJson(row.lines_json, [])) {
       if (line.kind !== "item") continue;
       // One dish, whatever the language it was rung up in.
       const key = line.names?.de || line.name;
-      const item = byItem.get(key) ?? { name: line.name, names: line.names ?? null, quantity: 0, grossCents: 0 };
+      const item = byItem.get(key) ?? {
+        name: line.name,
+        names: line.names ?? null,
+        quantity: 0,
+        grossCents: 0,
+      };
       item.quantity += line.quantity;
       item.grossCents += line.totalCents;
       byItem.set(key, item);
@@ -113,15 +151,28 @@ export function salesReport(rows, range, timeZone) {
     from: range.from,
     to: range.to,
     timeZone,
-    totals: { ...totals, receipts: netSales, averageCents: netSales > 0 ? Math.round(totals.grossCents / netSales) : 0 },
+    totals: {
+      ...totals,
+      receipts: netSales,
+      averageCents: netSales > 0 ? Math.round(totals.grossCents / netSales) : 0,
+    },
     days: [...byDay.values()],
     hours: byHour,
-    items: [...byItem.values()].filter((item) => item.quantity !== 0 || item.grossCents !== 0).sort((left, right) => right.grossCents - left.grossCents || right.quantity - left.quantity),
-    staff: [...byStaff.values()].sort((left, right) => right.grossCents - left.grossCents)
+    items: [...byItem.values()]
+      .filter((item) => item.quantity !== 0 || item.grossCents !== 0)
+      .sort(
+        (left, right) =>
+          right.grossCents - left.grossCents || right.quantity - left.quantity,
+      ),
+    staff: [...byStaff.values()].sort(
+      (left, right) => right.grossCents - left.grossCents,
+    ),
   };
 }
 
-export const REPORT_RECEIPTS_SQL = "SELECT * FROM receipts WHERE created_at >= ? AND created_at < ? ORDER BY receipt_no";
+/** Parameters: tenant, from, to. */
+export const REPORT_RECEIPTS_SQL =
+  "SELECT * FROM receipts WHERE tenant_id = ? AND created_at >= ? AND created_at < ? ORDER BY receipt_no";
 
 /**
  * 会员数据看板 (member analytics). Read-only: built from the customers table
@@ -147,7 +198,8 @@ export function memberReport(data, range, timeZone) {
   };
 
   let newMembers = 0;
-  for (const row of data.newMembers ?? []) if (inDays(row.created_at)) newMembers += 1;
+  for (const row of data.newMembers ?? [])
+    if (inDays(row.created_at)) newMembers += 1;
 
   // Over the days: top-up principal, the house's bonus, and balance spent.
   let topUpCents = 0;
@@ -181,8 +233,10 @@ export function memberReport(data, range, timeZone) {
     set.add(local(iso).date);
     daysByMember.set(customerId, set);
   };
-  for (const row of data.pointsLedger ?? []) if ((row.delta ?? 0) > 0) note(row.customer_id, row.created_at);
-  for (const row of data.balanceLedger ?? []) if (row.reason === "spend") note(row.customer_id, row.created_at);
+  for (const row of data.pointsLedger ?? [])
+    if ((row.delta ?? 0) > 0) note(row.customer_id, row.created_at);
+  for (const row of data.balanceLedger ?? [])
+    if (row.reason === "spend") note(row.customer_id, row.created_at);
   let repeatBuyers = 0;
   for (const set of daysByMember.values()) if (set.size >= 2) repeatBuyers += 1;
   const buyers = daysByMember.size;
@@ -193,17 +247,45 @@ export function memberReport(data, range, timeZone) {
     to: range.to,
     timeZone,
     members: { total: totals.members ?? 0, new: newMembers, active: buyers },
-    balance: { outstandingCents: totals.balanceCents ?? 0, topUpCents, bonusCents, spentCents },
+    balance: {
+      outstandingCents: totals.balanceCents ?? 0,
+      topUpCents,
+      bonusCents,
+      spentCents,
+    },
     points: { outstanding: totals.points ?? 0, earned, redeemed },
-    repeat: { buyers, repeatBuyers, ratePct: buyers > 0 ? Math.round((repeatBuyers / buyers) * 100) : 0 },
-    topBalance: (data.topBalance ?? []).map((row) => ({ id: row.id, name: row.name || "", email: row.email || "", balanceCents: row.balance_cents ?? 0 })),
-    topPoints: (data.topPoints ?? []).map((row) => ({ id: row.id, name: row.name || "", email: row.email || "", points: row.points ?? 0 }))
+    repeat: {
+      buyers,
+      repeatBuyers,
+      ratePct: buyers > 0 ? Math.round((repeatBuyers / buyers) * 100) : 0,
+    },
+    topBalance: (data.topBalance ?? []).map((row) => ({
+      id: row.id,
+      name: row.name || "",
+      email: row.email || "",
+      balanceCents: row.balance_cents ?? 0,
+    })),
+    topPoints: (data.topPoints ?? []).map((row) => ({
+      id: row.id,
+      name: row.name || "",
+      email: row.email || "",
+      points: row.points ?? 0,
+    })),
   };
 }
 
-/** The member ledgers over the wide window, read for memberReport (store.mjs). */
-export const MEMBER_BALANCE_LEDGER_SQL = "SELECT customer_id, delta_cents, reason, created_at FROM balance_ledger WHERE created_at >= ? AND created_at < ?";
-export const MEMBER_POINTS_LEDGER_SQL = "SELECT customer_id, delta, created_at FROM points_ledger WHERE created_at >= ? AND created_at < ?";
-export const MEMBER_NEW_SQL = "SELECT created_at FROM customers WHERE created_at >= ? AND created_at < ?";
-export const MEMBER_TOP_BALANCE_SQL = "SELECT c.id, c.name, c.email, mb.balance_cents FROM member_balances mb JOIN customers c ON c.id = mb.customer_id WHERE mb.balance_cents > 0 ORDER BY mb.balance_cents DESC, c.created_at ASC LIMIT 10";
-export const MEMBER_TOP_POINTS_SQL = "SELECT id, name, email, points FROM customers WHERE points > 0 ORDER BY points DESC, created_at ASC LIMIT 10";
+/** The member ledgers over the wide window, read for memberReport (store.mjs). Parameters: tenant, from, to. */
+export const MEMBER_BALANCE_LEDGER_SQL =
+  "SELECT customer_id, delta_cents, reason, created_at FROM balance_ledger WHERE tenant_id = ? AND created_at >= ? AND created_at < ?";
+/** Parameters: tenant, from, to. */
+export const MEMBER_POINTS_LEDGER_SQL =
+  "SELECT customer_id, delta, created_at FROM points_ledger WHERE tenant_id = ? AND created_at >= ? AND created_at < ?";
+/** Parameters: tenant, from, to. */
+export const MEMBER_NEW_SQL =
+  "SELECT created_at FROM customers WHERE tenant_id = ? AND created_at >= ? AND created_at < ?";
+/** Parameters: tenant. The customer joined is the tenant's own. */
+export const MEMBER_TOP_BALANCE_SQL =
+  "SELECT c.id, c.name, c.email, mb.balance_cents FROM member_balances mb JOIN customers c ON c.id = mb.customer_id AND c.tenant_id = mb.tenant_id WHERE mb.tenant_id = ? AND mb.balance_cents > 0 ORDER BY mb.balance_cents DESC, c.created_at ASC LIMIT 10";
+/** Parameters: tenant. */
+export const MEMBER_TOP_POINTS_SQL =
+  "SELECT id, name, email, points FROM customers WHERE tenant_id = ? AND points > 0 ORDER BY points DESC, created_at ASC LIMIT 10";

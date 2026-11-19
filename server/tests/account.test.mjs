@@ -45,6 +45,9 @@ test("a password set at the old door becomes the account admin, on Node and on D
 
   const d1 = new DatabaseSync(path.join(directory, "d1.sqlite"));
   d1.exec(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "migrations", "0001_init.sql"), "utf8"));
+  // The catalog seeds the default tenant before any account is written, so
+  // the migrated account's foreign key holds.
+  d1.prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, config_json, created_at, updated_at) VALUES ('t_default', 'default', 'Chiri', 'active', '{}', 'x', 'x')").run();
   await setOldDoorPassword(d1, "altes-passwort-2");
   d1.exec(migration);
   const account = d1.prepare("SELECT login FROM accounts").all();

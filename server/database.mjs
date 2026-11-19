@@ -6,6 +6,7 @@ import { dishPhotos } from "./dish-photos.mjs";
 import { SET_MENU_SEED_KEY, setMenuProducts } from "./set-menus.mjs";
 import { sqliteDriver } from "./sqlite-driver.mjs";
 import { now, parseJson } from "../shared/core.mjs";
+import { DEFAULT_TENANT_ID } from "../shared/tenant.mjs";
 import { DEFAULT_VAT_PERCENT, mapProduct, normalizeProduct } from "../shared/products.mjs";
 import { createStore, PRODUCT_INSERT_SQL, productInsertParams } from "../shared/store.mjs";
 
@@ -18,15 +19,18 @@ import { createStore, PRODUCT_INSERT_SQL, productInsertParams } from "../shared/
  * d1:migrations): a new table goes here and, for a D1 already deployed, into
  * a hand-written migration of its own.
  */
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 const BUSY_TIMEOUT_MS = Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000);
 
-export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS } = {}) {
+export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, passwordViewKey = null } = {}) {
   mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = new DatabaseSync(databasePath);
   // The API server and every print agent open the same file from separate processes.
   // Without a busy timeout the second writer fails immediately with SQLITE_BUSY.
-  db.exec(`
+  // The schema, as one string so the tenant migration below can read a
+  // table's own CREATE statement back out of it: a rebuild uses the exact
+  // definition the server itself declares, so the two cannot drift apart.
+  const SCHEMA_SQL = `
     PRAGMA foreign_keys = ON;
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = ${Number(busyTimeoutMs) || 0};
@@ -34,7 +38,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
-      sku TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      sku TEXT NOT NULL,
       kind TEXT NOT NULL CHECK (kind IN ('food','drink','sushi')),
       category TEXT NOT NULL,
       name_zh TEXT NOT NULL DEFAULT '',
@@ -59,11 +64,13 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       vat_percent INTEGER NOT NULL DEFAULT 10,
       bundle_items_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, sku)
     );
 
     CREATE TABLE IF NOT EXISTS product_media (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       type TEXT NOT NULL CHECK (type IN ('image','video')),
       url TEXT NOT NULL,
@@ -74,19 +81,23 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
-      order_no TEXT NOT NULL UNIQUE,
-      client_request_id TEXT UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      order_no TEXT NOT NULL,
+      client_request_id TEXT,
       table_no TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'new',
       note TEXT NOT NULL DEFAULT '',
       total_cents INTEGER NOT NULL,
       billed_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, order_no),
+      UNIQUE (tenant_id, client_request_id)
     );
 
     CREATE TABLE IF NOT EXISTS order_items (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       product_id TEXT NOT NULL,
       product_name TEXT NOT NULL,
@@ -99,23 +110,27 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS order_item_vat_splits (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       split_json TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS order_item_notes (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       note TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS order_item_holds (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       held_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS receipts (
       id TEXT PRIMARY KEY,
-      receipt_no INTEGER NOT NULL UNIQUE,
-      client_request_id TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      receipt_no INTEGER NOT NULL,
+      client_request_id TEXT NOT NULL,
       cash_register_id TEXT NOT NULL,
       type TEXT NOT NULL CHECK (type IN ('sale','storno')),
       table_no TEXT,
@@ -130,13 +145,16 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       fiscal_json TEXT,
       created_at TEXT NOT NULL,
       staff_id TEXT,
-      staff_name TEXT
+      staff_name TEXT,
+      UNIQUE (tenant_id, receipt_no),
+      UNIQUE (tenant_id, client_request_id)
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS receipt_items (
       receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_item_id TEXT NOT NULL REFERENCES order_items(id),
       quantity INTEGER NOT NULL CHECK (quantity > 0),
       PRIMARY KEY (receipt_id, order_item_id)
@@ -145,27 +163,33 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_receipt_items_item ON receipt_items(order_item_id);
 
     CREATE TABLE IF NOT EXISTS vouchers (
-      code TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       value_cents INTEGER NOT NULL,
       balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
       sold_receipt_id TEXT NOT NULL REFERENCES receipts(id),
       voided_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, code)
     );
 
     CREATE TABLE IF NOT EXISTS day_closings (
       id TEXT PRIMARY KEY,
-      closing_no INTEGER NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      closing_no INTEGER NOT NULL,
       first_receipt_no INTEGER NOT NULL,
-      last_receipt_no INTEGER NOT NULL UNIQUE,
+      last_receipt_no INTEGER NOT NULL,
       totals_json TEXT NOT NULL,
       staff_role TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      UNIQUE (tenant_id, closing_no),
+      UNIQUE (tenant_id, last_receipt_no)
     );
 
     CREATE TABLE IF NOT EXISTS pos_devices (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       token_hash TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
@@ -174,18 +198,21 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS staff (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      name TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('staff','manager')),
       pin_hash TEXT NOT NULL,
       pin_salt TEXT NOT NULL,
       pin_iterations INTEGER NOT NULL,
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, name)
     );
 
     CREATE TABLE IF NOT EXISTS pos_sessions (
       token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
       device_id TEXT NOT NULL REFERENCES pos_devices(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
@@ -193,11 +220,13 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     );
 
     CREATE TABLE IF NOT EXISTS table_claims (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       device_id TEXT NOT NULL,
       staff_id TEXT,
       staff_name TEXT,
-      expires_at TEXT NOT NULL
+      expires_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, table_no)
     );
 
     -- Collaborative tables (many devices at one table) and the table lock's
@@ -209,14 +238,17 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- time the table changes hands, so a device whose hold lapsed can be told
     -- apart from the one that holds it now. See migrations/0108.
     CREATE TABLE IF NOT EXISTS table_claim_meta (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       shared INTEGER NOT NULL DEFAULT 0,
       epoch INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL DEFAULT ''
+      updated_at TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (tenant_id, table_no)
     );
 
     CREATE TABLE IF NOT EXISTS order_staff (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       staff_id TEXT,
       staff_name TEXT,
       pickup_no INTEGER,
@@ -228,6 +260,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- (shared/register.mjs, planVoid). See migrations/0056_item_voids.sql.
     CREATE TABLE IF NOT EXISTS order_item_voids (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_item_id TEXT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
       order_id TEXT NOT NULL,
       table_no TEXT NOT NULL,
@@ -241,6 +274,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS staff_settlements (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       staff_id TEXT NOT NULL,
       staff_name TEXT NOT NULL,
       last_receipt_no INTEGER NOT NULL,
@@ -249,17 +283,20 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     );
 
     CREATE TABLE IF NOT EXISTS journal (
-      seq INTEGER PRIMARY KEY,
+      seq INTEGER NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       at TEXT NOT NULL,
       kind TEXT NOT NULL,
       ref TEXT,
       payload_json TEXT NOT NULL,
       prev_hash TEXT NOT NULL,
-      hash TEXT NOT NULL
+      hash TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, seq)
     );
 
     CREATE TABLE IF NOT EXISTS service_requests (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       table_no TEXT NOT NULL,
       type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'open',
@@ -269,6 +306,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       at TEXT NOT NULL,
       role TEXT NOT NULL,
       ip TEXT NOT NULL DEFAULT '',
@@ -279,17 +317,20 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     );
 
     CREATE TABLE IF NOT EXISTS restaurant_tables (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       label TEXT NOT NULL DEFAULT '',
       token TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       locked_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, table_no)
     );
 
     CREATE TABLE IF NOT EXISTS printer_profiles (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       transport TEXT NOT NULL CHECK (transport IN ('lan','bluetooth','usb')),
       address TEXT NOT NULL,
@@ -303,6 +344,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS print_jobs (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
       printer_role TEXT NOT NULL,
       payload_json TEXT NOT NULL,
@@ -317,9 +359,10 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     );
 
     CREATE TABLE IF NOT EXISTS restaurant_settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
       menu_theme TEXT NOT NULL DEFAULT 'jade',
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id)
     );
 
     -- The console's password. One restaurant, one row: there is nothing to
@@ -345,9 +388,11 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- EXISTS. The next setting is a new key here, not a migration.
     -- See migrations/0004_app_settings.sql.
     CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      key TEXT NOT NULL,
       value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, key)
     );
 
     -- Pictures kept in the database itself, served at /media/<id>. The Worker
@@ -357,6 +402,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- See migrations/0005_dish_photos.sql.
     CREATE TABLE IF NOT EXISTS media_files (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       content_type TEXT NOT NULL,
       bytes BLOB NOT NULL,
       credit TEXT,
@@ -379,17 +425,64 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- See migrations/0055_accounts.sql.
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       login TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       password_iterations INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('owner', 'admin')),
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+      email TEXT NOT NULL DEFAULT '',
+      password_enc TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
 
+    -- The restaurants this deployment serves: one row per restaurant, and the
+    -- data that belongs to it is every row carrying its id. The first tenant
+    -- owns what was there before tenants existed. See migrations/0112.
+    CREATE TABLE IF NOT EXISTS tenants (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+      config_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- A tenant's role tokens: its kitchen screen and staff tablets sign in
+    -- with these, because the shared tokens a deployment configures belong to
+    -- the first tenant only. Only the SHA-256 of a token is stored.
+    CREATE TABLE IF NOT EXISTS tenant_tokens (
+      token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      role TEXT NOT NULL CHECK (role IN ('kitchen', 'staff', 'manager')),
+      created_at TEXT NOT NULL
+    );
+
+    -- One-time links: an invite (a new admin sets their password) and a
+    -- password reset (an existing account sets a new one). Only the SHA-256
+    -- of the token is stored.
+    CREATE TABLE IF NOT EXISTS account_tokens (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('invite', 'reset')),
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+      login TEXT,
+      name TEXT,
+      email TEXT,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_account_tokens_expiry ON account_tokens(expires_at);
+
     CREATE TABLE IF NOT EXISTS account_sessions (
       token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
@@ -401,18 +494,21 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- See migrations/0057_customers.sql.
     CREATE TABLE IF NOT EXISTS customers (
       id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      email TEXT NOT NULL,
       name TEXT NOT NULL DEFAULT '',
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       password_iterations INTEGER NOT NULL,
       points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, email)
     );
 
     CREATE TABLE IF NOT EXISTS customer_sessions (
       token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
@@ -420,6 +516,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS customer_favorites (
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       product_id TEXT NOT NULL,
       created_at TEXT NOT NULL,
       PRIMARY KEY (customer_id, product_id)
@@ -427,6 +524,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS points_ledger (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       delta INTEGER NOT NULL,
       reason TEXT NOT NULL CHECK (reason IN ('earn','reverse','redeem','refund','adjust')),
@@ -443,12 +541,14 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- the same balance cannot both be written. See migrations/0069_member_balance.sql.
     CREATE TABLE IF NOT EXISTS member_balances (
       customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       balance_cents INTEGER NOT NULL DEFAULT 0 CHECK (balance_cents >= 0),
       updated_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS balance_ledger (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       delta_cents INTEGER NOT NULL,
       reason TEXT NOT NULL CHECK (reason IN ('topup','bonus','spend','refund','adjust','reverse')),
@@ -466,6 +566,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- a full audit trail. See migrations/0072_balance_operator.sql.
     CREATE TABLE IF NOT EXISTS balance_operators (
       ledger_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       operator TEXT NOT NULL DEFAULT ''
     );
 
@@ -475,6 +576,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- table safely but not a new column. See migrations/0070_member_birthday.sql.
     CREATE TABLE IF NOT EXISTS member_birthdays (
       customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
       day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
       updated_at TEXT NOT NULL
@@ -485,6 +587,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- See migrations/0071_birthday_greetings.sql.
     CREATE TABLE IF NOT EXISTS birthday_greetings (
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       year INTEGER NOT NULL,
       sent_at TEXT NOT NULL,
       PRIMARY KEY (customer_id, year)
@@ -494,6 +597,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- for pickup, by whom when signed in, and the points it spent.
     CREATE TABLE IF NOT EXISTS guest_orders (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
       channel TEXT NOT NULL CHECK (channel IN ('dine-in','pickup')),
       table_no TEXT NOT NULL,
@@ -505,16 +609,19 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     -- Tables a waiter opened for guests to order from (开台).
     CREATE TABLE IF NOT EXISTS table_sessions (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       opened_at TEXT NOT NULL,
       expires_at TEXT NOT NULL,
-      staff_name TEXT
+      staff_name TEXT,
+      PRIMARY KEY (tenant_id, table_no)
     );
 
     -- The print bridges in the restaurant (server/print-agent.mjs) and what
     -- each last found at its printers. See migrations/0058_print_bridge.sql.
     CREATE TABLE IF NOT EXISTS print_bridges (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       version TEXT NOT NULL DEFAULT '',
       last_seen_at TEXT NOT NULL
@@ -522,6 +629,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
 
     CREATE TABLE IF NOT EXISTS printer_status (
       printer_id TEXT PRIMARY KEY REFERENCES printer_profiles(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       bridge_id TEXT NOT NULL,
       ok INTEGER NOT NULL,
       error TEXT,
@@ -540,7 +648,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- the restaurant's own wall clock. See migrations/0062_reservations.sql.
     CREATE TABLE IF NOT EXISTS reservations (
       id TEXT PRIMARY KEY,
-      reference TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      reference TEXT NOT NULL,
       token_hash TEXT,
       date TEXT NOT NULL,
       time TEXT NOT NULL,
@@ -555,7 +664,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       source TEXT NOT NULL,
       customer_id TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, reference)
     );
 
     -- One row per booking already reminded (shared/reminders.mjs): the
@@ -564,6 +674,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- database created from today's schema. See migrations/0069_reservation_reminders.sql.
     CREATE TABLE IF NOT EXISTS reservation_reminders (
       reservation_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       sent_at TEXT NOT NULL
     );
 
@@ -572,6 +683,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- gone. See migrations/0070_waitlist.sql.
     CREATE TABLE IF NOT EXISTS waitlist (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       phone TEXT NOT NULL DEFAULT '',
       email TEXT NOT NULL DEFAULT '',
@@ -588,6 +700,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- platform and platform id. See migrations/0063_delivery_orders.sql.
     CREATE TABLE IF NOT EXISTS delivery_orders (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       provider TEXT NOT NULL,
       external_id TEXT NOT NULL,
       reference TEXT NOT NULL,
@@ -611,17 +724,19 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       synced_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      UNIQUE (provider, external_id)
+      UNIQUE (tenant_id, provider, external_id)
     );
 
     -- Portions a dish has left today (shared/stock.mjs): its daily limit and
     -- today's count. See migrations/0064_product_stock.sql.
     CREATE TABLE IF NOT EXISTS product_stock (
-      product_id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       daily_limit INTEGER,
       stock_day TEXT,
       stock_left INTEGER,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, product_id)
     );
 
     -- A guest's email proved by a code before they book (shared/email-verify.mjs):
@@ -630,6 +745,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- migrations/0066_email_verification.sql.
     CREATE TABLE IF NOT EXISTS email_codes (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL,
       email TEXT NOT NULL,
       code_hash TEXT NOT NULL,
@@ -641,11 +757,13 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     CREATE INDEX IF NOT EXISTS idx_email_codes_customer ON email_codes(customer_id, created_at);
     CREATE TABLE IF NOT EXISTS customer_verified_emails (
       customer_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       email TEXT NOT NULL,
       verified_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS mail_outbox (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       to_email TEXT NOT NULL,
       subject TEXT NOT NULL,
       text TEXT NOT NULL,
@@ -658,7 +776,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- migrations/0065_cash_drawer.sql.
     CREATE TABLE IF NOT EXISTS drawer_sessions (
       id TEXT PRIMARY KEY,
-      open_flag INTEGER UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      open_flag INTEGER,
       after_receipt_no INTEGER NOT NULL,
       float_cents INTEGER NOT NULL,
       opened_by TEXT,
@@ -669,11 +788,13 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
       counted_cents INTEGER,
       counts_json TEXT,
       totals_json TEXT,
-      note TEXT
+      note TEXT,
+      UNIQUE (tenant_id, open_flag)
     );
     CREATE INDEX IF NOT EXISTS idx_drawer_sessions_closed ON drawer_sessions(closed_at);
     CREATE TABLE IF NOT EXISTS drawer_movements (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       session_id TEXT NOT NULL REFERENCES drawer_sessions(id),
       kind TEXT NOT NULL CHECK (kind IN ('in','out')),
       amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
@@ -688,11 +809,12 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- offer. See migrations/0059_discovered_printers.sql.
     CREATE TABLE IF NOT EXISTS discovered_printers (
       address TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       port INTEGER NOT NULL,
       escpos INTEGER NOT NULL DEFAULT 0,
       bridge_id TEXT NOT NULL,
       seen_at TEXT NOT NULL,
-      PRIMARY KEY (address, port)
+      PRIMARY KEY (tenant_id, address, port)
     );
 
     INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at)
@@ -705,28 +827,50 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
     -- menus pages (app_settings). See migrations/0052_drop_product_schedules.sql.
     DROP TABLE IF EXISTS product_schedules;
 
-    CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(published, available, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_products_catalog ON products(tenant_id, published, available, sort_order);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_account_sessions_expiry ON account_sessions(expires_at);
     CREATE INDEX IF NOT EXISTS idx_order_item_voids_item ON order_item_voids(order_item_id);
-    CREATE INDEX IF NOT EXISTS idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts(created_at);
+    CREATE INDEX IF NOT EXISTS idx_order_item_voids_staff ON order_item_voids(tenant_id, staff_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(tenant_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts(tenant_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_customer_sessions_expiry ON customer_sessions(expires_at);
-    CREATE INDEX IF NOT EXISTS idx_points_ledger_customer ON points_ledger(customer_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_points_ledger_customer ON points_ledger(tenant_id, customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_points_ledger_ref ON points_ledger(ref, reason);
-    CREATE INDEX IF NOT EXISTS idx_balance_ledger_customer ON balance_ledger(customer_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_balance_ledger_customer ON balance_ledger(tenant_id, customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_balance_ledger_ref ON balance_ledger(ref, reason);
-    CREATE INDEX IF NOT EXISTS idx_guest_orders_table ON guest_orders(table_no, created_at);
-    CREATE INDEX IF NOT EXISTS idx_guest_orders_customer ON guest_orders(customer_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status, created_at);
-    CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at DESC);
-    CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(date, time);
-    CREATE INDEX IF NOT EXISTS idx_waitlist_status ON waitlist(status, created_at);
-    CREATE INDEX IF NOT EXISTS idx_reservations_customer ON reservations(customer_id, date);
-    CREATE INDEX IF NOT EXISTS idx_delivery_orders_created ON delivery_orders(created_at);
-    CREATE INDEX IF NOT EXISTS idx_delivery_orders_status ON delivery_orders(status, created_at);
-  `);
+    CREATE INDEX IF NOT EXISTS idx_guest_orders_table ON guest_orders(tenant_id, table_no, created_at);
+    CREATE INDEX IF NOT EXISTS idx_guest_orders_customer ON guest_orders(tenant_id, customer_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(tenant_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(tenant_id, at DESC);
+    CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(tenant_id, date, time);
+    CREATE INDEX IF NOT EXISTS idx_waitlist_status ON waitlist(tenant_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_reservations_customer ON reservations(tenant_id, customer_id, date);
+    CREATE INDEX IF NOT EXISTS idx_delivery_orders_created ON delivery_orders(tenant_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_delivery_orders_status ON delivery_orders(tenant_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+    CREATE INDEX IF NOT EXISTS idx_order_items_tenant_order ON order_items(tenant_id, order_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(tenant_id, table_no, billed_at);
+    CREATE INDEX IF NOT EXISTS idx_product_media_product ON product_media(product_id);
+    CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
+    CREATE INDEX IF NOT EXISTS idx_vouchers_receipt ON vouchers(sold_receipt_id);
+    CREATE INDEX IF NOT EXISTS idx_pos_sessions_staff ON pos_sessions(staff_id);
+    CREATE INDEX IF NOT EXISTS idx_account_sessions_account ON account_sessions(account_id);
+    CREATE INDEX IF NOT EXISTS idx_customer_sessions_customer ON customer_sessions(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_service_requests_table ON service_requests(tenant_id, table_no, status);
+    CREATE INDEX IF NOT EXISTS idx_reservations_table ON reservations(tenant_id, table_no);
+    CREATE INDEX IF NOT EXISTS idx_order_item_voids_order ON order_item_voids(order_id);
+    CREATE INDEX IF NOT EXISTS idx_staff_settlements_staff ON staff_settlements(staff_id);
+    CREATE INDEX IF NOT EXISTS idx_print_jobs_order ON print_jobs(order_id);
+    CREATE INDEX IF NOT EXISTS idx_printer_status_bridge ON printer_status(bridge_id);
+    CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(tenant_id, email);
+    CREATE INDEX IF NOT EXISTS idx_tenant_tokens_tenant ON tenant_tokens(tenant_id, role);
+  `;
+  // The tables first: on a database from before tenants the indexes name
+  // columns that do not exist yet, so they are created only after the
+  // migration below has added them.
+  const indexesAt = SCHEMA_SQL.indexOf("\n    CREATE INDEX IF NOT EXISTS idx_products_catalog");
+  db.exec(SCHEMA_SQL.slice(0, indexesAt));
   for (const statement of [
     "ALTER TABLE products ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE order_items ADD COLUMN modifiers_json TEXT NOT NULL DEFAULT '[]'",
@@ -755,9 +899,146 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS }
   if (currentSchemaVersion > SCHEMA_VERSION) throw new Error(`Unsupported database schema version: ${currentSchemaVersion}`);
   if (currentSchemaVersion < SCHEMA_VERSION) db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 
+  // A database from before tenants gets them: the default tenant, its name
+  // from the settings, and every row moved under it. A database already on
+  // the new schema is untouched — each step checks before it writes.
+  migrateToMultiTenant(db, SCHEMA_SQL);
+  db.exec(SCHEMA_SQL.slice(indexesAt));
+
   const driver = sqliteDriver(db);
   seed(driver.sync, db);
-  return { ...createStore(driver), close: () => db.close() };
+  return { ...createStore(driver, { passwordViewKey }), close: () => db.close() };
+}
+
+/**
+ * Tenants, on a database that predates them (migrations/0112 does the same
+ * for a deployed D1; this is the Node server's equivalent, run on start).
+ *
+ * The shape of a rebuilt table is read out of SCHEMA_SQL — the definition
+ * the server itself declares — so a rebuild cannot drift from a fresh
+ * database: the new table is the old rows under the new definition, with
+ * every row's tenant the default one, and its indexes recreated from the
+ * same string. A table that already carries tenant_id is left alone, so
+ * this is safe to run on every start.
+ *
+ * Two tables are special-cased, because tenant_id is not their second
+ * column: restaurant_settings becomes one row per tenant, and app_settings
+ * one row per tenant per key. Everything else rebuilds generically: the new
+ * column sits after the first, and the rows move across with 't_default'.
+ */
+function migrateToMultiTenant(db, schemaSql) {
+  const columnsOf = (table) => db.prepare("SELECT name FROM pragma_table_info(?)").all(table).map((row) => row.name);
+  const hasTenant = (table) => columnsOf(table).includes("tenant_id");
+  const timestamp = now();
+
+  // The default tenant's name is the restaurant's own, while it is still
+  // readable from the settings it was kept under.
+  let tenantName = "Chiri";
+  try {
+    const stored = db.prepare("SELECT value FROM app_settings WHERE key = 'restaurant_name'").get();
+    const name = parseJson(stored?.value, "");
+    if (typeof name === "string" && name.trim()) tenantName = name.trim().slice(0, 40);
+  } catch {
+    // No settings yet: the default name stands.
+  }
+  db.prepare(
+    `INSERT INTO tenants (id, slug, name, status, config_json, created_at, updated_at)
+     SELECT ?, ?, ?, 'active', '{}', ?, ? WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE id = ?)`
+  ).run(DEFAULT_TENANT_ID, "default", tenantName, timestamp, timestamp, DEFAULT_TENANT_ID);
+
+  const foreignKeys = db.prepare("PRAGMA foreign_keys").get().foreign_keys;
+  db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    // A table whose keys change with the tenant, or whose columns move to
+    // make room for it, is rebuilt under the new definition, its rows
+    // carried across. The definition is the server's own (SCHEMA_SQL), and
+    // the indexes come back from the same string — so a rebuilt table reads
+    // exactly as a fresh one does. The final table is created under its own
+    // name, not renamed into it: a rename rewrites the stored definition
+    // with the name quoted, and the two would no longer match.
+    const createOf = (table) => {
+      const found = schemaSql.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n    \\);`));
+      if (!found) throw new Error(`No CREATE TABLE for ${table} in the schema`);
+      return found[0];
+    };
+    const indexesOf = (table) => {
+      const found = [];
+      for (const match of schemaSql.matchAll(/CREATE (UNIQUE )?INDEX IF NOT EXISTS (\w+) ON (\w+)[^;]*;/g)) {
+        if (match[3] === table) found.push(match[0]);
+      }
+      return found;
+    };
+    const rebuild = (table) => {
+      if (hasTenant(table)) return;
+      const oldColumns = columnsOf(table);
+      const create = createOf(table);
+      const temp = `${table}__tenant_new`;
+      db.exec(create.replace(`CREATE TABLE IF NOT EXISTS ${table} (`, `CREATE TABLE IF NOT EXISTS ${temp} (`));
+      const newColumns = [oldColumns[0], "tenant_id", ...oldColumns.slice(1)];
+      const selectList = [oldColumns[0], "'t_default'", ...oldColumns.slice(1)].join(", ");
+      db.exec(`INSERT INTO ${temp} (${newColumns.join(", ")}) SELECT ${selectList} FROM ${table}`);
+      db.exec(`DROP TABLE ${table}`);
+      db.exec(create);
+      db.exec(`INSERT INTO ${table} (${newColumns.join(", ")}) SELECT ${newColumns.join(", ")} FROM ${temp}`);
+      db.exec(`DROP TABLE ${temp}`);
+      for (const index of indexesOf(table)) db.exec(index);
+    };
+    for (const table of [
+      "accounts", "account_sessions", "products", "product_media", "orders", "order_items",
+      "order_item_vat_splits", "order_item_notes", "order_item_holds",
+      "receipts", "receipt_items", "day_closings", "pos_devices", "staff",
+      "pos_sessions", "table_claims", "table_claim_meta", "order_staff",
+      "order_item_voids", "staff_settlements", "journal", "service_requests",
+      "audit_log", "restaurant_tables", "printer_profiles", "print_jobs",
+      "print_bridges", "printer_status", "discovered_printers", "reservations",
+      "reservation_reminders", "waitlist", "delivery_orders", "product_stock",
+      "vouchers", "email_codes", "customer_verified_emails", "mail_outbox",
+      "drawer_sessions", "drawer_movements", "customers", "customer_sessions",
+      "customer_favorites", "points_ledger", "guest_orders", "table_sessions",
+      "member_balances", "balance_ledger", "balance_operators",
+      "member_birthdays", "birthday_greetings", "media_files"
+    ]) rebuild(table);
+    // The first account registered is the platform's owner; any other
+    // account there already keeps administering the default tenant.
+    db.exec(`UPDATE accounts SET role = 'owner' WHERE id = (SELECT id FROM accounts ORDER BY created_at, id LIMIT 1)`);
+
+    // The settings, one row per tenant rather than one row in all. The
+    // final tables are created under their own names from the server's own
+    // definitions, never renamed into them (see rebuild, above).
+    if (!hasTenant("restaurant_settings")) {
+      db.exec(`CREATE TABLE IF NOT EXISTS restaurant_settings__tenant_new (
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      menu_theme TEXT NOT NULL DEFAULT 'jade',
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id)
+    );`);
+      db.exec(`INSERT INTO restaurant_settings__tenant_new (tenant_id, menu_theme, updated_at)
+               SELECT 't_default', menu_theme, updated_at FROM restaurant_settings`);
+      db.exec("DROP TABLE restaurant_settings");
+      db.exec(createOf("restaurant_settings"));
+      db.exec(`INSERT INTO restaurant_settings (tenant_id, menu_theme, updated_at)
+               SELECT tenant_id, menu_theme, updated_at FROM restaurant_settings__tenant_new`);
+      db.exec("DROP TABLE restaurant_settings__tenant_new");
+    }
+    if (!hasTenant("app_settings")) {
+      db.exec(`CREATE TABLE IF NOT EXISTS app_settings__tenant_new (
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, key)
+    );`);
+      db.exec(`INSERT INTO app_settings__tenant_new (tenant_id, key, value, updated_at)
+               SELECT 't_default', key, value, updated_at FROM app_settings`);
+      db.exec("DROP TABLE app_settings");
+      db.exec(createOf("app_settings"));
+      db.exec(`INSERT INTO app_settings (tenant_id, key, value, updated_at)
+               SELECT tenant_id, key, value, updated_at FROM app_settings__tenant_new`);
+      db.exec("DROP TABLE app_settings__tenant_new");
+    }
+  } finally {
+    db.exec(`PRAGMA foreign_keys = ${foreignKeys ? "ON" : "OFF"}`);
+  }
 }
 
 /** One transaction, for the seeding: nothing else runs yet. */
@@ -788,20 +1069,20 @@ function seed(sql, db) {
 }
 
 function seedDishes(sql, db) {
-  const existing = sql.all("SELECT sku FROM products");
+  const existing = sql.all("SELECT sku FROM products WHERE tenant_id = ?", DEFAULT_TENANT_ID);
   const isLegacyDemoCatalog = existing.length > 0 && existing.length <= 15 && existing.every((row) => row.sku.startsWith("FOOD-"));
-  if (isLegacyDemoCatalog) db.exec("DELETE FROM products");
-  if (sql.get("SELECT COUNT(*) AS count FROM products").count) {
+  if (isLegacyDemoCatalog) db.exec("DELETE FROM products WHERE tenant_id = 't_default'");
+  if (sql.get("SELECT COUNT(*) AS count FROM products WHERE tenant_id = ?", DEFAULT_TENANT_ID).count) {
     // The category tidy (migrations/0111_category_cleanup.sql): a database
     // seeded before it still carries CHIRI ROLLS and TEA. Only rows still
     // under the old names move — a category the owner renamed stays renamed.
-    sql.run("UPDATE products SET category = 'URAMAKI ROLLS', updated_at = ? WHERE category = 'CHIRI ROLLS'", now());
-    sql.run("UPDATE products SET category = 'NON-ALCOHOLIC', updated_at = ? WHERE category = 'TEA'", now());
+    sql.run("UPDATE products SET category = 'URAMAKI ROLLS', updated_at = ? WHERE tenant_id = ? AND category = 'CHIRI ROLLS'", now(), DEFAULT_TENANT_ID);
+    sql.run("UPDATE products SET category = 'NON-ALCOHOLIC', updated_at = ? WHERE tenant_id = ? AND category = 'TEA'", now(), DEFAULT_TENANT_ID);
     // A catalogue from before the dishes had options gets them.
-    const ramen = sql.get("SELECT * FROM products WHERE sku = ?", "R1");
+    const ramen = sql.get("SELECT * FROM products WHERE tenant_id = ? AND sku = ?", DEFAULT_TENANT_ID, "R1");
     if (ramen && !parseJson(ramen.modifiers_json, []).length) {
       for (const dish of photoMenuDishes) {
-        const current = sql.get("SELECT * FROM products WHERE sku = ?", dish.sku);
+        const current = sql.get("SELECT * FROM products WHERE tenant_id = ? AND sku = ?", DEFAULT_TENANT_ID, dish.sku);
         if (current) sql.run("UPDATE products SET modifiers_json = ?, updated_at = ? WHERE id = ?", normalizeProduct({ modifiers: dish.modifiers || [] }, current).modifiersJson, now(), current.id);
       }
     }
@@ -827,13 +1108,13 @@ function seedDishes(sql, db) {
 
 /** The starting set menus, once: the marker, not the products, records that it happened. */
 function seedSetMenus(sql, db) {
-  if (sql.get("SELECT 1 AS done FROM app_settings WHERE key = ?", SET_MENU_SEED_KEY)) return;
+  if (sql.get("SELECT 1 AS done FROM app_settings WHERE tenant_id = ? AND key = ?", DEFAULT_TENANT_ID, SET_MENU_SEED_KEY)) return;
   transaction(db, () => {
-    const dishes = sql.all("SELECT * FROM products ORDER BY sort_order, created_at").map((row) => mapProduct(row, []));
+    const dishes = sql.all("SELECT * FROM products WHERE tenant_id = ? ORDER BY sort_order, created_at", DEFAULT_TENANT_ID).map((row) => mapProduct(row, []));
     for (const set of setMenuProducts(dishes)) {
-      if (!sql.get("SELECT id FROM products WHERE id = ? OR sku = ?", set.id, set.sku)) insertProduct(sql, set);
+      if (!sql.get("SELECT id FROM products WHERE tenant_id = ? AND (id = ? OR sku = ?)", DEFAULT_TENANT_ID, set.id, set.sku)) insertProduct(sql, set);
     }
-    sql.run("INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", SET_MENU_SEED_KEY, "true", now());
+    sql.run("INSERT INTO app_settings (tenant_id, key, value, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(tenant_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", DEFAULT_TENANT_ID, SET_MENU_SEED_KEY, "true", now());
   });
 }
 
@@ -848,16 +1129,16 @@ function seedPhotos(sql, db) {
   transaction(db, () => {
     for (const photo of photos) {
       if (sql.get("SELECT 1 AS seen FROM media_files WHERE id = ?", photo.fileId)) continue;
-      sql.run("INSERT INTO media_files (id, content_type, bytes, credit, source_url, created_at) VALUES (?, ?, ?, ?, ?, ?)", photo.fileId, photo.contentType, photo.bytes, photo.credit, photo.sourceUrl, now());
+      sql.run("INSERT INTO media_files (id, tenant_id, content_type, bytes, credit, source_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", photo.fileId, DEFAULT_TENANT_ID, photo.contentType, photo.bytes, photo.credit, photo.sourceUrl, now());
       // A new photo for a dish still showing the one seeded before takes its
       // place; a photo the owner uploaded is not a seeded one and stays.
-      const seeded = sql.get("SELECT id FROM product_media WHERE product_id = ? AND id LIKE 'seed-%'", photo.productId);
+      const seeded = sql.get("SELECT id FROM product_media WHERE tenant_id = ? AND product_id = ? AND id LIKE 'seed-%'", DEFAULT_TENANT_ID, photo.productId);
       if (seeded) {
         sql.run("UPDATE product_media SET url = ? WHERE id = ?", `/media/${photo.fileId}`, seeded.id);
         continue;
       }
-      if (sql.get("SELECT id FROM products WHERE id = ?", photo.productId) && !sql.get("SELECT COUNT(*) AS count FROM product_media WHERE product_id = ?", photo.productId).count) {
-        sql.run("INSERT INTO product_media (id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", `seed-${photo.fileId}`, photo.productId, "image", `/media/${photo.fileId}`, null, 0, now());
+      if (sql.get("SELECT id FROM products WHERE tenant_id = ? AND id = ?", DEFAULT_TENANT_ID, photo.productId) && !sql.get("SELECT COUNT(*) AS count FROM product_media WHERE tenant_id = ? AND product_id = ?", DEFAULT_TENANT_ID, photo.productId).count) {
+        sql.run("INSERT INTO product_media (id, tenant_id, product_id, type, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", `seed-${photo.fileId}`, DEFAULT_TENANT_ID, photo.productId, "image", `/media/${photo.fileId}`, null, 0, now());
       }
     }
   });

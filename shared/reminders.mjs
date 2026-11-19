@@ -18,20 +18,32 @@ import { addDays, localNow } from "./reservations.mjs";
 
 export async function remindReservations({ store, mail, send = (...args) => fetch(...args) } = {}) {
   if (!mail) return { ran: false, reason: "mail-off", sent: 0, due: 0 };
-  const settings = await store.getSettings();
-  if (!settings.reservations?.enabled) return { ran: false, reason: "reservations-off", sent: 0, due: 0 };
-  // Tomorrow on the restaurant's own wall clock, so a booking at 20:00 is
-  // reminded the day before wherever the schedule's own clock happens to be.
-  const date = addDays(localNow(settings.timeZone).date, 1);
-  const due = await store.reservations.remindableFor(date);
-  const sendMail = createMailer({ mail, store, send });
   let sent = 0;
-  for (const reservation of due) {
-    const message = { to: reservation.email, ...reminderMessage(reservation, { language: reservation.language, restaurant: settings.restaurantName }) };
-    if (await sendMail(message)) {
-      await store.reservations.markReminded(reservation.id);
-      sent += 1;
+  let due = 0;
+  let date = null;
+  let eligible = 0;
+  // One restaurant at a time: each tenant has its own timezone, its own
+  // bookings and its own mail outbox, so a reminder never crosses restaurants.
+  for (const tenant of await store.listTenants()) {
+    const scoped = store.withTenant(tenant.id);
+    const settings = await scoped.getSettings();
+    if (!settings.reservations?.enabled) continue;
+    eligible += 1;
+    // Tomorrow on the restaurant's own wall clock, so a booking at 20:00 is
+    // reminded the day before wherever the schedule's own clock happens to be.
+    const day = addDays(localNow(settings.timeZone).date, 1);
+    if (!date) date = day;
+    const rows = await scoped.reservations.remindableFor(day);
+    due += rows.length;
+    const sendMail = createMailer({ mail, store: scoped, send });
+    for (const reservation of rows) {
+      const message = { to: reservation.email, ...reminderMessage(reservation, { language: reservation.language, restaurant: settings.restaurantName }) };
+      if (await sendMail(message)) {
+        await scoped.reservations.markReminded(reservation.id);
+        sent += 1;
+      }
     }
   }
-  return { ran: true, date, sent, due: due.length };
+  if (!eligible) return { ran: false, reason: "reservations-off", sent: 0, due: 0 };
+  return { ran: true, date, sent, due };
 }

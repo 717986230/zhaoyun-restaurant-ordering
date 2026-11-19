@@ -579,7 +579,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const registered = await call("POST", "/api/account/register", { body: { login: " Wirt@Zhaoyun.at ", name: "Frau Li", password: "kueche-passwort-2026" } });
       assert.equal(registered.status, 201);
       assert.ok(registered.json.token, "registering signs in");
-      assert.deepEqual({ ...registered.json.account, id: "", createdAt: "" }, { id: "", login: "wirt@zhaoyun.at", name: "Frau Li", createdAt: "" }, "the name is kept without case or spaces; no hash leaves");
+      assert.deepEqual({ ...registered.json.account, id: "", createdAt: "" }, { id: "", login: "wirt@zhaoyun.at", name: "Frau Li", tenantId: "t_default", role: "owner", status: "active", email: "", createdAt: "" }, "the name is kept without case or spaces; no hash leaves");
       assert.deepEqual((await call("GET", "/api/account")).json, { registered: true });
       const second = await call("POST", "/api/account/register", { body: { login: "someone", password: "anderes-passwort" } });
       assert.equal(second.status, 409, "one restaurant, one account: registration closes");

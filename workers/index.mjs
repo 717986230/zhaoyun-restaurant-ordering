@@ -51,7 +51,7 @@ function adminToken(env) {
 
 /** The store and the API over this deployment's D1, as a request or the cron sees them. */
 function buildApi(env, ctx) {
-  const store = createStore(d1Driver(env.DB));
+  const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null });
   const api = createApi({
     store,
     state,
@@ -127,11 +127,30 @@ export default {
     if (at.getUTCHours() === 9) {
       ctx.waitUntil((async () => {
         try {
-          const store = createStore(d1Driver(env.DB));
+          const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null });
           const reminded = await remindReservations({ store, mail: mailConfig(env) });
           console.log(JSON.stringify({ level: "info", msg: "reservation reminders", ...reminded }));
         } catch (error) {
           console.error(JSON.stringify({ level: "error", msg: "reservation reminders failed", error: String(error?.message ?? error) }));
+        }
+      })());
+    }
+    // Retention (shared/store.mjs, purgeExpired): expired sessions, spent
+    // one-time links, old mail and audit rows go, once a day at 03:00 UTC.
+    // Per tenant; the auth-throttle purge inside it is global and
+    // idempotent, so running it once per tenant is harmless.
+    if (at.getUTCHours() === 3) {
+      ctx.waitUntil((async () => {
+        try {
+          const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null });
+          const purged = {};
+          for (const tenant of await store.listTenants()) {
+            const counts = await store.withTenant(tenant.id).purgeExpired();
+            for (const [key, value] of Object.entries(counts)) purged[key] = (purged[key] ?? 0) + value;
+          }
+          console.log(JSON.stringify({ level: "info", msg: "retention purge", ...purged }));
+        } catch (error) {
+          console.error(JSON.stringify({ level: "error", msg: "retention purge failed", error: String(error?.message ?? error) }));
         }
       })());
     }

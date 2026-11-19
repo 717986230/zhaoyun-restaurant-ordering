@@ -66,7 +66,11 @@ const incremental = [
   // The collaborative-table flag and the table lock's fencing token.
   { file: "0108_shared_table_claims.sql", drop: "DROP TABLE table_claim_meta;" },
   { file: "0109_order_item_notes.sql", drop: "DROP TABLE order_item_notes;" },
-  { file: "0110_order_item_holds.sql", drop: "DROP TABLE order_item_holds;" }
+  { file: "0110_order_item_holds.sql", drop: "DROP TABLE order_item_holds;" },
+  // 0112 rebuilds every tenant table under the new definition: the drop
+  // restores the pre-tenant shape of each one from a fixture built from the
+  // 0001 that shipped before tenants.
+  { file: "0112_multi_tenancy.sql", drop: readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "pre-tenant-schema.sql"), "utf8") }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")
@@ -276,19 +280,77 @@ test("the incremental migrations are no-ops on a fresh database and bring a depl
   });
   assert.deepEqual(fresh, expected, "an incremental migration must not change a database created from today's 0001");
 
-  for (const migration of incremental) {
+  // A database that missed a migration takes it and everything after it —
+  // wrangler applies them in order — so the check runs the rest of the chain
+  // too: a later migration may rewrite the same table (0112 rebuilds every
+  // tenant table), and the deployed database must still end up where the
+  // Node server does.
+  for (const [index, migration] of incremental.entries()) {
     const deployed = inTempDatabase((file) => {
       const db = new DatabaseSync(file);
       db.exec(sql.schema);
       db.exec(sql.catalog);
       db.exec(migration.drop);
-      db.exec(migration.sql);
+      for (const later of incremental.slice(index)) db.exec(later.sql);
       const result = schemaOf(db);
       db.close();
       return result;
     });
     assert.deepEqual(deployed, expected, `${migration.file} must give an already-deployed database what it adds`);
   }
+});
+
+/**
+ * 0112 moves the rows, not just the tables: an account becomes the platform
+ * owner, every row lands under the default tenant, and the journal's hashes
+ * — the fiscal chain — come across untouched.
+ */
+test("0112 carries a deployed database's rows into the default tenant", () => {
+  const sql = committed();
+  const fixture = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "pre-tenant-schema.sql"), "utf8");
+  const result = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    db.exec(fixture);
+    // A deployed database, before tenants: an account, an order with an
+    // item, a journal entry, a customer, a table — and a name for the house.
+    db.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('restaurant_name', '\"Chiri\"', 'x')").run();
+    db.prepare("INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at) VALUES ('acc-1', 'admin', 'Admin', 'h', 's', 100000, 'x', 'x')").run();
+    db.prepare("INSERT INTO orders (id, order_no, client_request_id, table_no, status, note, total_cents, billed_at, created_at, updated_at) VALUES ('ord-1', '2026-11-19-1', 'cr-1', '5', 'open', '', 1250, NULL, 'x', 'x')").run();
+    db.prepare("INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price_cents, print_station, modifiers_json, vat_percent) VALUES ('oi-1', 'ord-1', 'photo-r1', 'Ramen', 1, 1250, 'kitchen', '[]', 10)").run();
+    db.prepare("INSERT INTO journal (seq, at, kind, ref, payload_json, prev_hash, hash) VALUES (1, 'x', 'order', 'ord-1', '{}', 'GENESIS', 'abc')").run();
+    db.prepare("INSERT INTO customers (id, email, name, password_hash, password_salt, password_iterations, points, created_at, updated_at) VALUES ('cus-1', 'gast@example.at', 'Gast', 'h', 's', 100000, 10, 'x', 'x')").run();
+    db.prepare("INSERT INTO restaurant_tables (table_no, label, token, enabled, locked_at, created_at, updated_at) VALUES ('5', 'Tisch 5', 'tok-5', 1, NULL, 'x', 'x')").run();
+    // A dish the owner added: the fixture dropped the seeded catalog, so a
+    // row put back here is what 0112 has to carry across.
+    db.prepare("INSERT INTO products (id, sku, kind, category, name_zh, name_de, name_en, description, price_cents, allergens_json, prep_time, portion, level, ingredients, art, pattern, tag_color, available, published, sort_order, print_station, print_printer_id, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at) VALUES ('dish-1', 'TEST-1', 'food', 'RAMEN', 'Test', 'Test', 'Test', '', 1000, '[]', '', '', '', '', '', 'lines', '', 1, 1, 0, 'kitchen', '', '[]', 10, '[]', 'x', 'x')").run();
+    db.exec(readFileSync(path.join(migrationsDir, "0112_multi_tenancy.sql"), "utf8"));
+    // Rows come back null-prototype; plain objects compare cleanly.
+    const plain = (rows) => rows.map((row) => ({ ...row }));
+    const out = {
+      tenant: plain(db.prepare("SELECT id, slug, name, status FROM tenants").all()),
+      account: plain(db.prepare("SELECT login, tenant_id, role, status FROM accounts").all()),
+      order: plain(db.prepare("SELECT order_no, tenant_id, table_no FROM orders").all()),
+      item: plain(db.prepare("SELECT order_id, tenant_id FROM order_items").all()),
+      journal: plain(db.prepare("SELECT seq, tenant_id, hash FROM journal").all()),
+      customer: plain(db.prepare("SELECT email, tenant_id FROM customers").all()),
+      table: plain(db.prepare("SELECT table_no, tenant_id FROM restaurant_tables").all()),
+      product: plain(db.prepare("SELECT id, sku, tenant_id FROM products").all()),
+      products: db.prepare("SELECT COUNT(*) AS n FROM products WHERE tenant_id = 't_default'").get()
+    };
+    db.close();
+    return out;
+  });
+  assert.deepEqual(result.tenant, [{ id: "t_default", slug: "default", name: "Chiri", status: "active" }]);
+  assert.deepEqual(result.account, [{ login: "admin", tenant_id: "t_default", role: "owner", status: "active" }]);
+  assert.deepEqual(result.order, [{ order_no: "2026-11-19-1", tenant_id: "t_default", table_no: "5" }]);
+  assert.deepEqual(result.item, [{ order_id: "ord-1", tenant_id: "t_default" }]);
+  assert.deepEqual(result.journal, [{ seq: 1, tenant_id: "t_default", hash: "abc" }]);
+  assert.deepEqual(result.customer, [{ email: "gast@example.at", tenant_id: "t_default" }]);
+  assert.deepEqual(result.table, [{ table_no: "5", tenant_id: "t_default" }]);
+  assert.deepEqual(result.product, [{ id: "dish-1", sku: "TEST-1", tenant_id: "t_default" }]);
+  assert.equal(result.products.n, 1);
 });
 
 /**
