@@ -214,6 +214,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 /* Open on another device: locked here until that waiter is done. */
 .pos-table.claimed { border-style: dashed; border-color: var(--p-warn); background: repeating-linear-gradient(135deg, transparent 0 10px, var(--p-stripe) 10px 20px); }
 .pos-table.claimed b, .pos-table.claimed span { opacity: .6; }
+/* Held by a booking now: the floor may not open it, only a manager. */
+.pos-table.reserved { border-style: dashed; border-color: var(--p-pay); background: repeating-linear-gradient(135deg, transparent 0 10px, var(--p-pay-wash) 10px 20px); }
+.pos-held-badge { border-color: var(--p-pay); color: var(--p-pay); }
 /* 多人同桌: a collaborative table any device may join, not a locked one. */
 .pos-table.shared { border-style: solid; border-color: var(--p-accent); }
 .pos-shared-badge { border-color: var(--p-accent); color: var(--p-accent); }

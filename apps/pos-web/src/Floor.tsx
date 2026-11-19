@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError } from "@zhaoyun/api-client";
 import type { TableOverview } from "@zhaoyun/api-client";
-import type { ApiDeliveryOrder, ApiPrintJob, ApiReservation, ApiServiceRequest, PosClaim, ReservationUpdateCommand } from "@zhaoyun/contracts";
+import type { ApiDeliveryOrder, ApiPrintJob, ApiReservation, ApiServiceRequest, HeldTable, PosClaim, ReservationUpdateCommand } from "@zhaoyun/contracts";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
 import type { PosKey } from "./i18n";
@@ -25,6 +25,12 @@ export async function openTable(pos: Pos, table: string, go: (screen: Screen) =>
     await api.claim(table);
     go({ name: "order", table: table.toUpperCase() });
   } catch (error) {
+    // A booking holds this table: only a manager opens it over the hold (and a
+    // manager's own claim never lands here, since the server lets them through).
+    if ((error as { code?: string })?.code === "TABLE_RESERVED") {
+      const at = (error as { details?: { reservedFor?: string } })?.details?.reservedFor ?? "";
+      return pos.notify(pos.t("reservedHeld", { table: table.toUpperCase(), time: at }), "error");
+    }
     const held = (error as { status?: number })?.status === 409;
     // Locked to the device that has it open: a waiter is told whose it is; the manager may take it over.
     if (!held) return pos.failed(error);
@@ -236,6 +242,8 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const [requests, setRequests] = useState<ApiServiceRequest[]>([]);
   const [bookings, setBookings] = useState<ApiReservation[]>([]);
   const [delivery, setDelivery] = useState<ApiDeliveryOrder[]>([]);
+  // Tables a booking is holding right now (reserved, waiting for the guest).
+  const [held, setHeld] = useState<HeldTable[]>([]);
   // The camera at the door: a booking's code or a member's.
   const [scanning, setScanning] = useState(false);
   // A booking being seated: the free-table picker is open for it.
@@ -251,6 +259,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       setDeviceId(floor.deviceId ?? "");
       setRequests(floor.requests ?? []);
       setBookings(floor.reservations ?? []);
+      setHeld(floor.held ?? []);
       setDelivery(floor.delivery ?? []);
     } catch (error) { pos.failed(error); }
   }, [pos.failed]);
@@ -269,6 +278,10 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   for (const booking of bookings) {
     if (booking.table && booking.status !== "seated" && !bookedAt.has(booking.table.toUpperCase())) bookedAt.set(booking.table.toUpperCase(), booking.time);
   }
+  // Tables held by a booking right now (locked to walk-ins and the floor): shown
+  // with a lock, and the time the table is reserved for.
+  const heldAt = new Map<string, string>();
+  for (const entry of held) heldAt.set(entry.table.toUpperCase(), entry.time);
   const room = tables.filter((table) => !TAKEAWAY.test(table.table));
   const takeaways = tables.filter((table) => TAKEAWAY.test(table.table) && table.state !== "free");
 
@@ -302,9 +315,11 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
     // A collaborative table (多人同桌) is open to every device, so it is never
     // "busy" — any waiter may tap it to join and work it alongside the others.
     const busy = claim && !mine && !claim.shared;
+    // Held by a booking now: the floor cannot open it (only a manager can).
+    const reservedAt = !claim && table.state === "free" ? heldAt.get(table.table.toUpperCase()) : undefined;
     return <button key={table.table} type="button" data-table={table.table}
-      className={`pos-table ${table.state} ${busy ? "claimed" : ""} ${claim?.shared ? "shared" : ""}`}
-      title={busy ? t("claimedBy", { table: table.table, name: claim.staffName ?? "?" }) : undefined}
+      className={`pos-table ${table.state} ${busy ? "claimed" : ""} ${reservedAt ? "reserved" : ""} ${claim?.shared ? "shared" : ""}`}
+      title={busy ? t("claimedBy", { table: table.table, name: claim.staffName ?? "?" }) : reservedAt ? t("reservedHeld", { table: table.table, time: reservedAt }) : undefined}
       onClick={() => void openTable(pos, table.table, go, claims)}>
       <b>{busy && <i className="pos-lock" aria-label={t("lockedHere")}>🔒</i>}{table.table}</b>
       <span>{table.total > 0 ? money(Math.round(table.total * 100)) : t(table.state === "locked" ? "lockedByGuest" : "free")}</span>
@@ -312,7 +327,9 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       {busy && <small>{t("openOn", { name: claim.staffName ?? "?" })}</small>}
       {calling.has(table.table.toUpperCase()) && <em className="pos-call-badge">🔔 {t("calling")}</em>}
       {table.orderingUntil && <em className="pos-qr-badge">{t("qrBadge")}</em>}
-      {bookedAt.has(table.table.toUpperCase()) && <em className="pos-qr-badge pos-booked-badge">{t("bookingBadge", { time: bookedAt.get(table.table.toUpperCase())! })}</em>}
+      {reservedAt
+        ? <em className="pos-qr-badge pos-held-badge">{t("heldBadge", { time: reservedAt })}</em>
+        : bookedAt.has(table.table.toUpperCase()) && <em className="pos-qr-badge pos-booked-badge">{t("bookingBadge", { time: bookedAt.get(table.table.toUpperCase())! })}</em>}
       {table.orders.some((order) => order.channel === "pickup") && <em className="pos-qr-badge">{t("pickupBadge")}</em>}
     </button>;
   };

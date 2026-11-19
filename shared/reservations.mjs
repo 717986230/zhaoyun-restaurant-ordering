@@ -69,7 +69,16 @@ export const RESERVATION_DEFAULTS = {
   signupPoints: 20,
   bookingPoints: 5,
   noShowPoints: 5,
-  noShowAfterMinutes: 30
+  noShowAfterMinutes: 30,
+  // A booking with a table assigned holds that table on the floor: from
+  // `holdBeforeMinutes` before its time, no walk-in (scanning the table's code)
+  // and no waiter on a POS may take it — only a manager may open it over the
+  // hold. The guest arriving (scanning the table's own code, or the floor
+  // checking them in) takes the hold as theirs; `releaseAfterMinutes` past the
+  // booking's time with nobody checked in, the hold lifts and the table is free
+  // again. 0 for either: that edge of the window is off.
+  holdBeforeMinutes: 30,
+  releaseAfterMinutes: 10
 };
 export const NO_SHOW_WINDOW_DAYS = 180;
 export const MAX_BOOKABLE_TABLES = 200;
@@ -187,8 +196,24 @@ export function normalizeReservationSettings(value) {
     signupPoints: integer("Points for signing up after scanning a table's code", input.signupPoints, 0, 100_000),
     bookingPoints: integer("Points a booking costs", input.bookingPoints, 0, 100_000),
     noShowPoints: integer("Points a missed booking costs", input.noShowPoints, 0, 100_000),
-    noShowAfterMinutes: integer("Minutes before a booking not checked in counts as missed", input.noShowAfterMinutes, 0, 720)
+    noShowAfterMinutes: integer("Minutes before a booking not checked in counts as missed", input.noShowAfterMinutes, 0, 720),
+    holdBeforeMinutes: integer("Minutes before a booking its table is held", input.holdBeforeMinutes, 0, 720),
+    releaseAfterMinutes: integer("Minutes past a booking before its table is freed", input.releaseAfterMinutes, 0, 720)
   };
+}
+
+/**
+ * Whether `booking` holds its assigned table at `clock` (the restaurant's day
+ * and minute): a booking still waiting for its guest (pending or confirmed,
+ * not yet seated), with a table, on today, inside [time - holdBeforeMinutes,
+ * time + releaseAfterMinutes]. A seated booking no longer holds — its guest is
+ * there, so the table is simply in use.
+ */
+export function holdsTableNow(booking, rules, clock) {
+  if (!booking?.table_no || booking.date !== clock.date) return false;
+  if (!["pending", "confirmed"].includes(booking.status)) return false;
+  const at = toMinutes(booking.time);
+  return clock.minute >= at - rules.holdBeforeMinutes && clock.minute <= at + rules.releaseAfterMinutes;
 }
 
 /**
