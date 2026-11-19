@@ -3,13 +3,18 @@ import type { FormEvent } from "react";
 import type { AdminApi } from "@zhaoyun/api-client";
 import type { PosDevice, PosStaff } from "@zhaoyun/contracts";
 import { formatTime, useI18n } from "../../app/i18n";
-import { jumpLinkProps } from "../../app/pwa";
 
 /**
  * The POS's people and devices, kept by the manager: each waiter with a PIN
  * of their own (switched off rather than deleted, so their receipts keep a
  * name), and the tablets and phones paired to the POS, which can be unpaired
  * when one is lost.
+ *
+ * One card per person, devices included: a device carries no staff id of its
+ * own — it is named when it is paired, usually after the person using it —
+ * so devices are shown under the person whose name they carry, and a device
+ * no person answers to lands in "other devices" below instead of a second
+ * list repeating the same names.
  */
 export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (message: string) => void; failed: (error: unknown) => void }) {
   const { t, language } = useI18n();
@@ -59,8 +64,18 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
     } catch (error) { failed(error); }
   }
 
+  // Devices under their person, by the name they were paired with; the rest
+  // have no person and are listed on their own below.
+  const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const devicesOf = (person: PosStaff) => devices.filter((device) => sameName(device.name, person.name));
+  const otherDevices = devices.filter((device) => !staff.some((person) => sameName(device.name, person.name)));
+  const deviceRow = (device: PosDevice) => <li key={device.id} className="staff-device">
+    <b>{device.name}</b>
+    <small>{device.lastSeenAt ? t("lastSeen", { time: formatTime(device.lastSeenAt, language) }) : ""}</small>
+    <button type="button" className="ghost-action" onClick={() => void unpair(device)}>{t("unpairDevice")}</button>
+  </li>;
+
   return <div className="staff-card">
-    <a className="ghost-action staff-open-pos" {...jumpLinkProps("pos.html")}>{t("openPos")} ↗</a>
     {staff.length ? <ul className="staff-list">{staff.map((person) => <li key={person.id} data-staff={person.name} className={person.active ? "" : "inactive"}>
       <b>{person.name}</b>
       <select aria-label={t("staffRole")} value={person.role} onChange={(event) => void save(person, { role: event.target.value === "manager" ? "manager" : "staff" })}>
@@ -78,6 +93,7 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
           <button type="button" className="ghost-action" onClick={() => void save(person, { active: !person.active })}>{t(person.active ? "deactivate" : "activate")}</button>
         </span>}
       {!person.active && <em>{t("staffInactive")}</em>}
+      {devicesOf(person).length > 0 && <ul className="staff-devices">{devicesOf(person).map(deviceRow)}</ul>}
     </li>)}</ul> : <p className="settings-hint">{t("noStaffYet")}</p>}
 
     <form className="staff-add" onSubmit={add}>
@@ -87,11 +103,11 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
       <button type="submit" className="primary-action">{t("addStaff")}</button>
     </form>
 
-    <p className="settings-label">{t("posDevices")}</p>
-    {devices.length ? <ul className="staff-list">{devices.map((device) => <li key={device.id}>
-      <b>{device.name}</b>
-      <small>{device.lastSeenAt ? t("lastSeen", { time: formatTime(device.lastSeenAt, language) }) : ""}</small>
-      <button type="button" className="ghost-action" onClick={() => void unpair(device)}>{t("unpairDevice")}</button>
-    </li>)}</ul> : <p className="settings-hint">{t("noDevices")}</p>}
+    {devices.length === 0
+      ? <p className="settings-hint">{t("noDevices")}</p>
+      : otherDevices.length > 0 && <>
+        <p className="settings-label">{t("otherDevices")}</p>
+        <ul className="staff-list">{otherDevices.map(deviceRow)}</ul>
+      </>}
   </div>;
 }

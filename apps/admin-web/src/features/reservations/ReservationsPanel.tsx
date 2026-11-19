@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import type { AdminApi, ReservationList, StaffRole } from "@zhaoyun/api-client";
 import type { ApiMailStatus, ApiReservation, ApiReservationSettings, ApiSettings, ReservationStatus, ReservationUpdateCommand } from "@zhaoyun/contracts";
 import { useI18n } from "../../app/i18n";
+import { downloadCsv } from "../../app/csv";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 
 interface Props {
@@ -201,20 +202,6 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
         }
       }} />}
   </div></section>;
-}
-
-/** A CSV the way Excel opens it right: a BOM for UTF-8, fields quoted. */
-function downloadCsv(name: string, rows: Array<Array<string | number>>) {
-  const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-  const text = `﻿${rows.map((row) => row.map(quote).join(",")).join("\r\n")}\r\n`;
-  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**

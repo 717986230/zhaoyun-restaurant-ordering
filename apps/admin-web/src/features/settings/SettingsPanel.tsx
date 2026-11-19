@@ -634,6 +634,9 @@ export function SettingsPanel(props: Props) {
           <label><span>{t("takeawayDiscount")}</span><input name="takeawayDiscountPercent" type="number" min={0} max={50} step={1} inputMode="numeric" defaultValue={settings.takeawayDiscountPercent} /></label>
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
+        {/* The ordering switch lives here now: one toggle in the business card
+            instead of a card of its own. */}
+        <Toggle checked={settings.showOrdering} label={t("showOrdering")} hint={t("showOrderingHint")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
       </Section>
       {/* The shop's SEPA account for the POS pay-by-transfer GiroCode. */}
       <Section id="sepa" title={t("sectionSepa")} summary={settings.sepaPayment.enabled ? (settings.sepaPayment.iban || t("sepaNoIban")) : t("foldOff")}>
@@ -650,20 +653,10 @@ export function SettingsPanel(props: Props) {
           <button className="primary-action" type="submit">{t("save")}</button>
         </form>
       </Section>
-      <Section id="modules" title={t("sectionModules")} summary={t(settings.showOrdering ? "foldOn" : "foldOff")}>
-        <Toggle checked={settings.showOrdering} label={t("showOrdering")} onChange={(showOrdering) => void props.onSaveSettings({ showOrdering }, "appearanceSaved")} />
-        <small className="settings-hint">{t("showOrderingHint")}</small>
-      </Section>
       <Section id="staff" title={t("sectionStaff")}>
         <StaffCard api={props.api} notify={props.notify} failed={props.failed} />
       </Section>
       </>}
-      <Section id="tables" title={t("sectionTables")}>
-        <p className="settings-hint">{t("tablesMovedTo")}</p>
-        <div className="qr-actions">
-          <a className="primary-action" href="#tables">{t("tabTables")}</a>
-        </div>
-      </Section>
     </div>
 
     <h2 className="settings-group" id="group-account">{t("groupAccount")}</h2>

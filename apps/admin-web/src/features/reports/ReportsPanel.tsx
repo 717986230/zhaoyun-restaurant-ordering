@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AdminApi } from "@zhaoyun/api-client";
 import type { ApiSalesReport } from "@zhaoyun/contracts";
 import { formatMoney, useI18n } from "../../app/i18n";
+import { downloadCsv } from "../../app/csv";
 import type { CopyKey } from "../../app/i18n";
 
 interface Props {
@@ -55,20 +56,6 @@ function previousRange(from: string, to: string): [string, string] {
 function changePct(now: number, before: number | undefined): number | null {
   if (before === undefined || before === 0) return null;
   return Math.round((now - before) / before * 100);
-}
-
-/** A CSV the way Excel opens it right: a BOM for UTF-8, fields quoted. */
-function downloadCsv(name: string, rows: Array<Array<string | number>>) {
-  const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-  const text = `﻿${rows.map((row) => row.map(quote).join(",")).join("\r\n")}\r\n`;
-  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 const euros = (cents: number) => (cents / 100).toFixed(2);
