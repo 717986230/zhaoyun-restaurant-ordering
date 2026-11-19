@@ -2802,6 +2802,51 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       await call("PUT", "/api/admin/settings", { admin: true, body: { delivery: { lieferando: { enabled: false }, foodora: { enabled: false } } } });
     }],
 
+    ["a booking holds its table: the floor cannot open it, a walk-in scanning it is turned away, and only a manager opens it over the hold", async () => {
+      const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "00:00", to: "23:30" }], intervalMinutes: 30, durationMinutes: 120, capacity: 20, leadMinutes: 60, daysAhead: 30, autoConfirm: true, bookingPoints: 0, noShowAfterMinutes: 180, holdBeforeMinutes: 30, releaseAfterMinutes: 10 };
+      assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: rules } })).status, 200);
+
+      // The restaurant's own clock, so the booking's time is "now" — always
+      // inside the hold window [now - 30, now + 10].
+      const timeZone = (await call("GET", "/api/admin/settings", { admin: true })).json.timeZone;
+      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date()).map((part) => [part.type, part.value]));
+      const day = `${parts.year}-${parts.month}-${parts.day}`;
+      const time = `${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}`;
+
+      // The table is on the floor, so a guest scanning its code is checked.
+      const table = (await call("POST", "/api/admin/tables", { admin: true, body: { table: "HT1", label: "Hold" } })).json.table;
+      const booked = await call("POST", "/api/admin/reservations", { role: "staff", body: { date: day, time, party: 2, name: "Reserver", phone: "+43 660 7777777", table: "HT1" } });
+      assert.equal(booked.status, 201, JSON.stringify(booked.json));
+      assert.equal(booked.json.reservation.table, "HT1");
+
+      // The floor overview shows it held, and the floor may not open it.
+      const overview = (await call("GET", "/api/admin/tables/overview", { role: "staff" }));
+      assert.ok(overview.json.held.some((entry) => entry.table === "HT1" && entry.time === time), "the overview carries the held tables");
+      const refusedOpen = await call("POST", "/api/admin/tables/HT1/ordering", { role: "staff", body: { open: true } });
+      assert.equal(refusedOpen.status, 409);
+      assert.equal(refusedOpen.json.code, "TABLE_RESERVED");
+
+      // A walk-in scanning the table's code is told it is reserved, and may not order on it.
+      const scanned = await call("GET", "/api/guest/tables/HT1", { tableToken: table.token });
+      assert.equal(scanned.json.open, false);
+      assert.equal(scanned.json.reserved.time, time);
+      const walkIn = await call("POST", "/api/orders", { tableToken: table.token, body: { clientRequestId: "contract-hold-walkin", table: "HT1", note: "", items: [{ id: "photo-r1", qty: 1 }] } });
+      assert.equal(walkIn.status, 409, JSON.stringify(walkIn.json));
+      assert.equal(walkIn.json.code, "TABLE_RESERVED");
+
+      // A manager opens it over the hold: the booked guest is checked in (seated),
+      // and the table is no longer held.
+      const managerOpen = await call("POST", "/api/admin/tables/HT1/ordering", { role: "manager", body: { open: true } });
+      assert.equal(managerOpen.status, 200, JSON.stringify(managerOpen.json));
+      assert.ok(managerOpen.json.session, "the table opens for its guests");
+      const seatedList = (await call("GET", `/api/admin/reservations?from=${day}&to=${day}&q=Reserver`, { role: "staff" })).json.reservations;
+      assert.equal(seatedList.find((entry) => entry.reference === booked.json.reservation.reference)?.status, "seated");
+      const afterOpen = (await call("GET", "/api/admin/tables/overview", { role: "staff" }));
+      assert.ok(!afterOpen.json.held.some((entry) => entry.table === "HT1"), "a seated booking no longer holds its table");
+
+      await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { enabled: false } } });
+    }],
+
     ["an unknown API route is a JSON 404, not the web app", async () => {
       const { status, json } = await call("GET", "/api/not-a-route");
       assert.equal(status, 404);

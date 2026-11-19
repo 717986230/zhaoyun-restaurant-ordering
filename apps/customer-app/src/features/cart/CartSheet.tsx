@@ -91,7 +91,7 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
         setError(g(language, "offline"));
       } else {
         if (failure.code === "SIGN_IN_REQUIRED") dispatch({ type: "sheet", sheet: "account" });
-        if (failure.code === "TABLE_NOT_OPEN") void tableOrdering.refetch();
+        if (failure.code === "TABLE_NOT_OPEN" || failure.code === "TABLE_RESERVED") void tableOrdering.refetch();
         // A dish counted out for today (每日限量) is named, with how many there still are.
         const soldOut = failure.code === "SOLD_OUT" ? products.find((product) => product.sku === failure.details.sku) : undefined;
         const dish = soldOut ? productName(soldOut, language) : String(failure.details.sku ?? "");
@@ -105,7 +105,11 @@ export function CartSheet({ state, dispatch, products, ordering, loyalty, accoun
   }
 
   return <Sheet id="cartSheet" title={g(language, "cart")} closeLabel={t(language, "close")} onClose={() => dispatch({ type: "sheet", sheet: null })}>
-    {tableOrdering.data?.open === false && <p className="cart-hint table-not-open" id="tableNotOpen" role="status">{g(language, "tableNotOpenYet")}</p>}
+    {tableOrdering.data?.reserved
+      ? <p className="cart-hint table-reserved" id="tableReserved" role="status">{g(language, "tableReserved", { time: tableOrdering.data.reserved.time })}</p>
+      : tableOrdering.data?.checkedIn
+        ? <p className="cart-hint table-checked-in" id="tableCheckedIn" role="status">{g(language, "tableCheckedIn")}</p>
+        : tableOrdering.data?.open === false && <p className="cart-hint table-not-open" id="tableNotOpen" role="status">{g(language, "tableNotOpenYet")}</p>}
     {!summary.lines.length ? <p className="sheet-empty">{g(language, "cartEmpty")}</p> : <>
       <ul className="cart-lines">{summary.lines.map(({ key, entry, product, unitCents }) => <li key={key} className={`cart-line ${entry.reward ? "reward" : ""}`} data-key={key}>
         <div className="cart-line-text">

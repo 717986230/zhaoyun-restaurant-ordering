@@ -20,7 +20,7 @@ import {
   welcomeAtCounterStatements
 } from "./customer.mjs";
 import {
-  ACTIVE_RESERVATION_STATUSES, addDays, availability, bookingView, guestLimit, guestMayCancel, guestReservationView, isDate, localNow,
+  ACTIVE_RESERVATION_STATUSES, addDays, availability, bookingView, guestLimit, guestMayCancel, guestReservationView, holdsTableNow, isDate, localNow,
   newReference, NO_SHOW_WINDOW_DAYS, picksTable, normalizeReservationInput, normalizeReservationUpdate, outsideWindow, peakGuests, phoneKey, RESERVATION_RETENTION_DAYS,
   RESERVATION_STATUSES, reservationContactMatches, reservationError, reservationTable, reservationView, slotMinutes, tableFree, tablesAt, toMinutes
 } from "./reservations.mjs";
@@ -298,6 +298,58 @@ export function createReservationStore(driver, { settings }) {
       await expireMissed(rules, clock);
       const rows = await driver.all(`${LISTED_SQL} WHERE reservations.date = ? AND reservations.status IN (${ACTIVE_SQL}) ORDER BY reservations.time, reservations.created_at LIMIT 500`, addDays(clock.date, -NO_SHOW_WINDOW_DAYS), clock.date);
       return rows.map(reservationView);
+    },
+
+    /**
+     * The bookings whose assigned table is held right now (shared/reservations.mjs
+     * holdsTableNow): still waiting for their guest, within the hold window. The
+     * floor shows these as reserved, and the lock reads from them.
+     */
+    async heldTables() {
+      const { now: clock, rules } = await context();
+      await expireMissed(rules, clock);
+      const rows = await driver.all(
+        "SELECT * FROM reservations WHERE date = ? AND table_no IS NOT NULL AND table_no <> '' AND status IN ('pending', 'confirmed') ORDER BY time, created_at",
+        clock.date
+      );
+      return rows.filter((row) => holdsTableNow(row, rules, clock)).map((row) => ({
+        id: row.id, reference: row.reference, table: row.table_no, time: row.time, party: row.party, name: row.name, status: row.status
+      }));
+    },
+
+    /** The booking holding `table` now, or null. */
+    async holdOn(tableInput) {
+      const table = reservationTable(tableInput);
+      const { now: clock, rules } = await context();
+      await expireMissed(rules, clock);
+      const rows = await driver.all(
+        "SELECT * FROM reservations WHERE date = ? AND table_no = ? AND status IN ('pending', 'confirmed') ORDER BY time, created_at",
+        clock.date, table
+      );
+      const hold = rows.find((row) => holdsTableNow(row, rules, clock));
+      return hold ? { id: hold.id, reference: hold.reference, table: hold.table_no, time: hold.time, party: hold.party, name: hold.name, status: hold.status } : null;
+    },
+
+    /**
+     * The guest has arrived: the booking holding `table` is seated, so its hold
+     * becomes a real occupancy. `customerId` (a guest scanning the table's own
+     * code on their phone) only checks in their own booking; `force` (the floor,
+     * or a manager opening the table over the hold) checks in whoever holds it.
+     * Returns the seated booking, or null when nobody matching holds the table.
+     */
+    async checkIn(tableInput, { customerId = null, force = false } = {}) {
+      const table = reservationTable(tableInput);
+      const { now: clock, rules } = await context();
+      await expireMissed(rules, clock);
+      const rows = await driver.all(
+        "SELECT * FROM reservations WHERE date = ? AND table_no = ? AND status IN ('pending', 'confirmed') ORDER BY time, created_at",
+        clock.date, table
+      );
+      const hold = rows.find((row) => holdsTableNow(row, rules, clock)
+        && (force || (customerId && String(row.customer_id) === String(customerId))));
+      if (!hold) return null;
+      await writeStatus(hold, "seated", rules);
+      return reservationView(await driver.first(`${LISTED_SQL} WHERE reservations.id = ?`, addDays(clock.date, -NO_SHOW_WINDOW_DAYS), hold.id));
     },
 
     /**

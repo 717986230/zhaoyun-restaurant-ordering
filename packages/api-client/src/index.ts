@@ -5,7 +5,7 @@ import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles
   AccountSession, AccountUpdateCommand, ApiAccount, RegisterCommand,
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiMemberTiers, ApiBirthday, ApiBirthdayPerk, ApiBalanceEntry, ApiPointsEntry, ApiSepaPayment, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
-  ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand,
+  ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, HeldTable, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand,
   ApiWaitlist, ApiWaitlistEntry, WaitlistCommand, WaitlistUpdateCommand
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
@@ -108,7 +108,8 @@ export const RESERVATION_DEFAULTS: ApiReservationSettings = {
   hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "11:30", to: "14:00" }, { days: [1, 2, 3, 4, 5, 6, 7], from: "17:30", to: "21:00" }],
   intervalMinutes: 30, durationMinutes: 120, capacity: 40, maxParty: 8, leadMinutes: 60, daysAhead: 60, autoConfirm: true, closedDates: [], note: "", tables: [],
   maxActivePerGuest: 2, maxPerDayPerGuest: 1, noShowLimit: 2,
-  minPoints: 0, welcomePoints: 0, signupPoints: 20, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 30
+  minPoints: 0, welcomePoints: 0, signupPoints: 20, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 30,
+  holdBeforeMinutes: 30, releaseAfterMinutes: 10
 };
 
 /** shared/delivery.mjs, DELIVERY_SETTING_DEFAULTS (the same for each platform). */
@@ -382,7 +383,7 @@ export class AdminApi {
   printBill(table: string): Promise<{ bill: ApiBill }> { return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/bill/print`, { method: "POST" }); }
   tables(): Promise<{ tables: RestaurantTable[] }> { return this.#request("/api/admin/tables"); }
   openTables(): Promise<{ tables: string[] }> { return this.#request("/api/admin/tables/open"); }
-  tableOverview(): Promise<{ tables: TableOverview[] }> { return this.#request("/api/admin/tables/overview"); }
+  tableOverview(): Promise<{ tables: TableOverview[]; held?: HeldTable[] }> { return this.#request("/api/admin/tables/overview"); }
   setTableLock(table: string, locked: boolean): Promise<{ table: RestaurantTable }> {
     return this.#request(`/api/admin/tables/${encodeURIComponent(table)}/lock`, { method: "POST", body: JSON.stringify({ locked }) });
   }
@@ -581,7 +582,7 @@ export class PosApi {
   fire(table: string, orderItemId: string): Promise<{ fired: { orderItemId: string; printJobId: string } }> {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/fire`, { method: "POST", body: JSON.stringify({ orderItemId }) });
   }
-  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number; sepaPayment?: ApiSepaPayment }> { return this.#request("/api/pos/floor"); }
+  floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; held?: HeldTable[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number; sepaPayment?: ApiSepaPayment }> { return this.#request("/api/pos/floor"); }
   deliveryAction(id: string, action: DeliveryAction, options: { prepMinutes?: number; reason?: DeliveryRejectReason } = {}): Promise<{ order: ApiDeliveryOrder }> {
     return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });
   }
@@ -674,8 +675,13 @@ export class RestaurantApi {
     return this.#request("/api/guest/orders", { method: "POST", body: JSON.stringify(command) });
   }
 
-  /** Whether this table may order yet (a waiter opened it), with its card's token. */
-  tableOrdering(table: string): Promise<{ table: string; open: boolean }> {
+  /**
+   * Whether this table may order yet (a waiter opened it), with its card's
+   * token. A table a booking holds answers `reserved` with the time it is kept
+   * for; the booked guest scanning it (signed in) is checked in instead, and
+   * the table opens for them (`checkedIn`).
+   */
+  tableOrdering(table: string): Promise<{ table: string; open: boolean; reserved?: { time: string }; checkedIn?: boolean; reservation?: { reference: string; time: string } }> {
     return this.#request(`/api/guest/tables/${encodeURIComponent(table)}`);
   }
 

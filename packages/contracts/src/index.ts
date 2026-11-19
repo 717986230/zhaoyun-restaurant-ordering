@@ -682,6 +682,21 @@ export interface ApiReservationSettings {
   noShowPoints: number;
   /** Minutes past its time before a booking not checked in counts as missed; 0: only the floor marks it. */
   noShowAfterMinutes: number;
+  /** Minutes before a booking its assigned table is held (closed to walk-ins and the floor). */
+  holdBeforeMinutes: number;
+  /** Minutes past a booking's time with nobody checked in before its table is freed. */
+  releaseAfterMinutes: number;
+}
+
+/** A table a booking is holding right now (reserved, waiting for the guest). */
+export interface HeldTable {
+  id: string;
+  reference: string;
+  table: string;
+  time: string;
+  party: number;
+  name: string;
+  status: ReservationStatus;
 }
 
 export interface ApiBookableTable { table: string; seats: number }

@@ -497,6 +497,16 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     async function placeGuestOrder({ channel, payment, ...order }) {
       try {
         const customer = await store.customers.session(request.headers.get("x-customer-token"));
+        // A booking holds this table: only its guest (checked in, so the table
+        // is no longer held) may order on it. A walk-in is turned away.
+        if (channel === "dine-in" && order.table) {
+          const hold = await store.reservations.holdOn(order.table);
+          if (hold) {
+            const mine = customer ? await store.reservations.checkIn(order.table, { customerId: customer.id }) : null;
+            if (mine) await store.openTable(order.table);
+            else return json({ error: `Table ${hold.table} is reserved for ${hold.time}`, code: "TABLE_RESERVED", reserved: { time: hold.time } }, 409);
+          }
+        }
         return json({ order: await store.placeGuestOrder(order, { channel, payment, customer }) }, 201);
       } catch (error) {
         return coded(error);
@@ -510,6 +520,19 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       const refused = await refuseUnknownTable(request, command);
       if (refused) return refused;
       const ordering = (await store.getSettings()).guestOrdering;
+      // A table a booking holds: the booked guest scanning its code checks
+      // themselves in (seated, and the table opened for them to order); anyone
+      // else is told it is reserved and may not order on it.
+      const hold = await store.reservations.holdOn(command.table);
+      if (hold) {
+        const customer = await store.customers.session(request.headers.get("x-customer-token"));
+        const mine = customer ? await store.reservations.checkIn(command.table, { customerId: customer.id }) : null;
+        if (mine) {
+          await store.openTable(command.table);
+          return json({ table: command.table, open: true, checkedIn: true, reservation: { reference: mine.reference, time: mine.time } });
+        }
+        return json({ table: command.table, open: false, reserved: { time: hold.time } });
+      }
       const open = !ordering?.requireOpenTable || await store.tableOpenForGuests(command.table);
       return json({ table: command.table, open });
     }
@@ -910,6 +933,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             requests: await store.openServiceRequests(),
             // Today's bookings still to come or at the table.
             reservations: await store.reservations.today(),
+            // Tables a booking is holding right now (reserved, waiting for the guest).
+            held: await store.reservations.heldTables(),
             // Delivery platforms' orders not yet handed over.
             delivery: await store.delivery.open(),
             takeawayDiscountPercent: floorSettings.takeawayDiscountPercent,
@@ -921,6 +946,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           if (method === "POST") {
             // A POS keeps its table every half minute; only taking it is news.
             const renewing = await store.holdsTable(path[3], pos.deviceId);
+            // A table a booking holds is closed to the floor: only a manager may
+            // open it over the hold, which checks the booked guest in. A device
+            // renewing its own open table is past this.
+            if (!renewing) {
+              const hold = await store.reservations.holdOn(path[3]);
+              if (hold && role !== "manager") return json({ error: `Table ${hold.table} is reserved for ${hold.time}`, code: "TABLE_RESERVED", reservedFor: hold.time }, 409);
+              if (hold) await store.reservations.checkIn(path[3], { force: true });
+            }
             // `?shared=1` opens the table to several devices at once (多人同桌),
             // `?shared=0` makes it exclusive again, and no flag (the hold
             // heartbeat) keeps whatever mode the table is already in.
@@ -1118,18 +1151,25 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       if (path.length === 4 && path[2] === "tables" && path[3] === "overview" && method === "GET") {
         const { denied } = await gate("staff");
         if (denied) return denied;
-        return json({ tables: await store.tablesOverview() });
+        return json({ tables: await store.tablesOverview(), held: await store.reservations.heldTables() });
       }
       // Open a table for its guests to order from their phones (开台), or close it.
       if (path.length === 5 && path[2] === "tables" && path[4] === "ordering" && method === "POST") {
-        const { denied, pos } = await gate("staff");
+        const { denied, role, pos } = await gate("staff");
         if (denied) return denied;
         const { value, invalid } = await body(request, TableOrderingBody);
         if (invalid) return invalid;
         try {
           // A table open on a POS is that device's to open or close.
           await store.assertTableFree(path[3], pos?.deviceId ?? null);
-          if (value.open) return json({ session: await store.openTable(path[3], pos) });
+          if (value.open) {
+            // Held by a booking: only a manager opens it over the hold, and
+            // doing so checks the booked guest in.
+            const hold = await store.reservations.holdOn(path[3]);
+            if (hold && role !== "manager") return json({ error: `Table ${hold.table} is reserved for ${hold.time}`, code: "TABLE_RESERVED", reservedFor: hold.time }, 409);
+            if (hold) await store.reservations.checkIn(path[3], { force: true });
+            return json({ session: await store.openTable(path[3], pos) });
+          }
           await store.closeTable(path[3]);
           return json({ session: null });
         } catch (error) {

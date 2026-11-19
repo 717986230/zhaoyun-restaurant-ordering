@@ -374,6 +374,13 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
       <label><span>{t("resDaysAhead")}</span><input type="number" min={1} max={365} value={draft.daysAhead} onChange={(event) => set("daysAhead", Number(event.target.value))} /></label>
     </div>
 
+    <p className="settings-label">{t("resHold")}</p>
+    <div className="field-grid three">
+      <label><span>{t("resHoldBefore")}</span><input type="number" id="resHoldBefore" min={0} max={720} step={5} value={draft.holdBeforeMinutes} onChange={(event) => set("holdBeforeMinutes", Number(event.target.value))} /></label>
+      <label><span>{t("resReleaseAfter")}</span><input type="number" id="resReleaseAfter" min={0} max={720} step={5} value={draft.releaseAfterMinutes} onChange={(event) => set("releaseAfterMinutes", Number(event.target.value))} /></label>
+    </div>
+    <p className="settings-hint">{t("resHoldHint", { before: draft.holdBeforeMinutes, after: draft.releaseAfterMinutes })}</p>
+
     <p className="settings-label">{t("resLimits")}</p>
     <div className="field-grid three">
       <label><span>{t("resMaxActive")}</span><input type="number" id="resMaxActive" min={1} max={20} value={draft.maxActivePerGuest} onChange={(event) => set("maxActivePerGuest", Number(event.target.value))} /></label>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { availability, bookingView, normalizeReservationSettings, reservationContactMatches } from "../../shared/reservations.mjs";
+import { availability, bookingView, holdsTableNow, normalizeReservationSettings, reservationContactMatches } from "../../shared/reservations.mjs";
 
 const rules = normalizeReservationSettings({ enabled: true, hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "11:00", to: "14:00" }], intervalMinutes: 30, leadMinutes: 60, capacity: 10 });
 
@@ -32,6 +32,23 @@ test("a booking is found again by the phone or email it was made with, however w
   // A booking missing the field the guest gives never matches on it.
   assert.equal(reservationContactMatches({ phone: "", email: "" }, "0660 9090909"), false);
   assert.equal(reservationContactMatches({ phone: "+43 660 9090909", email: "" }, "a@b.com"), false);
+});
+
+test("a booking holds its table from holdBeforeMinutes before its time until releaseAfterMinutes past it", () => {
+  const held = normalizeReservationSettings({ enabled: true, hours: [{ days: [1, 2, 3, 4, 5, 6, 7], from: "11:00", to: "22:00" }], intervalMinutes: 30, holdBeforeMinutes: 30, releaseAfterMinutes: 10 });
+  const booking = { date: "2026-11-18", time: "19:00", table_no: "7", status: "confirmed" };
+  const at = (minute) => ({ date: "2026-11-18", minute });
+  // 19:00 = 1140. The window is [18:30, 19:10].
+  assert.equal(holdsTableNow(booking, held, at(18 * 60 + 29)), false, "a minute before the hold opens: free");
+  assert.equal(holdsTableNow(booking, held, at(18 * 60 + 30)), true, "the hold opens 30 minutes before");
+  assert.equal(holdsTableNow(booking, held, at(19 * 60)), true, "at the booking's time");
+  assert.equal(holdsTableNow(booking, held, at(19 * 60 + 10)), true, "the grace is still on at +10");
+  assert.equal(holdsTableNow(booking, held, at(19 * 60 + 11)), false, "the table is freed past the grace");
+  // Only a booking still waiting for its guest holds a table.
+  assert.equal(holdsTableNow({ ...booking, status: "seated" }, held, at(19 * 60)), false, "a seated booking is an occupancy, not a hold");
+  assert.equal(holdsTableNow({ ...booking, status: "cancelled" }, held, at(19 * 60)), false, "a cancelled booking holds nothing");
+  assert.equal(holdsTableNow({ ...booking, table_no: "" }, held, at(19 * 60)), false, "no table assigned, nothing to hold");
+  assert.equal(holdsTableNow(booking, held, { date: "2026-11-19", minute: 19 * 60 }), false, "another day does not hold today's table");
 });
 
 test("the booking page offers the menu's languages, in its order", () => {
