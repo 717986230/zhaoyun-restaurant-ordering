@@ -289,6 +289,9 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
   // On a phone the list and the form take turns; the button opens a blank one.
   await page.getByRole("button", { name: "＋ 新增菜品" }).click();
 
+  // The category is a dropdown of the menu's existing ones; "＋ 新分类" opens a
+  // field for a name not in the list yet.
+  await page.locator('select[name="category"]').selectOption({ label: "＋ 新分类" });
   await page.locator('input[name="category"]').fill("SET");
   await page.locator('input[name="nameZh"]').fill("双人套餐");
   await page.locator('input[name="price"]').fill("39.90");
@@ -722,8 +725,12 @@ test("the menu's QR code downloads as a PNG that a phone can scan", async ({ pag
   await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
     { table: "12", label: "窗边", token: "tok-12-secret", enabled: true }
   ] }) }));
+  // The 桌位 grid reads the overview; table 12 is registered and free.
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
+    { table: "12", label: "窗边", state: "free", orders: [], total: 0, registered: true, enabled: true, since: null, openOn: null, orderingUntil: null }
+  ] }) }));
   await page.goto("/admin.html");
-  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
 
   /** The downloaded file, decoded in the page by a real QR reader. */
   const scan = async (trigger) => {
@@ -748,18 +755,24 @@ test("the menu's QR code downloads as a PNG that a phone can scan", async ({ pag
   // page's Content-Security-Policy (no inline scripts) does not apply.
   await page.evaluate(readFileSync(require.resolve("jsqr/dist/jsQR.js"), "utf8"));
 
-  // The code has to carry exactly the link the console shows for that table.
-  const row = page.locator(".table-row", { hasText: "桌 12" });
-  const shown = await row.locator("code").textContent();
-  expect(shown).toContain("?table=12&k=tok-12-secret");
+  // The address the codes carry: the guest menu at this console's API base, and
+  // the same with a table's number and secret for its own card.
+  const base = "http://127.0.0.1:8787/";
+  const entry = `${base}?table=12&k=tok-12-secret`;
 
+  // The menu's own code — no table in it — lives on the 跳转 page.
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "跳转", exact: true }).click();
   const menu = await scan(() => page.getByRole("button", { name: /下载菜单二维码/ }).click());
   expect(menu.name).toBe("menu-qr.png");
-  expect(menu.text).toBe(shown.split("?")[0]);
+  expect(menu.text).toBe(base);
 
-  const table = await scan(() => row.getByRole("button", { name: /二维码/ }).click());
+  // A table's own code is on the 桌位 page, in edit mode.
+  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "桌位", exact: true }).click();
+  await page.getByRole("button", { name: "编辑桌台" }).click();
+  const tile = page.locator('.table-tile[data-table="12"]');
+  const table = await scan(() => tile.getByRole("button", { name: /二维码/ }).click());
   expect(table.name).toBe("table-12-qr.png");
-  expect(table.text).toBe(shown);
+  expect(table.text).toBe(entry);
 });
 
 test("a set opened for editing shows its dishes, and saving it keeps them", async ({ page }) => {
