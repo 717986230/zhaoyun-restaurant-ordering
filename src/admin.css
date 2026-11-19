@@ -316,24 +316,17 @@ button {
   background: var(--a-card);
 }
 
-/* One group: its name, then its tabs — wrapping inside the group too, so a
-   long group (the floor's six) folds onto a second line on a phone instead
-   of pushing its last tab off the screen. */
+/* One group of related tabs, kept together and wrapping inside the group so a
+   long group (the floor's six) folds onto a second line on a phone instead of
+   pushing its last tab off the screen. The tabs within a group sit tight (2px)
+   while the wider column gap on .admin-tabs (20px) sets each group apart — the
+   sections read on their own without a label word that repeated a tab's name. */
 .admin-tab-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   min-width: 0;
-}
-
-.admin-tab-group-label {
-  color: var(--a-faint);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .05em;
-  padding-right: 6px;
-  white-space: nowrap;
 }
 
 .admin-tabs button,

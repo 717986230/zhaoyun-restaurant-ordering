@@ -685,7 +685,6 @@ export function App() {
         const visible = group.tabs.filter((tab) => tabs.includes(tab));
         if (!visible.length) return null;
         return <div key={group.label} className="admin-tab-group" role="group" aria-label={t(group.label)}>
-          <span className="admin-tab-group-label" aria-hidden="true">{t(group.label)}</span>
           {visible.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}
         </div>;
       })}
