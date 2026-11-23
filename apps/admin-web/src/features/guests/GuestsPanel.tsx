@@ -204,15 +204,18 @@ function CustomerList({ api, notify, failed }: { api: AdminApi; notify: (message
       <span className="customer-points">{customer.points} ★</span>
       <span className="staff-actions">
         <button type="button" className="ghost-action" onClick={() => adjust(customer)}>{t("adjustPoints")}</button>
-        <button type="button" className="ghost-action" onClick={() => reset(customer)}>{t("resetCustomerPassword")}</button>
-        <button type="button" className="ghost-action" onClick={() => void exportData(customer)}>{t("exportCustomer")}</button>
-        <button type="button" className="ghost-action danger" onClick={() => remove(customer)}>{t("deleteCustomer")}</button>
       </span>
       {open?.customer.id === customer.id && <div className="customer-history">
         <small>{t("customerSince", { date: new Date(customer.createdAt).toLocaleDateString(language) })} · {t("customerHistory")}</small>
         <ul>{open.points.map((entry) => <li key={entry.id}>
           <span>{formatTime(entry.createdAt, language)}</span><span>{t(entry.kind ? KINDS[entry.kind] : REASONS[entry.reason])}{entry.note ? ` · ${entry.note}` : ""}</span><b>{entry.delta > 0 ? `+${entry.delta}` : entry.delta}</b>
         </li>)}</ul>
+        {/* The rare, destructive ones live in the detail, not on every row. */}
+        <span className="staff-actions">
+          <button type="button" className="ghost-action" onClick={() => reset(customer)}>{t("resetCustomerPassword")}</button>
+          <button type="button" className="ghost-action" onClick={() => void exportData(customer)}>{t("exportCustomer")}</button>
+          <button type="button" className="ghost-action danger" onClick={() => remove(customer)}>{t("deleteCustomer")}</button>
+        </span>
       </div>}
     </li>)}</ul>}
   </div>;

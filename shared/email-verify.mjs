@@ -33,18 +33,20 @@ export function maskEmail(email) {
   return `${local.slice(0, 1)}${"•".repeat(Math.min(Math.max(local.length - 1, 2), 6))}@${domain}`;
 }
 
-export const EMAIL_CODES_SINCE_SQL = "SELECT created_at FROM email_codes WHERE customer_id = ? AND created_at >= ? ORDER BY created_at DESC";
-export const INSERT_EMAIL_CODE_SQL = "INSERT INTO email_codes (id, customer_id, email, code_hash, attempts, expires_at, used_at, created_at) VALUES (?, ?, ?, ?, 0, ?, NULL, ?)";
+export const EMAIL_CODES_SINCE_SQL = "SELECT created_at FROM email_codes WHERE tenant_id = ? AND customer_id = ? AND created_at >= ? ORDER BY created_at DESC";
+export const INSERT_EMAIL_CODE_SQL = "INSERT INTO email_codes (tenant_id, id, customer_id, email, code_hash, attempts, expires_at, used_at, created_at) VALUES (?, ?, ?, ?, ?, 0, ?, NULL, ?)";
 /** The newest code for the account's address, still open. */
-export const OPEN_EMAIL_CODE_SQL = "SELECT * FROM email_codes WHERE customer_id = ? AND email = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1";
-export const COUNT_EMAIL_CODE_ATTEMPT_SQL = "UPDATE email_codes SET attempts = attempts + 1 WHERE id = ?";
-export const USE_EMAIL_CODE_SQL = "UPDATE email_codes SET used_at = ? WHERE id = ? AND used_at IS NULL";
-export const VERIFY_EMAIL_SQL = `INSERT INTO customer_verified_emails (customer_id, email, verified_at) VALUES (?, ?, ?)
-  ON CONFLICT (customer_id) DO UPDATE SET email = excluded.email, verified_at = excluded.verified_at`;
+export const OPEN_EMAIL_CODE_SQL = "SELECT * FROM email_codes WHERE tenant_id = ? AND customer_id = ? AND email = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1";
+export const COUNT_EMAIL_CODE_ATTEMPT_SQL = "UPDATE email_codes SET attempts = attempts + 1 WHERE tenant_id = ? AND id = ?";
+export const USE_EMAIL_CODE_SQL = "UPDATE email_codes SET used_at = ? WHERE tenant_id = ? AND id = ? AND used_at IS NULL";
+export const VERIFY_EMAIL_SQL = `INSERT INTO customer_verified_emails (tenant_id, customer_id, email, verified_at) VALUES (?, ?, ?, ?)
+  ON CONFLICT (customer_id) DO UPDATE SET tenant_id = excluded.tenant_id, email = excluded.email, verified_at = excluded.verified_at`;
 /** Whether the account's address, as it is now, was proved. */
 export const EMAIL_VERIFIED_SQL = `SELECT 1 AS verified FROM customer_verified_emails JOIN customers ON customers.id = customer_verified_emails.customer_id
-  WHERE customer_verified_emails.customer_id = ? AND customer_verified_emails.email = customers.email`;
+    AND customers.tenant_id = customer_verified_emails.tenant_id
+  WHERE customer_verified_emails.tenant_id = ? AND customer_verified_emails.customer_id = ? AND customer_verified_emails.email = customers.email`;
+/** A janitor purge of day-old codes: deliberately global — the codes are keyed by a globally unique customer id, and a tenant whose store is never built still has its stale codes swept. */
 export const DELETE_OLD_EMAIL_CODES_SQL = "DELETE FROM email_codes WHERE created_at < ?";
 
-export const INSERT_OUTBOX_SQL = "INSERT INTO mail_outbox (id, to_email, subject, text, created_at) VALUES (?, ?, ?, ?, ?)";
-export const OUTBOX_SQL = "SELECT * FROM mail_outbox ORDER BY created_at DESC, rowid DESC LIMIT ?";
+export const INSERT_OUTBOX_SQL = "INSERT INTO mail_outbox (tenant_id, id, to_email, subject, text, created_at) VALUES (?, ?, ?, ?, ?, ?)";
+export const OUTBOX_SQL = "SELECT * FROM mail_outbox WHERE tenant_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?";

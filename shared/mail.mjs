@@ -77,7 +77,15 @@ const COPY = {
     birthdayLead: "{name}，祝你生日快乐！",
     birthdayOffer: "整个生日月来店用餐，报手机号或邮箱给收银员，即享会员价 {percent}% off。",
     birthdayPlain: "感谢你一直以来的支持，期待再见到你。",
-    birthdayStop: "不想再收到生日邮件？在账户里清除生日即可。"
+    birthdayStop: "不想再收到生日邮件？在账户里清除生日即可。",
+    inviteSubject: "{restaurant}：请设置你的管理密码",
+    inviteLead: "你好，你被邀请管理 {restaurant}：",
+    inviteSet: "请在下面链接设置你的密码：",
+    inviteExpires: "链接 7 天内有效，只能使用一次。不是你本人操作的话，忽略这封邮件即可。",
+    resetSubject: "{restaurant}：重设你的管理密码",
+    resetLead: "你好，有人申请重设 {restaurant} 的管理密码：",
+    resetSet: "请在下面链接设置新密码：",
+    resetExpires: "链接 7 天内有效，只能使用一次。不是你本人操作的话，忽略这封邮件即可。"
   },
   de: {
     subject: "{restaurant} – Ihr Bestätigungscode: {code}",
@@ -106,7 +114,15 @@ const COPY = {
     birthdayLead: "Liebe/r {name}, alles Gute zum Geburtstag!",
     birthdayOffer: "Den ganzen Geburtstagsmonat erhalten Sie bei uns {percent}% Mitgliedspreis – einfach an der Kassa Ihre Nummer oder E-Mail nennen.",
     birthdayPlain: "Danke für Ihre Treue – wir freuen uns auf Ihren nächsten Besuch.",
-    birthdayStop: "Keine Geburtstagsmails mehr? Löschen Sie Ihren Geburtstag im Konto."
+    birthdayStop: "Keine Geburtstagsmails mehr? Löschen Sie Ihren Geburtstag im Konto.",
+    inviteSubject: "{restaurant}: Bitte lege dein Admin-Passwort fest",
+    inviteLead: "Hallo, du wurdest eingeladen, {restaurant} zu verwalten:",
+    inviteSet: "Lege dein Passwort unter diesem Link fest:",
+    inviteExpires: "Der Link ist 7 Tage gültig und nur einmal verwendbar. Wenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren.",
+    resetSubject: "{restaurant}: Dein Admin-Passwort zurücksetzen",
+    resetLead: "Hallo, jemand hat das Zurücksetzen des Admin-Passworts für {restaurant} angefordert:",
+    resetSet: "Lege dein neues Passwort unter diesem Link fest:",
+    resetExpires: "Der Link ist 7 Tage gültig und nur einmal verwendbar. Wenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren."
   },
   en: {
     subject: "{restaurant} – your verification code: {code}",
@@ -135,7 +151,15 @@ const COPY = {
     birthdayLead: "Happy birthday, {name}!",
     birthdayOffer: "All through your birthday month you get {percent}% member price with us – just give the cashier your number or email.",
     birthdayPlain: "Thank you for being our guest – we look forward to seeing you again.",
-    birthdayStop: "No more birthday emails? Clear your birthday in your account."
+    birthdayStop: "No more birthday emails? Clear your birthday in your account.",
+    inviteSubject: "{restaurant}: please set your admin password",
+    inviteLead: "Hi, you have been invited to manage {restaurant}:",
+    inviteSet: "Set your password at this link:",
+    inviteExpires: "The link is valid for 7 days and can only be used once. If you did not ask for it, you can ignore this email.",
+    resetSubject: "{restaurant}: reset your admin password",
+    resetLead: "Hi, someone asked to reset the admin password for {restaurant}:",
+    resetSet: "Set your new password at this link:",
+    resetExpires: "The link is valid for 7 days and can only be used once. If you did not ask for it, you can ignore this email."
   }
 };
 
@@ -301,4 +325,28 @@ export function birthdayMessage(name, { language = "de", restaurant = "", discou
     text: `${lead}\n\n${body}\n\n${stop}\n`,
     html: `<p style="font-size:20px">🎂 ${escapeHtml(lead)}</p><p>${escapeHtml(body)}</p><p style="color:#666;font-size:12px">${escapeHtml(stop)}</p>`
   };
+}
+
+/**
+ * The link a new admin gets to set their own password (shared/tenant.mjs,
+ * account_tokens kind 'invite'), and the link an existing account gets to
+ * reset theirs (kind 'reset'). Both carry the one-time link, and say how
+ * long it lives; the token itself travels only in the link.
+ */
+function accountLinkMessage(copyKeys, { language = "de", restaurant = "", url = "" } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const values = { restaurant: restaurant || "Restaurant", url };
+  return {
+    subject: fill(copy[copyKeys.subject], values),
+    text: `${fill(copy[copyKeys.lead], values)}\n\n${fill(copy[copyKeys.set], values)}\n${url}\n\n${fill(copy[copyKeys.expires], values)}\n`,
+    html: `<p>${escapeHtml(fill(copy[copyKeys.lead], values))}</p><p>${escapeHtml(fill(copy[copyKeys.set], values))}<br><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p><p style="color:#666">${escapeHtml(fill(copy[copyKeys.expires], values))}</p>`
+  };
+}
+
+export function inviteMessage(options = {}) {
+  return accountLinkMessage({ subject: "inviteSubject", lead: "inviteLead", set: "inviteSet", expires: "inviteExpires" }, options);
+}
+
+export function resetMessage(options = {}) {
+  return accountLinkMessage({ subject: "resetSubject", lead: "resetLead", set: "resetSet", expires: "resetExpires" }, options);
 }

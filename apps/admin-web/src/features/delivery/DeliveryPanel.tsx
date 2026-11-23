@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AdminApi, DeliveryAction, DeliveryList, StaffRole } from "@zhaoyun/api-client";
 import type { ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliverySettings, ApiSettings, DeliveryProvider, DeliveryRejectReason, DeliveryStatus } from "@zhaoyun/contracts";
 import { formatMoney, useI18n } from "../../app/i18n";
+import { downloadCsv } from "../../app/csv";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 
 interface Props {
@@ -31,20 +32,6 @@ function todayIn(timeZone: string) {
 const shift = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 const statusKey = (status: DeliveryStatus) => `dlStatus_${status}` as CopyKey;
 const reasonKey = (reason: string) => `dlReason_${reason}` as CopyKey;
-
-/** A CSV the way Excel opens it right: a BOM for UTF-8, fields quoted. */
-function downloadCsv(name: string, rows: Array<Array<string | number>>) {
-  const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-  const text = `﻿${rows.map((row) => row.map(quote).join(",")).join("\r\n")}\r\n`;
-  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 /**
  * The delivery platforms (shared/delivery.mjs): their orders over any days —

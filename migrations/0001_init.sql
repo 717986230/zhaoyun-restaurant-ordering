@@ -3,7 +3,8 @@
 
 CREATE TABLE products (
       id TEXT PRIMARY KEY,
-      sku TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      sku TEXT NOT NULL,
       kind TEXT NOT NULL CHECK (kind IN ('food','drink','sushi')),
       category TEXT NOT NULL,
       name_zh TEXT NOT NULL DEFAULT '',
@@ -28,10 +29,12 @@ CREATE TABLE products (
       vat_percent INTEGER NOT NULL DEFAULT 10,
       bundle_items_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, sku)
     );
 CREATE TABLE product_media (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       type TEXT NOT NULL CHECK (type IN ('image','video')),
       url TEXT NOT NULL,
@@ -41,18 +44,22 @@ CREATE TABLE product_media (
     );
 CREATE TABLE orders (
       id TEXT PRIMARY KEY,
-      order_no TEXT NOT NULL UNIQUE,
-      client_request_id TEXT UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      order_no TEXT NOT NULL,
+      client_request_id TEXT,
       table_no TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'new',
       note TEXT NOT NULL DEFAULT '',
       total_cents INTEGER NOT NULL,
       billed_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, order_no),
+      UNIQUE (tenant_id, client_request_id)
     );
 CREATE TABLE order_items (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       product_id TEXT NOT NULL,
       product_name TEXT NOT NULL,
@@ -64,20 +71,24 @@ CREATE TABLE order_items (
     );
 CREATE TABLE order_item_vat_splits (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       split_json TEXT NOT NULL
     );
 CREATE TABLE order_item_notes (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       note TEXT NOT NULL
     );
 CREATE TABLE order_item_holds (
       order_item_id TEXT PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       held_at TEXT NOT NULL
     );
 CREATE TABLE receipts (
       id TEXT PRIMARY KEY,
-      receipt_no INTEGER NOT NULL UNIQUE,
-      client_request_id TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      receipt_no INTEGER NOT NULL,
+      client_request_id TEXT NOT NULL,
       cash_register_id TEXT NOT NULL,
       type TEXT NOT NULL CHECK (type IN ('sale','storno')),
       table_no TEXT,
@@ -92,34 +103,43 @@ CREATE TABLE receipts (
       fiscal_json TEXT,
       created_at TEXT NOT NULL,
       staff_id TEXT,
-      staff_name TEXT
+      staff_name TEXT,
+      UNIQUE (tenant_id, receipt_no),
+      UNIQUE (tenant_id, client_request_id)
     );
 CREATE TABLE receipt_items (
       receipt_id TEXT NOT NULL REFERENCES receipts(id),
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_item_id TEXT NOT NULL REFERENCES order_items(id),
       quantity INTEGER NOT NULL CHECK (quantity > 0),
       PRIMARY KEY (receipt_id, order_item_id)
     );
 CREATE TABLE vouchers (
-      code TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       value_cents INTEGER NOT NULL,
       balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
       sold_receipt_id TEXT NOT NULL REFERENCES receipts(id),
       voided_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, code)
     );
 CREATE TABLE day_closings (
       id TEXT PRIMARY KEY,
-      closing_no INTEGER NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      closing_no INTEGER NOT NULL,
       first_receipt_no INTEGER NOT NULL,
-      last_receipt_no INTEGER NOT NULL UNIQUE,
+      last_receipt_no INTEGER NOT NULL,
       totals_json TEXT NOT NULL,
       staff_role TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      UNIQUE (tenant_id, closing_no),
+      UNIQUE (tenant_id, last_receipt_no)
     );
 CREATE TABLE pos_devices (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       token_hash TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
@@ -127,37 +147,45 @@ CREATE TABLE pos_devices (
     );
 CREATE TABLE staff (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      name TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('staff','manager')),
       pin_hash TEXT NOT NULL,
       pin_salt TEXT NOT NULL,
       pin_iterations INTEGER NOT NULL,
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, name)
     );
 CREATE TABLE pos_sessions (
       token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
       device_id TEXT NOT NULL REFERENCES pos_devices(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
 CREATE TABLE table_claims (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       device_id TEXT NOT NULL,
       staff_id TEXT,
       staff_name TEXT,
-      expires_at TEXT NOT NULL
+      expires_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, table_no)
     );
 CREATE TABLE table_claim_meta (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       shared INTEGER NOT NULL DEFAULT 0,
       epoch INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL DEFAULT ''
+      updated_at TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (tenant_id, table_no)
     );
 CREATE TABLE order_staff (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       staff_id TEXT,
       staff_name TEXT,
       pickup_no INTEGER,
@@ -165,6 +193,7 @@ CREATE TABLE order_staff (
     );
 CREATE TABLE order_item_voids (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_item_id TEXT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
       order_id TEXT NOT NULL,
       table_no TEXT NOT NULL,
@@ -177,6 +206,7 @@ CREATE TABLE order_item_voids (
     );
 CREATE TABLE staff_settlements (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       staff_id TEXT NOT NULL,
       staff_name TEXT NOT NULL,
       last_receipt_no INTEGER NOT NULL,
@@ -184,16 +214,19 @@ CREATE TABLE staff_settlements (
       created_at TEXT NOT NULL
     );
 CREATE TABLE journal (
-      seq INTEGER PRIMARY KEY,
+      seq INTEGER NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       at TEXT NOT NULL,
       kind TEXT NOT NULL,
       ref TEXT,
       payload_json TEXT NOT NULL,
       prev_hash TEXT NOT NULL,
-      hash TEXT NOT NULL
+      hash TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, seq)
     );
 CREATE TABLE service_requests (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       table_no TEXT NOT NULL,
       type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'open',
@@ -202,6 +235,7 @@ CREATE TABLE service_requests (
     );
 CREATE TABLE audit_log (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       at TEXT NOT NULL,
       role TEXT NOT NULL,
       ip TEXT NOT NULL DEFAULT '',
@@ -211,16 +245,19 @@ CREATE TABLE audit_log (
       detail_json TEXT NOT NULL DEFAULT '{}'
     );
 CREATE TABLE restaurant_tables (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       label TEXT NOT NULL DEFAULT '',
       token TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       locked_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, table_no)
     );
 CREATE TABLE printer_profiles (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       transport TEXT NOT NULL CHECK (transport IN ('lan','bluetooth','usb')),
       address TEXT NOT NULL,
@@ -233,6 +270,7 @@ CREATE TABLE printer_profiles (
     );
 CREATE TABLE print_jobs (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
       printer_role TEXT NOT NULL,
       payload_json TEXT NOT NULL,
@@ -246,9 +284,10 @@ CREATE TABLE print_jobs (
       updated_at TEXT NOT NULL
     );
 CREATE TABLE restaurant_settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
       menu_theme TEXT NOT NULL DEFAULT 'jade',
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id)
     );
 CREATE TABLE admin_gate (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -258,12 +297,15 @@ CREATE TABLE admin_gate (
       updated_at TEXT NOT NULL
     );
 CREATE TABLE app_settings (
-      key TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      key TEXT NOT NULL,
       value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, key)
     );
 CREATE TABLE media_files (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       content_type TEXT NOT NULL,
       bytes BLOB NOT NULL,
       credit TEXT,
@@ -277,45 +319,84 @@ CREATE TABLE admin_sessions (
     );
 CREATE TABLE accounts (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       login TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       password_iterations INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('owner', 'admin')),
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+      email TEXT NOT NULL DEFAULT '',
+      password_enc TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+CREATE TABLE tenants (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+      config_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE tenant_tokens (
+      token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      role TEXT NOT NULL CHECK (role IN ('kitchen', 'staff', 'manager')),
+      created_at TEXT NOT NULL
+    );
+CREATE TABLE account_tokens (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('invite', 'reset')),
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+      login TEXT,
+      name TEXT,
+      email TEXT,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
 CREATE TABLE account_sessions (
       token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
 CREATE TABLE customers (
       id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      email TEXT NOT NULL,
       name TEXT NOT NULL DEFAULT '',
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       password_iterations INTEGER NOT NULL,
       points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, email)
     );
 CREATE TABLE customer_sessions (
       token_hash TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
 CREATE TABLE customer_favorites (
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       product_id TEXT NOT NULL,
       created_at TEXT NOT NULL,
       PRIMARY KEY (customer_id, product_id)
     );
 CREATE TABLE points_ledger (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       delta INTEGER NOT NULL,
       reason TEXT NOT NULL CHECK (reason IN ('earn','reverse','redeem','refund','adjust')),
@@ -325,11 +406,13 @@ CREATE TABLE points_ledger (
     );
 CREATE TABLE member_balances (
       customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       balance_cents INTEGER NOT NULL DEFAULT 0 CHECK (balance_cents >= 0),
       updated_at TEXT NOT NULL
     );
 CREATE TABLE balance_ledger (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       delta_cents INTEGER NOT NULL,
       reason TEXT NOT NULL CHECK (reason IN ('topup','bonus','spend','refund','adjust','reverse')),
@@ -339,22 +422,26 @@ CREATE TABLE balance_ledger (
     );
 CREATE TABLE balance_operators (
       ledger_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       operator TEXT NOT NULL DEFAULT ''
     );
 CREATE TABLE member_birthdays (
       customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
       day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
       updated_at TEXT NOT NULL
     );
 CREATE TABLE birthday_greetings (
       customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       year INTEGER NOT NULL,
       sent_at TEXT NOT NULL,
       PRIMARY KEY (customer_id, year)
     );
 CREATE TABLE guest_orders (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
       channel TEXT NOT NULL CHECK (channel IN ('dine-in','pickup')),
       table_no TEXT NOT NULL,
@@ -364,19 +451,23 @@ CREATE TABLE guest_orders (
       created_at TEXT NOT NULL
     );
 CREATE TABLE table_sessions (
-      table_no TEXT PRIMARY KEY,
+      table_no TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       opened_at TEXT NOT NULL,
       expires_at TEXT NOT NULL,
-      staff_name TEXT
+      staff_name TEXT,
+      PRIMARY KEY (tenant_id, table_no)
     );
 CREATE TABLE print_bridges (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       version TEXT NOT NULL DEFAULT '',
       last_seen_at TEXT NOT NULL
     );
 CREATE TABLE printer_status (
       printer_id TEXT PRIMARY KEY REFERENCES printer_profiles(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       bridge_id TEXT NOT NULL,
       ok INTEGER NOT NULL,
       error TEXT,
@@ -389,7 +480,8 @@ CREATE TABLE auth_throttle (
     );
 CREATE TABLE reservations (
       id TEXT PRIMARY KEY,
-      reference TEXT NOT NULL UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      reference TEXT NOT NULL,
       token_hash TEXT,
       date TEXT NOT NULL,
       time TEXT NOT NULL,
@@ -404,14 +496,17 @@ CREATE TABLE reservations (
       source TEXT NOT NULL,
       customer_id TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, reference)
     );
 CREATE TABLE reservation_reminders (
       reservation_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       sent_at TEXT NOT NULL
     );
 CREATE TABLE waitlist (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       name TEXT NOT NULL,
       phone TEXT NOT NULL DEFAULT '',
       email TEXT NOT NULL DEFAULT '',
@@ -425,6 +520,7 @@ CREATE TABLE waitlist (
     );
 CREATE TABLE delivery_orders (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       provider TEXT NOT NULL,
       external_id TEXT NOT NULL,
       reference TEXT NOT NULL,
@@ -448,17 +544,20 @@ CREATE TABLE delivery_orders (
       synced_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      UNIQUE (provider, external_id)
+      UNIQUE (tenant_id, provider, external_id)
     );
 CREATE TABLE product_stock (
-      product_id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       daily_limit INTEGER,
       stock_day TEXT,
       stock_left INTEGER,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, product_id)
     );
 CREATE TABLE email_codes (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       customer_id TEXT NOT NULL,
       email TEXT NOT NULL,
       code_hash TEXT NOT NULL,
@@ -469,11 +568,13 @@ CREATE TABLE email_codes (
     );
 CREATE TABLE customer_verified_emails (
       customer_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       email TEXT NOT NULL,
       verified_at TEXT NOT NULL
     );
 CREATE TABLE mail_outbox (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       to_email TEXT NOT NULL,
       subject TEXT NOT NULL,
       text TEXT NOT NULL,
@@ -481,7 +582,8 @@ CREATE TABLE mail_outbox (
     );
 CREATE TABLE drawer_sessions (
       id TEXT PRIMARY KEY,
-      open_flag INTEGER UNIQUE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      open_flag INTEGER,
       after_receipt_no INTEGER NOT NULL,
       float_cents INTEGER NOT NULL,
       opened_by TEXT,
@@ -492,10 +594,12 @@ CREATE TABLE drawer_sessions (
       counted_cents INTEGER,
       counts_json TEXT,
       totals_json TEXT,
-      note TEXT
+      note TEXT,
+      UNIQUE (tenant_id, open_flag)
     );
 CREATE TABLE drawer_movements (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       session_id TEXT NOT NULL REFERENCES drawer_sessions(id),
       kind TEXT NOT NULL CHECK (kind IN ('in','out')),
       amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
@@ -506,35 +610,54 @@ CREATE TABLE drawer_movements (
     );
 CREATE TABLE discovered_printers (
       address TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       port INTEGER NOT NULL,
       escpos INTEGER NOT NULL DEFAULT 0,
       bridge_id TEXT NOT NULL,
       seen_at TEXT NOT NULL,
-      PRIMARY KEY (address, port)
+      PRIMARY KEY (tenant_id, address, port)
     );
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
+CREATE INDEX idx_account_tokens_expiry ON account_tokens(expires_at);
 CREATE INDEX idx_email_codes_customer ON email_codes(customer_id, created_at);
 CREATE INDEX idx_drawer_sessions_closed ON drawer_sessions(closed_at);
 CREATE INDEX idx_drawer_movements_session ON drawer_movements(session_id);
-CREATE INDEX idx_products_catalog ON products(published, available, sort_order);
+CREATE INDEX idx_products_catalog ON products(tenant_id, published, available, sort_order);
 CREATE INDEX idx_admin_sessions_expiry ON admin_sessions(expires_at);
 CREATE INDEX idx_account_sessions_expiry ON account_sessions(expires_at);
 CREATE INDEX idx_order_item_voids_item ON order_item_voids(order_item_id);
-CREATE INDEX idx_order_item_voids_staff ON order_item_voids(staff_id, created_at);
-CREATE INDEX idx_orders_created ON orders(created_at DESC);
-CREATE INDEX idx_receipts_created ON receipts(created_at);
+CREATE INDEX idx_order_item_voids_staff ON order_item_voids(tenant_id, staff_id, created_at);
+CREATE INDEX idx_orders_created ON orders(tenant_id, created_at DESC);
+CREATE INDEX idx_receipts_created ON receipts(tenant_id, created_at);
 CREATE INDEX idx_customer_sessions_expiry ON customer_sessions(expires_at);
-CREATE INDEX idx_points_ledger_customer ON points_ledger(customer_id, created_at);
+CREATE INDEX idx_points_ledger_customer ON points_ledger(tenant_id, customer_id, created_at);
 CREATE INDEX idx_points_ledger_ref ON points_ledger(ref, reason);
-CREATE INDEX idx_balance_ledger_customer ON balance_ledger(customer_id, created_at);
+CREATE INDEX idx_balance_ledger_customer ON balance_ledger(tenant_id, customer_id, created_at);
 CREATE INDEX idx_balance_ledger_ref ON balance_ledger(ref, reason);
-CREATE INDEX idx_guest_orders_table ON guest_orders(table_no, created_at);
-CREATE INDEX idx_guest_orders_customer ON guest_orders(customer_id, created_at);
-CREATE INDEX idx_print_jobs_status ON print_jobs(status, created_at);
-CREATE INDEX idx_audit_at ON audit_log(at DESC);
-CREATE INDEX idx_reservations_date ON reservations(date, time);
-CREATE INDEX idx_waitlist_status ON waitlist(status, created_at);
-CREATE INDEX idx_reservations_customer ON reservations(customer_id, date);
-CREATE INDEX idx_delivery_orders_created ON delivery_orders(created_at);
-CREATE INDEX idx_delivery_orders_status ON delivery_orders(status, created_at);
+CREATE INDEX idx_guest_orders_table ON guest_orders(tenant_id, table_no, created_at);
+CREATE INDEX idx_guest_orders_customer ON guest_orders(tenant_id, customer_id, created_at);
+CREATE INDEX idx_print_jobs_status ON print_jobs(tenant_id, status, created_at);
+CREATE INDEX idx_audit_at ON audit_log(tenant_id, at DESC);
+CREATE INDEX idx_reservations_date ON reservations(tenant_id, date, time);
+CREATE INDEX idx_waitlist_status ON waitlist(tenant_id, status, created_at);
+CREATE INDEX idx_reservations_customer ON reservations(tenant_id, customer_id, date);
+CREATE INDEX idx_delivery_orders_created ON delivery_orders(tenant_id, created_at);
+CREATE INDEX idx_delivery_orders_status ON delivery_orders(tenant_id, status, created_at);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_tenant_order ON order_items(tenant_id, order_id);
+CREATE INDEX idx_orders_table ON orders(tenant_id, table_no, billed_at);
+CREATE INDEX idx_product_media_product ON product_media(product_id);
+CREATE INDEX idx_order_items_product ON order_items(product_id);
+CREATE INDEX idx_vouchers_receipt ON vouchers(sold_receipt_id);
+CREATE INDEX idx_pos_sessions_staff ON pos_sessions(staff_id);
+CREATE INDEX idx_account_sessions_account ON account_sessions(account_id);
+CREATE INDEX idx_customer_sessions_customer ON customer_sessions(customer_id);
+CREATE INDEX idx_service_requests_table ON service_requests(tenant_id, table_no, status);
+CREATE INDEX idx_reservations_table ON reservations(tenant_id, table_no);
+CREATE INDEX idx_order_item_voids_order ON order_item_voids(order_id);
+CREATE INDEX idx_staff_settlements_staff ON staff_settlements(staff_id);
+CREATE INDEX idx_print_jobs_order ON print_jobs(order_id);
+CREATE INDEX idx_printer_status_bridge ON printer_status(bridge_id);
+CREATE INDEX idx_email_codes_email ON email_codes(tenant_id, email);
+CREATE INDEX idx_tenant_tokens_tenant ON tenant_tokens(tenant_id, role);

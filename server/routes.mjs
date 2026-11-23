@@ -73,6 +73,25 @@ export function registerRoutes(app, { database, realtime, config }) {
   app.addHook("onClose", async () => clearInterval(greetingTimer));
   app.decorate("birthdayGreetings", (at) => api.birthdayGreetings(at));
 
+  // Retention: expired sessions, spent one-time links, old mail and audit
+  // rows go, once a day — the same job the Worker's cron runs at 03:00 UTC.
+  // Unref'd like the greetings timer: it never keeps the process alive.
+  const runPurge = async () => {
+    try {
+      const purged = {};
+      for (const tenant of await database.listTenants()) {
+        const counts = await database.withTenant(tenant.id).purgeExpired();
+        for (const [key, value] of Object.entries(counts)) purged[key] = (purged[key] ?? 0) + value;
+      }
+      if (Object.values(purged).some(Boolean)) app.log.info({ purged }, "retention purge");
+    } catch (error) {
+      app.log.error({ err: error }, "retention purge failed");
+    }
+  };
+  const purgeTimer = setInterval(runPurge, 24 * 60 * 60 * 1000);
+  purgeTimer.unref?.();
+  app.addHook("onClose", async () => clearInterval(purgeTimer));
+
   /** A Fastify request as the web's Request, for shared/http.mjs. */
   function toRequest(request) {
     const headers = new Headers();

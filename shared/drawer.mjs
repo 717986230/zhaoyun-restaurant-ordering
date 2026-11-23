@@ -19,15 +19,21 @@ import { closingTotals } from "./register.mjs";
 import { parseJson, uuid } from "./core.mjs";
 
 /** Euro notes and coins, in cents, largest first: the count is by these. */
-export const DENOMINATIONS = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+export const DENOMINATIONS = [
+  50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1,
+];
 /** More than this in a small restaurant's drawer is a typing slip. */
 export const MAX_DRAWER_CENTS = 2_000_000;
 export const MOVEMENT_KINDS = ["in", "out"];
 
 function amountCents(value, what, { zero = false } = {}) {
   const cents = Math.round(Number(value) * 100);
-  if (!Number.isFinite(cents) || cents < 0 || (!zero && cents === 0)) throw new Error(`${what} must be ${zero ? "zero or more" : "more than zero"}`);
-  if (cents > MAX_DRAWER_CENTS) throw new Error(`${what} is at most ${MAX_DRAWER_CENTS / 100} euros`);
+  if (!Number.isFinite(cents) || cents < 0 || (!zero && cents === 0))
+    throw new Error(
+      `${what} must be ${zero ? "zero or more" : "more than zero"}`,
+    );
+  if (cents > MAX_DRAWER_CENTS)
+    throw new Error(`${what} is at most ${MAX_DRAWER_CENTS / 100} euros`);
   return cents;
 }
 
@@ -43,15 +49,21 @@ export function countedOf(input) {
     for (const [key, value] of Object.entries(input.counts)) {
       const denomination = Number(key);
       const count = Number(value);
-      if (!DENOMINATIONS.includes(denomination)) throw new Error(`There is no ${denomination / 100} euro note or coin`);
-      if (!Number.isInteger(count) || count < 0 || count > 10_000) throw new Error("A count is a whole number");
+      if (!DENOMINATIONS.includes(denomination))
+        throw new Error(`There is no ${denomination / 100} euro note or coin`);
+      if (!Number.isInteger(count) || count < 0 || count > 10_000)
+        throw new Error("A count is a whole number");
       if (count) counts[denomination] = count;
       cents += denomination * count;
     }
-    if (cents > MAX_DRAWER_CENTS) throw new Error(`The count is at most ${MAX_DRAWER_CENTS / 100} euros`);
+    if (cents > MAX_DRAWER_CENTS)
+      throw new Error(`The count is at most ${MAX_DRAWER_CENTS / 100} euros`);
     return { cents, counts };
   }
-  return { cents: amountCents(input?.amount, "The count", { zero: true }), counts: null };
+  return {
+    cents: amountCents(input?.amount, "The count", { zero: true }),
+    counts: null,
+  };
 }
 
 export function floatOf(input) {
@@ -61,10 +73,17 @@ export function floatOf(input) {
 /** Money put in or taken out, with why: nothing leaves the drawer unexplained. */
 export function movementOf(input) {
   const kind = String(input?.kind ?? "");
-  if (!MOVEMENT_KINDS.includes(kind)) throw new Error("Money is put in or taken out");
-  const reason = String(input?.reason ?? "").trim().slice(0, 120);
+  if (!MOVEMENT_KINDS.includes(kind))
+    throw new Error("Money is put in or taken out");
+  const reason = String(input?.reason ?? "")
+    .trim()
+    .slice(0, 120);
   if (!reason) throw new Error("Say what the money is for");
-  return { kind, amountCents: amountCents(input?.amount, "The amount"), reason };
+  return {
+    kind,
+    amountCents: amountCents(input?.amount, "The amount"),
+    reason,
+  };
 }
 
 /**
@@ -72,11 +91,25 @@ export function movementOf(input) {
  * (DRAWER_RECEIPTS_SQL), `movementRows` its movements. With `countedCents`,
  * the difference too: over when positive, short when negative.
  */
-export function drawerTotals(session, receiptRows, movementRows, countedCents = null) {
+export function drawerTotals(
+  session,
+  receiptRows,
+  movementRows,
+  countedCents = null,
+) {
   const takings = closingTotals(receiptRows);
-  const inCents = movementRows.filter((row) => row.kind === "in").reduce((sum, row) => sum + row.amount_cents, 0);
-  const outCents = movementRows.filter((row) => row.kind === "out").reduce((sum, row) => sum + row.amount_cents, 0);
-  const expectedCents = session.float_cents + takings.payments.cash + inCents - outCents - takings.tips.card;
+  const inCents = movementRows
+    .filter((row) => row.kind === "in")
+    .reduce((sum, row) => sum + row.amount_cents, 0);
+  const outCents = movementRows
+    .filter((row) => row.kind === "out")
+    .reduce((sum, row) => sum + row.amount_cents, 0);
+  const expectedCents =
+    session.float_cents +
+    takings.payments.cash +
+    inCents -
+    outCents -
+    takings.tips.card;
   return {
     floatCents: session.float_cents,
     receipts: receiptRows.length,
@@ -88,12 +121,21 @@ export function drawerTotals(session, receiptRows, movementRows, countedCents = 
     inCents,
     outCents,
     expectedCents,
-    ...(countedCents === null ? {} : { countedCents, differenceCents: countedCents - expectedCents })
+    ...(countedCents === null
+      ? {}
+      : { countedCents, differenceCents: countedCents - expectedCents }),
   };
 }
 
 export function movementView(row) {
-  return { id: row.id, kind: row.kind, amountCents: row.amount_cents, reason: row.reason, staffName: row.staff_name ?? null, createdAt: row.created_at };
+  return {
+    id: row.id,
+    kind: row.kind,
+    amountCents: row.amount_cents,
+    reason: row.reason,
+    staffName: row.staff_name ?? null,
+    createdAt: row.created_at,
+  };
 }
 
 /** An open drawer as the POS shows it: its figures so far and what went in and out. */
@@ -110,29 +152,48 @@ export function drawerView(row, totals, movementRows) {
     note: row.note ?? null,
     counts: parseJson(row.counts_json, null),
     totals: closed ? parseJson(row.totals_json, totals) : totals,
-    movements: movementRows.map(movementView)
+    movements: movementRows.map(movementView),
   };
 }
 
-/** A drawer, and the one before it: its receipts start after the last receipt when it opened. */
-export const DRAWER_RECEIPTS_SQL = "SELECT * FROM receipts WHERE receipt_no > ? ORDER BY receipt_no";
-export const OPEN_DRAWER_SQL = "SELECT * FROM drawer_sessions WHERE open_flag = 1";
+/** A drawer, and the one before it: its receipts start after the last receipt when it opened. Parameters: tenant, after receipt no. */
+export const DRAWER_RECEIPTS_SQL =
+  "SELECT * FROM receipts WHERE tenant_id = ? AND receipt_no > ? ORDER BY receipt_no";
+/** Parameters: tenant. */
+export const OPEN_DRAWER_SQL =
+  "SELECT * FROM drawer_sessions WHERE tenant_id = ? AND open_flag = 1";
 // Tie-break on rowid, not the random uuid id: two movements in the same
 // millisecond must still come back in the order they were entered, both on the
 // drawer-close report and in the tests.
-export const DRAWER_MOVEMENTS_SQL = "SELECT * FROM drawer_movements WHERE session_id = ? ORDER BY created_at, rowid";
-/** open_flag is UNIQUE: a second open drawer is refused by the database, even from two devices at once. */
-export const INSERT_DRAWER_SQL = `INSERT INTO drawer_sessions (id, open_flag, after_receipt_no, float_cents, opened_by, opened_at)
-  VALUES (?, 1, COALESCE((SELECT MAX(receipt_no) FROM receipts), 0), ?, ?, ?)`;
-export const INSERT_MOVEMENT_SQL = `INSERT INTO drawer_movements (id, session_id, kind, amount_cents, reason, staff_id, staff_name, created_at)
-  SELECT ?, id, ?, ?, ?, ?, ?, ? FROM drawer_sessions WHERE id = ? AND open_flag = 1`;
+/** Parameters: tenant, session. */
+export const DRAWER_MOVEMENTS_SQL =
+  "SELECT * FROM drawer_movements WHERE tenant_id = ? AND session_id = ? ORDER BY created_at, rowid";
+/** open_flag is UNIQUE: a second open drawer is refused by the database, even from two devices at once. The last receipt is the tenant's own: receipt numbers are per tenant. Parameters: tenant, id, tenant, float, opened by, opened at. */
+export const INSERT_DRAWER_SQL = `INSERT INTO drawer_sessions (tenant_id, id, open_flag, after_receipt_no, float_cents, opened_by, opened_at)
+  VALUES (?, ?, 1, COALESCE((SELECT MAX(receipt_no) FROM receipts WHERE tenant_id = ?), 0), ?, ?, ?)`;
+/**
+ * A movement, written only while its drawer is open: the SELECT takes the
+ * session's id (and tenant) from drawer_sessions, so a movement never lands
+ * on another tenant's drawer. Parameters: tenant, movement id, kind, amount,
+ * reason, staff, staff name, created at, tenant, session.
+ */
+export const INSERT_MOVEMENT_SQL = `INSERT INTO drawer_movements (tenant_id, id, session_id, kind, amount_cents, reason, staff_id, staff_name, created_at)
+  SELECT ?, ?, id, ?, ?, ?, ?, ?, ? FROM drawer_sessions WHERE tenant_id = ? AND id = ? AND open_flag = 1`;
+/** Parameters: closed at, closed by, last receipt no, counted, counts, totals, note, tenant, id. */
 export const CLOSE_DRAWER_SQL = `UPDATE drawer_sessions SET open_flag = NULL, closed_at = ?, closed_by = ?, last_receipt_no = ?, counted_cents = ?, counts_json = ?, totals_json = ?, note = ?
-  WHERE id = ? AND open_flag = 1`;
+  WHERE tenant_id = ? AND id = ? AND open_flag = 1`;
 
 /** The rows a new movement writes. */
 export function planMovement(session, input, { staff = null, at }) {
   const movement = movementOf(input);
-  return { id: uuid(), sessionId: session.id, ...movement, staffId: staff?.id ?? null, staffName: staff?.name ?? null, at };
+  return {
+    id: uuid(),
+    sessionId: session.id,
+    ...movement,
+    staffId: staff?.id ?? null,
+    staffName: staff?.name ?? null,
+    at,
+  };
 }
 
 /** What goes to the front printer when a drawer is counted. */

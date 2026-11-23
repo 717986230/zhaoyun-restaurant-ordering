@@ -14,6 +14,8 @@ const copy = {
     signupBonusHint: "新用户注册即送 {n} 积分", signupBonusGot: "注册成功，已赠送 {n} 积分", loginInvalid: "请填写有效的邮箱或手机号", phoneNotMobile: "请填写手机号，不是座机号码",
     tooManyTries: "操作太频繁，请稍后再试", accountFailed: "没有成功，请检查填写的内容再试一次",
     tableNotOpenYet: "这桌还没开台：可以先选好菜，请服务员开台后再下单",
+    tableReserved: "这桌 {time} 已被预约，暂不能下单；本人到店请用预约账号扫桌码签到，或请服务员帮忙",
+    tableCheckedIn: "已为你签到入座，欢迎光临，可以开始点餐啦",
     reviewTitle: "吃得满意吗？", reviewBody: "花半分钟在 Google 上给我们打个分，对小店帮助很大。", reviewGo: "去评价", reviewLater: "以后再说",
     suggestDrinks: "来点喝的？",
     accountsOff: "餐厅暂未开放顾客注册", signInLead: "登录后可以收藏菜品、外带自取、积攒积分兑换菜品。", welcome: "你好，{name}",
@@ -40,6 +42,7 @@ const copy = {
     statusNew: "已送厨", statusPreparing: "制作中", statusReady: "可取餐 / 上菜", statusCompleted: "已完成", statusCancelled: "已取消", paid: "已结账",
     refused: {
       ORDERING_OFF: "餐厅暂未开放线上点餐，请呼叫服务员", ORDERING_CLOSED: "现在不接受线上点餐", TABLE_NOT_OPEN: "这桌还没开台，请先请服务员开台",
+     TABLE_RESERVED: "这桌已被预约，暂时不能下单，请联系服务员",
       TABLE_LOCKED: "这桌正在结账，暂时不能下单", TOO_SOON: "刚刚下过单，请 {seconds} 秒后再试", ORDER_TOO_LARGE: "这单超过了线上点餐的上限，请分开下单或请服务员帮忙",
       SIGN_IN_REQUIRED: "请先登录", TOO_MANY_PICKUPS: "你还有没取的外带订单，请先取餐", NOT_ENOUGH_POINTS: "积分不够兑换这道菜", PAYMENT_UNAVAILABLE: "暂不支持线上付款，请到店付款", BAD_CHANNEL: "请选择堂食或外带",
       SOLD_OUT: "{dish}今天只剩 {left} 份了，请改一下数量或换一道菜"
@@ -52,6 +55,8 @@ const copy = {
     signupBonusHint: "Neu hier? Registrieren und {n} Punkte geschenkt bekommen", signupBonusGot: "Willkommen! {n} Punkte sind schon gutgeschrieben", loginInvalid: "Bitte eine gültige E-Mail oder Handynummer angeben", phoneNotMobile: "Bitte eine Handynummer angeben, keine Festnetznummer",
     tooManyTries: "Zu viele Versuche – bitte kurz warten", accountFailed: "Das hat nicht geklappt – bitte die Angaben prüfen und erneut versuchen",
     tableNotOpenYet: "Der Tisch ist noch nicht freigegeben: schon auswählen, nach der Freigabe durch den Service bestellen",
+    tableReserved: "Dieser Tisch ist für {time} reserviert und kann nicht bestellt werden; als Gast der Reservierung mit deinem Konto den Tisch-Code scannen oder den Service fragen",
+    tableCheckedIn: "Eingecheckt – willkommen, du kannst jetzt bestellen",
     reviewTitle: "Hat es geschmeckt?", reviewBody: "Eine kurze Bewertung auf Google hilft uns sehr.", reviewGo: "Jetzt bewerten", reviewLater: "Später",
     suggestDrinks: "Etwas zu trinken dazu?",
     accountsOff: "Kundenkonten sind derzeit nicht verfügbar", signInLead: "Mit Konto: Lieblingsgerichte merken, zum Abholen bestellen, Punkte sammeln und einlösen.", welcome: "Hallo, {name}",
@@ -78,6 +83,7 @@ const copy = {
     statusNew: "In der Küche", statusPreparing: "In Zubereitung", statusReady: "Fertig", statusCompleted: "Erledigt", statusCancelled: "Storniert", paid: "Bezahlt",
     refused: {
       ORDERING_OFF: "Online-Bestellung ist nicht verfügbar – bitte Service rufen", ORDERING_CLOSED: "Derzeit keine Online-Bestellungen", TABLE_NOT_OPEN: "Der Tisch ist noch nicht freigegeben – bitte den Service fragen",
+     TABLE_RESERVED: "Dieser Tisch ist reserviert und kann derzeit nicht bestellen – bitte den Service fragen",
       TABLE_LOCKED: "Der Tisch wird gerade abgerechnet", TOO_SOON: "Gerade bestellt – bitte in {seconds} Sekunden noch einmal", ORDER_TOO_LARGE: "Zu groß für eine Online-Bestellung – bitte aufteilen oder den Service fragen",
       SIGN_IN_REQUIRED: "Bitte zuerst anmelden", TOO_MANY_PICKUPS: "Es warten noch Bestellungen auf Abholung", NOT_ENOUGH_POINTS: "Zu wenig Punkte für diese Prämie", PAYMENT_UNAVAILABLE: "Online-Zahlung noch nicht möglich – bitte im Restaurant bezahlen", BAD_CHANNEL: "Bitte hier essen oder abholen wählen",
       SOLD_OUT: "{dish}: heute nur noch {left} Portionen – bitte Menge ändern oder etwas anderes wählen"
@@ -90,6 +96,8 @@ const copy = {
     signupBonusHint: "New here? Sign up for {n} points on us", signupBonusGot: "Welcome! {n} points are already yours", loginInvalid: "Please enter a valid email or mobile number", phoneNotMobile: "Please enter a mobile number, not a landline",
     tooManyTries: "Too many attempts – please wait a moment", accountFailed: "That did not work – please check your details and try again",
     tableNotOpenYet: "Your table is not open yet: pick your dishes now, then order once a waiter has opened it",
+    tableReserved: "This table is reserved for {time} and cannot order yet; if the booking is yours, scan the table code signed in, or ask a waiter",
+    tableCheckedIn: "Checked in — welcome, you can order now",
     reviewTitle: "Did you enjoy it?", reviewBody: "Half a minute on Google helps a small restaurant a lot.", reviewGo: "Rate us", reviewLater: "Maybe later",
     suggestDrinks: "Something to drink?",
     accountsOff: "Guest accounts are not available right now", signInLead: "With an account: keep favourites, order for pickup, collect points and redeem them.", welcome: "Hello, {name}",
@@ -116,6 +124,7 @@ const copy = {
     statusNew: "With the kitchen", statusPreparing: "Being prepared", statusReady: "Ready", statusCompleted: "Done", statusCancelled: "Cancelled", paid: "Paid",
     refused: {
       ORDERING_OFF: "Ordering from the menu is not available – please call a waiter", ORDERING_CLOSED: "Not taking orders right now", TABLE_NOT_OPEN: "Your table is not open for ordering yet – please ask a waiter",
+     TABLE_RESERVED: "This table is reserved and cannot order right now – please ask a waiter",
       TABLE_LOCKED: "Your table's bill is being settled", TOO_SOON: "You just ordered – please try again in {seconds} seconds", ORDER_TOO_LARGE: "Too large for an order from the menu – split it or ask a waiter",
       SIGN_IN_REQUIRED: "Please sign in first", TOO_MANY_PICKUPS: "You have pickups waiting – please collect them first", NOT_ENOUGH_POINTS: "Not enough points for this reward", PAYMENT_UNAVAILABLE: "Online payment is not available yet – please pay at the restaurant", BAD_CHANNEL: "Please choose eat in or pickup",
       SOLD_OUT: "{dish}: only {left} left today – please change the quantity or pick another dish"

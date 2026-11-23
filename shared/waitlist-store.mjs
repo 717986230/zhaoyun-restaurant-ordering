@@ -11,24 +11,50 @@
  * the way it sends a booking's confirmation.
  */
 import { now, uuid } from "./core.mjs";
-import { ACTIVE_WAITLIST_STATUSES, normalizeWaitlistInput, waitlistError, waitlistView, WAITLIST_STATUSES } from "./waitlist.mjs";
+import {
+  ACTIVE_WAITLIST_STATUSES,
+  normalizeWaitlistInput,
+  waitlistError,
+  waitlistView,
+  WAITLIST_STATUSES,
+} from "./waitlist.mjs";
+import { DEFAULT_TENANT_ID } from "./tenant.mjs";
 
-const ACTIVE_SQL = ACTIVE_WAITLIST_STATUSES.map((status) => `'${status}'`).join(", ");
-const INSERT_SQL = `INSERT INTO waitlist (id, name, phone, email, party, notes, language, status, created_at, updated_at, notified_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+const ACTIVE_SQL = ACTIVE_WAITLIST_STATUSES.map((status) => `'${status}'`).join(
+  ", ",
+);
+const INSERT_SQL = `INSERT INTO waitlist (tenant_id, id, name, phone, email, party, notes, language, status, created_at, updated_at, notified_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-export function createWaitlistStore(driver) {
-  const byId = (id) => driver.first("SELECT * FROM waitlist WHERE id = ?", String(id));
+/**
+ * The tenant this store reads and writes: `options.tenantId`, or the default
+ * tenant when none is named — the one all data predating tenants lives under,
+ * so a store built without a tenant keeps working exactly as before. Every
+ * statement below takes that tenant as its first bound parameter.
+ */
+export function createWaitlistStore(driver, options = {}) {
+  const tenantId = options.tenantId ?? DEFAULT_TENANT_ID;
+  const byId = (id) =>
+    driver.first(
+      "SELECT * FROM waitlist WHERE tenant_id = ? AND id = ?",
+      tenantId,
+      String(id),
+    );
 
   return {
     /** The queue: every party still waiting or notified, in the order they arrived. */
     async list() {
       const at = now();
-      const rows = await driver.all(`SELECT * FROM waitlist WHERE status IN (${ACTIVE_SQL}) ORDER BY created_at, id LIMIT 500`);
+      const rows = await driver.all(
+        `SELECT * FROM waitlist WHERE tenant_id = ? AND status IN (${ACTIVE_SQL}) ORDER BY created_at, id LIMIT 500`,
+        tenantId,
+      );
       return {
-        entries: rows.map((row, index) => waitlistView(row, { position: index + 1, nowIso: at })),
+        entries: rows.map((row, index) =>
+          waitlistView(row, { position: index + 1, nowIso: at }),
+        ),
         waiting: rows.filter((row) => row.status === "waiting").length,
-        notified: rows.filter((row) => row.status === "notified").length
+        notified: rows.filter((row) => row.status === "notified").length,
       };
     },
 
@@ -37,7 +63,21 @@ export function createWaitlistStore(driver) {
       const entry = normalizeWaitlistInput(input);
       const at = now();
       const id = uuid();
-      await driver.run(INSERT_SQL, id, entry.name, entry.phone, entry.email, entry.party, entry.notes, entry.language, "waiting", at, at, null);
+      await driver.run(
+        INSERT_SQL,
+        tenantId,
+        id,
+        entry.name,
+        entry.phone,
+        entry.email,
+        entry.party,
+        entry.notes,
+        entry.language,
+        "waiting",
+        at,
+        at,
+        null,
+      );
       return { entry: waitlistView(await byId(id), { nowIso: at }) };
     },
 
@@ -49,7 +89,11 @@ export function createWaitlistStore(driver) {
     async update(id, input) {
       const row = await byId(id);
       if (!row) return null;
-      if (input.status !== undefined && !WAITLIST_STATUSES.includes(input.status)) throw waitlistError("Unknown waitlist status", "INVALID");
+      if (
+        input.status !== undefined &&
+        !WAITLIST_STATUSES.includes(input.status)
+      )
+        throw waitlistError("Unknown waitlist status", "INVALID");
       const status = input.status ?? row.status;
       const merged = normalizeWaitlistInput({
         name: input.name ?? row.name,
@@ -57,19 +101,37 @@ export function createWaitlistStore(driver) {
         email: input.email ?? row.email,
         party: input.party ?? row.party,
         notes: input.notes ?? row.notes,
-        language: input.language ?? row.language
+        language: input.language ?? row.language,
       });
       const at = now();
       const justNotified = status === "notified" && row.status !== "notified";
       const notifiedAt = justNotified ? at : row.notified_at;
       await driver.run(
-        "UPDATE waitlist SET name = ?, phone = ?, email = ?, party = ?, notes = ?, language = ?, status = ?, notified_at = ?, updated_at = ? WHERE id = ?",
-        merged.name, merged.phone, merged.email, merged.party, merged.notes, merged.language, status, notifiedAt, at, row.id
+        "UPDATE waitlist SET name = ?, phone = ?, email = ?, party = ?, notes = ?, language = ?, status = ?, notified_at = ?, updated_at = ? WHERE tenant_id = ? AND id = ?",
+        merged.name,
+        merged.phone,
+        merged.email,
+        merged.party,
+        merged.notes,
+        merged.language,
+        status,
+        notifiedAt,
+        at,
+        tenantId,
+        row.id,
       );
-      return { entry: waitlistView(await byId(id), { nowIso: at }), justNotified };
+      return {
+        entry: waitlistView(await byId(id), { nowIso: at }),
+        justNotified,
+      };
     },
 
     /** Gone for good: a party added by mistake, or one the floor clears out. */
-    remove: async (id) => (await driver.run("DELETE FROM waitlist WHERE id = ?", String(id))) > 0
+    remove: async (id) =>
+      (await driver.run(
+        "DELETE FROM waitlist WHERE tenant_id = ? AND id = ?",
+        tenantId,
+        String(id),
+      )) > 0,
   };
 }

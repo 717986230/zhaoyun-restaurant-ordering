@@ -200,6 +200,11 @@ test("a table moves to a free table, then merges onto an occupied one — each s
   await expect(typed).toHaveCount(0);
   expect((await bill("24")).items).toHaveLength(1);
   expect((await bill("21")).items).toHaveLength(2);
+
+  // Leave table 24 so its claim is released: the shared server carries state
+  // between tests, and a table left locked here shows up as still open under
+  // its waiter in the live-board test that follows.
+  await backToFloor();
 });
 
 test("a merge onto a table another waiter holds is shown blocked, not offered", async ({ browser, request }, testInfo) => {
@@ -233,6 +238,14 @@ test("a merge onto a table another waiter holds is shown blocked, not offered", 
   const target = move.getByRole("button", { name: /27/ });
   await expect(target).toBeDisabled();
   await expect(target).toContainText("Wang 正在操作");
+
+  // Leave both tables so their claims are released: the shared server carries
+  // state between tests, and a table left locked here would show up as still
+  // open under its waiter in the live-board test that follows.
+  await move.getByRole("button", { name: "取消" }).click();
+  await li.getByRole("button", { name: "← 返回" }).click();
+  await wang.getByRole("button", { name: "← 返回" }).click();
+  await Promise.all([li.close(), wang.close()]);
 });
 
 test("点菜一次点多份：菜号×份数，规格弹窗带份数", async ({ page, request }, testInfo) => {

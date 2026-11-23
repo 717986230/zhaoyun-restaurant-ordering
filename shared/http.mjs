@@ -18,7 +18,8 @@ import {
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, UrgeBody, FireBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, LetteredTablesBody, TableRenameBody, ClientErrorBody,
-  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody
+  ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody,
+  InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody
 } from "../src/contracts.js";
 import {
   SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent,
@@ -26,7 +27,8 @@ import {
 } from "./http-response.mjs";
 
 export { SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent, reservationRefusal, segments, tableRefusal, tokenMatches } from "./http-response.mjs";
-import { alertMessage, birthdayMessage, bookingMessage, codeMessage, createMailer, mailStatus, testMessage, waitlistReadyMessage } from "./mail.mjs";
+import { alertMessage, birthdayMessage, bookingMessage, codeMessage, createMailer, inviteMessage, mailStatus, resetMessage, testMessage, waitlistReadyMessage } from "./mail.mjs";
+import { DEFAULT_TENANT_ID } from "./tenant.mjs";
 import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
@@ -115,9 +117,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
    * shows it and can send it again. A test order, or a platform whose API
    * access is not configured, has nothing to tell: `sync.status` "none".
    */
-  async function tellPlatform(order, action, extra = {}) {
+  async function tellPlatform(db, order, action, extra = {}) {
     const credentials = { ...(delivery[order.provider] ?? {}) };
-    if (order.test) return store.delivery.recordSync(order.id, { ok: null });
+    if (order.test) return db.delivery.recordSync(order.id, { ok: null });
     try {
       if (order.provider === "foodora") {
         const cached = platformTokens.get("foodora");
@@ -126,26 +128,26 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const login = foodoraLoginRequest(credentials);
           if (login) {
             const response = await send(login.url, { method: login.method, headers: login.headers, body: login.body, signal: AbortSignal.timeout(8000) });
-            if (!response.ok) return store.delivery.recordSync(order.id, { ok: false, error: `Sign-in HTTP ${response.status}` });
+            if (!response.ok) return db.delivery.recordSync(order.id, { ok: false, error: `Sign-in HTTP ${response.status}` });
             const signedIn = await response.json().catch(() => ({}));
             const token = signedIn.access_token ?? signedIn.accessToken;
-            if (!token) return store.delivery.recordSync(order.id, { ok: false, error: "Sign-in gave no token" });
+            if (!token) return db.delivery.recordSync(order.id, { ok: false, error: "Sign-in gave no token" });
             platformTokens.set("foodora", { token, expires: Date.now() + Math.max(60, Number(signedIn.expires_in) || 1800) * 1000 - 60_000 });
             credentials.accessToken = token;
           }
         }
       }
       const call = outboundRequest(order, action, credentials, extra);
-      if (!call) return store.delivery.recordSync(order.id, { ok: null });
+      if (!call) return db.delivery.recordSync(order.id, { ok: null });
       const response = await send(call.url, { method: call.method, headers: call.headers, body: JSON.stringify(call.body), signal: AbortSignal.timeout(8000) });
       if (response.status === 401) platformTokens.delete(order.provider);
       if (!response.ok) {
         const detail = (await response.text().catch(() => "")).slice(0, 200);
-        return store.delivery.recordSync(order.id, { ok: false, error: `HTTP ${response.status}${detail ? `: ${detail}` : ""}` });
+        return db.delivery.recordSync(order.id, { ok: false, error: `HTTP ${response.status}${detail ? `: ${detail}` : ""}` });
       }
-      return store.delivery.recordSync(order.id, { ok: true });
+      return db.delivery.recordSync(order.id, { ok: true });
     } catch (error) {
-      return store.delivery.recordSync(order.id, { ok: false, error: String(error?.message ?? error) });
+      return db.delivery.recordSync(order.id, { ok: false, error: String(error?.message ?? error) });
     }
   }
 
@@ -199,12 +201,6 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     };
   }
 
-  /**
-   * One email (shared/mail.mjs): through Brevo, or into the outbox for the
-   * tests. False when it could not go; why is in the log, never the key.
-   */
-  const sendMail = createMailer({ mail, store, send });
-
   /** A burst from one device to a public route: a 429 with how long to wait, or nothing. */
   function throttlePublic(limiter, ctx, message) {
     const { allowed, retryAfter } = limiter.check(ctx.ip || "unknown");
@@ -218,7 +214,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
    * burst is one email. Never throws — the request already failed, and the
    * telling of it must not fail the host's request lifecycle in turn.
    */
-  async function alertOwner(detail) {
+  async function alertOwner(db, detail) {
     if (!mail || !ownerAlertEmail) return;
     const now = Date.now();
     if (now - state.errorAlert.lastSentAt < ALERT_COOLDOWN_MS) return;
@@ -226,8 +222,9 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     try {
       let restaurant = "";
       // The settings read may itself be what failed; the alert goes out regardless.
-      try { restaurant = (await store.getSettings()).restaurantName; } catch { /* no name, still send */ }
-      await sendMail({ to: ownerAlertEmail, ...alertMessage({ ...detail, restaurant }) });
+      try { restaurant = (await db.getSettings()).restaurantName; } catch { /* no name, still send */ }
+      const mailer = createMailer({ mail, store: db, send });
+      await mailer({ to: ownerAlertEmail, ...alertMessage({ ...detail, restaurant }) });
     } catch (error) {
       console.error(JSON.stringify({ level: "error", msg: "owner alert not sent", error: String(error?.message ?? error) }));
     }
@@ -236,19 +233,29 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
   /**
    * Authenticate, then check rank. The header carries a session token (the
    * restaurant's account, or a waiter on a POS device) or one of the
-   * configured tokens. Returns `{ role, pos, account }` to go on, or
-   * `{ denied }`, so a caller cannot forget to check.
+   * configured tokens. Returns `{ role, pos, account, via }` to go on, or
+   * `{ denied }`, so a caller cannot forget to check. `via` says how the
+   * role was granted — the owner gate needs it, to tell the platform owner's
+   * own login apart from a shared manager token or a waiter's session.
    */
-  async function requireRole(request, ctx, minimumRole) {
+  async function requireRole(db, request, ctx, minimumRole) {
     const throttle = authThrottle(ctx);
     if (throttle.denied) return throttle;
     const provided = request.headers.get("x-admin-token");
-    const session = await store.roleForSession(provided);
+    const session = await db.roleForSession(provided);
+    // A session that belongs to another tenant is not this tenant's session,
+    // even when it was good enough to resolve the tenant: the tenant came
+    // from a different token, or the session expired between the two reads.
+    if (session?.tenantId && session.tenantId !== ctx.tenantId) {
+      throttle.fail();
+      return { denied: json({ error: "Admin authentication required" }, 401) };
+    }
+    const via = session ? (session.account ? "account" : session.staff ? "pos" : "tenant-token") : "env-token";
     const role = session?.role ?? resolveStaffRole((token) => tokenMatches(provided, token), tokens);
     if (!role) {
       // Nothing configured that could ever grant one: say so, rather than
       // counting a failure against a caller who had no way to succeed.
-      if (!tokens.manager && !(await store.accountStatus()).registered) {
+      if (!tokens.manager && !(await db.accountStatus()).registered) {
         return { denied: fail("Register the restaurant's account on the admin console, or configure ADMIN_TOKEN", 503) };
       }
       throttle.fail();
@@ -265,10 +272,10 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       // A valid token used beyond its role is worth recording, not just refusing.
       ctx.audited = true;
       const url = new URL(request.url);
-      await store.recordAudit({ role, ip: ctx.ip ?? "", method: request.method, route: url.pathname + url.search, status: 403, detail: { denied: minimumRole, ...auditActor(ctx.staff) } });
+      await db.recordAudit({ role, ip: ctx.ip ?? "", method: request.method, route: url.pathname + url.search, status: 403, detail: { denied: minimumRole, ...auditActor(ctx.staff) } });
       return { denied: json({ error: `This role may not perform ${minimumRole} actions` }, 403) };
     }
-    return { role, pos, account: session?.account ?? null };
+    return { role, pos, account: session?.account ?? null, via };
   }
 
   /**
@@ -278,16 +285,49 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
    * token printed on its card. The table is upper-cased in place: that is
    * what is stored and what the bill is grouped by.
    */
-  async function refuseUnknownTable(request, command) {
+  async function refuseUnknownTable(db, request, command) {
     const table = String(command.table ?? "").trim().toUpperCase();
     // Validated even in open mode: a table that cannot be registered later
     // would otherwise be accepted now and become unbillable.
     if (!TABLE_PATTERN.test(table)) return fail("Table number must be 1-8 letters or digits");
     command.table = table;
-    if (!await store.hasTables()) return null;
-    const registered = await store.getTable(table);
+    if (!await db.hasTables()) return null;
+    const registered = await db.getTable(table);
     if (!registered || !registered.enabled) return json({ error: "Unknown table" }, 403);
     if (!tokenMatches(request.headers.get("x-table-token"), registered.token)) return json({ error: "Table token is invalid" }, 403);
+    return null;
+  }
+
+  /**
+   * Which restaurant this request belongs to, resolved before the store is
+   * scoped to it. A credential that names the tenant wins, in the order the
+   * store knows them (shared/store.mjs, resolveTenant); then a slug on the
+   * query or header; then the env tokens, which belong to the default tenant
+   * only; then the single-tenant fallback, which keeps today's
+   * single-restaurant deployments working without any token. A request that
+   * names no tenant at all resolves to the default tenant (the store fails
+   * closed to it), never to everything.
+   */
+  async function resolveRequestTenant(request) {
+    const url = new URL(request.url);
+    const headers = request.headers;
+    // A minimal store (a test double, or a deployment predating tenants)
+    // has none of these: it is the single default tenant, and nothing here
+    // may fail for that. A real store always has them.
+    const tenant = typeof store.resolveTenant === "function"
+      ? await store.resolveTenant({
+          adminToken: headers.get("x-admin-token"),
+          deviceToken: headers.get("x-device-token"),
+          tableToken: headers.get("x-table-token"),
+          customerToken: headers.get("x-customer-token"),
+          reservationToken: headers.get("x-reservation-token"),
+          slug: url.searchParams.get("restaurant") ?? headers.get("x-restaurant"),
+        })
+      : null;
+    if (tenant) return tenant;
+    if (resolveStaffRole((token) => tokenMatches(headers.get("x-admin-token"), token), tokens)) return DEFAULT_TENANT_ID;
+    const tenants = typeof store.listTenants === "function" ? await store.listTenants() : [];
+    if (tenants.length === 1) return tenants[0].id;
     return null;
   }
 
@@ -315,13 +355,31 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     return response;
   };
 
-  async function handle(request, ctx) {
+  async function handle(request, ctx, db) {
+    // The store for this request's tenant (serve resolved it): every query
+    // below reads and writes that restaurant only. `db` shadows the outer
+    // store for the whole dispatch, so a helper that forgets its store
+    // argument cannot touch another tenant's rows.
+    const store = db;
+    // One email (shared/mail.mjs): through Brevo, or into the outbox for
+    // the tests — recorded under this tenant, like everything else here.
+    const sendMail = createMailer({ mail, store, send });
     const url = new URL(request.url);
     const path = segments(url.pathname);
     const method = request.method;
     const limit = url.searchParams.get("limit") ?? undefined;
 
-    const gate = (minimumRole) => requireRole(request, ctx, minimumRole);
+    const gate = (minimumRole) => requireRole(store, request, ctx, minimumRole);
+    // The platform owner only: the account whose role is 'owner', or the
+    // deployment's own manager token (the owner's own credential). A tenant
+    // admin, a tenant role token, or a waiter's session is a manager of one
+    // restaurant, not the owner of the platform.
+    const gateOwner = async () => {
+      const { denied, role, account, via } = await gate("manager");
+      if (denied) return { denied };
+      if (account?.role === "owner" || via === "env-token") return { role, account };
+      return { denied: fail("Only the platform owner", 403) };
+    };
 
     // /api/health
     if (path.length === 2 && path[0] === "api" && path[1] === "health" && method === "GET") {
@@ -359,7 +417,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (limited) return limited;
         const { value, invalid } = await body(request, CreateOrderBody);
         if (invalid) return invalid;
-        const refused = await refuseUnknownTable(request, value);
+        const refused = await refuseUnknownTable(store, request, value);
         if (refused) return refused;
         return placeGuestOrder({ ...value, channel: "dine-in" });
       }
@@ -398,6 +456,16 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     async function placeGuestOrder({ channel, payment, ...order }) {
       try {
         const customer = await store.customers.session(request.headers.get("x-customer-token"));
+        // A booking holds this table: only its guest (checked in, so the table
+        // is no longer held) may order on it. A walk-in is turned away.
+        if (channel === "dine-in" && order.table) {
+          const hold = await store.reservations.holdOn(order.table);
+          if (hold) {
+            const mine = customer ? await store.reservations.checkIn(order.table, { customerId: customer.id }) : null;
+            if (mine) await store.openTable(order.table);
+            else return json({ error: `Table ${hold.table} is reserved for ${hold.time}`, code: "TABLE_RESERVED", reserved: { time: hold.time } }, 409);
+          }
+        }
         return json({ order: await store.placeGuestOrder(order, { channel, payment, customer }) }, 201);
       } catch (error) {
         return coded(error);
@@ -408,9 +476,22 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     // filled, not when it is sent (the table's card token, as for an order).
     if (path[0] === "api" && path[1] === "guest" && path[2] === "tables" && path.length === 4 && method === "GET") {
       const command = { table: decodeURIComponent(path[3]) };
-      const refused = await refuseUnknownTable(request, command);
+      const refused = await refuseUnknownTable(store, request, command);
       if (refused) return refused;
       const ordering = (await store.getSettings()).guestOrdering;
+      // A table a booking holds: the booked guest scanning its code checks
+      // themselves in (seated, and the table opened for them to order); anyone
+      // else is told it is reserved and may not order on it.
+      const hold = await store.reservations.holdOn(command.table);
+      if (hold) {
+        const customer = await store.customers.session(request.headers.get("x-customer-token"));
+        const mine = customer ? await store.reservations.checkIn(command.table, { customerId: customer.id }) : null;
+        if (mine) {
+          await store.openTable(command.table);
+          return json({ table: command.table, open: true, checkedIn: true, reservation: { reference: mine.reference, time: mine.time } });
+        }
+        return json({ table: command.table, open: false, reserved: { time: hold.time } });
+      }
       const open = !ordering?.requireOpenTable || await store.tableOpenForGuests(command.table);
       return json({ table: command.table, open });
     }
@@ -424,7 +505,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         // A pickup names no table; an order at the table names its own, with its card's token.
         if (value.channel === "pickup") delete value.table;
         else {
-          const refused = await refuseUnknownTable(request, value);
+          const refused = await refuseUnknownTable(store, request, value);
           if (refused) return refused;
         }
         return placeGuestOrder(value);
@@ -470,7 +551,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (invalid) return invalid;
         const budget = await guessBudget(ctx, "customer", value.email);
         if (budget.denied) return budget.denied;
-        const session = await customers.signIn(value.email, value.password);
+        // This tenant first; a member whose email belongs to exactly one
+        // other tenant signs in there instead, so a pickup guest who opens
+        // the menu without a table token still reaches their account.
+        let session = await customers.signIn(value.email, value.password);
+        if (!session) {
+          const emailTenant = await store.tenantForCustomerEmail(value.email);
+          if (emailTenant && emailTenant !== ctx.tenantId) session = await store.withTenant(emailTenant).customers.signIn(value.email, value.password);
+        }
         if (!session) {
           throttle.fail();
           await budget.fail();
@@ -588,7 +676,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       try {
         if (path[3] === "orders") {
           const received = await store.delivery.receive(provider, value);
-          const order = received.autoAccepted ? await tellPlatform(received.order, "accept", { prepMinutes: received.order.prepMinutes }) : received.order;
+          const order = received.autoAccepted ? await tellPlatform(store, received.order, "accept", { prepMinutes: received.order.prepMinutes }) : received.order;
           return json({ id: order.id, status: order.status, duplicate: !received.created }, received.created ? 201 : 200);
         }
         const event = platformEvent(value);
@@ -689,7 +777,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const refusedBody = await body(request, ServiceRequestBody);
           if (refusedBody.invalid) return refusedBody.invalid;
           const value = refusedBody.value;
-          const refused = await refuseUnknownTable(request, value);
+          const refused = await refuseUnknownTable(store, request, value);
           if (refused) return refused;
           const created = await store.createServiceRequest(value);
           // The same call again, before anyone came: the one already waiting, not a second.
@@ -819,6 +907,8 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
             requests: await store.openServiceRequests(),
             // Today's bookings still to come or at the table.
             reservations: await store.reservations.today(),
+            // Tables a booking is holding right now (reserved, waiting for the guest).
+            held: await store.reservations.heldTables(),
             // Delivery platforms' orders not yet handed over.
             delivery: await store.delivery.open(),
             takeawayDiscountPercent: floorSettings.takeawayDiscountPercent,
@@ -830,6 +920,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           if (method === "POST") {
             // A POS keeps its table every half minute; only taking it is news.
             const renewing = await store.holdsTable(path[3], pos.deviceId);
+            // A table a booking holds is closed to the floor: only a manager may
+            // open it over the hold, which checks the booked guest in. A device
+            // renewing its own open table is past this.
+            if (!renewing) {
+              const hold = await store.reservations.holdOn(path[3]);
+              if (hold && role !== "manager") return json({ error: `Table ${hold.table} is reserved for ${hold.time}`, code: "TABLE_RESERVED", reservedFor: hold.time }, 409);
+              if (hold) await store.reservations.checkIn(path[3], { force: true });
+            }
             // `?shared=1` opens the table to several devices at once (多人同桌),
             // `?shared=0` makes it exclusive again, and no flag (the hold
             // heartbeat) keeps whatever mode the table is already in.
@@ -1007,6 +1105,62 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return fail(error.message);
         }
       }
+      // The owner's invitation: a new admin for a tenant, who sets their own
+      // password through the one-time link. The link reaches the admin by
+      // email when mail is configured and an address was given; otherwise
+      // the token rides in the response, for the owner to hand over (phase
+      // 3's dashboard copies the link from there).
+      if (path.length === 3 && path[2] === "invite" && method === "POST") {
+        const { denied } = await gateOwner();
+        if (denied) return denied;
+        const { value, invalid } = await body(request, InviteBody);
+        if (invalid) return invalid;
+        try {
+          const targetTenant = value.tenantId ?? ctx.tenantId;
+          const { account, token } = await store.inviteAccount({ tenantId: targetTenant, login: value.login, name: value.name, email: value.email });
+          const inviteUrl = `${url.origin}/set-password?token=${token}`;
+          // The set-password page is phase 3's; until it exists the link's
+          // token is what the owner hands over.
+          let emailed = false;
+          if (mail && account.email) {
+            const target = store.withTenant(targetTenant);
+            const settings = await target.getSettings();
+            emailed = await createMailer({ mail, store: target, send })({ to: account.email, ...inviteMessage({ language: settings.menuLanguages?.[0] ?? "de", restaurant: settings.restaurantName, url: inviteUrl }) });
+          }
+          return json({ account, inviteUrl, ...(emailed ? {} : { token }) }, 201);
+        } catch (error) {
+          return fail(error.message);
+        }
+      }
+      // Spending a one-time link: the token it carries, and the password it sets.
+      if (path.length === 3 && path[2] === "set-password" && method === "POST") {
+        const throttle = authThrottle(ctx);
+        if (throttle.denied) return throttle.denied;
+        const { value, invalid } = await body(request, SetPasswordBody);
+        if (invalid) return invalid;
+        const account = await store.useAccountToken(value.token, { password: value.password });
+        if (!account) {
+          throttle.fail();
+          return fail("This link is invalid or expired", 401);
+        }
+        throttle.pass();
+        return json({ account });
+      }
+      // A forgotten password: the link goes out by email, or nothing does —
+      // the token is never handed to whoever asked, or any login could be
+      // taken over by asking. The response is the same either way.
+      if (path.length === 3 && path[2] === "forgot-password" && method === "POST") {
+        const { value, invalid } = await body(request, ForgotPasswordBody);
+        if (invalid) return invalid;
+        const result = await store.requestPasswordReset(value.login);
+        if (result?.account?.email && mail) {
+          const target = store.withTenant(result.account.tenantId);
+          const settings = await target.getSettings();
+          const resetUrl = `${url.origin}/set-password?token=${result.token}`;
+          await createMailer({ mail, store: target, send })({ to: result.account.email, ...resetMessage({ language: settings.menuLanguages?.[0] ?? "de", restaurant: settings.restaurantName, url: resetUrl }) });
+        }
+        return json({ ok: true });
+      }
       return fail("Not found", 404);
     }
 
@@ -1019,6 +1173,70 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         const { denied, role, account } = await gate("kitchen");
         return denied || json(account ? { role, account } : { role });
       }
+      // The platform owner's tenant powers (phase 3's dashboard calls these):
+      // list the restaurants, open a new one with the seed catalogue, and
+      // view or change any account's password. A tenant admin is a manager
+      // of one restaurant, not the owner — gateOwner refuses them.
+      if (path.length === 3 && path[2] === "tenants" && method === "GET") {
+        const { denied } = await gateOwner();
+        if (denied) return denied;
+        return json({ tenants: await store.listTenants() });
+      }
+      if (path.length === 3 && path[2] === "tenants" && method === "POST") {
+        const { denied } = await gateOwner();
+        if (denied) return denied;
+        const { value, invalid } = await body(request, TenantBody);
+        if (invalid) return invalid;
+        try {
+          const tenant = await store.createTenant(value);
+          const provisioned = await store.provisionTenant(tenant.id);
+          return json({ tenant, provisioned }, 201);
+        } catch (error) {
+          return fail(error.message);
+        }
+      }
+      // A tenant's whole database, as plain rows — the export it takes when
+      // it moves, or the owner keeps before a delete.
+      if (path.length === 5 && path[2] === "tenants" && path[4] === "export" && method === "GET") {
+        const { denied } = await gateOwner();
+        if (denied) return denied;
+        try {
+          return json(await store.exportTenantData(path[3]));
+        } catch (error) {
+          return fail(error.message, error.message === "No such tenant" ? 404 : 400);
+        }
+      }
+      // A tenant, gone: every row it owns, then the tenant row itself, all
+      // or nothing. The default tenant cannot be deleted. The dashboard
+      // confirms this first; the delete itself is audited into the default
+      // tenant by the caller, since the tenant's own audit log goes with it.
+      if (path.length === 4 && path[2] === "tenants" && method === "DELETE") {
+        const { denied } = await gateOwner();
+        if (denied) return denied;
+        try {
+          const result = await store.deleteTenant(path[3]);
+          await store.recordAudit({ role: "owner", ip: ctx.ip ?? "", method: "DELETE", route: `/api/admin/tenants/${path[3]}`, status: 200, detail: { tenantId: path[3], tenantName: result.tenant.name } });
+          return json(result);
+        } catch (error) {
+          return fail(error.message, error.message === "No such tenant" ? 404 : 400);
+        }
+      }
+      if (path.length === 5 && path[2] === "accounts" && path[4] === "password" && method === "GET") {
+        const { denied } = await gateOwner();
+        if (denied) return denied;
+        if (!(await store.getAccount(path[3]))) return fail("No such account", 404);
+        // Null when the password was set before any view key existed: a hash
+        // cannot be turned back into the password it came from.
+        return json({ password: await store.viewAccountPassword(path[3]) });
+      }
+      if (path.length === 5 && path[2] === "accounts" && path[4] === "password" && method === "PUT") {
+        const { denied } = await gateOwner();
+        if (denied) return denied;
+        const { value, invalid } = await body(request, OwnerPasswordBody);
+        if (invalid) return invalid;
+        const updated = await store.setAccountPassword(path[3], { password: value.password });
+        return updated ? json(updated) : fail("No such account", 404);
+      }
       if (path.length === 4 && path[2] === "tables" && path[3] === "open" && method === "GET") {
         const { denied } = await gate("staff");
         if (denied) return denied;
@@ -1029,18 +1247,25 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       if (path.length === 4 && path[2] === "tables" && path[3] === "overview" && method === "GET") {
         const { denied } = await gate("staff");
         if (denied) return denied;
-        return json({ tables: await store.tablesOverview() });
+        return json({ tables: await store.tablesOverview(), held: await store.reservations.heldTables() });
       }
       // Open a table for its guests to order from their phones (开台), or close it.
       if (path.length === 5 && path[2] === "tables" && path[4] === "ordering" && method === "POST") {
-        const { denied, pos } = await gate("staff");
+        const { denied, role, pos } = await gate("staff");
         if (denied) return denied;
         const { value, invalid } = await body(request, TableOrderingBody);
         if (invalid) return invalid;
         try {
           // A table open on a POS is that device's to open or close.
           await store.assertTableFree(path[3], pos?.deviceId ?? null);
-          if (value.open) return json({ session: await store.openTable(path[3], pos) });
+          if (value.open) {
+            // Held by a booking: only a manager opens it over the hold, and
+            // doing so checks the booked guest in.
+            const hold = await store.reservations.holdOn(path[3]);
+            if (hold && role !== "manager") return json({ error: `Table ${hold.table} is reserved for ${hold.time}`, code: "TABLE_RESERVED", reservedFor: hold.time }, 409);
+            if (hold) await store.reservations.checkIn(path[3], { force: true });
+            return json({ session: await store.openTable(path[3], pos) });
+          }
           await store.closeTable(path[3]);
           return json({ session: null });
         } catch (error) {
@@ -1281,13 +1506,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
               if (!order) return fail("Order not found", 404);
               const step = LAST_TOLD[order.status];
               if (!step) return fail("Nothing to tell the platform", 409);
-              return json({ order: await tellPlatform(order, step, { prepMinutes: order.prepMinutes ?? 20, reason: order.rejectReason ?? "OTHER" }) });
+              return json({ order: await tellPlatform(store, order, step, { prepMinutes: order.prepMinutes ?? 20, reason: order.rejectReason ?? "OTHER" }) });
             }
             if (!["accept", "reject", "ready", "complete"].includes(action)) return fail("Not found", 404);
             const done = await store.delivery.act(path[4], action, value);
             if (!done) return fail("Order not found", 404);
             if (action === "complete") return json({ order: done.order });
-            return json({ order: await tellPlatform(done.order, action, { prepMinutes: done.order.prepMinutes ?? 20, reason: done.order.rejectReason ?? "OTHER" }) });
+            return json({ order: await tellPlatform(store, done.order, action, { prepMinutes: done.order.prepMinutes ?? 20, reason: done.order.rejectReason ?? "OTHER" }) });
           }
           if (path.length === 4 && path[3] === "status" && method === "GET") {
             const settings = (await store.getSettings()).delivery;
@@ -1725,25 +1950,42 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
    * fails gives the claim back for the next run. Members who signed up with a
    * mobile number have no address to write to and are left out.
    */
+  /**
+   * The daily birthday job, one restaurant at a time: each tenant has its
+   * own perk, timezone, languages and members, so a greeting never crosses
+   * restaurants. The return keeps the old shape for a single tenant — off
+   * when no tenant greets by email, early when every greeting tenant is
+   * still before 09:00 local — and counts what was sent across all of them.
+   */
   async function birthdayGreetings(at = new Date()) {
-    const settings = await store.getSettings();
-    const perk = settings.birthdayPerk;
-    if (!mail || !perk?.enabled || !perk.greetByEmail) return { sent: 0, skipped: "off" };
-    const today = localDayIn(settings.timeZone, at);
-    if (today.hour < 9) return { sent: 0, skipped: "early" };
-    // German where the menu has it (an Austrian restaurant's guests); otherwise the menu's own language.
-    const offered = settings.menuLanguages ?? [];
-    const language = offered.includes("de") || !offered.length ? "de" : offered.includes("en") ? "en" : "zh";
+    if (!mail) return { sent: 0, skipped: "off" };
     let sent = 0;
     let failed = 0;
-    for (const member of await store.customers.birthdaysDue(today)) {
-      if (isPhoneLogin(member.email)) continue;
-      if (!(await store.customers.claimGreeting(member.id, today.year))) continue;
-      const name = member.name || String(member.email).split("@")[0];
-      const message = birthdayMessage(name, { language, restaurant: settings.restaurantName, discountPercent: perk.discountPercent });
-      if (await sendMail({ to: member.email, ...message })) sent += 1;
-      else { failed += 1; await store.customers.releaseGreeting(member.id, today.year); }
+    let eligible = 0;
+    let early = 0;
+    for (const tenant of await store.listTenants()) {
+      const scoped = store.withTenant(tenant.id);
+      const settings = await scoped.getSettings();
+      const perk = settings.birthdayPerk;
+      if (!perk?.enabled || !perk.greetByEmail) continue;
+      eligible += 1;
+      const today = localDayIn(settings.timeZone, at);
+      if (today.hour < 9) { early += 1; continue; }
+      // German where the menu has it (an Austrian restaurant's guests); otherwise the menu's own language.
+      const offered = settings.menuLanguages ?? [];
+      const language = offered.includes("de") || !offered.length ? "de" : offered.includes("en") ? "en" : "zh";
+      const mailer = createMailer({ mail, store: scoped, send });
+      for (const member of await scoped.customers.birthdaysDue(today)) {
+        if (isPhoneLogin(member.email)) continue;
+        if (!(await scoped.customers.claimGreeting(member.id, today.year))) continue;
+        const name = member.name || String(member.email).split("@")[0];
+        const message = birthdayMessage(name, { language, restaurant: settings.restaurantName, discountPercent: perk.discountPercent });
+        if (await mailer({ to: member.email, ...message })) sent += 1;
+        else { failed += 1; await scoped.customers.releaseGreeting(member.id, today.year); }
+      }
     }
+    if (!eligible) return { sent: 0, skipped: "off" };
+    if (early === eligible) return { sent: 0, skipped: "early" };
     return { sent, failed };
   }
 
@@ -1751,7 +1993,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
   return serve;
 
   async function serve(request, { ip = "", requestId = "" } = {}) {
-    const ctx = { ip, requestId, role: null, staff: null, audited: false };
+    const ctx = { ip, requestId, role: null, staff: null, audited: false, tenantId: DEFAULT_TENANT_ID };
     const url = new URL(request.url);
     const writing = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     // The body a write names its table and business fields in, read once.
@@ -1759,15 +2001,21 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     if (writing && request.headers.get("content-type")?.includes("application/json")) {
       try { sent = (await request.clone().json()) ?? {}; } catch { sent = {}; }
     }
+    // Which restaurant this request belongs to — the API's routes never see
+    // the unscoped store. Non-API requests (the web app, a picture) never
+    // reach the store, so they keep the default one. A store without tenant
+    // methods (a test double) is the single default tenant.
+    const scoped = url.pathname.startsWith("/api/") && typeof store.withTenant === "function" ? store.withTenant(await resolveRequestTenant(request)) : store;
+    ctx.tenantId = scoped.tenantId ?? DEFAULT_TENANT_ID;
     let response;
     try {
-      response = await handle(request, ctx);
+      response = await handle(request, ctx, scoped);
     } catch (error) {
       // One line a log search can find by the id the caller was given.
       console.error(JSON.stringify({ level: "error", msg: "request failed", requestId, method: request.method, path: url.pathname, error: String(error?.message ?? error), stack: error?.stack }));
       // Tell the owner out of band, without holding up the 500 (the host runs
       // it to completion — ctx.waitUntil on a Worker; the running process on Node).
-      defer(alertOwner({ method: request.method, path: url.pathname, requestId, time: new Date().toISOString() }));
+      defer(alertOwner(scoped, { method: request.method, path: url.pathname, requestId, time: new Date().toISOString() }));
       response = json({ error: "Internal server error", ...(requestId ? { requestId } : {}) }, 500);
     }
     if (!response || !writing || QUIET.has(response)) return response;
@@ -1784,7 +2032,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       // contribute nothing and keep only their role, as before).
       Object.assign(detail, auditActor(ctx.staff));
       try {
-        await store.recordAudit({ role: ctx.role, ip, method: request.method, route: url.pathname, status: response.status, detail });
+        await scoped.recordAudit({ role: ctx.role, ip, method: request.method, route: url.pathname, status: response.status, detail });
       } catch (error) {
         console.error("audit write failed", error);
       }

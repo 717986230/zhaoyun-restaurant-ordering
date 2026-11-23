@@ -289,6 +289,7 @@ test("a combo is built by packaging existing dishes into a new entry", async ({ 
   // On a phone the list and the form take turns; the button opens a blank one.
   await page.getByRole("button", { name: "＋ 新增菜品" }).click();
 
+  await page.locator('select[name="category"]').selectOption("__new__");
   await page.locator('input[name="category"]').fill("SET");
   await page.locator('input[name="nameZh"]').fill("双人套餐");
   await page.locator('input[name="price"]').fill("39.90");
@@ -722,8 +723,13 @@ test("the menu's QR code downloads as a PNG that a phone can scan", async ({ pag
   await page.route("**/api/admin/tables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
     { table: "12", label: "窗边", token: "tok-12-secret", enabled: true }
   ] }) }));
+  // The room's overview, with table 12 registered and free.
+  await page.unroute("**/api/admin/tables/overview");
+  await page.route("**/api/admin/tables/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ tables: [
+    { table: "12", label: "窗边", enabled: true, locked: false, lockedAt: null, registered: true, state: "free", total: 0, since: null, orders: [] }
+  ] }) }));
   await page.goto("/admin.html");
-  await page.getByRole("navigation", { name: "管理模块" }).getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "桌位" }).click();
 
   /** The downloaded file, decoded in the page by a real QR reader. */
   const scan = async (trigger) => {
@@ -748,18 +754,28 @@ test("the menu's QR code downloads as a PNG that a phone can scan", async ({ pag
   // page's Content-Security-Policy (no inline scripts) does not apply.
   await page.evaluate(readFileSync(require.resolve("jsqr/dist/jsQR.js"), "utf8"));
 
-  // The code has to carry exactly the link the console shows for that table.
-  const row = page.locator(".table-row", { hasText: "桌 12" });
-  const shown = await row.locator("code").textContent();
-  expect(shown).toContain("?table=12&k=tok-12-secret");
+  // The table's entry link, as the console builds it: the menu with its
+  // number and code. It is no longer printed as text anywhere — the card
+  // carries it as a code — so the expected link is built the same way: the
+  // API's base, which on the dev server (port 5173) is the API on 8787
+  // (packages/api-client/src/index.ts), not the page's own origin.
+  const shown = await page.evaluate(() => {
+    const base = location.port === "5173" ? "http://127.0.0.1:8787" : location.origin;
+    return `${base}/?table=12&k=tok-12-secret`;
+  });
 
+  // A table's code is downloaded from its card, in the room's edit mode.
+  await page.getByRole("button", { name: "编辑桌台" }).click();
+  const tile = page.locator(".table-tile", { hasText: "桌 12" });
+  const table = await scan(() => tile.getByRole("button", { name: /二维码/ }).click());
+  expect(table.name).toBe("table-12-qr.png");
+  expect(table.text).toBe(shown);
+
+  // The menu's own code lives on the links page, and carries the bare menu.
+  await page.getByRole("button", { name: "跳转" }).click();
   const menu = await scan(() => page.getByRole("button", { name: /下载菜单二维码/ }).click());
   expect(menu.name).toBe("menu-qr.png");
   expect(menu.text).toBe(shown.split("?")[0]);
-
-  const table = await scan(() => row.getByRole("button", { name: /二维码/ }).click());
-  expect(table.name).toBe("table-12-qr.png");
-  expect(table.text).toBe(shown);
 });
 
 test("a set opened for editing shows its dishes, and saving it keeps them", async ({ page }) => {

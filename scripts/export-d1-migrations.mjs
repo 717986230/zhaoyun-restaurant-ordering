@@ -80,6 +80,9 @@ export function generate() {
       `-- The ${products.length} dishes server/photo-menu.mjs seeds, with the ids the`,
       "-- customer app already ships in bundled-catalog.json.",
       "",
+      // The catalog belongs to the default tenant, and the dishes reference
+      // it: it is seeded first, so the foreign key holds.
+      `INSERT OR IGNORE INTO tenants (id, slug, name, status, config_json, created_at, updated_at) VALUES ('t_default', 'default', 'Chiri', 'active', '{}', ${quote(SEEDED_AT)}, ${quote(SEEDED_AT)});`,
       `INSERT INTO products (${columns.join(", ")}) VALUES`,
       `${rows.join(",\n")};`,
       ""

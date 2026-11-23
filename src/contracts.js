@@ -442,6 +442,17 @@ export const AccountUpdateBody = Type.Object({
 // ADMIN_TOKEN's way back in: a new password, and a new account name if wanted.
 export const AccountRecoverBody = Type.Object({ login: Type.Optional(Login), name: Type.Optional(AccountName), password: Password }, { additionalProperties: false });
 
+// The owner's invitation: a new admin for a tenant, who sets their own
+// password through the one-time link (shared/tenant.mjs, account_tokens).
+export const InviteBody = Type.Object({ tenantId: Type.Optional(Type.String({ maxLength: 64 })), login: Login, name: Type.Optional(AccountName), email: Type.Optional(Type.String({ maxLength: 254 })) }, { additionalProperties: false });
+// Spending a one-time link: the token it carries, and the password it sets.
+export const SetPasswordBody = Type.Object({ token: Type.String({ minLength: 1, maxLength: 512 }), password: Password }, { additionalProperties: false });
+export const ForgotPasswordBody = Type.Object({ login: Type.String({ maxLength: 64 }) }, { additionalProperties: false });
+// The owner changing a user's password directly.
+export const OwnerPasswordBody = Type.Object({ password: Password }, { additionalProperties: false });
+// A new restaurant: its slug, name and per-tenant config (shared/tenant.mjs).
+export const TenantBody = Type.Object({ slug: Type.String({ minLength: 1, maxLength: 64 }), name: Type.Optional(Type.String({ maxLength: 40 })), config: Type.Optional(Type.Any()) }, { additionalProperties: false });
+
 export const PrinterBody = Type.Object({
   name: Type.String({ minLength: 1, maxLength: 120 }),
   transport: Type.Union([Type.Literal("lan"), Type.Literal("bluetooth"), Type.Literal("usb")]),

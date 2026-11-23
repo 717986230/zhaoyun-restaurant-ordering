@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import type { AdminApi, ReservationList, StaffRole } from "@zhaoyun/api-client";
 import type { ApiMailStatus, ApiReservation, ApiReservationSettings, ApiSettings, ReservationStatus, ReservationUpdateCommand } from "@zhaoyun/contracts";
 import { useI18n } from "../../app/i18n";
+import { downloadCsv } from "../../app/csv";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 
 interface Props {
@@ -203,20 +204,6 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
   </div></section>;
 }
 
-/** A CSV the way Excel opens it right: a BOM for UTF-8, fields quoted. */
-function downloadCsv(name: string, rows: Array<Array<string | number>>) {
-  const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-  const text = `﻿${rows.map((row) => row.map(quote).join(",")).join("\r\n")}\r\n`;
-  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 /**
  * The booking records: every booking over a run of days, found by its number,
  * the guest's name, phone or email, by status; each one's record to read or
@@ -373,6 +360,13 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
       <label><span>{t("resLeadTime")}</span><input type="number" min={0} max={10080} step={15} value={draft.leadMinutes} onChange={(event) => set("leadMinutes", Number(event.target.value))} /></label>
       <label><span>{t("resDaysAhead")}</span><input type="number" min={1} max={365} value={draft.daysAhead} onChange={(event) => set("daysAhead", Number(event.target.value))} /></label>
     </div>
+
+    <p className="settings-label">{t("resHold")}</p>
+    <div className="field-grid three">
+      <label><span>{t("resHoldBefore")}</span><input type="number" id="resHoldBefore" min={0} max={720} step={5} value={draft.holdBeforeMinutes} onChange={(event) => set("holdBeforeMinutes", Number(event.target.value))} /></label>
+      <label><span>{t("resReleaseAfter")}</span><input type="number" id="resReleaseAfter" min={0} max={720} step={5} value={draft.releaseAfterMinutes} onChange={(event) => set("releaseAfterMinutes", Number(event.target.value))} /></label>
+    </div>
+    <p className="settings-hint">{t("resHoldHint", { before: draft.holdBeforeMinutes, after: draft.releaseAfterMinutes })}</p>
 
     <p className="settings-label">{t("resLimits")}</p>
     <div className="field-grid three">

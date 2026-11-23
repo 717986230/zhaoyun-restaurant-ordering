@@ -673,7 +673,7 @@ export function receiptRow(receipt) {
 export const INSERT_RECEIPT_SQL = `INSERT INTO receipts (id, receipt_no, client_request_id, cash_register_id, type, table_no,
   lines_json, vat_json, total_cents, payments_json, refers_to, reason, staff_role, created_at, staff_id, staff_name)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-export const INSERT_JOURNAL_SQL = "INSERT INTO journal (seq, at, kind, ref, payload_json, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?)";
+export const INSERT_JOURNAL_SQL = "INSERT INTO journal (tenant_id, seq, at, kind, ref, payload_json, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 /** A receipt as the console and the printer read it. */
 export function receiptView(row, { cancelledBy = null, referredNo = null } = {}) {

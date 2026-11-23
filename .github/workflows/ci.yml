@@ -61,7 +61,10 @@ jobs:
     # newer than the libicudata.so.74 the cached WebKit build links against, so
     # WebKit (the iPhone projects) failed to launch. 24.04 ships ICU 74.
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # The install step below may take 18 minutes on a cold apt cache, and
+    # the shard's tests need a few minutes after it; 20 minutes was not
+    # enough headroom for both.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -110,25 +113,47 @@ jobs:
           done
           exit 1
 
+            # The .deb archives for the system libraries, cached between runs: a
+      # fresh runner downloads 126 MB from the apt mirror on every run, and
+      # the mirror stalls on the odd large file (libflite1, 13.6 MB) often
+      # enough that three 300-second attempts all died at the same place.
+      # With the archives cached, install-deps finds the packages locally
+      # and the mirror is out of the critical path after the first good run.
+      - name: Cache apt archives for browser libraries
+        uses: actions/cache@v6
+        with:
+          path: ~/apt-archives
+          key: apt-archives-${{ runner.os }}-${{ env.ImageOS }}-${{ steps.playwright.outputs.version }}
+          restore-keys: |
+            apt-archives-${{ runner.os }}-${{ env.ImageOS }}-
+
       # The system libraries the browsers need, from apt, whether or not they
       # came from the cache. The Azure apt mirror stalls on the odd package,
-      # and a single run past six minutes failed the whole shard before a test
-      # ran; so, like the download above, each attempt is cut off with its own
-      # `timeout` and tried again, refreshing the package lists between tries.
-      # Without the per-attempt timeout one stalled apt call ate the whole
-      # 15-minute step before the loop could retry — which is what timed the
-      # step out. A cut-off apt can leave its lock and a half-configured dpkg
-      # behind, so both are cleared before the next try.
+      # so apt is told to retry a stalled file itself (three quick retries
+      # with a 60-second timeout each) instead of hanging until the outer
+      # `timeout` kills the whole transaction; each attempt is still cut off
+      # with its own `timeout` and tried again, refreshing the package lists
+      # between tries. A cut-off apt can leave its lock and a half-configured
+      # dpkg behind, so both are cleared before the next try. After a good
+      # install the downloaded archives are copied aside so the cache above
+      # can save them for the next run.
       - name: Install the browsers' system libraries
         timeout-minutes: 18
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt-get update || true
-          for attempt in 1 2 3; do
-            if sudo timeout 300 npx playwright install-deps chromium webkit; then exit 0; fi
-            echo "::warning::apt stalled installing browser libraries (attempt $attempt of 3)"
-            sudo pkill -9 -f 'apt-get|apt\.systemd|dpkg' || true
+          sudo cp ~/apt-archives/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\n' | sudo tee /etc/apt/apt.conf.d/99-playwright-retries >/dev/null
+          for attempt in 1 2; do
+            if sudo timeout 420 npx playwright install-deps chromium webkit; then
+              mkdir -p ~/apt-archives
+              sudo cp /var/cache/apt/archives/*.deb ~/apt-archives/ 2>/dev/null || true
+              exit 0
+            fi
+            echo "::warning::apt stalled installing browser libraries (attempt $attempt of 2)"
+            sudo pkill -9 -x apt-get || true
+            sudo pkill -9 -x dpkg || true
             sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend || true
             sudo dpkg --configure -a || true
             sudo apt-get update || true

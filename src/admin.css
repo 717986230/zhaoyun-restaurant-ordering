@@ -3567,11 +3567,6 @@ em.voided {
   gap: 12px;
 }
 
-.staff-open-pos {
-  justify-self: start;
-  text-decoration: none;
-}
-
 .staff-list {
   display: grid;
   gap: 6px;
@@ -3619,6 +3614,40 @@ em.voided {
 .staff-list .ghost-action {
   padding: 6px 10px;
   font-size: 13px;
+}
+
+/* A waiter's own paired devices, tucked under their row. */
+.staff-devices {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px dashed var(--a-line-2);
+  list-style: none;
+}
+
+.staff-device {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--a-ink-2);
+}
+
+.staff-device b {
+  color: var(--a-ink);
+  font-weight: 600;
+}
+
+.staff-device small {
+  flex: 1;
+  color: var(--a-muted);
+}
+
+.staff-device .ghost-action {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .staff-pin-edit {
