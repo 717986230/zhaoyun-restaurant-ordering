@@ -1291,6 +1291,26 @@ em.voided {
   font-size: 13px;
 }
 
+.table-generator {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--a-line-2);
+}
+
+.table-generator h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.table-generator .field-grid {
+  max-width: 420px;
+}
+
+.table-generator > button.primary-action {
+  justify-self: start;
+}
+
 .table-editor-add {
   display: flex;
   flex-wrap: wrap;

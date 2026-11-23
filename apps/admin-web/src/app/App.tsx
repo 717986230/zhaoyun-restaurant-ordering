@@ -360,6 +360,24 @@ export function App() {
     }
   }
 
+  /** The one-click generators: like editRoom, but the toast names how many
+   *  tables were actually created (the rest already existed and were kept). */
+  async function generateRoom(action: () => Promise<{ created: number }>): Promise<boolean> {
+    setState((current) => ({ ...current, boardBusy: true }));
+    try {
+      const { created } = await action();
+      await Promise.all([loadBoard(true), loadTables()]);
+      notify(t("tablesGenerated", { created }));
+      return true;
+    } catch (error) {
+      tableFailed(error, "tableSaveFailed");
+      await loadBoard(true);
+      return false;
+    } finally {
+      setState((current) => ({ ...current, boardBusy: false }));
+    }
+  }
+
   async function lockTable(table: string, locked: boolean) {
     await runBoardAction(() => adminApi.setTableLock(table, locked), t(locked ? "tableLockedToast" : "tableUnlockedToast", { table }));
   }
@@ -725,6 +743,8 @@ export function App() {
         onPrintBill={printBill}
         onOrdering={(table: string, open: boolean) => runBoardAction(() => adminApi.setTableOrdering(table, open), t(open ? "openForOrdering" : "closeForOrdering"))}
         onSetUpTables={(count: number) => editRoom(() => adminApi.registerNumberedTables(count), t("tablesSetUpDone", { count }))}
+        onGenerateNumbered={(count: number) => generateRoom(() => adminApi.registerNumberedTables(count))}
+        onGenerateLettered={(letters: number, perLetter: number) => generateRoom(() => adminApi.registerLetteredTables(letters, perLetter))}
         onAddTable={(table: string) => state.tableOverview.some((known) => known.table === table && known.registered)
           ? Promise.resolve((notify(t("tableErrExists"), "error"), false))
           : editRoom(() => adminApi.saveTable({ table }), t("tableAdded", { table }))}

@@ -585,6 +585,7 @@ export const TableRenameBody = Type.Object({
   label: Type.Optional(Type.String({ maxLength: 64 }))
 }, { additionalProperties: false });
 export const NumberedTablesBody = Type.Object({ count: Type.Integer({ minimum: 1, maximum: 200 }) }, { additionalProperties: false });
+export const LetteredTablesBody = Type.Object({ letters: Type.Integer({ minimum: 1, maximum: 26 }), perLetter: Type.Integer({ minimum: 1, maximum: 99 }) }, { additionalProperties: false });
 
 export const TableBody = Type.Object({
   table: TableNo,

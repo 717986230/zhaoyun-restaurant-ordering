@@ -2002,6 +2002,38 @@ export function createStore(driver, options = {}) {
       return { tables, created: missing.length };
     },
     /**
+     * The by-letter generator: `letters` zones A, B, C … each with `perLetter`
+     * tables, giving A1, A2 … A{n}, B1 … in that order. The names it would make
+     * mirror the console's preview exactly, capped at 400 so one click can't
+     * flood the room. Tables that already exist keep their code; only the
+     * missing ones are inserted. The result is sorted in generation order (A2
+     * before A10), so the printable cards come out in the order a manager laid
+     * the room out.
+     */
+    registerLetteredTables: async ({ letters, perLetter }) => {
+      const names = [];
+      for (let zone = 0; zone < letters && names.length < 400; zone += 1) {
+        const letter = String.fromCharCode(65 + zone);
+        for (let n = 1; n <= perLetter && names.length < 400; n += 1) names.push(`${letter}${n}`);
+      }
+      const order = new Map(names.map((name, index) => [name, index]));
+      const existing = new Set((await all("SELECT table_no FROM restaurant_tables WHERE tenant_id = ?", tenantId)).map((row) => row.table_no));
+      const missing = names.filter((table) => !existing.has(table));
+      const timestamp = now();
+      if (missing.length) {
+        await batch(missing.map((table) => sql(
+          "INSERT INTO restaurant_tables (tenant_id, table_no, label, token, enabled, created_at, updated_at) VALUES (?, ?, '', ?, 1, ?, ?) ON CONFLICT(tenant_id, table_no) DO NOTHING",
+          tenantId, table, entryToken(), timestamp, timestamp
+        )));
+      }
+      const wanted = new Set(names);
+      const tables = (await all("SELECT * FROM restaurant_tables WHERE tenant_id = ?", tenantId))
+        .filter((row) => wanted.has(row.table_no))
+        .sort((a, b) => order.get(a.table_no) - order.get(b.table_no))
+        .map(tableView);
+      return { tables, created: missing.length };
+    },
+    /**
      * A table given another number, a label, or both. The number changes only
      * while nobody is at the table: an open bill, a waiter on a POS or guests
      * ordering from their phones all hang on the number. The card on the table

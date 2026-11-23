@@ -17,7 +17,7 @@ import {
   CategoryRenameBody, CategoryVatBody, CheckoutBody, EmailCodeBody, EmailVerifyBody, MailTestBody, CreateOrderBody, StornoBody, StaffBody, DeviceBody, PosSignInBody, MoveTableBody, SettlementBody, DrawerOpenBody, DrawerMoveBody, DrawerCloseBody, OrderStatusBody, PrinterBody, ProductBody, ServiceRequestBody, ServiceStatusBody,
   SettingsBody, TableBody, TableLockBody, RegisterBody, AccountSignInBody, AccountUpdateBody, AccountRecoverBody, VoidBody, UrgeBody, FireBody, AvailabilityBody,
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
-  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, TableRenameBody, ClientErrorBody,
+  PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, LetteredTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody,
   InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody
 } from "../src/contracts.js";
@@ -1693,6 +1693,11 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           const { value, invalid } = await body(request, NumberedTablesBody);
           if (invalid) return invalid;
           return json(await store.registerNumberedTables(value.count), 201);
+        }
+        if (path.length === 4 && path[3] === "lettered" && method === "POST") {
+          const { value, invalid } = await body(request, LetteredTablesBody);
+          if (invalid) return invalid;
+          return json(await store.registerLetteredTables(value), 201);
         }
         if (path.length === 3 && method === "POST") {
           try {
