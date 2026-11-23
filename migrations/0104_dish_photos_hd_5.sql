@@ -3,6 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS media_files (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
       content_type TEXT NOT NULL,
       bytes BLOB NOT NULL,
       credit TEXT,
