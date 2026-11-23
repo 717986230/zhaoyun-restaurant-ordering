@@ -46,7 +46,11 @@ export function createWaitlistStore(driver, options = {}) {
     async list() {
       const at = now();
       const rows = await driver.all(
-        `SELECT * FROM waitlist WHERE tenant_id = ? AND status IN (${ACTIVE_SQL}) ORDER BY created_at, id LIMIT 500`,
+        // Arrival order, strictly: two parties added in the same millisecond
+        // share a created_at, so the tiebreak must be the monotonic insertion
+        // order (rowid), never the random uuid in `id` — otherwise "first in,
+        // first in line" flips at random on a fast machine.
+        `SELECT * FROM waitlist WHERE tenant_id = ? AND status IN (${ACTIVE_SQL}) ORDER BY created_at, rowid LIMIT 500`,
         tenantId,
       );
       return {
