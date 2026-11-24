@@ -4807,6 +4807,65 @@ em.voided {
   margin-top: 2px;
 }
 
+/* 库存管理 — the unified stock view. */
+.report-tile[data-tone="warn"] {
+  border-color: var(--a-danger-line);
+  background: var(--a-danger-wash);
+}
+
+.report-tile[data-tone="low"] {
+  border-color: var(--a-accent-line);
+  background: var(--a-accent-wash);
+}
+
+.inv-threshold {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+.inv-threshold select {
+  width: auto;
+}
+
+.inv-table td {
+  vertical-align: middle;
+}
+
+.inv-sub {
+  color: var(--a-muted);
+  font-weight: 400;
+}
+
+.inv-num {
+  width: 5.5em;
+  text-align: right;
+}
+
+.inv-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.inv-pill.inv-ok { color: var(--a-muted); }
+.inv-pill.inv-low { color: var(--a-accent-ink); background: var(--a-accent-wash); }
+.inv-pill.inv-outToday,
+.inv-pill.inv-soldOut { color: var(--a-danger); background: var(--a-danger-wash); }
+
+.inv-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.inv-actions .inv-soldout { color: var(--a-danger); }
+.inv-actions .inv-restore { color: var(--a-accent-ink); }
+
 .res-dialog {
   position: fixed;
   inset: 0;

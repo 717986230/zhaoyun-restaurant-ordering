@@ -354,7 +354,7 @@ export function nextPriceCents(currentCents: number, mode: "fixed" | "percent", 
 
 /** A dish as the admin PUT wants it, so a bulk change resends everything
  *  unchanged but the one field it touches (the backend merges onto the row). */
-function productToInput(product: Product): AdminProductInput {
+export function productToInput(product: Product): AdminProductInput {
   return {
     sku: product.sku,
     kind: product.kind,
