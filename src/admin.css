@@ -304,36 +304,46 @@ button {
   box-shadow: 0 6px 18px var(--a-shadow-1);
 }
 
-/* The sections, grouped by the job and wrapping onto as many rows as they
-   need, so every one is on screen at once — no sideways scroll hiding the
-   later tabs. */
+/* The sections, grouped by the job. Each group is a block — its name as a
+   small heading on its own line, its tabs on the row below — so the group
+   name never reads as one more tab, and on a phone the groups stack cleanly
+   one under another instead of all the labels and tabs running together. */
 .admin-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 20px;
-  padding: 4px clamp(10px, 4vw, 48px);
+  align-items: flex-start;
+  gap: 6px 22px;
+  padding: 8px clamp(10px, 4vw, 48px) 0;
   border-bottom: 1px solid var(--a-line);
   background: var(--a-card);
 }
 
-/* One group: its name, then its tabs — wrapping inside the group too, so a
-   long group (the floor's six) folds onto a second line on a phone instead
-   of pushing its last tab off the screen. */
+/* One group: its heading, then its tabs under it. */
 .admin-tab-group {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
+  flex-direction: column;
+  gap: 1px;
   min-width: 0;
 }
 
+/* The group heading — clearly a label, not a tab: muted, small, spaced out,
+   sitting above its tabs rather than inline with them. */
 .admin-tab-group-label {
   color: var(--a-faint);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: .05em;
-  padding-right: 6px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  padding: 0 0 1px 12px;
   white-space: nowrap;
+}
+
+/* The group's tabs, wrapping within the group so a long one (the floor's
+   six) folds onto a second line instead of pushing a tab off screen. */
+.admin-tab-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
 }
 
 .admin-tabs button,
@@ -1017,6 +1027,14 @@ h2 {
   text-align: center;
 }
 
+.admin-empty p {
+  margin: 0;
+}
+
+.admin-empty button.primary-action {
+  margin-top: 16px;
+}
+
 #boardPanel > .list-head {
   padding: 20px clamp(16px, 3vw, 30px) 0;
 }
@@ -1307,6 +1325,22 @@ em.voided {
   max-width: 420px;
 }
 
+/* The two mode buttons (按字母 / 按号码): compact pills sized to their label,
+   side by side, instead of being squeezed into the report page's narrow 60px
+   preset columns where they overlapped on a phone. */
+.table-gen-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.table-gen-modes button {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  white-space: nowrap;
+}
+
 .table-generator > button.primary-action {
   justify-self: start;
 }
@@ -1453,12 +1487,27 @@ em.voided {
   gap: 8px;
 }
 
+/* The bill opens over the room, centred, so a tap on 结账 is seen at once —
+   it used to render inline at the foot of the whole table grid, off-screen on
+   a phone, which read as "the button does nothing". */
+.bill-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--a-shadow-1);
+}
+
 .bill-sheet {
-  margin-top: 10px;
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow: auto;
   border: 1px solid var(--a-line-2);
-  border-radius: var(--r-xs);
+  border-radius: var(--r-sm);
   background: var(--a-card);
-  padding: 14px;
+  padding: 16px;
 }
 
 .bill-items {
