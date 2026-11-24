@@ -304,37 +304,39 @@ button {
   box-shadow: 0 6px 18px var(--a-shadow-1);
 }
 
-/* The sections, grouped by the job. Each group is a block — its name as a
-   small heading on its own line, its tabs on the row below — so the group
-   name never reads as one more tab, and on a phone the groups stack cleanly
-   one under another instead of all the labels and tabs running together. */
+/* The sections, grouped by the job. On a wide screen the group name sits
+   inline before its tabs (one row, so the sticky header stays short — a tall
+   header would overlap the page on a short landscape phone); on a narrow
+   phone each group stacks its name above its tabs and the groups stack one
+   under another (see the max-width block below). Either way the name is
+   styled as a muted heading, never as one more tab. */
 .admin-tabs {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 6px 22px;
-  padding: 8px clamp(10px, 4vw, 48px) 0;
+  align-items: center;
+  gap: 2px 20px;
+  padding: 4px clamp(10px, 4vw, 48px);
   border-bottom: 1px solid var(--a-line);
   background: var(--a-card);
 }
 
-/* One group: its heading, then its tabs under it. */
+/* One group: its heading, then its tabs — inline and wrapping. */
 .admin-tab-group {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
   min-width: 0;
 }
 
-/* The group heading — clearly a label, not a tab: muted, small, spaced out,
-   sitting above its tabs rather than inline with them. */
+/* The group heading — clearly a label, not a tab: muted, small, spaced out. */
 .admin-tab-group-label {
   color: var(--a-faint);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .09em;
   text-transform: uppercase;
-  padding: 0 0 1px 12px;
+  padding-right: 8px;
   white-space: nowrap;
 }
 
@@ -343,7 +345,30 @@ button {
 .admin-tab-group-tabs {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 2px;
+}
+
+/* On a phone the inline strip gets cramped, so give each group its own row
+   with its name stacked above its tabs — clean top to bottom. Portrait phones
+   only (≤600px); landscape phones and tablets keep the short inline header. */
+@media (max-width: 600px) {
+  .admin-tabs {
+    align-items: flex-start;
+    gap: 8px 0;
+    padding: 8px clamp(10px, 4vw, 48px) 0;
+  }
+
+  .admin-tab-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    width: 100%;
+  }
+
+  .admin-tab-group-label {
+    padding: 0 0 1px 12px;
+  }
 }
 
 .admin-tabs button,
