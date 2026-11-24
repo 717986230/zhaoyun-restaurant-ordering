@@ -88,9 +88,17 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     registerLimiter: createRateLimiter({ windowMs: 10 * 60_000, max: 40 }),
     // When the owner was last told about an unplanned error, so the cooldown
     // above holds across requests (ALERT_COOLDOWN_MS).
-    errorAlert: { lastSentAt: 0 }
+    errorAlert: { lastSentAt: 0 },
+    // The built /api/catalog body per tenant, kept between requests so the many
+    // guests browsing one isolate share one build. Valid while the store's menu
+    // stamp and the restaurant day are unchanged; see the /api/catalog route.
+    catalogBodies: new Map()
   };
 }
+
+// A cached catalog body may outlive, by this long, a change made in another
+// isolate (a menu edit a guest's live channel already tells them to refetch).
+const CATALOG_BODY_TTL_MS = 10_000;
 
 /**
  * The API over one store.
@@ -396,12 +404,28 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     // /api/catalog
     if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
       const settings = await store.getSettings();
+      // The whole built body is the same for every guest of one restaurant and
+      // changes only when the menu, the stock or the sales do — so it is cached
+      // and served without rebuilding (no stock read, no 100-dish map, no
+      // re-serialize) while the store's stamp and the restaurant day hold.
+      const stamp = typeof store.menuStamp === "function" ? store.menuStamp() : null;
+      const today = settings.timeZone ? restaurantDay(settings.timeZone) : null;
+      const cacheKey = ctx.tenantId;
+      if (stamp) {
+        const hit = state.catalogBodies.get(cacheKey);
+        if (hit && hit.menu === stamp.menu && hit.dyn === stamp.dyn && hit.today === today && Date.now() - hit.at < CATALOG_BODY_TTL_MS) {
+          return new Response(hit.body, { status: 200, headers: { "content-type": "application/json; charset=utf-8", ...SECURITY_HEADERS } });
+        }
+      }
       const suggestions = settings.cartSuggestions;
       const [products, bestSellers] = await Promise.all([
         store.listProducts(true, settings.timeZone),
         suggestions?.enabled && !suggestions.productIds.length ? store.topDrinks(30, 3) : []
       ]);
-      return json({ products, theme: settings.menuTheme, languages: settings.menuLanguages, menu: { ...menuSettingsView(settings), ...cartSuggestionsFor(suggestions, products, bestSellers) } });
+      const payload = { products, theme: settings.menuTheme, languages: settings.menuLanguages, menu: { ...menuSettingsView(settings), ...cartSuggestionsFor(suggestions, products, bestSellers) } };
+      const serialized = JSON.stringify(payload);
+      if (stamp) state.catalogBodies.set(cacheKey, { menu: stamp.menu, dyn: stamp.dyn, today, at: Date.now(), body: serialized });
+      return new Response(serialized, { status: 200, headers: { "content-type": "application/json; charset=utf-8", ...SECURITY_HEADERS } });
     }
 
     // /api/orders and /api/orders/:id/status

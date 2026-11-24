@@ -132,7 +132,7 @@ const PRINTERS_WITH_STATUS_SQL = `SELECT printer_profiles.*, printer_status.ok A
  * tells them to refetch).
  */
 export function createMenuCache() {
-  return { settings: new Map(), catalog: new Map(), versions: new Map(), tenants: null };
+  return { settings: new Map(), catalog: new Map(), versions: new Map(), dyn: new Map(), tenants: null };
 }
 // How long a cached read may outlive a write made in another isolate.
 const MENU_CACHE_TTL_MS = 10_000;
@@ -142,15 +142,30 @@ export function createStore(driver, options = {}) {
   const cache = options.cache ?? createMenuCache();
   const { first, all } = driver;
   const menuVersion = () => cache.versions.get(tenantId) ?? 0;
+  const dynVersion = () => cache.dyn.get(tenantId) ?? 0;
+  /**
+   * The current tenant's cache stamp, in memory and synchronous (no query):
+   * `menu` moves when the dishes/pictures/settings change, `dyn` when the
+   * stock or the sales do. The HTTP layer caches the whole built /api/catalog
+   * body against this stamp (plus the restaurant day, for the midnight reset).
+   */
+  const menuStamp = () => ({ menu: menuVersion(), dyn: dynVersion() });
   /**
    * A write touching the menu, the settings or the tenant list drops the
-   * matching cache. Reads (`first`/`all`) never pass through here, and a
-   * dish's stock (`product_stock`) is deliberately left out so it stays live.
+   * matching cache. Reads (`first`/`all`) never pass through here. Two kinds:
+   * the dishes/pictures/settings (`menu` version — the cached rows) and the
+   * stock/sales (`dyn` version — product_stock, orders and their items, which
+   * move what is left today and the best-seller suggestions). The cached rows
+   * deliberately do NOT move on stock/sales, so `listProducts` keeps serving
+   * them and only re-reads the live stock.
    */
   function noteWrite(text) {
     if (typeof text !== "string" || !/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(text)) return;
     if (/\b(products|product_media|restaurant_settings|app_settings)\b/i.test(text)) {
       cache.versions.set(tenantId, menuVersion() + 1);
+    }
+    if (/\b(product_stock|orders|order_items|order_item_voids)\b/i.test(text)) {
+      cache.dyn.set(tenantId, dynVersion() + 1);
     }
     if (/\btenants\b/i.test(text)) cache.tenants = null;
   }
@@ -168,8 +183,14 @@ export function createStore(driver, options = {}) {
   const tenantId = options.tenantId ?? DEFAULT_TENANT_ID;
   /** The key the owner's password view uses, when one is configured (base64 of 32 bytes, or a CryptoKey). */
   const passwordViewKey = options.passwordViewKey ?? null;
-  /** The same store for another tenant: a cheap closure allocation, per request. */
-  const withTenant = (nextTenantId) => createStore(driver, { ...options, tenantId: nextTenantId });
+  /**
+   * The same store for another tenant: a cheap closure allocation, per request.
+   * It must carry the same read cache, so a deployment's one cache is shared by
+   * every tenant scoping of the root store (without this, each per-request
+   * `withTenant` would get a fresh, empty cache and nothing would ever be
+   * reused or — worse, against a persistent body cache — invalidated).
+   */
+  const withTenant = (nextTenantId) => createStore(driver, { ...options, tenantId: nextTenantId, cache });
 
   /**
    * What a receipt is stored as, with its tenant: INSERT_RECEIPT_SQL
@@ -1775,6 +1796,7 @@ export function createStore(driver, options = {}) {
 
   return {
     listProducts,
+    menuStamp,
     getProduct,
     setStock,
     saveProduct,
