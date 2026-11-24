@@ -1320,7 +1320,19 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       if (path[2] === "receipts" && method === "GET" && path.length <= 4) {
         const { denied } = await gate("staff");
         if (denied) return denied;
-        if (path.length === 3) return json({ receipts: await store.listReceipts(limit) });
+        if (path.length === 3) {
+          const filters = {};
+          for (const key of ["from", "to", "table", "payment", "type", "q"]) {
+            const value = url.searchParams.get(key);
+            if (value !== null && value !== "") filters[key] = value;
+          }
+          if (!Object.keys(filters).length) return json({ receipts: await store.listReceipts(limit) });
+          try {
+            return json({ receipts: await store.searchReceipts({ ...filters, limit }) });
+          } catch (error) {
+            return coded(error);
+          }
+        }
         const receipt = await store.getReceipt(path[3]);
         return receipt ? json({ receipt }) : fail("Receipt not found", 404);
       }
