@@ -304,70 +304,43 @@ button {
   box-shadow: 0 6px 18px var(--a-shadow-1);
 }
 
-/* The sections, grouped by the job. On a wide screen the group name sits
-   inline before its tabs (one row, so the sticky header stays short — a tall
-   header would overlap the page on a short landscape phone); on a narrow
-   phone each group stacks its name above its tabs and the groups stack one
-   under another (see the max-width block below). Either way the name is
-   styled as a muted heading, never as one more tab. */
+/* One clean module bar: a single row of tabs that scrolls sideways when it
+   is wider than the screen, the way a phone POS does it. No group-name rows —
+   those stacked three deep on a phone and read as clutter (and the label
+   beside its first tab looked like a duplicate: 「菜单 菜品」, 「客户 顾客」).
+   The strip never wraps and never hides a tab: what does not fit scrolls into
+   view, and a soft fade on the right edge says there is more. The active tab
+   is scrolled to the middle on change (see App.tsx). */
 .admin-tabs {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 20px;
-  padding: 4px clamp(10px, 4vw, 48px);
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 clamp(10px, 4vw, 48px);
   border-bottom: 1px solid var(--a-line);
   background: var(--a-card);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  /* Fade the right edge so a half-cut tab reads as "scroll for more". The mask
+     only uses each stop's alpha, so the token's hue is immaterial — it is here
+     just to be fully opaque. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, var(--a-ink) 16px, var(--a-ink) calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, var(--a-ink) 16px, var(--a-ink) calc(100% - 22px), transparent 100%);
 }
 
-/* One group: its heading, then its tabs — inline and wrapping. */
-.admin-tab-group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
+.admin-tabs::-webkit-scrollbar {
+  display: none;
 }
 
-/* The group heading — clearly a label, not a tab: muted, small, spaced out. */
-.admin-tab-group-label {
-  color: var(--a-faint);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-  padding-right: 8px;
-  white-space: nowrap;
-}
-
-/* The group's tabs, wrapping within the group so a long one (the floor's
-   six) folds onto a second line instead of pushing a tab off screen. */
-.admin-tab-group-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-}
-
-/* On a phone the inline strip gets cramped, so give each group its own row
-   with its name stacked above its tabs — clean top to bottom. Portrait phones
-   only (≤600px); landscape phones and tablets keep the short inline header. */
-@media (max-width: 600px) {
+/* Wide enough for every tab: no scroll, no fade, centred spacing. */
+@media (min-width: 1180px) {
   .admin-tabs {
-    align-items: flex-start;
-    gap: 8px 0;
-    padding: 8px clamp(10px, 4vw, 48px) 0;
-  }
-
-  .admin-tab-group {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
-    width: 100%;
-  }
-
-  .admin-tab-group-label {
-    padding: 0 0 1px 12px;
+    flex-wrap: wrap;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 }
 
@@ -385,6 +358,7 @@ button {
   border-bottom: 3px solid transparent;
   white-space: nowrap;
   font-size: 15px;
+  scroll-snap-align: center;
 }
 
 .admin-tabs button.active {
@@ -1274,6 +1248,33 @@ em.voided {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+}
+
+/* Online-pickup orders live under their own heading, apart from the floor. */
+.takeaway-section {
+  margin-top: 24px;
+}
+
+.takeaway-head {
+  margin: 0 0 12px;
+}
+
+.takeaway-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.takeaway-head p {
+  margin: 2px 0 0;
+  color: var(--a-muted);
+  font-size: 13px;
+}
+
+/* A pickup card reads as off-floor: a dashed, neutral left edge, never the
+   room's "seated" green. */
+.table-tile.takeaway {
+  border-left-style: dashed;
+  border-left-color: var(--a-line-2);
 }
 
 .table-tile {
@@ -5085,10 +5086,14 @@ em.voided {
   }
 }
 
-/* A table's buttons share its width evenly, the same on every card. */
+/* A table's buttons share its width evenly, the same on every card. The
+   minimum track is a real button width (not 0), so on a phone four buttons
+   wrap onto two rows instead of crushing into one unreadable overlapping
+   pile; `min(100%, …)` keeps a single button from overflowing a very narrow
+   card. */
 .table-tile > .board-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr));
   gap: 8px;
   margin-top: auto;
 }

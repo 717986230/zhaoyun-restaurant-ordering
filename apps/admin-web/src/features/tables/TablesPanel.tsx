@@ -225,12 +225,20 @@ export function TablesPanel(props: Props) {
       </article>)}
     </section>}
 
-    <div className="table-grid">{visible.length ? visible.map((table) => {
+    {(() => {
+    // Takeaway (TA-…) is an online pickup order, not a seat in the room. It
+    // rode in the same grid as the real tables and read as a phantom table
+    // nobody could clear; give it its own section so the floor list is only
+    // the floor. Both lists honour the state filter above.
+    const dineIn = visible.filter((table) => !table.table.startsWith("TA-"));
+    const takeaway = visible.filter((table) => table.table.startsWith("TA-"));
+    const renderTile = (table: TableOverview) => {
+      const takeawayTile = table.table.startsWith("TA-");
       // Open on a POS: that device's table. The console looks, and touches nothing.
       const held = Boolean(table.openOn);
       const holder = table.openOn?.staffName ?? "?";
       const lockedTitle = held ? t("tableLockedOnPosHint", { name: holder }) : "";
-      return <article className={`table-tile ${table.state} ${held ? "claimed" : ""}`} key={table.table} data-table={table.table}>
+      return <article className={`table-tile ${table.state} ${held ? "claimed" : ""} ${takeawayTile ? "takeaway" : ""}`} key={table.table} data-table={table.table}>
       <div className="table-tile-head">
         <b>{t("table", { table: table.table })}</b>
         <span className={`status ${table.state}`}>{t(STATE_KEYS[table.state])}</span>
@@ -263,7 +271,11 @@ export function TablesPanel(props: Props) {
         <div className="table-tile-total"><span>{t("tableOpen")}</span><b>{formatMoney(euro(table.total), language)}</b></div>
       </> : null}
 
-      {editing && !table.table.startsWith("TA-") ? (renaming === table.table
+      {takeawayTile
+        ? <div className="board-actions">
+          {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>}
+        </div>
+        : editing ? (renaming === table.table
         ? <form className="table-rename" onSubmit={(event) => void rename(event, table)}>
           <label><span>{t("tableNumber")}</span><input name="table" required maxLength={8} pattern="[A-Za-z0-9][A-Za-z0-9\-]{0,7}" autoCapitalize="characters" defaultValue={table.table} disabled={inUse(table)} autoFocus /></label>
           <label><span>{t("tableNote")}</span><input name="label" maxLength={64} defaultValue={table.label} placeholder={t("tableNotePlaceholder")} /></label>
@@ -287,16 +299,27 @@ export function TablesPanel(props: Props) {
           title={held ? lockedTitle : table.registered ? "" : t("tableRegisterFirst")}
           onClick={() => void props.onLock(table.table, !table.locked)}
         >{t(table.locked ? "tableUnlock" : "tableLock")}</button>
-        {!table.table.startsWith("TA-") && <button className="ghost-action" disabled={props.busy || held} title={lockedTitle} onClick={() => void props.onOrdering(table.table, !table.orderingUntil)}>
+        <button className="ghost-action" disabled={props.busy || held} title={lockedTitle} onClick={() => void props.onOrdering(table.table, !table.orderingUntil)}>
           {t(table.orderingUntil ? "closeForOrdering" : "openForOrdering")}
-        </button>}
+        </button>
         {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>}
       </div>}
     </article>;
-    }) : <div className="admin-empty">
-      <p>{t("tablesEmpty")}</p>
-      {manager && !editing && props.tables.length === 0 && <button className="primary-action" data-action="generate-tables" disabled={props.busy} onClick={() => void startEditing()}>{t("tablesGenerate")}</button>}
-    </div>}</div>
+    };
+    return <>
+      <div className="table-grid">{dineIn.length ? dineIn.map(renderTile) : <div className="admin-empty">
+        <p>{t("tablesEmpty")}</p>
+        {manager && !editing && props.tables.length === 0 && <button className="primary-action" data-action="generate-tables" disabled={props.busy} onClick={() => void startEditing()}>{t("tablesGenerate")}</button>}
+      </div>}</div>
+      {takeaway.length > 0 && <section className="takeaway-section" aria-label={t("tablesTakeaway")}>
+        <div className="takeaway-head">
+          <h2>{t("tablesTakeaway")}</h2>
+          <p>{t("tablesTakeawayHint")}</p>
+        </div>
+        <div className="table-grid">{takeaway.map(renderTile)}</div>
+      </section>}
+    </>;
+    })()}
 
     {props.bill && <div className="bill-overlay" onClick={(event) => { if (event.target === event.currentTarget) props.onCloseBill(); }}>
       <div className="bill-sheet" role="dialog" aria-modal="true" aria-label={t("billDialog")}>
