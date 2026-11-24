@@ -304,6 +304,32 @@ export interface ApiReceipt {
   createdAt: string;
 }
 
+/**
+ * 营销活动 — a promotion the restaurant runs, applied as a discount at
+ * checkout. `kind: "percent"` is a whole-bill percentage off; `percent` is set
+ * for that kind. The window is a date range (`activeFrom`/`activeTo`, either
+ * open), the weekdays it runs (0=Sun..6=Sat; empty = every day) and a
+ * time-of-day band (`startMin`/`endMin`, minutes from midnight; null = all
+ * day). All read in the restaurant's time zone.
+ */
+export interface ApiPromotion {
+  id: string;
+  name: { zh: string; de: string; en: string };
+  kind: "percent";
+  percent: number;
+  scope: "order";
+  category: string | null;
+  activeFrom: string | null;
+  activeTo: string | null;
+  weekdays: number[];
+  startMin: number | null;
+  endMin: number | null;
+  enabled: boolean;
+  priority: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CheckoutCommand {
   clientRequestId?: string;
   table?: string;

@@ -617,6 +617,26 @@ CREATE TABLE discovered_printers (
       seen_at TEXT NOT NULL,
       PRIMARY KEY (tenant_id, address, port)
     );
+CREATE TABLE promotions (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      name_zh TEXT NOT NULL DEFAULT '',
+      name_de TEXT NOT NULL DEFAULT '',
+      name_en TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'percent',
+      config_json TEXT NOT NULL DEFAULT '{}',
+      scope TEXT NOT NULL DEFAULT 'order',
+      category TEXT,
+      active_from TEXT,
+      active_to TEXT,
+      weekdays TEXT NOT NULL DEFAULT '',
+      start_min INTEGER,
+      end_min INTEGER,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      priority INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
 CREATE INDEX idx_account_tokens_expiry ON account_tokens(expires_at);
@@ -639,6 +659,7 @@ CREATE INDEX idx_guest_orders_table ON guest_orders(tenant_id, table_no, created
 CREATE INDEX idx_guest_orders_customer ON guest_orders(tenant_id, customer_id, created_at);
 CREATE INDEX idx_print_jobs_status ON print_jobs(tenant_id, status, created_at);
 CREATE INDEX idx_audit_at ON audit_log(tenant_id, at DESC);
+CREATE INDEX idx_promotions_tenant ON promotions(tenant_id, enabled);
 CREATE INDEX idx_reservations_date ON reservations(tenant_id, date, time);
 CREATE INDEX idx_waitlist_status ON waitlist(tenant_id, status, created_at);
 CREATE INDEX idx_reservations_customer ON reservations(tenant_id, customer_id, date);

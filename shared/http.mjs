@@ -19,7 +19,7 @@ import {
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, LetteredTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody,
-  InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody
+  InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody, PromotionBody
 } from "../src/contracts.js";
 import {
   SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent,
@@ -29,6 +29,7 @@ import {
 export { SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent, reservationRefusal, segments, tableRefusal, tokenMatches } from "./http-response.mjs";
 import { alertMessage, birthdayMessage, bookingMessage, codeMessage, createMailer, inviteMessage, mailStatus, resetMessage, testMessage, waitlistReadyMessage } from "./mail.mjs";
 import { DEFAULT_TENANT_ID } from "./tenant.mjs";
+import { bestOrderPromotion } from "./promotions.mjs";
 import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
@@ -897,6 +898,14 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
                 : 400,
             );
       try {
+        // 营销活动: the best promotion live right now (shared/promotions.mjs),
+        // for the till to apply as a whole-bill discount — read by any signed-in
+        // waiter, not just the manager who sets them.
+        if (path.length === 4 && path[2] === "promotions" && path[3] === "active" && method === "GET") {
+          const promoSettings = await store.getSettings();
+          const promotion = bestOrderPromotion(await store.listPromotions(), { at: new Date().toISOString(), timeZone: promoSettings.timeZone });
+          return json({ promotion });
+        }
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.
           const floorSettings = await store.getSettings();
@@ -1763,6 +1772,35 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return result ? json(result) : fail("No dish is in that category", 404);
         } catch (error) {
           return fail(error.message);
+        }
+      }
+
+      // /api/admin/promotions[/:id] — 营销活动 (shared/promotions.mjs), manager-only.
+      if (path[2] === "promotions") {
+        if (path.length === 3 && method === "GET") return json({ promotions: await store.listPromotions() });
+        if (path.length === 3 && method === "POST") {
+          const { value, invalid } = await body(request, PromotionBody);
+          if (invalid) return invalid;
+          try {
+            return json({ promotion: await store.savePromotion(value) }, 201);
+          } catch (error) {
+            return fail(error.message);
+          }
+        }
+        if (path.length === 4 && method === "PUT") {
+          const { value, invalid } = await body(request, PromotionBody);
+          if (invalid) return invalid;
+          try {
+            const promotion = await store.savePromotion({ ...value, id: path[3] });
+            return promotion ? json({ promotion }) : fail("No such promotion", 404);
+          } catch (error) {
+            return fail(error.message);
+          }
+        }
+        if (path.length === 4 && method === "DELETE") {
+          return (await store.deletePromotion(path[3]))
+            ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
+            : fail("No such promotion", 404);
         }
       }
 

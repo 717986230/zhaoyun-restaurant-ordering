@@ -415,6 +415,31 @@ export const AvailabilityBody = Type.Object({ available: Type.Boolean() }, { add
 const Portions = Type.Union([Type.Integer({ minimum: 0, maximum: 9999 }), Type.Null()]);
 export const StockBody = Type.Object({ dailyLimit: Type.Optional(Portions), leftToday: Type.Optional(Portions) }, { additionalProperties: false, minProperties: 1 });
 
+/**
+ * 营销活动 (shared/promotions.mjs): a promotion the console creates or edits.
+ * The edge check is loose on purpose — the shared `normalizePromotion` is the
+ * real rule, so both backends refuse the same way — but the shapes and bounds
+ * are pinned here. Dates are ISO calendar days; the time band is minutes from
+ * midnight; weekdays are 0=Sun..6=Sat.
+ */
+const PromotionDay = Type.Union([Type.String({ maxLength: 10 }), Type.Null()]);
+const PromotionMinute = Type.Union([Type.Integer({ minimum: 0, maximum: 1439 }), Type.Null()]);
+export const PromotionBody = Type.Object({
+  id: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  name: Names,
+  kind: Type.Optional(Type.Literal("percent")),
+  percent: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  scope: Type.Optional(Type.Literal("order")),
+  category: Type.Optional(Type.Union([Category, Type.Null()])),
+  activeFrom: Type.Optional(PromotionDay),
+  activeTo: Type.Optional(PromotionDay),
+  weekdays: Type.Optional(Type.Array(Type.Integer({ minimum: 0, maximum: 6 }), { maxItems: 7 })),
+  startMin: Type.Optional(PromotionMinute),
+  endMin: Type.Optional(PromotionMinute),
+  enabled: Type.Optional(Type.Boolean()),
+  priority: Type.Optional(Type.Integer({ minimum: 0, maximum: 1000 }))
+}, { additionalProperties: false });
+
 // A storno always says why.
 export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false });
 

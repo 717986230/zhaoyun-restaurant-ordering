@@ -6,7 +6,8 @@ import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles
   ApiCustomer, ApiGuestOrdering, CustomerDataExport, ApiLoyalty, ApiMembership, ApiMemberTiers, ApiBirthday, ApiBirthdayPerk, ApiBalanceEntry, ApiPointsEntry, ApiSepaPayment, ApiTableSession, CustomerRegisterCommand, CustomerSession, CustomerUpdateCommand, GuestOrderCommand,
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
   ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, HeldTable, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand,
-  ApiWaitlist, ApiWaitlistEntry, WaitlistCommand, WaitlistUpdateCommand
+  ApiWaitlist, ApiWaitlistEntry, WaitlistCommand, WaitlistUpdateCommand,
+  ApiPromotion
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -156,6 +157,22 @@ export interface AdminProductInput {
   tagColor?: string | null;
   modifiers?: ModifierGroup[];
   bundleItems?: BundleItem[];
+}
+
+/** 营销活动: what the console sends to create or edit a promotion (shared/promotions.mjs). */
+export interface AdminPromotionInput {
+  name: { zh: string; de: string; en: string };
+  kind?: "percent";
+  percent?: number;
+  scope?: "order";
+  category?: string | null;
+  activeFrom?: string | null;
+  activeTo?: string | null;
+  weekdays?: number[];
+  startMin?: number | null;
+  endMin?: number | null;
+  enabled?: boolean;
+  priority?: number;
 }
 
 export type StaffRole = "manager" | "staff" | "kitchen";
@@ -374,6 +391,11 @@ export class AdminApi {
   }
   receipt(id: string): Promise<{ receipt: ApiReceipt }> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}`); }
   reprintReceipt(id: string): Promise<void> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/print`, { method: "POST" }); }
+  /** 营销活动: the restaurant's promotions, newest-effective first. */
+  promotions(): Promise<{ promotions: ApiPromotion[] }> { return this.#request("/api/admin/promotions"); }
+  createPromotion(input: AdminPromotionInput): Promise<{ promotion: ApiPromotion }> { return this.#request("/api/admin/promotions", { method: "POST", body: JSON.stringify(input) }); }
+  updatePromotion(id: string, input: AdminPromotionInput): Promise<{ promotion: ApiPromotion }> { return this.#request(`/api/admin/promotions/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }); }
+  deletePromotion(id: string): Promise<void> { return this.#request(`/api/admin/promotions/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   updateOrderStatus(id: string, status: ApiOrder["status"]): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   serviceRequests(limit = 100): Promise<{ requests: ApiServiceRequest[] }> { return this.#request(`/api/service-requests?limit=${limit}`); }
   updateServiceRequestStatus(id: string, status: ApiServiceRequest["status"]): Promise<{ request: ApiServiceRequest }> { return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
@@ -593,6 +615,8 @@ export class PosApi {
     return this.#request(`/api/pos/tables/${encodeURIComponent(table)}/fire`, { method: "POST", body: JSON.stringify({ orderItemId }) });
   }
   floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; held?: HeldTable[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number; sepaPayment?: ApiSepaPayment }> { return this.#request("/api/pos/floor"); }
+  /** 营销活动: the best promotion live right now, or null, for the till to apply as a whole-bill discount. */
+  activePromotion(): Promise<{ promotion: { id: string; name: { zh: string; de: string; en: string }; percent: number } | null }> { return this.#request("/api/pos/promotions/active"); }
   deliveryAction(id: string, action: DeliveryAction, options: { prepMinutes?: number; reason?: DeliveryRejectReason } = {}): Promise<{ order: ApiDeliveryOrder }> {
     return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });
   }

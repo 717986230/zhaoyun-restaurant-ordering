@@ -4866,6 +4866,118 @@ em.voided {
 .inv-actions .inv-soldout { color: var(--a-danger); }
 .inv-actions .inv-restore { color: var(--a-accent-ink); }
 
+/* 营销活动 — the promotions view. */
+.promo-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 4px 0 12px;
+}
+
+.promo-discount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--a-accent-ink);
+}
+
+.promo-when {
+  color: var(--a-muted);
+  font-size: 13px;
+}
+
+.promo-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.promo-pill.promo-live { color: var(--a-accent-ink); background: var(--a-accent-wash); }
+.promo-pill.promo-idle { color: var(--a-muted); }
+.promo-pill.promo-paused { color: var(--a-danger); background: var(--a-danger-wash); }
+
+.promo-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.promo-actions .promo-del { color: var(--a-danger); }
+
+.promo-dialog {
+  max-width: 520px;
+  width: 100%;
+}
+
+.promo-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.promo-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.promo-form > label > span {
+  font-size: 13px;
+  color: var(--a-muted);
+}
+
+.promo-weekdays {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.promo-weekdays > span {
+  font-size: 13px;
+  color: var(--a-muted);
+}
+
+.promo-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.promo-day {
+  min-width: 2.4em;
+  padding: 6px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-card);
+  cursor: pointer;
+}
+
+.promo-day.on {
+  border-color: var(--a-accent-line);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.promo-enabled {
+  grid-column: 1 / -1;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.promo-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (max-width: 560px) {
+  .promo-form { grid-template-columns: 1fr; }
+}
+
 .res-dialog {
   position: fixed;
   inset: 0;
