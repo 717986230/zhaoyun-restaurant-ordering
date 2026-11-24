@@ -19,6 +19,7 @@ import { MembersPanel } from "../features/members/MembersPanel";
 import { LinksPanel } from "../features/links/LinksPanel";
 import { ReportsPanel } from "../features/reports/ReportsPanel";
 import { OrdersPanel } from "../features/orders/OrdersPanel";
+import { StockPanel } from "../features/stock/StockPanel";
 import { TodayPanel } from "../features/reports/TodayPanel";
 import { ReservationsPanel } from "../features/reservations/ReservationsPanel";
 import { WaitlistPanel } from "../features/waitlist/WaitlistPanel";
@@ -69,11 +70,12 @@ function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   // receipts both read, so they do not belong behind the guest-ordering-era
   // gate; only the realtime 订单 board and 打印 setup stay behind showOrdering,
   // and the toggle's label now says exactly those two.
-  return showOrdering ? ["today", "catalog", "board", "tables", "reservations", "waitlist", "delivery", "reports", "orders", "printers", "guests", "members", "system", "links"] : ["today", "reports", "orders", "tables", "catalog", "reservations", "waitlist", "delivery", "guests", "members", "system", "links"];
+  return showOrdering ? ["today", "catalog", "stock", "board", "tables", "reservations", "waitlist", "delivery", "reports", "orders", "printers", "guests", "members", "system", "links"] : ["today", "reports", "orders", "tables", "catalog", "stock", "reservations", "waitlist", "delivery", "guests", "members", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
   catalog: "tabCatalog",
+  stock: "tabStock",
   board: "tabBoard",
   tables: "tabTables",
   reservations: "tabReservations",
@@ -101,7 +103,7 @@ const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "
  */
 const TAB_GROUPS: Array<{ label: CopyKey; tabs: AdminTab[] }> = [
   { label: "navGroupFloor", tabs: ["today", "board", "tables", "reservations", "waitlist", "delivery"] },
-  { label: "navGroupMenu", tabs: ["catalog", "printers"] },
+  { label: "navGroupMenu", tabs: ["catalog", "stock", "printers"] },
   { label: "navGroupBusiness", tabs: ["reports", "orders", "system"] },
   { label: "navGroupGuests", tabs: ["guests", "members", "links"] }
 ];
@@ -761,6 +763,7 @@ export function App() {
       {state.tab === "waitlist" && <WaitlistPanel api={adminApi} notify={notify} failed={reportFailed} liveTick={reservationTick} />}
       {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
       {state.tab === "orders" && state.settings && <OrdersPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} notify={notify} />}
+      {state.tab === "stock" && <StockPanel api={adminApi} products={state.products} onRefresh={async () => { await connect(); }} notify={notify} failed={reportFailed} />}
       {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} restaurantName={state.settings?.restaurantName ?? ""} menuLanguages={state.settings?.menuLanguages ?? []} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
