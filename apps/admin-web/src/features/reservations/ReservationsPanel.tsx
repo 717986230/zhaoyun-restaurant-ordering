@@ -116,7 +116,7 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
     <div className="list-head">
       <div>
         <h1>{t("resTitle")}</h1>
-        
+        <p className="res-summary">{t("resLead")}</p>
       </div>
     </div>
 
@@ -341,9 +341,10 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
   const setPeriod = (index: number, change: Partial<ApiReservationSettings["hours"][number]>) =>
     set("hours", draft.hours.map((period, at) => (at === index ? { ...period, ...change } : period)));
   const link = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}book.html`;
-  const valid = draft.hours.every((period) => period.days.length && period.from < period.to)
-    && draft.tables.every((entry) => /^[A-Z0-9][A-Z0-9-]{0,7}$/.test(entry.table) && entry.seats >= 1 && entry.seats <= 50)
+  const hoursOk = draft.hours.every((period) => period.days.length && period.from < period.to);
+  const tablesOk = draft.tables.every((entry) => /^[A-Z0-9][A-Z0-9-]{0,7}$/.test(entry.table) && entry.seats >= 1 && entry.seats <= 50)
     && new Set(draft.tables.map((entry) => entry.table)).size === draft.tables.length;
+  const valid = hoursOk && tablesOk;
 
   return <details className="settings-card settings-section res-rules" open={!rules.enabled}>
     <summary><h2>{t("resSettings")}</h2><span className="settings-summary">{t(rules.enabled ? "orderingOn" : "orderingOff")}</span></summary>
@@ -429,6 +430,8 @@ function ReservationRules({ rules, onSave, notify, onImportTables }: { rules: Ap
       <button type="button" className="ghost-action" onClick={() => void navigator.clipboard?.writeText(link).then(() => notify(t("resCopied")), () => undefined)}>{t("resCopyLink")}</button>
     </div>
 
+    {!hoursOk && <p className="settings-warning" role="alert">{t("resRulesFixHours")}</p>}
+    {!tablesOk && <p className="settings-warning" role="alert">{t("resRulesFixTables")}</p>}
     <button type="button" className="primary-action" id="resSaveRules" disabled={!valid} onClick={() => void onSave(draft)}>{t("resSaveSettings")}</button>
     </div>
   </details>;
