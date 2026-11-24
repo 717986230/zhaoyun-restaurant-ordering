@@ -2146,6 +2146,47 @@ export function createStore(driver, options = {}) {
     },
     listClosings: async (limit = 30) => (await all("SELECT * FROM day_closings WHERE tenant_id = ? ORDER BY closing_no DESC LIMIT ?", tenantId, Math.min(Number(limit) || 30, 366))).map(closingView),
     listReceipts: async (limit = 50) => receiptDetails(await all("SELECT * FROM receipts WHERE tenant_id = ? ORDER BY receipt_no DESC LIMIT ?", tenantId, boundedLimit(limit, 50))),
+    /**
+     * The back office's bill lookup: the same receipts, narrowed by a date
+     * range (the restaurant's own calendar days, like the sales report), table,
+     * payment type, sale/storno, and a free-text match on receipt number,
+     * table, staff or the dish names on the bill. All filters optional; none
+     * given is the same as listReceipts but with a larger default page.
+     *
+     * The date range is resolved in the restaurant's time zone the same way the
+     * sales report does it: read a padded UTC window, then keep the rows whose
+     * local day falls inside [from, to].
+     */
+    searchReceipts: async ({ from = "", to = "", table = "", payment = "", type = "", q = "", limit = 200 } = {}) => {
+      const where = ["tenant_id = ?"];
+      const args = [tenantId];
+      const range = from || to ? reportRange(from || to, to || from) : null;
+      if (range) { where.push("created_at >= ?", "created_at < ?"); args.push(range.readFrom, range.readTo); }
+      if (table) { where.push("UPPER(table_no) = ?"); args.push(String(table).toUpperCase()); }
+      if (type === "sale" || type === "storno") { where.push("type = ?"); args.push(type); }
+      if (payment) { where.push("payments_json LIKE ?"); args.push(`%"type":"${String(payment).replace(/[^a-z]/gi, "")}"%`); }
+      const text = String(q ?? "").trim();
+      if (text) {
+        // A plain number is a receipt number — matched exactly, not as a
+        // substring, so it does not collide with the figures inside the bill.
+        if (/^\d+$/.test(text)) { where.push("receipt_no = ?"); args.push(Number(text)); }
+        else {
+          const like = `%${text.replace(/[%_\\]/g, (ch) => `\\${ch}`)}%`;
+          where.push("(table_no LIKE ? ESCAPE '\\' OR staff_name LIKE ? ESCAPE '\\' OR lines_json LIKE ? ESCAPE '\\')");
+          args.push(like, like, like);
+        }
+      }
+      const capped = boundedLimit(limit, 200);
+      // With no day range the SQL window already bounds the read, so cap it there.
+      if (!range) args.push(capped);
+      const rows = await all(`SELECT * FROM receipts WHERE ${where.join(" AND ")} ORDER BY receipt_no DESC${range ? "" : " LIMIT ?"}`, ...args);
+      if (!range) return receiptDetails(rows);
+      // Keep only the rows whose restaurant-local day is inside the picked range.
+      const timeZone = (await getSettings()).timeZone;
+      const localDay = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: timeZone || "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+      const inRange = rows.filter((row) => { const day = localDay(row.created_at); return day >= range.from && day <= range.to; });
+      return receiptDetails(inRange.slice(0, capped));
+    },
     getReceipt: async (id) => receiptDetail(await first("SELECT * FROM receipts WHERE tenant_id = ? AND id = ?", tenantId, String(id))),
     getVoucher: async (code) => {
       const row = await first("SELECT * FROM vouchers WHERE tenant_id = ? AND code = ?", tenantId, normalizeVoucherCode(code));

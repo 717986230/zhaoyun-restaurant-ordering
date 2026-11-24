@@ -365,6 +365,15 @@ export class AdminApi {
   session(): Promise<{ role: StaffRole; account?: ApiAccount }> { return this.#request("/api/admin/session"); }
   audit(limit = 100): Promise<{ entries: AuditEntry[] }> { return this.#request(`/api/admin/audit?limit=${limit}`); }
   orders(limit = 100): Promise<{ orders: ApiOrder[] }> { return this.#request(`/api/orders?limit=${limit}`); }
+  /** The back office's bill lookup. All filters optional; none given = recent bills. */
+  receipts(filters: { from?: string; to?: string; table?: string; payment?: string; type?: string; q?: string; limit?: number } = {}): Promise<{ receipts: ApiReceipt[] }> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+    const suffix = query.toString();
+    return this.#request(`/api/admin/receipts${suffix ? `?${suffix}` : ""}`);
+  }
+  receipt(id: string): Promise<{ receipt: ApiReceipt }> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}`); }
+  reprintReceipt(id: string): Promise<void> { return this.#request(`/api/admin/receipts/${encodeURIComponent(id)}/print`, { method: "POST" }); }
   updateOrderStatus(id: string, status: ApiOrder["status"]): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   serviceRequests(limit = 100): Promise<{ requests: ApiServiceRequest[] }> { return this.#request(`/api/service-requests?limit=${limit}`); }
   updateServiceRequestStatus(id: string, status: ApiServiceRequest["status"]): Promise<{ request: ApiServiceRequest }> { return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
