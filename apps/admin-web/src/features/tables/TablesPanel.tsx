@@ -166,6 +166,7 @@ export function TablesPanel(props: Props) {
         <p>{t("tablesLead", { seated: seated.length, total: takings.toFixed(2) })}</p>
       </div>
       <div className="list-head-actions">
+        {manager && !editing && <button className="primary-action" data-action="generate-tables" disabled={props.busy} onClick={() => void startEditing()}>{t("tablesGenerate")}</button>}
         {manager && <button className="ghost-action" disabled={props.busy || !props.registeredTables.length} onClick={() => setShowCards(true)}>{t("printCards")}</button>}
         {manager && <button className={editing ? "primary-action" : "ghost-action"} data-action="edit-tables" disabled={props.busy}
           onClick={() => { if (editing) { setEditing(false); setRenaming(null); } else void startEditing(); }}>{t(editing ? "tablesEditDone" : "tablesEdit")}</button>}
@@ -183,7 +184,7 @@ export function TablesPanel(props: Props) {
     {editing && <section className="table-editor" aria-label={t("tablesEdit")}>
       <div className="table-generator">
         <h3>{t("genHeading")}</h3>
-        <div className="report-presets" role="group" aria-label={t("genHeading")}>
+        <div className="report-presets table-gen-modes" role="group" aria-label={t("genHeading")}>
           <button type="button" className={genMode === "letter" ? "primary-action" : "ghost-action"} aria-pressed={genMode === "letter"} onClick={() => setGenMode("letter")}>{t("genModeLetter")}</button>
           <button type="button" className={genMode === "number" ? "primary-action" : "ghost-action"} aria-pressed={genMode === "number"} onClick={() => setGenMode("number")}>{t("genModeNumber")}</button>
         </div>
@@ -292,9 +293,13 @@ export function TablesPanel(props: Props) {
         {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>}
       </div>}
     </article>;
-    }) : <div className="admin-empty">{t("tablesEmpty")}</div>}</div>
+    }) : <div className="admin-empty">
+      <p>{t("tablesEmpty")}</p>
+      {manager && !editing && props.tables.length === 0 && <button className="primary-action" data-action="generate-tables" disabled={props.busy} onClick={() => void startEditing()}>{t("tablesGenerate")}</button>}
+    </div>}</div>
 
-    {props.bill && <div className="bill-sheet" role="dialog" aria-label={t("billDialog")}>
+    {props.bill && <div className="bill-overlay" onClick={(event) => { if (event.target === event.currentTarget) props.onCloseBill(); }}>
+      <div className="bill-sheet" role="dialog" aria-modal="true" aria-label={t("billDialog")}>
       <div className="board-card-head"><b>{t("billTitle", { table: props.bill.table })}</b><button className="ghost-action" onClick={props.onCloseBill}>{t("close")}</button></div>
       {props.bill.items.length ? <>
         <ul className="bill-items">{props.bill.items.map((item, index) => <li key={`${item.orderNo}-${index}`}><span>{item.qty} × {item.name}</span><span>{item.lineTotal.toFixed(2)} · {item.vatSplit ? item.vatSplit.map((part) => `${part.percent}%`).join("/") : `${item.vatPercent}%`}</span></li>)}</ul>
@@ -307,6 +312,7 @@ export function TablesPanel(props: Props) {
           <a className="primary-action" {...jumpLinkProps("pos.html")}>{t("billTakePayment")}</a>
         </div>
       </> : <div className="admin-empty">{t("billEmpty")}</div>}
+      </div>
     </div>}
 
     {showCards && <TableCards
