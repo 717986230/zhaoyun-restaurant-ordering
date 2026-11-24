@@ -84,7 +84,7 @@ export function DeliveryPanel({ api, role, settings, notify, failed, onSaveSetti
     <div className="list-head">
       <div>
         <h1>{t("dlTitle")}</h1>
-        
+        <p className="res-summary">{t("dlHint")}</p>
       </div>
     </div>
 
