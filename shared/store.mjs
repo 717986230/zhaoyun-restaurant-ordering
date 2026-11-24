@@ -115,9 +115,47 @@ const PRINTERS_WITH_STATUS_SQL = `SELECT printer_profiles.*, printer_status.ok A
   WHERE printer_profiles.tenant_id = ?
   ORDER BY printer_profiles.role, printer_profiles.name`;
 
+/**
+ * A read cache shared by every store built for one deployment, kept alive by
+ * the host across requests (the Worker passes one module-level cache into
+ * every `createStore`; the Node server's single store carries its own). It
+ * holds only the menu's heavy, rarely-changing reads — the dishes' rows and
+ * pictures, the settings, the tenant list — never a dish's stock, which is
+ * read fresh every time so what is left today is never stale.
+ *
+ * Freshness: every write a store makes bumps a per-tenant version (detected
+ * from the SQL, so no write path can forget to), which drops that tenant's
+ * cached menu and settings at once in the same process — the contract's
+ * write-then-read holds. Across the Worker's many isolates a write bumps only
+ * its own isolate's version, so a short TTL bounds how long another isolate
+ * may serve the old menu (a catalogue change a guest's live channel already
+ * tells them to refetch).
+ */
+export function createMenuCache() {
+  return { settings: new Map(), catalog: new Map(), versions: new Map(), tenants: null };
+}
+// How long a cached read may outlive a write made in another isolate.
+const MENU_CACHE_TTL_MS = 10_000;
+const TENANTS_CACHE_TTL_MS = 60_000;
+
 export function createStore(driver, options = {}) {
-  const { first, all, run } = driver;
-  const batch = (list) => driver.batch(list);
+  const cache = options.cache ?? createMenuCache();
+  const { first, all } = driver;
+  const menuVersion = () => cache.versions.get(tenantId) ?? 0;
+  /**
+   * A write touching the menu, the settings or the tenant list drops the
+   * matching cache. Reads (`first`/`all`) never pass through here, and a
+   * dish's stock (`product_stock`) is deliberately left out so it stays live.
+   */
+  function noteWrite(text) {
+    if (typeof text !== "string" || !/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(text)) return;
+    if (/\b(products|product_media|restaurant_settings|app_settings)\b/i.test(text)) {
+      cache.versions.set(tenantId, menuVersion() + 1);
+    }
+    if (/\btenants\b/i.test(text)) cache.tenants = null;
+  }
+  const run = (text, ...params) => { noteWrite(text); return driver.run(text, ...params); };
+  const batch = (list) => { for (const [text] of list) noteWrite(text); return driver.batch(list); };
 
   /**
    * The tenant this store reads and writes: `options.tenantId`, or the
@@ -270,14 +308,24 @@ export function createStore(driver, options = {}) {
    * restaurant's time zone passed in when the caller has the settings already.
    */
   async function listProducts(publishedOnly = false, timeZone = null) {
-    const [rows, media, { stock, today }] = await Promise.all([
-      publishedOnly
-        ? all("SELECT * FROM products WHERE tenant_id = ? AND published = 1 AND available = 1 ORDER BY sort_order, created_at", tenantId)
-        : all("SELECT * FROM products WHERE tenant_id = ? ORDER BY sort_order, created_at", tenantId),
-      mediaFor(null),
-      stockFor(null, timeZone)
-    ]);
-    const products = rows.map((row) => mapProduct(row, media.get(row.id) ?? [], stockView(stock.get(String(row.id)), today)));
+    // The dishes and their pictures are the same for every guest and change
+    // only when the owner edits the menu, so they are cached; the stock is
+    // asked for fresh every time, so what is left today is always right.
+    const key = `${tenantId}:${publishedOnly ? 1 : 0}`;
+    const version = menuVersion();
+    let base = cache.catalog.get(key);
+    if (!base || base.version !== version || Date.now() - base.at >= MENU_CACHE_TTL_MS) {
+      const [rows, media] = await Promise.all([
+        publishedOnly
+          ? all("SELECT * FROM products WHERE tenant_id = ? AND published = 1 AND available = 1 ORDER BY sort_order, created_at", tenantId)
+          : all("SELECT * FROM products WHERE tenant_id = ? ORDER BY sort_order, created_at", tenantId),
+        mediaFor(null)
+      ]);
+      base = { version, at: Date.now(), rows, media };
+      cache.catalog.set(key, base);
+    }
+    const { stock, today } = await stockFor(null, timeZone);
+    const products = base.rows.map((row) => mapProduct(row, base.media.get(row.id) ?? [], stockView(stock.get(String(row.id)), today)));
     return publishedOnly ? products.filter((product) => product.leftToday !== 0) : products;
   }
 
@@ -1349,8 +1397,16 @@ export function createStore(driver, options = {}) {
   }
 
   async function getSettings() {
+    // Read on nearly every request (the menu, every guest order, the table
+    // checks), yet it changes only when the owner saves settings — cached per
+    // tenant, dropped the moment a write touches app_settings/restaurant_settings.
+    const version = menuVersion();
+    const hit = cache.settings.get(tenantId);
+    if (hit && hit.version === version && Date.now() - hit.at < MENU_CACHE_TTL_MS) return hit.value;
     const values = Object.fromEntries((await all("SELECT key, value FROM app_settings WHERE tenant_id = ?", tenantId)).map((row) => [row.key, row.value]));
-    return settingsView(await first("SELECT * FROM restaurant_settings WHERE tenant_id = ?", tenantId), values);
+    const view = settingsView(await first("SELECT * FROM restaurant_settings WHERE tenant_id = ?", tenantId), values);
+    cache.settings.set(tenantId, { version, at: Date.now(), value: view });
+    return view;
   }
 
   /** Any subset of the settings may come; the ones left out keep their value.
@@ -1398,7 +1454,13 @@ export function createStore(driver, options = {}) {
   }
 
   async function listTenants() {
-    return (await all(LIST_TENANTS_SQL)).map(tenantView);
+    // Read on every tokenless request to route it to the one restaurant, yet
+    // the tenant list changes only when one is opened or closed (which clears
+    // this). Cached deployment-wide; a short TTL bounds cross-isolate lag.
+    if (cache.tenants && Date.now() - cache.tenants.at < TENANTS_CACHE_TTL_MS) return cache.tenants.value;
+    const value = (await all(LIST_TENANTS_SQL)).map(tenantView);
+    cache.tenants = { at: Date.now(), value };
+    return value;
   }
 
   /**
