@@ -2028,6 +2028,34 @@ export function createStore(driver, options = {}) {
         await batch(keys.map((key) => sql("DELETE FROM auth_throttle WHERE key = ?", key)));
       }
     },
+    /**
+     * A fixed-window rate limit shared by every isolate and process, over the
+     * same `auth_throttle` table (keys are prefixed, so they never meet the
+     * auth counts). For the low-volume public endpoints a burst from one
+     * source would otherwise be capped per isolate only; the hot paths
+     * (catalogue, polling, ordering) keep the in-memory burst guard, and
+     * ordering's real limits live in shared/ordering.mjs. Each key's count is
+     * returned post-increment by one atomic UPSERT (reset when its window has
+     * passed), so a window needs no read-then-write race.
+     */
+    async rateLimit(keys, max, windowMs) {
+      if (!Number.isFinite(max) || max <= 0) return { allowed: true, retryAfter: 0 };
+      const at = now();
+      const resetAt = new Date(Date.now() + windowMs).toISOString();
+      let worst = 0;
+      for (const key of keys) {
+        const row = await first(
+          `INSERT INTO auth_throttle (key, failures, reset_at) VALUES (?, 1, ?)
+           ON CONFLICT(key) DO UPDATE SET
+             failures = CASE WHEN auth_throttle.reset_at <= ? THEN 1 ELSE auth_throttle.failures + 1 END,
+             reset_at = CASE WHEN auth_throttle.reset_at <= ? THEN excluded.reset_at ELSE auth_throttle.reset_at END
+           RETURNING failures, reset_at`,
+          key, resetAt, at, at
+        );
+        if (row && row.failures > max) worst = Math.max(worst, Math.ceil((Date.parse(row.reset_at) - Date.now()) / 1000));
+      }
+      return worst > 0 ? { allowed: false, retryAfter: Math.max(1, worst) } : { allowed: true, retryAfter: 0 };
+    },
     /** The database answers: what /api/health asks. */
     ping: async () => Boolean(await first("SELECT 1 AS ok")),
     hasTables: async () => Boolean(await first("SELECT table_no FROM restaurant_tables WHERE tenant_id = ? LIMIT 1", tenantId)),

@@ -63,6 +63,36 @@ test("wrong passwords are counted across every server, by address and by account
   assert.equal((await signIn(servers[0], "the-right-one", "192.0.2.201")).statusCode, 200, "another account is not held");
 });
 
+/**
+ * The public burst limits for the abuse-sensitive, low-volume endpoints are
+ * kept in the database too (store.rateLimit), so a flood from one address is
+ * capped across every isolate, not per isolate. Three servers over one
+ * database stand in for three isolates: together they hold to the one count.
+ */
+test("the booking-lookup burst limit is counted across every server, by address", async (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-pub-limit-"));
+  const options = { databasePath: path.join(directory, "restaurant.sqlite"), uploadDir: path.join(directory, "media"), adminToken: "pub-limit-admin-token-pub-limit-admin-token", logger: false };
+  const servers = [await build(options), await build(options), await build(options)];
+  context.after(async () => {
+    for (const server of servers) await server.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const lookup = (server, remoteAddress = "203.0.113.9") => server.inject({
+    method: "POST", url: "/api/reservations/lookup", remoteAddress,
+    payload: { reference: "ZZ-UNKNOWN", contact: "nobody@example.com" }
+  });
+  // Ten look-ups from one address, spread over the three servers: each miss is
+  // a 404, and no one server has seen all ten.
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    assert.equal((await lookup(servers[attempt % 3])).statusCode, 404);
+  }
+  const held = await lookup(servers[2]);
+  assert.equal(held.statusCode, 429, "the eleventh is held, on whichever server");
+  assert.ok(Number(held.headers["retry-after"]) > 0);
+  // Another address is counted on its own, and may still try.
+  assert.equal((await lookup(servers[0], "198.51.100.9")).statusCode, 404, "a fresh address is not held");
+});
+
 test("catalog, orders, service requests and print routing work together", async (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "zhaoyun-api-"));
   const app = await buildServer({
