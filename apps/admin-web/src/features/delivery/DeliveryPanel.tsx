@@ -73,6 +73,10 @@ export function DeliveryPanel({ api, role, settings, notify, failed, onSaveSetti
 
   const stamp = (iso: string | null) => iso ? new Intl.DateTimeFormat(LOCALES[language], { timeZone, dateStyle: "short", timeStyle: "short" }).format(new Date(iso)) : "—";
   const orders = list?.orders ?? [];
+  // A new restaurant has no platform switched on, so the list stays empty with
+  // no hint why — point the manager to the switches below in that case.
+  const deliverySettings = settings?.delivery ?? null;
+  const noPlatformOn = deliverySettings !== null && !PROVIDERS.some((provider) => deliverySettings[provider].enabled);
   const lines = (order: ApiDeliveryOrder) => order.items.reduce((total, item) => total + item.quantity, 0);
   const exportCsv = () => downloadCsv(`delivery_${filter.from}_${filter.to}.csv`, [
     [t("dlPlacedAt"), t("dlPlatform"), t("dlReference"), t("dlType"), t("dlStatus"), t("dlItems"), t("dlTotal"), t("dlFee"), t("dlPaid"), t("dlTest")],
@@ -84,7 +88,7 @@ export function DeliveryPanel({ api, role, settings, notify, failed, onSaveSetti
     <div className="list-head">
       <div>
         <h1>{t("dlTitle")}</h1>
-        
+        <p className="res-summary">{t("dlHint")}</p>
       </div>
     </div>
 
@@ -113,7 +117,10 @@ export function DeliveryPanel({ api, role, settings, notify, failed, onSaveSetti
       <ul className="dl-totals" id="dlTotals">{(list?.totals ?? []).map((entry) => <li key={entry.provider} data-provider={entry.provider}>
         {t("dlTotals", { name: entry.name, orders: entry.orders, money: money(entry.grossCents), rejected: entry.rejected, cancelled: entry.cancelled })}
       </li>)}</ul>
-      {!orders.length ? <div className="admin-empty">{t("dlNone")}</div> : <div className="res-table-wrap"><table className="report-table res-records-table">
+      {!orders.length ? <div className="admin-empty">
+        <p>{t("dlNone")}</p>
+        {role === "manager" && noPlatformOn && <p className="settings-hint">{t("dlEnableHint")}</p>}
+      </div> : <div className="res-table-wrap"><table className="report-table res-records-table">
         <thead><tr><th>{t("dlPlacedAt")}</th><th>{t("dlPlatform")}</th><th>{t("dlReference")}</th><th>{t("dlType")}</th><th>{t("dlItems")}</th><th>{t("dlTotal")}</th><th>{t("dlStatus")}</th><th>{t("dlSync")}</th><th /></tr></thead>
         <tbody>{orders.map((order) => <tr key={order.id} data-delivery={order.reference} data-status={order.status}>
           <td>{stamp(order.createdAt)}</td><td>{order.providerName}{order.test ? <em className="res-warn"> · {t("dlTest")}</em> : null}</td>

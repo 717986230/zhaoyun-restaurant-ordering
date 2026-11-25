@@ -355,6 +355,54 @@ test("0112 carries a deployed database's rows into the default tenant", () => {
 });
 
 /**
+ * The live D1 was deployed in the window after the 2026-10-08 product columns
+ * (modifiers_json, vat_percent, bundle_items_json) but before tag_color
+ * (2026-11-08) and print_printer_id (2026-11-10), which only ever reached
+ * existing databases through the Node server's start-up ALTER block — never
+ * D1. So its products table has neither column, and 0112 must still rebuild it
+ * without reading them: this is the drift that made the deploy fail with
+ * "no such column: tag_color". The rows come across with both columns at the
+ * default '', which is what the seed gives them anyway.
+ */
+test("0112 rebuilds products on a D1 deployed before tag_color and print_printer_id", () => {
+  const sql = committed();
+  const fixture = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "pre-tenant-schema.sql"), "utf8");
+  const result = inTempDatabase((file) => {
+    const db = new DatabaseSync(file);
+    db.exec(sql.schema);
+    db.exec(sql.catalog);
+    db.exec(fixture);
+    // Drop the two columns that D1 never got, so products reads as the live
+    // database's does: the pre-tenant shape minus the two later additions.
+    db.exec("ALTER TABLE products DROP COLUMN tag_color");
+    db.exec("ALTER TABLE products DROP COLUMN print_printer_id");
+    const columns = db.prepare("SELECT name FROM pragma_table_info('products')").all().map((row) => row.name);
+    assert.ok(!columns.includes("tag_color") && !columns.includes("print_printer_id"), "the fixture should be missing both columns");
+    // A dish the owner added, in the old shape (no tag_color / print_printer_id).
+    db.prepare("INSERT INTO products (id, sku, kind, category, name_zh, name_de, name_en, description, price_cents, allergens_json, prep_time, portion, level, ingredients, art, pattern, available, published, sort_order, print_station, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at) VALUES ('dish-1', 'TEST-1', 'food', 'RAMEN', 'Test', 'Test', 'Test', '', 1000, '[]', '', '', '', '', '', 'lines', 1, 1, 0, 'kitchen', '[]', 10, '[]', 'x', 'x')").run();
+    db.exec(readFileSync(path.join(migrationsDir, "0112_multi_tenancy.sql"), "utf8"));
+    const plain = (rows) => rows.map((row) => ({ ...row }));
+    const out = {
+      product: plain(db.prepare("SELECT id, sku, tenant_id, tag_color, print_printer_id FROM products WHERE id = 'dish-1'").all()),
+      schema: schemaOf(db)
+    };
+    db.close();
+    return out;
+  });
+  assert.deepEqual(result.product, [{ id: "dish-1", sku: "TEST-1", tenant_id: "t_default", tag_color: "", print_printer_id: "" }]);
+  // The rebuilt products table ends up identical to the fresh one — the two
+  // columns are back, with their defaults.
+  const expected = inTempDatabase((file) => {
+    createDatabase(file).close();
+    const db = new DatabaseSync(file);
+    const result = schemaOf(db).find((object) => object.name === "products");
+    db.close();
+    return result;
+  });
+  assert.equal(result.schema.find((object) => object.name === "products").sql, expected.sql);
+});
+
+/**
  * 0111 renames the two tidied categories, nothing else.
  */
 test("0111 renames the two tidied categories, nothing else", () => {

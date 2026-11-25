@@ -660,6 +660,13 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  // The module bar scrolls sideways on a phone: keep the open tab in view so a
+  // deep link or a tab further along the strip never lands off screen.
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [state.tab]);
+
   const languagePicker = <div className="admin-languages" role="group" aria-label={t("language")}>{ADMIN_LANGUAGES.map((option) => <button
     key={option}
     type="button"
@@ -705,16 +712,13 @@ export function App() {
       </div>
     </header>
     <nav className="admin-tabs" aria-label={t("modules")}>
-      {TAB_GROUPS.map((group) => {
-        const visible = group.tabs.filter((tab) => tabs.includes(tab));
-        if (!visible.length) return null;
-        return <div key={group.label} className="admin-tab-group" role="group" aria-label={t(group.label)}>
-          <span className="admin-tab-group-label" aria-hidden="true">{t(group.label)}</span>
-          <div className="admin-tab-group-tabs">
-            {visible.map((tab) => <button key={tab} className={state.tab === tab ? "active" : ""} aria-current={state.tab === tab ? "page" : undefined} onClick={() => setTab(tab)}>{t(TAB_KEYS[tab])}</button>)}
-          </div>
-        </div>;
-      })}
+      {TAB_GROUPS.flatMap((group) => group.tabs).filter((tab) => tabs.includes(tab)).map((tab) => <button
+        key={tab}
+        ref={state.tab === tab ? activeTabRef : undefined}
+        className={state.tab === tab ? "active" : ""}
+        aria-current={state.tab === tab ? "page" : undefined}
+        onClick={() => setTab(tab)}
+      >{t(TAB_KEYS[tab])}</button>)}
     </nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     </div>

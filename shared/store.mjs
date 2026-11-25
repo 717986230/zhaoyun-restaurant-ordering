@@ -116,9 +116,62 @@ const PRINTERS_WITH_STATUS_SQL = `SELECT printer_profiles.*, printer_status.ok A
   WHERE printer_profiles.tenant_id = ?
   ORDER BY printer_profiles.role, printer_profiles.name`;
 
+/**
+ * A read cache shared by every store built for one deployment, kept alive by
+ * the host across requests (the Worker passes one module-level cache into
+ * every `createStore`; the Node server's single store carries its own). It
+ * holds only the menu's heavy, rarely-changing reads — the dishes' rows and
+ * pictures, the settings, the tenant list — never a dish's stock, which is
+ * read fresh every time so what is left today is never stale.
+ *
+ * Freshness: every write a store makes bumps a per-tenant version (detected
+ * from the SQL, so no write path can forget to), which drops that tenant's
+ * cached menu and settings at once in the same process — the contract's
+ * write-then-read holds. Across the Worker's many isolates a write bumps only
+ * its own isolate's version, so a short TTL bounds how long another isolate
+ * may serve the old menu (a catalogue change a guest's live channel already
+ * tells them to refetch).
+ */
+export function createMenuCache() {
+  return { settings: new Map(), catalog: new Map(), versions: new Map(), dyn: new Map(), tenants: null };
+}
+// How long a cached read may outlive a write made in another isolate.
+const MENU_CACHE_TTL_MS = 10_000;
+const TENANTS_CACHE_TTL_MS = 60_000;
+
 export function createStore(driver, options = {}) {
-  const { first, all, run } = driver;
-  const batch = (list) => driver.batch(list);
+  const cache = options.cache ?? createMenuCache();
+  const { first, all } = driver;
+  const menuVersion = () => cache.versions.get(tenantId) ?? 0;
+  const dynVersion = () => cache.dyn.get(tenantId) ?? 0;
+  /**
+   * The current tenant's cache stamp, in memory and synchronous (no query):
+   * `menu` moves when the dishes/pictures/settings change, `dyn` when the
+   * stock or the sales do. The HTTP layer caches the whole built /api/catalog
+   * body against this stamp (plus the restaurant day, for the midnight reset).
+   */
+  const menuStamp = () => ({ menu: menuVersion(), dyn: dynVersion() });
+  /**
+   * A write touching the menu, the settings or the tenant list drops the
+   * matching cache. Reads (`first`/`all`) never pass through here. Two kinds:
+   * the dishes/pictures/settings (`menu` version — the cached rows) and the
+   * stock/sales (`dyn` version — product_stock, orders and their items, which
+   * move what is left today and the best-seller suggestions). The cached rows
+   * deliberately do NOT move on stock/sales, so `listProducts` keeps serving
+   * them and only re-reads the live stock.
+   */
+  function noteWrite(text) {
+    if (typeof text !== "string" || !/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(text)) return;
+    if (/\b(products|product_media|restaurant_settings|app_settings)\b/i.test(text)) {
+      cache.versions.set(tenantId, menuVersion() + 1);
+    }
+    if (/\b(product_stock|orders|order_items|order_item_voids)\b/i.test(text)) {
+      cache.dyn.set(tenantId, dynVersion() + 1);
+    }
+    if (/\btenants\b/i.test(text)) cache.tenants = null;
+  }
+  const run = (text, ...params) => { noteWrite(text); return driver.run(text, ...params); };
+  const batch = (list) => { for (const [text] of list) noteWrite(text); return driver.batch(list); };
 
   /**
    * The tenant this store reads and writes: `options.tenantId`, or the
@@ -131,8 +184,14 @@ export function createStore(driver, options = {}) {
   const tenantId = options.tenantId ?? DEFAULT_TENANT_ID;
   /** The key the owner's password view uses, when one is configured (base64 of 32 bytes, or a CryptoKey). */
   const passwordViewKey = options.passwordViewKey ?? null;
-  /** The same store for another tenant: a cheap closure allocation, per request. */
-  const withTenant = (nextTenantId) => createStore(driver, { ...options, tenantId: nextTenantId });
+  /**
+   * The same store for another tenant: a cheap closure allocation, per request.
+   * It must carry the same read cache, so a deployment's one cache is shared by
+   * every tenant scoping of the root store (without this, each per-request
+   * `withTenant` would get a fresh, empty cache and nothing would ever be
+   * reused or — worse, against a persistent body cache — invalidated).
+   */
+  const withTenant = (nextTenantId) => createStore(driver, { ...options, tenantId: nextTenantId, cache });
 
   /**
    * What a receipt is stored as, with its tenant: INSERT_RECEIPT_SQL
@@ -271,14 +330,24 @@ export function createStore(driver, options = {}) {
    * restaurant's time zone passed in when the caller has the settings already.
    */
   async function listProducts(publishedOnly = false, timeZone = null) {
-    const [rows, media, { stock, today }] = await Promise.all([
-      publishedOnly
-        ? all("SELECT * FROM products WHERE tenant_id = ? AND published = 1 AND available = 1 ORDER BY sort_order, created_at", tenantId)
-        : all("SELECT * FROM products WHERE tenant_id = ? ORDER BY sort_order, created_at", tenantId),
-      mediaFor(null),
-      stockFor(null, timeZone)
-    ]);
-    const products = rows.map((row) => mapProduct(row, media.get(row.id) ?? [], stockView(stock.get(String(row.id)), today)));
+    // The dishes and their pictures are the same for every guest and change
+    // only when the owner edits the menu, so they are cached; the stock is
+    // asked for fresh every time, so what is left today is always right.
+    const key = `${tenantId}:${publishedOnly ? 1 : 0}`;
+    const version = menuVersion();
+    let base = cache.catalog.get(key);
+    if (!base || base.version !== version || Date.now() - base.at >= MENU_CACHE_TTL_MS) {
+      const [rows, media] = await Promise.all([
+        publishedOnly
+          ? all("SELECT * FROM products WHERE tenant_id = ? AND published = 1 AND available = 1 ORDER BY sort_order, created_at", tenantId)
+          : all("SELECT * FROM products WHERE tenant_id = ? ORDER BY sort_order, created_at", tenantId),
+        mediaFor(null)
+      ]);
+      base = { version, at: Date.now(), rows, media };
+      cache.catalog.set(key, base);
+    }
+    const { stock, today } = await stockFor(null, timeZone);
+    const products = base.rows.map((row) => mapProduct(row, base.media.get(row.id) ?? [], stockView(stock.get(String(row.id)), today)));
     return publishedOnly ? products.filter((product) => product.leftToday !== 0) : products;
   }
 
@@ -1350,8 +1419,16 @@ export function createStore(driver, options = {}) {
   }
 
   async function getSettings() {
+    // Read on nearly every request (the menu, every guest order, the table
+    // checks), yet it changes only when the owner saves settings — cached per
+    // tenant, dropped the moment a write touches app_settings/restaurant_settings.
+    const version = menuVersion();
+    const hit = cache.settings.get(tenantId);
+    if (hit && hit.version === version && Date.now() - hit.at < MENU_CACHE_TTL_MS) return hit.value;
     const values = Object.fromEntries((await all("SELECT key, value FROM app_settings WHERE tenant_id = ?", tenantId)).map((row) => [row.key, row.value]));
-    return settingsView(await first("SELECT * FROM restaurant_settings WHERE tenant_id = ?", tenantId), values);
+    const view = settingsView(await first("SELECT * FROM restaurant_settings WHERE tenant_id = ?", tenantId), values);
+    cache.settings.set(tenantId, { version, at: Date.now(), value: view });
+    return view;
   }
 
   /** Any subset of the settings may come; the ones left out keep their value.
@@ -1399,7 +1476,13 @@ export function createStore(driver, options = {}) {
   }
 
   async function listTenants() {
-    return (await all(LIST_TENANTS_SQL)).map(tenantView);
+    // Read on every tokenless request to route it to the one restaurant, yet
+    // the tenant list changes only when one is opened or closed (which clears
+    // this). Cached deployment-wide; a short TTL bounds cross-isolate lag.
+    if (cache.tenants && Date.now() - cache.tenants.at < TENANTS_CACHE_TTL_MS) return cache.tenants.value;
+    const value = (await all(LIST_TENANTS_SQL)).map(tenantView);
+    cache.tenants = { at: Date.now(), value };
+    return value;
   }
 
   /**
@@ -1741,6 +1824,7 @@ export function createStore(driver, options = {}) {
     savePromotion,
     deletePromotion: async (id) => (await run("DELETE FROM promotions WHERE tenant_id = ? AND id = ?", tenantId, String(id))) > 0,
     listProducts,
+    menuStamp,
     getProduct,
     setStock,
     saveProduct,
@@ -1971,6 +2055,34 @@ export function createStore(driver, options = {}) {
       async clear(keys) {
         await batch(keys.map((key) => sql("DELETE FROM auth_throttle WHERE key = ?", key)));
       }
+    },
+    /**
+     * A fixed-window rate limit shared by every isolate and process, over the
+     * same `auth_throttle` table (keys are prefixed, so they never meet the
+     * auth counts). For the low-volume public endpoints a burst from one
+     * source would otherwise be capped per isolate only; the hot paths
+     * (catalogue, polling, ordering) keep the in-memory burst guard, and
+     * ordering's real limits live in shared/ordering.mjs. Each key's count is
+     * returned post-increment by one atomic UPSERT (reset when its window has
+     * passed), so a window needs no read-then-write race.
+     */
+    async rateLimit(keys, max, windowMs) {
+      if (!Number.isFinite(max) || max <= 0) return { allowed: true, retryAfter: 0 };
+      const at = now();
+      const resetAt = new Date(Date.now() + windowMs).toISOString();
+      let worst = 0;
+      for (const key of keys) {
+        const row = await first(
+          `INSERT INTO auth_throttle (key, failures, reset_at) VALUES (?, 1, ?)
+           ON CONFLICT(key) DO UPDATE SET
+             failures = CASE WHEN auth_throttle.reset_at <= ? THEN 1 ELSE auth_throttle.failures + 1 END,
+             reset_at = CASE WHEN auth_throttle.reset_at <= ? THEN excluded.reset_at ELSE auth_throttle.reset_at END
+           RETURNING failures, reset_at`,
+          key, resetAt, at, at
+        );
+        if (row && row.failures > max) worst = Math.max(worst, Math.ceil((Date.parse(row.reset_at) - Date.now()) / 1000));
+      }
+      return worst > 0 ? { allowed: false, retryAfter: Math.max(1, worst) } : { allowed: true, retryAfter: 0 };
     },
     /** The database answers: what /api/health asks. */
     ping: async () => Boolean(await first("SELECT 1 AS ok")),

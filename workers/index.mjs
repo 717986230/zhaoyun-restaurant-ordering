@@ -7,7 +7,7 @@
  * Durable Object, CORS, and the built web app (ASSETS).
  */
 import { createApi, createApiState, SECURITY_HEADERS } from "../shared/http.mjs";
-import { createStore } from "../shared/store.mjs";
+import { createStore, createMenuCache } from "../shared/store.mjs";
 import { d1Driver } from "./d1-driver.mjs";
 import { deliveryConfig } from "../shared/delivery.mjs";
 import { mailConfig } from "../shared/mail.mjs";
@@ -22,6 +22,10 @@ const MAX_STORED_IMAGE_BYTES = 1.5 * 1024 * 1024;
 
 // Kept by the isolate across requests: the guessing and ordering budgets.
 const state = createApiState();
+// Kept by the isolate across requests too: the menu read cache, so the many
+// guests on one isolate share one set of catalogue/settings reads instead of
+// each paying for them. Stock stays fresh; see shared/store.mjs.
+const menuCache = createMenuCache();
 
 function json(body, status) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", ...SECURITY_HEADERS } });
@@ -51,7 +55,7 @@ function adminToken(env) {
 
 /** The store and the API over this deployment's D1, as a request or the cron sees them. */
 function buildApi(env, ctx) {
-  const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null });
+  const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null, cache: menuCache });
   const api = createApi({
     store,
     state,
@@ -127,7 +131,7 @@ export default {
     if (at.getUTCHours() === 9) {
       ctx.waitUntil((async () => {
         try {
-          const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null });
+          const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null, cache: menuCache });
           const reminded = await remindReservations({ store, mail: mailConfig(env) });
           console.log(JSON.stringify({ level: "info", msg: "reservation reminders", ...reminded }));
         } catch (error) {
@@ -142,7 +146,7 @@ export default {
     if (at.getUTCHours() === 3) {
       ctx.waitUntil((async () => {
         try {
-          const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null });
+          const store = createStore(d1Driver(env.DB), { passwordViewKey: env.PASSWORD_VIEW_KEY || null, cache: menuCache });
           const purged = {};
           for (const tenant of await store.listTenants()) {
             const counts = await store.withTenant(tenant.id).purgeExpired();

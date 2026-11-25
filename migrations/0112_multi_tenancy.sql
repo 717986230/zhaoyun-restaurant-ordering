@@ -149,7 +149,18 @@ CREATE TABLE IF NOT EXISTS products__tenant_new (
       updated_at TEXT NOT NULL,
       UNIQUE (tenant_id, sku)
     );
-INSERT INTO products__tenant_new (id, tenant_id, sku, kind, category, name_zh, name_de, name_en, description, price_cents, allergens_json, prep_time, portion, level, ingredients, art, pattern, tag_color, available, published, sort_order, print_station, print_printer_id, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at) SELECT id, 't_default', sku, kind, category, name_zh, name_de, name_en, description, price_cents, allergens_json, prep_time, portion, level, ingredients, art, pattern, tag_color, available, published, sort_order, print_station, print_printer_id, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at FROM products;
+-- tag_color and print_printer_id are left out of the SELECT on purpose.
+-- Both were added to products after this schema's baseline — tag_color on
+-- 2026-11-08, print_printer_id on 2026-11-10 — only through the Node server's
+-- start-up ALTER block (server/database.mjs), which never runs against D1. A
+-- D1 deployed in the window after the 2026-10-08 columns (modifiers_json,
+-- vat_percent, bundle_items_json) but before those two therefore has neither
+-- column, and reading them here is what made this migration fail on the live
+-- database ("no such column: tag_color"). The new table declares both with
+-- DEFAULT '', and the seed set them to '' on every dish, so filling them from
+-- the default loses nothing: a database missing the column had no value in it
+-- to carry across in the first place.
+INSERT INTO products__tenant_new (id, tenant_id, sku, kind, category, name_zh, name_de, name_en, description, price_cents, allergens_json, prep_time, portion, level, ingredients, art, pattern, available, published, sort_order, print_station, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at) SELECT id, 't_default', sku, kind, category, name_zh, name_de, name_en, description, price_cents, allergens_json, prep_time, portion, level, ingredients, art, pattern, available, published, sort_order, print_station, modifiers_json, vat_percent, bundle_items_json, created_at, updated_at FROM products;
 DROP TABLE products;
 CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,

@@ -75,23 +75,23 @@ export function createApiState({ publicWindowMs = 60_000, orderMax = 60, service
     serviceLimiter: createRateLimiter({ windowMs: publicWindowMs, max: serviceMax }),
     // Error reports from the apps: enough for a bad page load, not a flood.
     errorLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 20 }),
-    // Table bookings from one address (a restaurant's or a hotel's Wi-Fi is many
-    // guests): a burst, not a script filling the evening. The guest's account
-    // and its limits (shared/reservations.mjs, guestLimit) do the rest.
-    reservationLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 60 }),
-    // Looking a booking up by its number needs a matching phone or email too, so
-    // the number alone reveals nothing; a tight limit stops a script trying many.
-    reservationLookupLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
-    // Email codes from one address: each account has its own limits too (shared/email-verify.mjs).
-    mailLimiter: createRateLimiter({ windowMs: publicWindowMs, max: 10 }),
-    // Guest sign-ups from one address in ten minutes: a full dining room on
-    // the restaurant's Wi-Fi, not a script making accounts for their points.
-    registerLimiter: createRateLimiter({ windowMs: 10 * 60_000, max: 40 }),
+    // New accounts, bookings, booking look-ups and e-mail codes are
+    // abuse-sensitive but low-volume, so their burst cap is shared across every
+    // isolate in the database (store.rateLimit over auth_throttle; see
+    // throttleShared) rather than counted per isolate here.
     // When the owner was last told about an unplanned error, so the cooldown
     // above holds across requests (ALERT_COOLDOWN_MS).
-    errorAlert: { lastSentAt: 0 }
+    errorAlert: { lastSentAt: 0 },
+    // The built /api/catalog body per tenant, kept between requests so the many
+    // guests browsing one isolate share one build. Valid while the store's menu
+    // stamp and the restaurant day are unchanged; see the /api/catalog route.
+    catalogBodies: new Map()
   };
 }
+
+// A cached catalog body may outlive, by this long, a change made in another
+// isolate (a menu edit a guest's live channel already tells them to refetch).
+const CATALOG_BODY_TTL_MS = 10_000;
 
 /**
  * The API over one store.
@@ -205,6 +205,21 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
   /** A burst from one device to a public route: a 429 with how long to wait, or nothing. */
   function throttlePublic(limiter, ctx, message) {
     const { allowed, retryAfter } = limiter.check(ctx.ip || "unknown");
+    return allowed ? null : json({ error: message, retryAfter }, 429, { "retry-after": String(retryAfter) });
+  }
+
+  /**
+   * Like throttlePublic, but the count is shared by every isolate and process
+   * (store.rateLimit over the auth_throttle table). For the abuse-sensitive,
+   * low-volume public endpoints — new accounts, bookings and e-mail codes —
+   * where a per-isolate cap would let a burst through once multiplied by the
+   * isolates serving it. The hot paths keep the cheap in-memory guard. A store
+   * without rateLimit (a test double) falls back to letting the request by.
+   */
+  async function throttleShared(ctx, scope, max, windowMs, message) {
+    if (typeof store.rateLimit !== "function") return null;
+    const key = `pub:${ctx.tenantId}:${scope}:${ctx.ip || "unknown"}`;
+    const { allowed, retryAfter } = await store.rateLimit([key], max, windowMs);
     return allowed ? null : json({ error: message, retryAfter }, 429, { "retry-after": String(retryAfter) });
   }
 
@@ -397,12 +412,28 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
     // /api/catalog
     if (path.length === 2 && path[0] === "api" && path[1] === "catalog" && method === "GET") {
       const settings = await store.getSettings();
+      // The whole built body is the same for every guest of one restaurant and
+      // changes only when the menu, the stock or the sales do — so it is cached
+      // and served without rebuilding (no stock read, no 100-dish map, no
+      // re-serialize) while the store's stamp and the restaurant day hold.
+      const stamp = typeof store.menuStamp === "function" ? store.menuStamp() : null;
+      const today = settings.timeZone ? restaurantDay(settings.timeZone) : null;
+      const cacheKey = ctx.tenantId;
+      if (stamp) {
+        const hit = state.catalogBodies.get(cacheKey);
+        if (hit && hit.menu === stamp.menu && hit.dyn === stamp.dyn && hit.today === today && Date.now() - hit.at < CATALOG_BODY_TTL_MS) {
+          return new Response(hit.body, { status: 200, headers: { "content-type": "application/json; charset=utf-8", ...SECURITY_HEADERS } });
+        }
+      }
       const suggestions = settings.cartSuggestions;
       const [products, bestSellers] = await Promise.all([
         store.listProducts(true, settings.timeZone),
         suggestions?.enabled && !suggestions.productIds.length ? store.topDrinks(30, 3) : []
       ]);
-      return json({ products, theme: settings.menuTheme, languages: settings.menuLanguages, menu: { ...menuSettingsView(settings), ...cartSuggestionsFor(suggestions, products, bestSellers) } });
+      const payload = { products, theme: settings.menuTheme, languages: settings.menuLanguages, menu: { ...menuSettingsView(settings), ...cartSuggestionsFor(suggestions, products, bestSellers) } };
+      const serialized = JSON.stringify(payload);
+      if (stamp) state.catalogBodies.set(cacheKey, { menu: stamp.menu, dyn: stamp.dyn, today, at: Date.now(), body: serialized });
+      return new Response(serialized, { status: 200, headers: { "content-type": "application/json; charset=utf-8", ...SECURITY_HEADERS } });
     }
 
     // /api/orders and /api/orders/:id/status
@@ -531,7 +562,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (throttle.denied) return throttle.denied;
         if (rest === "register") {
           // New accounts from one address: a busy table's worth, not a script making them by the hundred.
-          const limited = throttlePublic(state.registerLimiter, ctx, "Too many new accounts from this device");
+          const limited = await throttleShared(ctx, "register", 40, 10 * 60_000, "Too many new accounts from this device");
           if (limited) return limited;
           const { value, invalid } = await body(request, CustomerRegisterBody);
           if (invalid) return invalid;
@@ -614,7 +645,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         // Proving the account's email before booking: a code to it, and the code back.
         if (rest === "email-code" && method === "POST") {
           if (!mail) return json({ error: "Email verification is not set up", code: "VERIFICATION_OFF" }, 409);
-          const limited = throttlePublic(state.mailLimiter, ctx, "Too many codes from this device");
+          const limited = await throttleShared(ctx, "mail", 10, 60_000, "Too many codes from this device");
           if (limited) return limited;
           const { value, invalid } = await body(request, EmailCodeBody);
           if (invalid) return invalid;
@@ -703,7 +734,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return json(await reservations.availability(date, url.searchParams.get("party") ?? undefined, url.searchParams.get("time")));
         }
         if (path.length === 3 && path[2] === "lookup" && method === "POST") {
-          const limited = throttlePublic(state.reservationLookupLimiter, ctx, "Too many lookups from this device");
+          const limited = await throttleShared(ctx, "booking-lookup", 10, 60_000, "Too many lookups from this device");
           if (limited) return limited;
           const { value, invalid } = await body(request, ReservationLookupBody);
           if (invalid) return invalid;
@@ -711,7 +742,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return found ? json(found, 200, { "cache-control": "no-store" }) : fail("Booking not found", 404);
         }
         if (path.length === 2 && method === "POST") {
-          const limited = throttlePublic(state.reservationLimiter, ctx, "Too many bookings from this device");
+          const limited = await throttleShared(ctx, "booking", 60, 60_000, "Too many bookings from this device");
           if (limited) return limited;
           const { value, invalid } = await body(request, ReservationBody);
           if (invalid) return invalid;
