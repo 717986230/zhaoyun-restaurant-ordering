@@ -35,6 +35,7 @@ interface Props {
   onRefresh: () => Promise<void>;
   onLock: (table: string, locked: boolean) => Promise<void>;
   onOpenBill: (table: string) => Promise<void>;
+  onCancelOrders?: (orderIds: string[]) => Promise<void>;
   onCloseBill: () => void;
   /** The bill on the front printer, for the guest to read; it marks nothing paid. */
   onPrintBill: (table: string) => Promise<void>;
@@ -273,7 +274,9 @@ export function TablesPanel(props: Props) {
 
       {takeawayTile
         ? <div className="board-actions">
-          {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>}
+          {table.orders.length > 0 && (table.total <= 0 && props.onCancelOrders && table.orders.some((order) => order.status !== "completed")
+            ? <button className="danger-action" disabled={props.busy} onClick={() => void props.onCancelOrders!(table.orders.filter((order) => order.status !== "completed").map((order) => order.id))}>{t("tableCancelZero")}</button>
+            : <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>)}
         </div>
         : editing ? (renaming === table.table
         ? <form className="table-rename" onSubmit={(event) => void rename(event, table)}>
@@ -302,7 +305,9 @@ export function TablesPanel(props: Props) {
         <button className="ghost-action" disabled={props.busy || held} title={lockedTitle} onClick={() => void props.onOrdering(table.table, !table.orderingUntil)}>
           {t(table.orderingUntil ? "closeForOrdering" : "openForOrdering")}
         </button>
-        {table.orders.length > 0 && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>}
+        {table.orders.length > 0 && (table.total <= 0 && props.onCancelOrders && table.orders.some((order) => order.status !== "completed")
+          ? <button className="danger-action" disabled={props.busy} onClick={() => void props.onCancelOrders!(table.orders.filter((order) => order.status !== "completed").map((order) => order.id))}>{t("tableCancelZero")}</button>
+          : <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>)}
       </div>}
     </article>;
     };

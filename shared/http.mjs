@@ -30,6 +30,7 @@ export { SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEve
 import { alertMessage, birthdayMessage, bookingMessage, broadcastMessage, codeMessage, createMailer, inviteMessage, mailStatus, resetMessage, testMessage, waitlistReadyMessage } from "./mail.mjs";
 import { DEFAULT_TENANT_ID } from "./tenant.mjs";
 import { bestOrderPromotion, bestAmountPromotion } from "./promotions.mjs";
+import { isTakeaway } from "./pos.mjs";
 import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
@@ -1659,7 +1660,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         const settings = await store.getSettings();
         const date = restaurantDay(settings.timeZone);
         const [report, tables, bookings] = await Promise.all([store.salesReport(date, date), store.tablesOverview(), store.reservations.today()]);
-        const seated = tables.filter((table) => table.state === "seated");
+        const seated = tables.filter((table) => table.state === "seated" && !isTakeaway(table.table));
         return json({
           today: {
             date,

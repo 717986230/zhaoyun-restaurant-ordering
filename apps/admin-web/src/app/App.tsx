@@ -755,6 +755,7 @@ export function App() {
         onRefresh={() => loadBoard()}
         onLock={lockTable}
         onOpenBill={openBill}
+        onCancelOrders={(orderIds: string[]) => runBoardAction(async () => { for (const id of orderIds) await adminApi.updateOrderStatus(id, "cancelled"); }, t("orderUpdated"))}
         onCloseBill={() => setState((current) => ({ ...current, bill: null }))}
         onPrintBill={printBill}
         onOrdering={(table: string, open: boolean) => runBoardAction(() => adminApi.setTableOrdering(table, open), t(open ? "openForOrdering" : "closeForOrdering"))}
