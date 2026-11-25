@@ -900,7 +900,7 @@ test("the first three tabs are chosen in settings, none fixed, and cannot repeat
   const card = page.locator(".settings-card", { has: page.getByRole("heading", { name: "导航标签顺序", exact: true }) });
   const [first, second, third] = [card.getByLabel("第 1 个"), card.getByLabel("第 2 个"), card.getByLabel("第 3 个")];
   // Nothing chosen: the usual order, promotions first.
-  await expect(card.locator(".nav-order-preview li")).toHaveText(["✦ 今日推荐", "套餐", "全部", "RAMEN", "SUSHI"]);
+  await expect(card.locator(".nav-order-preview li")).toHaveText(["✦ 今日推荐", "套餐", "全部", "拉面", "SUSHI"]);
   // Each place opens once the one before it is set.
   await expect(second).toBeDisabled();
   await expect(third).toBeDisabled();
@@ -917,7 +917,7 @@ test("the first three tabs are chosen in settings, none fixed, and cannot repeat
   await expect(first.locator('option[value="ALLE"]')).toHaveJSProperty("disabled", true);
   await expect(third.locator('option[value="__sets__"]')).toHaveJSProperty("disabled", true);
   // The preview is the order a guest gets.
-  await expect(card.locator(".nav-order-preview li")).toHaveText(["SUSHI", "套餐", "全部", "✦ 今日推荐", "RAMEN"]);
+  await expect(card.locator(".nav-order-preview li")).toHaveText(["SUSHI", "套餐", "全部", "✦ 今日推荐", "拉面"]);
   // Back to the usual order for the first: the others move up.
   await first.selectOption("");
   await expect.poll(() => appSettings.navPinned).toEqual(["__sets__", "ALLE"]);

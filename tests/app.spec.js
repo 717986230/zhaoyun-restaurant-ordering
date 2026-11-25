@@ -528,7 +528,7 @@ test.describe("the promotions page", () => {
     });
 
     test("a guest who moved on is not sent back to it on every reload", async ({ page }) => {
-      await page.getByRole("button", { name: "RAMEN", exact: true }).click();
+      await page.getByRole("button", { name: "拉面", exact: true }).click();
       await page.reload();
       await expect(page.locator(".chip.on")).not.toHaveText("✦ 精选推荐");
     });
@@ -591,11 +591,11 @@ test.describe("the menu turns its pages", () => {
     await expect(onChip(page)).toHaveText("套餐");
     await drag(page, 300, 600);
     await expect(onChip(page)).toHaveText("套餐");
-    await page.getByRole("button", { name: "RAMEN", exact: true }).click();
+    await page.getByRole("button", { name: "拉面", exact: true }).click();
     await expect(page.locator(".page-next")).toHaveCount(0);
     await expect(page.locator(".page-end")).toHaveText("菜单到底了");
     await drag(page, 600, 300);
-    await expect(onChip(page)).toHaveText("RAMEN");
+    await expect(onChip(page)).toHaveText("拉面");
   });
 
   test("a search is one page, with nothing to turn to", async ({ page }) => {
@@ -817,9 +817,9 @@ test("the owner's first three tabs lead, and the rest keep their order", async (
   }) }));
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
-  await expect(page.locator(".chip")).toHaveText(["RAMEN", "套餐", "全部", "✦ 精选推荐", "MAIN", "SUSHI"]);
+  await expect(page.locator(".chip")).toHaveText(["拉面", "套餐", "全部", "✦ 精选推荐", "MAIN", "SUSHI"]);
   // A first visit opens on the owner's first tab, not on the promotions page.
-  await expect(page.locator(".chip.on")).toHaveText("RAMEN");
+  await expect(page.locator(".chip.on")).toHaveText("拉面");
   // Pages turn in the same order.
   await page.locator(".page-next").click();
   await expect(page.locator(".chip.on")).toHaveText("套餐");
