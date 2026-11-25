@@ -112,19 +112,44 @@ const CALL_KEYS: Record<string, PosKey> = { waiter: "callWaiter", pay: "callPay"
 function ServiceCalls({ pos, requests, onDone }: { pos: Pos; requests: ApiServiceRequest[]; onDone: () => void }) {
   const { t } = pos;
   if (!requests.length) return null;
-  async function done(request: ApiServiceRequest) {
+  async function claim(items: ApiServiceRequest[]) {
     try {
-      await api.finishServiceRequest(request.id);
+      await Promise.all(items.filter((req) => req.status === "open").map((req) => api.acknowledgeServiceRequest(req.id)));
+      onDone();
+    } catch (error) { pos.failed(error); }
+  }
+  async function done(items: ApiServiceRequest[]) {
+    try {
+      await Promise.all(items.map((req) => api.finishServiceRequest(req.id)));
       onDone();
     } catch (error) { pos.failed(error); }
   }
   const minutes = (iso: string) => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
+  const byTable = new Map<string, ApiServiceRequest[]>();
+  for (const req of requests) {
+    const key = req.table.toUpperCase();
+    byTable.set(key, [...(byTable.get(key) ?? []), req]);
+  }
+  const groups = [...byTable.values()].map((items) => {
+    const oldest = items.reduce((min, req) => (Date.parse(req.createdAt) < Date.parse(min.createdAt) ? req : min), items[0]!);
+    const wait = minutes(oldest.createdAt);
+    const urgent = wait >= 2 || items.some((req) => req.type === "bill");
+    const claimed = items.every((req) => req.status === "acknowledged");
+    return { table: items[0]!.table, items, oldest, wait, urgent, claimed };
+  }).sort((a, b) => Number(b.urgent) - Number(a.urgent) || Date.parse(a.oldest.createdAt) - Date.parse(b.oldest.createdAt));
+
   return <section className="pos-calls" role="alert" aria-label={t("calls")}>
     <h2>🔔 {t("calls")}</h2>
-    <ul>{requests.map((request) => <li key={request.id} data-call={request.id}>
-      <span><b>{t("table", { table: request.table })}</b> · {CALL_KEYS[request.type] ? t(CALL_KEYS[request.type]!) : request.type}<small>{t("minutesAgo", { n: minutes(request.createdAt) })}</small></span>
-      <button type="button" onClick={() => void done(request)}>{t("callDone")}</button>
-    </li>)}</ul>
+    <ul>{groups.map((group) => {
+      const labels = [...new Set(group.items.map((req) => (CALL_KEYS[req.type] ? t(CALL_KEYS[req.type]!) : req.type)))].join("、");
+      return <li key={group.table} data-call={group.oldest.id} className={group.urgent ? "urgent" : ""}>
+        <span><b>{t("table", { table: group.table })}</b> · {labels}<small>{t("minutesAgo", { n: group.wait })}{group.claimed ? ` · ${t("callClaimed")}` : ""}</small></span>
+        <div className="pos-calls-actions">
+          {!group.claimed && <button type="button" className="secondary" onClick={() => void claim(group.items)}>{t("callClaim")}</button>}
+          <button type="button" onClick={() => void done(group.items)}>{t("callDone")}</button>
+        </div>
+      </li>;
+    })}</ul>
   </section>;
 }
 

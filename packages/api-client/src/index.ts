@@ -656,6 +656,10 @@ export class PosApi {
     return this.#request(`/api/admin/members/${encodeURIComponent(customerId)}/visit`, { method: "POST", body: "{}" });
   }
   /** The tickets the print bridge gave up on, for the waiter to see and send again. */
+  /** A guest's call claimed by a waiter: other phones see it is being handled. */
+  acknowledgeServiceRequest(id: string): Promise<{ request: ApiServiceRequest }> {
+    return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status: "acknowledged" }) });
+  }
   /** A guest's call dealt with: off every waiter's floor. */
   finishServiceRequest(id: string): Promise<{ request: ApiServiceRequest }> {
     return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status: "completed" }) });

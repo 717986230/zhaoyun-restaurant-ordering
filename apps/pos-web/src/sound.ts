@@ -79,6 +79,7 @@ export function useFloorAlerts(requests: ApiServiceRequest[], tables: TableOverv
       for (const req of fresh) seenCalls.current.add(req.id);
       if (fresh.length > 0) {
         chime(true);
+        try { navigator.vibrate?.([120, 80, 120]); } catch { /* not supported */ }
         const text = fresh.map((req) => {
           const label = CALL_LABEL[language][req.type] ?? req.type;
           return language === "zh" ? `${req.table}桌，${label}` : language === "de" ? `Tisch ${req.table}, ${label}` : `Table ${req.table}, ${label}`;
