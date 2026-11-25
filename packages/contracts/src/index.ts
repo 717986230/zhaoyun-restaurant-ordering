@@ -361,6 +361,18 @@ export interface ApiBroadcastPreview {
   sample: string[];
 }
 
+// 员工排班 (shared/roster.mjs): one rostered shift for one waiter.
+export interface ApiShift {
+  id: string;
+  staffId: string;
+  date: string;
+  startMin: number;
+  endMin: number;
+  note: string;
+  minutes: number;
+  overnight: boolean;
+}
+
 export interface CheckoutCommand {
   clientRequestId?: string;
   table?: string;

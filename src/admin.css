@@ -5131,6 +5131,171 @@ em.voided {
   .cast-conditions { grid-template-columns: 1fr; }
 }
 
+/* 员工排班 (RosterPanel) */
+.roster-weekbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+
+.roster-weeklabel {
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.roster-grid-wrap {
+  overflow-x: auto;
+}
+
+.roster-grid {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 720px;
+}
+
+.roster-grid th,
+.roster-grid td {
+  border: 1px solid var(--a-line);
+  padding: 6px;
+  vertical-align: top;
+  text-align: left;
+}
+
+.roster-grid thead th {
+  background: var(--a-head-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.roster-grid th.roster-today {
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.roster-corner,
+.roster-name {
+  position: sticky;
+  left: 0;
+  background: var(--a-card);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.roster-cell {
+  min-width: 92px;
+}
+
+.roster-shift {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.roster-shift-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--a-accent-line);
+  border-radius: 8px;
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.roster-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.roster-note {
+  font-size: 11px;
+  color: var(--a-muted);
+}
+
+.roster-del {
+  border: none;
+  background: transparent;
+  color: var(--a-danger);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.roster-add {
+  width: 100%;
+  border: 1px dashed var(--a-line-2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a-muted);
+  cursor: pointer;
+  padding: 3px;
+  font-size: 13px;
+}
+
+.roster-add:hover {
+  border-color: var(--a-accent);
+  color: var(--a-accent-ink);
+}
+
+.roster-total {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.roster-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.roster-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.roster-form > label > span {
+  font-weight: 600;
+}
+
+.roster-form .roster-note-field {
+  grid-column: 1 / -1;
+}
+
+.roster-form input,
+.roster-form select {
+  padding: 8px 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 8px;
+  background: var(--a-card);
+  color: var(--a-ink);
+  font: inherit;
+}
+
+.roster-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.roster-del-btn { color: var(--a-danger); margin-right: auto; }
+
+@media (max-width: 560px) {
+  .roster-form { grid-template-columns: 1fr; }
+}
+
 .res-dialog {
   position: fixed;
   inset: 0;

@@ -465,6 +465,17 @@ CREATE TABLE broadcast_sends (
       sent_at TEXT NOT NULL,
       PRIMARY KEY (broadcast_id, customer_id)
     );
+CREATE TABLE roster_shifts (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      work_date TEXT NOT NULL,
+      start_min INTEGER NOT NULL,
+      end_min INTEGER NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 CREATE TABLE guest_orders (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
       tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
@@ -668,6 +679,7 @@ CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
 CREATE INDEX idx_account_tokens_expiry ON account_tokens(expires_at);
 CREATE INDEX idx_member_consent_token ON member_consent(token);
 CREATE INDEX idx_broadcasts_tenant ON broadcasts(tenant_id, created_at);
+CREATE INDEX idx_roster_shifts_date ON roster_shifts(tenant_id, work_date);
 CREATE INDEX idx_email_codes_customer ON email_codes(customer_id, created_at);
 CREATE INDEX idx_drawer_sessions_closed ON drawer_sessions(closed_at);
 CREATE INDEX idx_drawer_movements_session ON drawer_movements(session_id);

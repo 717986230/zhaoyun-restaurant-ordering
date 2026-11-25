@@ -636,6 +636,24 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, 
       PRIMARY KEY (broadcast_id, customer_id)
     );
 
+    -- 员工排班 (shared/roster.mjs): one shift a waiter is rostered for — a date
+    -- and a time window on the restaurant's own wall clock, with an optional
+    -- note. A window whose end is at or before its start runs past midnight into
+    -- the next day. Distinct from the sales "shift" (交班/结算), which is a
+    -- staff member's open till, not a planned roster. See migrations/0115_roster.sql.
+    CREATE TABLE IF NOT EXISTS roster_shifts (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      work_date TEXT NOT NULL,
+      start_min INTEGER NOT NULL,
+      end_min INTEGER NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_roster_shifts_date ON roster_shifts(tenant_id, work_date);
+
     -- A guest's own order from the menu (shared/ordering.mjs): at the table or
     -- for pickup, by whom when signed in, and the points it spent.
     CREATE TABLE IF NOT EXISTS guest_orders (

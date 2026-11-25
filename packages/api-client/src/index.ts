@@ -7,7 +7,7 @@ import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
   ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, HeldTable, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand,
   ApiWaitlist, ApiWaitlistEntry, WaitlistCommand, WaitlistUpdateCommand,
-  ApiPromotion, ApiBroadcast, ApiSegment, ApiBroadcastPreview
+  ApiPromotion, ApiBroadcast, ApiSegment, ApiBroadcastPreview, ApiShift
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -179,6 +179,14 @@ export interface AdminBroadcastInput {
   subject: string;
   body: string;
   segment?: ApiSegment;
+}
+
+export interface AdminShiftInput {
+  staffId: string;
+  date: string;
+  startMin: number;
+  endMin: number;
+  note?: string;
 }
 
 export type StaffRole = "manager" | "staff" | "kitchen";
@@ -408,6 +416,11 @@ export class AdminApi {
   deleteBroadcast(id: string): Promise<void> { return this.#request(`/api/admin/broadcasts/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   sendBroadcast(id: string): Promise<{ broadcast: ApiBroadcast }> { return this.#request(`/api/admin/broadcasts/${encodeURIComponent(id)}/send`, { method: "POST" }); }
   previewSegment(segment: ApiSegment): Promise<ApiBroadcastPreview> { return this.#request("/api/admin/broadcasts/preview", { method: "POST", body: JSON.stringify({ segment }) }); }
+  // 员工排班 (shared/roster.mjs).
+  shifts(from: string, to: string): Promise<{ shifts: ApiShift[] }> { return this.#request(`/api/admin/shifts?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`); }
+  createShift(input: AdminShiftInput): Promise<{ shift: ApiShift }> { return this.#request("/api/admin/shifts", { method: "POST", body: JSON.stringify(input) }); }
+  updateShift(id: string, input: AdminShiftInput): Promise<{ shift: ApiShift }> { return this.#request(`/api/admin/shifts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }); }
+  deleteShift(id: string): Promise<void> { return this.#request(`/api/admin/shifts/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   updateOrderStatus(id: string, status: ApiOrder["status"]): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   serviceRequests(limit = 100): Promise<{ requests: ApiServiceRequest[] }> { return this.#request(`/api/service-requests?limit=${limit}`); }
   updateServiceRequestStatus(id: string, status: ApiServiceRequest["status"]): Promise<{ request: ApiServiceRequest }> { return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
