@@ -523,7 +523,7 @@ export function App() {
     try {
       await adminApi.deletePrinter(profile.id);
       setState((current) => ({ ...current, editingPrinter: null }));
-      await loadPrinters();
+      await connect();
       notify(t("printerDeleted"));
     } catch (error) { failed(error, "deleteFailed"); }
   }
@@ -777,7 +777,7 @@ export function App() {
       {state.tab === "stock" && <StockPanel api={adminApi} products={state.products} onRefresh={async () => { await connect(); }} notify={notify} failed={reportFailed} />}
       {state.tab === "promos" && state.settings && <PromotionsPanel api={adminApi} timeZone={state.settings.timeZone} notify={notify} failed={reportFailed} />}
       {state.tab === "roster" && <RosterPanel api={adminApi} notify={notify} failed={reportFailed} />}
-      {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} />}
+      {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} onNavigate={setTab} />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} restaurantName={state.settings?.restaurantName ?? ""} menuLanguages={state.settings?.menuLanguages ?? []} />}
       {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "members" && <MembersPanel api={adminApi} settings={state.settings} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}

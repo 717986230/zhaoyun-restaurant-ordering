@@ -4351,6 +4351,17 @@ em.voided {
   padding: 12px 14px;
 }
 
+button.report-tile-link {
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+}
+button.report-tile-link:hover {
+  border-color: var(--a-accent);
+  transform: translateY(-1px);
+}
+
 .report-tile small {
   color: var(--a-muted);
   font-size: 12px;

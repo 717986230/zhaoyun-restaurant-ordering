@@ -3,6 +3,7 @@ import type { AdminApi } from "@zhaoyun/api-client";
 import type { ApiToday } from "@zhaoyun/contracts";
 import { formatMoney, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
+import type { AdminTab } from "../../app/types";
 
 const STATUS_KEYS: Record<string, CopyKey> = { pending: "todayPending", confirmed: "todayConfirmed", seated: "todaySeated" };
 
@@ -12,7 +13,7 @@ const STATUS_KEYS: Record<string, CopyKey> = { pending: "todayPending", confirme
  * what they still owe, and the day's bookings by time. Refreshed every half
  * minute and whenever the live channel says something changed.
  */
-export function TodayPanel({ api, failed, liveTick }: { api: AdminApi; failed: (error: unknown) => void; liveTick: number }) {
+export function TodayPanel({ api, failed, liveTick, onNavigate }: { api: AdminApi; failed: (error: unknown) => void; liveTick: number; onNavigate?: (tab: AdminTab) => void }) {
   const { t, language } = useI18n();
   const [today, setToday] = useState<ApiToday | null>(null);
   const money = (cents: number) => formatMoney(cents, language);
@@ -35,11 +36,11 @@ export function TodayPanel({ api, failed, liveTick }: { api: AdminApi; failed: (
   return <section id="todayPanel" className="admin-panel active"><div className="settings-page">
     <h1 className="settings-title">{t("todayTitle")} <small className="today-date">{dateLabel}</small></h1>
     <div className="report-tiles" id="todayTiles">
-      <div className="report-tile"><small>{t("todayTakings")}</small><b id="todayGross">{money(today.grossCents)}</b></div>
-      <div className="report-tile"><small>{t("todayReceipts")}</small><b>{today.receipts}</b></div>
-      <div className="report-tile"><small>{t("todayAverage")}</small><b>{money(today.averageCents)}</b></div>
-      <div className="report-tile"><small>{t("todaySeatedNow")}</small><b id="todaySeatedNow">{today.seatedTables}</b><small>{today.openCents ? t("todayOpen", { amount: money(today.openCents) }) : t("todayNothingOpen")}</small></div>
-      <div className="report-tile"><small>{t("todayBooked")}</small><b>{today.bookings.length}</b><small>{t("todayGuests", { n: today.bookedGuests })}</small></div>
+      <button type="button" className="report-tile report-tile-link" onClick={() => onNavigate?.("reports")}><small>{t("todayTakings")}</small><b id="todayGross">{money(today.grossCents)}</b></button>
+      <button type="button" className="report-tile report-tile-link" onClick={() => onNavigate?.("orders")}><small>{t("todayReceipts")}</small><b>{today.receipts}</b></button>
+      <button type="button" className="report-tile report-tile-link" onClick={() => onNavigate?.("reports")}><small>{t("todayAverage")}</small><b>{money(today.averageCents)}</b></button>
+      <button type="button" className="report-tile report-tile-link" onClick={() => onNavigate?.("tables")}><small>{t("todaySeatedNow")}</small><b id="todaySeatedNow">{today.seatedTables}</b><small>{today.openCents ? t("todayOpen", { amount: money(today.openCents) }) : t("todayNothingOpen")}</small></button>
+      <button type="button" className="report-tile report-tile-link" onClick={() => onNavigate?.("reservations")}><small>{t("todayBooked")}</small><b>{today.bookings.length}</b><small>{t("todayGuests", { n: today.bookedGuests })}</small></button>
     </div>
     <div className="report-grid">
       <section className="report-card" id="todayTop">
