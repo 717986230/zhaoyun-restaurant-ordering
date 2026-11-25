@@ -18,3 +18,4 @@ playwright-report/
 .wrangler/
 .dev.vars
 print-bridge.config.json
+playwright.local.config.mjs

@@ -67,6 +67,9 @@ import {
   MEMBER_BIRTHDAY_SQL,
   UPSERT_BIRTHDAY_SQL,
   DELETE_BIRTHDAY_SQL,
+  MEMBER_CONSENT_SQL,
+  UPSERT_CONSENT_SQL,
+  UNSUBSCRIBE_BY_TOKEN_SQL,
   normalizeBirthday,
   isBirthdayMonth,
   BIRTHDAYS_DUE_SQL,
@@ -301,12 +304,40 @@ export function createCustomerStore(
     );
   }
 
+  /** 会员营销授权: whether this member has opted in to marketing email. */
+  async function marketingConsent(customerId) {
+    const row = await driver.first(MEMBER_CONSENT_SQL, tenantId, String(customerId));
+    return Boolean(row?.marketing);
+  }
+
+  /**
+   * The member says yes or no to marketing email. A token is set the first
+   * time and kept, so an unsubscribe link in an old email keeps working. Null
+   * when there is no such member; otherwise the new state.
+   */
+  async function setMarketing(customerId, on) {
+    const row = await byId(customerId);
+    if (!row) return null;
+    const existing = await driver.first(MEMBER_CONSENT_SQL, tenantId, row.id);
+    const token = existing?.token ?? newSessionToken();
+    await driver.run(
+      UPSERT_CONSENT_SQL,
+      tenantId,
+      row.id,
+      on ? 1 : 0,
+      token,
+      now(),
+    );
+    return Boolean(on);
+  }
+
   async function profile(customerId) {
     const row = await byId(customerId);
     return row
       ? {
           customer: await withMembership(customerView(row)),
           favorites: await favorites(customerId),
+          marketing: await marketingConsent(row.id),
         }
       : null;
   }
@@ -593,6 +624,14 @@ export function createCustomerStore(
     profile,
     update,
     setFavorite,
+    marketingConsent,
+    setMarketing,
+    /** One-click unsubscribe by the token in a marketing email. True when a consent was turned off. */
+    async unsubscribe(token) {
+      const key = String(token ?? "");
+      if (!key) return false;
+      return (await driver.run(UNSUBSCRIBE_BY_TOKEN_SQL, now(), key)) > 0;
+    },
     /** Deleting one's own account takes the password. Null on a wrong one. */
     async deleteOwn(customerId, password) {
       if (!(await withPassword(customerId, password))) return null;

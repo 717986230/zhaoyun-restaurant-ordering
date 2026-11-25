@@ -258,6 +258,8 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
       </div>
     </section>}
 
+    <MarketingToggle language={language} dispatch={dispatch} />
+
     <div className="guest-actions">
       <button type="button" className="secondary" onClick={() => dispatch({ type: "sheet", sheet: "orders" })}>{g(language, "myOrders")}</button>
       <button type="button" className="secondary" onClick={() => void account.signOut()}>{g(language, "signOut")}</button>
@@ -269,6 +271,39 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
       <PrivacyNotice language={language} restaurantName={restaurantName} />
     </div>
   </div>;
+}
+
+/**
+ * 会员营销授权 (GDPR opt-in): the member's own switch for marketing email.
+ * Off until the member turns it on; a broadcast never reaches anyone who has
+ * not. Reads the current state on open, writes on toggle.
+ */
+function MarketingToggle({ language, dispatch }: { language: CustomerState["language"]; dispatch: CustomerDispatch }) {
+  const consent = useQuery({ queryKey: ["customer-marketing"], queryFn: () => restaurantApi.customerMarketing() });
+  const [busy, setBusy] = useState(false);
+  const enabled = consent.data?.marketing ?? false;
+
+  async function toggle(next: boolean) {
+    setBusy(true);
+    try {
+      await restaurantApi.setCustomerMarketing(next);
+      await consent.refetch();
+      dispatch({ type: "toast", message: g(language, "marketingSaved") });
+    } catch (failure) {
+      dispatch({ type: "toast", message: failure instanceof ApiError ? failure.message : g(language, "marketingSaved") });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="guest-section">
+    <h3>{g(language, "marketingTitle")}</h3>
+    <p className="cart-hint">{g(language, "marketingHint")}</p>
+    <label className="marketing-opt">
+      <input type="checkbox" checked={enabled} disabled={busy || consent.isLoading} onChange={(event) => void toggle(event.target.checked)} />
+      <span>{g(language, "marketingLabel")}</span>
+    </label>
+  </section>;
 }
 
 function ProfileForm({ language, account, dispatch }: { language: CustomerState["language"]; account: CustomerAccount; dispatch: CustomerDispatch }) {

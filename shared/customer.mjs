@@ -534,6 +534,16 @@ export const UPSERT_BIRTHDAY_SQL =
 export const DELETE_BIRTHDAY_SQL =
   "DELETE FROM member_birthdays WHERE tenant_id = ? AND customer_id = ?";
 
+/** 会员营销授权: a member's consent row, or null. Parameters: tenant, customer. */
+export const MEMBER_CONSENT_SQL =
+  "SELECT marketing, token FROM member_consent WHERE tenant_id = ? AND customer_id = ?";
+/** The member says yes or no; a token is set once and kept. Parameters: tenant, customer, marketing, token, at. */
+export const UPSERT_CONSENT_SQL =
+  "INSERT INTO member_consent (tenant_id, customer_id, marketing, token, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET marketing = excluded.marketing, updated_at = excluded.updated_at";
+/** One-click unsubscribe by the token in the email. Parameters: at, token. Scoped by the token, which is unique and random. */
+export const UNSUBSCRIBE_BY_TOKEN_SQL =
+  "UPDATE member_consent SET marketing = 0, updated_at = ? WHERE token = ? AND marketing = 1";
+
 /** A balance ledger line as a member sees it, and as the console lists it. */
 export function balanceEntryView(row) {
   return {
@@ -634,6 +644,11 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   "DELETE FROM customer_sessions WHERE tenant_id = ? AND customer_id = ?",
   "DELETE FROM email_codes WHERE tenant_id = ? AND customer_id = ?",
   "DELETE FROM customer_verified_emails WHERE tenant_id = ? AND customer_id = ?",
+  // Their marketing consent and the record of which broadcasts reached them go
+  // with the account (GDPR erasure); the broadcasts themselves stay the
+  // restaurant's, with no trace of who this member was.
+  "DELETE FROM member_consent WHERE tenant_id = ? AND customer_id = ?",
+  "DELETE FROM broadcast_sends WHERE tenant_id = ? AND customer_id = ?",
   "DELETE FROM customers WHERE tenant_id = ? AND id = ?",
 ];
 /** The console's list: newest first, or those whose email or name holds the search. Parameters: tenant, search, search, search, limit. */

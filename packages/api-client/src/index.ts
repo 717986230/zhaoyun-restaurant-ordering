@@ -7,7 +7,7 @@ import type { ApiMailStatus, ApiMemberVisit, ApiAppIcons, ApiToday, AppIconFiles
   ApiDeliveryOrder, ApiDeliveryPlatform, ApiDeliveryTotals, DeliveryProvider, DeliveryRejectReason, DeliveryStatus,
   ApiBookingInfo, ApiGuestReservation, ApiReservation, ApiReservationSettings, ApiReservationSlot, ApiTableChoice, HeldTable, ReservationCommand, ReservationUpdateCommand, StaffReservationCommand,
   ApiWaitlist, ApiWaitlistEntry, WaitlistCommand, WaitlistUpdateCommand,
-  ApiPromotion
+  ApiPromotion, ApiBroadcast, ApiSegment, ApiBroadcastPreview
 } from "@zhaoyun/contracts";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product } from "@zhaoyun/domain";
 import { DEFAULT_FEATURED_TEMPLATE, DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME } from "@zhaoyun/domain";
@@ -173,6 +173,12 @@ export interface AdminPromotionInput {
   endMin?: number | null;
   enabled?: boolean;
   priority?: number;
+}
+
+export interface AdminBroadcastInput {
+  subject: string;
+  body: string;
+  segment?: ApiSegment;
 }
 
 export type StaffRole = "manager" | "staff" | "kitchen";
@@ -396,6 +402,12 @@ export class AdminApi {
   createPromotion(input: AdminPromotionInput): Promise<{ promotion: ApiPromotion }> { return this.#request("/api/admin/promotions", { method: "POST", body: JSON.stringify(input) }); }
   updatePromotion(id: string, input: AdminPromotionInput): Promise<{ promotion: ApiPromotion }> { return this.#request(`/api/admin/promotions/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }); }
   deletePromotion(id: string): Promise<void> { return this.#request(`/api/admin/promotions/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  // 群发营销 (shared/segments.mjs, shared/store.mjs).
+  broadcasts(): Promise<{ broadcasts: ApiBroadcast[] }> { return this.#request("/api/admin/broadcasts"); }
+  createBroadcast(input: AdminBroadcastInput): Promise<{ broadcast: ApiBroadcast }> { return this.#request("/api/admin/broadcasts", { method: "POST", body: JSON.stringify(input) }); }
+  deleteBroadcast(id: string): Promise<void> { return this.#request(`/api/admin/broadcasts/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+  sendBroadcast(id: string): Promise<{ broadcast: ApiBroadcast }> { return this.#request(`/api/admin/broadcasts/${encodeURIComponent(id)}/send`, { method: "POST" }); }
+  previewSegment(segment: ApiSegment): Promise<ApiBroadcastPreview> { return this.#request("/api/admin/broadcasts/preview", { method: "POST", body: JSON.stringify({ segment }) }); }
   updateOrderStatus(id: string, status: ApiOrder["status"]): Promise<{ order: ApiOrder }> { return this.#request(`/api/orders/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   serviceRequests(limit = 100): Promise<{ requests: ApiServiceRequest[] }> { return this.#request(`/api/service-requests?limit=${limit}`); }
   updateServiceRequestStatus(id: string, status: ApiServiceRequest["status"]): Promise<{ request: ApiServiceRequest }> { return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); }
@@ -750,6 +762,10 @@ export class RestaurantApi {
   setCustomerBirthday(month: number, day: number): Promise<{ birthday: ApiBirthday | null }> { return this.#request("/api/customer/birthday", { method: "POST", body: JSON.stringify({ month, day }) }); }
   /** The guest clears their birthday. */
   clearCustomerBirthday(): Promise<{ birthday: ApiBirthday | null }> { return this.#request("/api/customer/birthday", { method: "POST", body: JSON.stringify({ clear: true }) }); }
+  /** 会员营销授权 (GDPR opt-in): whether this guest has agreed to marketing email. */
+  customerMarketing(): Promise<{ marketing: boolean }> { return this.#request("/api/customer/marketing"); }
+  /** The guest opts in or out of marketing email. */
+  setCustomerMarketing(enabled: boolean): Promise<{ marketing: boolean }> { return this.#request("/api/customer/marketing", { method: "PUT", body: JSON.stringify({ enabled }) }); }
   customerOrders(): Promise<{ orders: ApiOrder[] }> { return this.#request("/api/customer/orders"); }
   /** Everything kept about this guest's account, to download. */
   exportCustomerData(): Promise<CustomerDataExport> { return this.#request("/api/customer/export"); }
