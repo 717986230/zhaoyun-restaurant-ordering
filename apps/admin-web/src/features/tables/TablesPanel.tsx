@@ -160,6 +160,7 @@ export function TablesPanel(props: Props) {
     if (!Object.keys(changes).length || await props.onRenameTable(from.table, changes)) setRenaming(null);
   }
 
+  const onlineStaff = props.staff.filter((person) => person.online);
   return <section id="tablesPanel" className="admin-panel active">
     <div className="list-head">
       <div>
@@ -210,8 +211,8 @@ export function TablesPanel(props: Props) {
       </form>
     </section>}
 
-    {props.staff.length > 0 && <section className="staff-live" aria-label={t("staffLive")}>
-      {props.staff.map((person) => <article key={person.id} data-staff={person.name} className={`staff-live-card ${person.online ? "online" : ""}`}>
+    {onlineStaff.length > 0 && <section className="staff-live" aria-label={t("staffLive")}>
+      {onlineStaff.map((person) => <article key={person.id} data-staff={person.name} className="staff-live-card online">
         <div className="staff-live-head">
           <i aria-hidden="true" />
           <b>{person.name}</b>
