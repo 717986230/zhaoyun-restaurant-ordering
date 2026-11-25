@@ -8,7 +8,7 @@ afterEach(() => { cleanup(); });
 
 function promo(over: Partial<ApiPromotion> = {}): ApiPromotion {
   return {
-    id: "p1", name: { zh: "满惠週", de: "", en: "Happy" }, kind: "percent", percent: 10,
+    id: "p1", name: { zh: "满惠週", de: "", en: "Happy" }, kind: "percent", percent: 10, amountCents: 0, minSpendCents: 0,
     scope: "order", category: null, activeFrom: null, activeTo: null, weekdays: [],
     startMin: null, endMin: null, enabled: true, priority: 0,
     createdAt: "2026-11-24T00:00:00Z", updatedAt: "2026-11-24T00:00:00Z", ...over
@@ -40,6 +40,27 @@ describe("the promotions view", () => {
     fireEvent.click(getByText("保存"));
     await waitFor(() => expect(api.createPromotion).toHaveBeenCalledWith(expect.objectContaining({
       name: expect.objectContaining({ zh: "午市折扣" }), kind: "percent", scope: "order"
+    })));
+  });
+
+  it("shows a 满减 amount promotion and its threshold", async () => {
+    const { getByText } = render(<PromotionsPanel api={fakeApi([promo({ kind: "amount", percent: 0, amountCents: 1000, minSpendCents: 5000, name: { zh: "满减券", de: "", en: "" } })])} timeZone="Europe/Vienna" notify={vi.fn()} failed={vi.fn()} />);
+    await waitFor(() => expect(getByText("满减券")).toBeTruthy());
+    expect(getByText("满 €50.00 减 €10.00")).toBeTruthy();
+  });
+
+  it("creates a 满减 amount promotion from the form", async () => {
+    const api = fakeApi([]);
+    const { getByText, getByLabelText } = render(<PromotionsPanel api={api} timeZone="Europe/Vienna" notify={vi.fn()} failed={vi.fn()} />);
+    await waitFor(() => expect(api.promotions).toHaveBeenCalled());
+    fireEvent.click(getByText("新建活动"));
+    fireEvent.change(getByLabelText("名称（中文）", { selector: "input" }), { target: { value: "满100减15" } });
+    fireEvent.change(getByLabelText("类型", { selector: "select" }), { target: { value: "amount" } });
+    fireEvent.change(getByLabelText("减免金额（€）", { selector: "input" }), { target: { value: "15" } });
+    fireEvent.change(getByLabelText("满额门槛（€，0=无门槛）", { selector: "input" }), { target: { value: "100" } });
+    fireEvent.click(getByText("保存"));
+    await waitFor(() => expect(api.createPromotion).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "amount", amountCents: 1500, minSpendCents: 10000, scope: "order"
     })));
   });
 

@@ -29,7 +29,7 @@ import {
 export { SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent, reservationRefusal, segments, tableRefusal, tokenMatches } from "./http-response.mjs";
 import { alertMessage, birthdayMessage, bookingMessage, broadcastMessage, codeMessage, createMailer, inviteMessage, mailStatus, resetMessage, testMessage, waitlistReadyMessage } from "./mail.mjs";
 import { DEFAULT_TENANT_ID } from "./tenant.mjs";
-import { bestOrderPromotion } from "./promotions.mjs";
+import { bestOrderPromotion, bestAmountPromotion } from "./promotions.mjs";
 import { isPhoneLogin, localDayIn } from "./customer.mjs";
 import { EMAIL_CODE_RESEND_MS, EMAIL_CODE_TTL_MS, maskEmail } from "./email-verify.mjs";
 import { DELIVERY_PROVIDER_IDS, DELIVERY_PROVIDERS, foodoraLoginRequest, outboundRequest, sampleOrder, webhookAuthentic } from "./delivery.mjs";
@@ -957,8 +957,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         // waiter, not just the manager who sets them.
         if (path.length === 4 && path[2] === "promotions" && path[3] === "active" && method === "GET") {
           const promoSettings = await store.getSettings();
-          const promotion = bestOrderPromotion(await store.listPromotions(), { at: new Date().toISOString(), timeZone: promoSettings.timeZone });
-          return json({ promotion });
+          const at = new Date().toISOString();
+          const promos = await store.listPromotions();
+          const promotion = bestOrderPromotion(promos, { at, timeZone: promoSettings.timeZone });
+          // 满减 rides alongside: the till checks the bill against minSpendCents and
+          // applies it as a whole-bill fixed cut (discountCents).
+          const amountPromotion = bestAmountPromotion(promos, { at, timeZone: promoSettings.timeZone });
+          return json({ promotion, amountPromotion });
         }
         if (path.length === 3 && path[2] === "floor" && method === "GET") {
           // `deviceId` is this device's: the tables it has open are its own, the others' are locked to it.

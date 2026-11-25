@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { promotionActive, bestOrderPromotion, promotionView, normalizePromotion, localClock } from "../../shared/promotions.mjs";
+import { promotionActive, bestOrderPromotion, bestAmountPromotion, promotionView, normalizePromotion, localClock } from "../../shared/promotions.mjs";
 
 const TZ = "Europe/Vienna";
 
@@ -111,4 +111,48 @@ test("normalizePromotion rejects bad input", () => {
   assert.throws(() => normalizePromotion({ name: { zh: "x" }, percent: 10, activeFrom: "2026-12-01", activeTo: "2026-11-01" }), /end date is before/);
   assert.throws(() => normalizePromotion({ name: { zh: "x" }, percent: 10, startMin: 660 }), /start and an end/);
   assert.throws(() => normalizePromotion({ name: { zh: "x" }, percent: 10, startMin: 660, endMin: 2000 }), /00:00 to 23:59/);
+});
+
+// 满减 (fixed-amount) promotions.
+test("normalizePromotion lays out an amount (满减) promotion", () => {
+  const row = normalizePromotion({ name: { zh: "满减", de: "", en: "" }, kind: "amount", amountCents: 1000, minSpendCents: 5000, scope: "order" });
+  assert.equal(row.kind, "amount");
+  const config = JSON.parse(row.config_json);
+  assert.equal(config.amountCents, 1000);
+  assert.equal(config.minSpendCents, 5000);
+});
+
+test("normalizePromotion rejects a bad 满减", () => {
+  assert.throws(() => normalizePromotion({ name: { zh: "x" }, kind: "amount", amountCents: 0 }), /0\.01 to 1000/);
+  assert.throws(() => normalizePromotion({ name: { zh: "x" }, kind: "amount", amountCents: 100001 }), /0\.01 to 1000/);
+  assert.throws(() => normalizePromotion({ name: { zh: "x" }, kind: "amount", amountCents: 1000, minSpendCents: -1 }), /0 to 1000/);
+  // The cut cannot exceed the threshold (满100减200 is nonsense).
+  assert.throws(() => normalizePromotion({ name: { zh: "x" }, kind: "amount", amountCents: 2000, minSpendCents: 1000 }), /larger than the threshold/);
+  // A cut with no threshold is fine (always applies).
+  assert.doesNotThrow(() => normalizePromotion({ name: { zh: "x" }, kind: "amount", amountCents: 2000, minSpendCents: 0 }));
+});
+
+test("promotionView reads amountCents/minSpendCents out of config for an amount promo", () => {
+  const view = promotionView({
+    id: "a1", name_zh: "满减", name_de: "", name_en: "", kind: "amount",
+    config_json: JSON.stringify({ amountCents: 1500, minSpendCents: 8000 }), scope: "order", category: null,
+    active_from: null, active_to: null, weekdays: "", start_min: null, end_min: null,
+    enabled: 1, priority: 0, created_at: "x", updated_at: "y"
+  });
+  assert.equal(view.amountCents, 1500);
+  assert.equal(view.minSpendCents, 8000);
+  assert.equal(view.percent, 0);
+});
+
+test("bestAmountPromotion picks the biggest cut, ignores percent promos, and null when none", () => {
+  const percent = { ...promo(), id: "pc" };
+  const small = { ...promo(), id: "am-s", kind: "amount", amountCents: 500, minSpendCents: 3000, percent: 0 };
+  const big = { ...promo(), id: "am-b", kind: "amount", amountCents: 1500, minSpendCents: 9000, percent: 0 };
+  const at = "2026-11-24T12:00:00Z";
+  const win = bestAmountPromotion([percent, small, big], { at, timeZone: TZ });
+  assert.equal(win.id, "am-b");
+  assert.equal(win.amountCents, 1500);
+  assert.equal(win.minSpendCents, 9000);
+  assert.equal(bestAmountPromotion([percent], { at, timeZone: TZ }), null);
+  assert.equal(bestOrderPromotion([small, big], { at, timeZone: TZ }), null); // percent picker ignores amount promos
 });

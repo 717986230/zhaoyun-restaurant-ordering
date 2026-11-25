@@ -58,6 +58,12 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [discountReason, setDiscountReason] = useState("");
   // 营销活动: the promotion live right now, if any — its percent is offered as the whole-bill discount.
   const [promo, setPromo] = useState<{ name: { zh: string; de: string; en: string }; percent: number } | null>(null);
+  // 满减: a fixed cut in cents off the whole bill, and the live 满减 promotion that
+  // offers it once the dishes reach its threshold. `amountTouched` stops the
+  // promotion from overriding a figure the waiter keyed in by hand.
+  const [amountDiscount, setAmountDiscount] = useState(0);
+  const [amountPromo, setAmountPromo] = useState<{ name: { zh: string; de: string; en: string }; amountCents: number; minSpendCents: number } | null>(null);
+  const amountTouched = useRef(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [busy, setBusy] = useState(false);
   const [sepa, setSepa] = useState<ApiSepaPayment | null>(null);
@@ -92,8 +98,10 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     }).catch(() => undefined);
     // Offer the best live promotion as the whole-bill discount, never below a
     // bigger one already set (a takeaway's, or one the waiter keyed in).
-    api.activePromotion().then(({ promotion }) => {
+    api.activePromotion().then(({ promotion, amountPromotion }) => {
       if (promotion) { setPromo({ name: promotion.name, percent: promotion.percent }); setDiscount((current) => Math.max(current, promotion.percent)); }
+      // 满减 is applied once the running bill reaches its threshold (effect below).
+      if (amountPromotion) setAmountPromo({ name: amountPromotion.name, amountCents: amountPromotion.amountCents, minSpendCents: amountPromotion.minSpendCents });
     }).catch(() => undefined);
     void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
@@ -143,7 +151,12 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     }
   }
   const offCents = [...byRate.values()].reduce((sum, cents) => sum + Math.round((cents * discount) / 100), 0);
-  const totalCents = itemsCents - itemOffCents - offCents;
+  // The dishes net of per-item and whole-bill percentage discounts: the base the
+  // 满减 fixed cut then comes off, capped so the bill never goes below zero —
+  // exactly as the server works it out (shared/register.mjs).
+  const netCents = itemsCents - itemOffCents - offCents;
+  const amountOffCents = Math.min(Math.max(0, amountDiscount), Math.max(0, netCents));
+  const totalCents = netCents - amountOffCents;
   const paidCents = payments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
   const remaining = totalCents - paidCents;
   const cash = payments.find((payment) => payment.type === "cash" && payment.tendered);
@@ -159,6 +172,14 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   // A price box with something unusable in it blocks the receipt.
   const badPrice = lines.some((item) => (picks[item.orderItemId] ?? 0) > 0 && priceInfo(item).bad);
   const canIssue = picked && totalCents >= 0 && remaining === 0 && change >= 0 && memberOk && (!reduced || discountReason.trim().length > 0) && !badPrice && !busy;
+
+  // 满减: apply the live promotion's cut once the dishes reach its threshold,
+  // and lift it again if a later change drops the bill back below — unless the
+  // waiter has keyed a figure in by hand (then it is theirs to manage).
+  useEffect(() => {
+    if (!amountPromo || amountTouched.current) return;
+    setAmountDiscount(netCents >= amountPromo.minSpendCents ? amountPromo.amountCents : 0);
+  }, [amountPromo, netCents]);
 
   const setMode = (next: boolean) => {
     setSeparate(next);
@@ -253,6 +274,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
           };
         }),
         ...(discount ? { discountPercent: discount } : {}),
+        ...(amountOffCents > 0 ? { discountCents: amountOffCents } : {}),
         ...(reduced ? { discountReason: discountReason.trim() } : {}),
         payments: payments.map((payment) => ({
           type: payment.type,
@@ -323,7 +345,9 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
 
     <div className="pos-pay-panel">
       {promo && <div className="pos-promo">{t("posPromoActive", { name: promo.name[language] || promo.name.zh || promo.name.en || promo.name.de, percent: String(promo.percent) })}</div>}
+      {amountPromo && <div className="pos-promo">{t("posAmountPromoActive", { name: amountPromo.name[language] || amountPromo.name.zh || amountPromo.name.en || amountPromo.name.de, cut: money(amountPromo.amountCents), min: money(amountPromo.minSpendCents) })}</div>}
       <label className="pos-discount"><span>{t("discount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={discount} onChange={(event) => setDiscount(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
+      <label className="pos-discount"><span>{t("amountDiscount")}</span><input type="number" min={0} max={1000} step="0.01" inputMode="decimal" value={amountDiscount ? (amountDiscount / 100).toFixed(2) : ""} placeholder="0" onChange={(event) => { amountTouched.current = true; const cents = Math.round((Number(event.target.value) || 0) * 100); setAmountDiscount(Math.max(0, Math.min(100000, cents))); }} /></label>
       {reduced && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>
       <div className="pos-pay-types">{(["cash", "card", "voucher", "balance"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
