@@ -465,6 +465,17 @@ export const BroadcastBody = Type.Object({
 // 会员营销授权 (GDPR opt-in): the member's own marketing-email switch.
 export const MarketingBody = Type.Object({ enabled: Type.Boolean() }, { additionalProperties: false });
 
+// 员工排班 (shared/roster.mjs): one rostered shift. Times are minutes of the
+// day; the engine checks the date, the window and that the staff member exists.
+export const ShiftBody = Type.Object({
+  id: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  staffId: Type.String({ minLength: 1, maxLength: 128 }),
+  date: Type.String({ minLength: 10, maxLength: 10 }),
+  startMin: Type.Integer({ minimum: 0, maximum: 1439 }),
+  endMin: Type.Integer({ minimum: 0, maximum: 1439 }),
+  note: Type.Optional(Type.String({ maxLength: 120 }))
+}, { additionalProperties: false });
+
 // A storno always says why.
 export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false });
 

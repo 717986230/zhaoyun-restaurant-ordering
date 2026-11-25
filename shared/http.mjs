@@ -19,7 +19,7 @@ import {
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, LetteredTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody,
-  InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody, PromotionBody, BroadcastBody, SegmentBody, MarketingBody
+  InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody, PromotionBody, BroadcastBody, SegmentBody, MarketingBody, ShiftBody
 } from "../src/contracts.js";
 import {
   SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent,
@@ -1900,6 +1900,33 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
               if (!(await sendMail({ to: member.email, ...message }))) await store.releaseBroadcastSend(broadcast.id, member.id);
             }
             return json({ broadcast: await store.finishBroadcast(broadcast.id, reachable.length) });
+          }
+        } catch (error) {
+          return fail(error.message);
+        }
+      }
+
+      // /api/admin/shifts?from=&to=[/:id] — 员工排班 (shared/roster.mjs), manager-only.
+      if (path[2] === "shifts") {
+        try {
+          if (path.length === 3 && method === "GET") {
+            return json({ shifts: await store.listShifts(url.searchParams.get("from"), url.searchParams.get("to")) });
+          }
+          if (path.length === 3 && method === "POST") {
+            const { value, invalid } = await body(request, ShiftBody);
+            if (invalid) return invalid;
+            return json({ shift: await store.saveShift(value) }, 201);
+          }
+          if (path.length === 4 && method === "PUT") {
+            const { value, invalid } = await body(request, ShiftBody);
+            if (invalid) return invalid;
+            const shift = await store.saveShift({ ...value, id: path[3] });
+            return shift ? json({ shift }) : fail("No such shift", 404);
+          }
+          if (path.length === 4 && method === "DELETE") {
+            return (await store.deleteShift(path[3]))
+              ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
+              : fail("No such shift", 404);
           }
         } catch (error) {
           return fail(error.message);

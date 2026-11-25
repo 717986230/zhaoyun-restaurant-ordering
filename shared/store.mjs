@@ -72,6 +72,7 @@ import {
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { normalizePromotion, promotionView } from "./promotions.mjs";
 import { matchesSegment, normalizeSegment } from "./segments.mjs";
+import { normalizeShift, shiftView } from "./roster.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
 import { createWaitlistStore } from "./waitlist-store.mjs";
 import { appIconsView } from "./app-icons.mjs";
@@ -1523,7 +1524,7 @@ export function createStore(driver, options = {}) {
     "day_closings", "delivery_orders", "discovered_printers", "email_codes",
     "journal", "mail_outbox", "media_files", "print_bridges", "reservation_reminders",
     "reservations", "restaurant_settings", "restaurant_tables", "service_requests",
-    "promotions", "member_consent", "broadcasts", "broadcast_sends",
+    "promotions", "member_consent", "broadcasts", "broadcast_sends", "roster_shifts",
     "staff_settlements", "table_claim_meta", "table_claims", "table_sessions",
     "tenant_tokens", "waitlist",
     "order_items", "receipts", "customers", "accounts", "staff", "pos_devices",
@@ -1935,6 +1936,31 @@ export function createStore(driver, options = {}) {
         Number(audience) || 0, String(id), at, tenantId, String(id));
       return broadcastView(await first("SELECT * FROM broadcasts WHERE tenant_id = ? AND id = ?", tenantId, String(id)));
     },
+    // 员工排班 (shared/roster.mjs). The roster over a span of days, oldest first.
+    listShifts: async (from, to) => {
+      const start = String(from ?? "");
+      const end = String(to ?? from ?? "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) throw new Error("from and to are dates (YYYY-MM-DD)");
+      const rows = await all("SELECT * FROM roster_shifts WHERE tenant_id = ? AND work_date BETWEEN ? AND ? ORDER BY work_date, start_min, staff_id", tenantId, start, end);
+      return rows.map(shiftView);
+    },
+    /** Create (no id) or update (id present) a shift; null when an id names none, or the staff member is gone. Throws a plain message on bad input. */
+    saveShift: async (input) => {
+      const columns = normalizeShift(input);
+      if (!(await first("SELECT id FROM staff WHERE tenant_id = ? AND id = ?", tenantId, columns.staff_id))) throw new Error("No such staff member");
+      const id = input.id ? String(input.id) : uuid();
+      const at = now();
+      if (input.id) {
+        if (!(await first("SELECT id FROM roster_shifts WHERE tenant_id = ? AND id = ?", tenantId, id))) return null;
+        await run("UPDATE roster_shifts SET staff_id = ?, work_date = ?, start_min = ?, end_min = ?, note = ?, updated_at = ? WHERE tenant_id = ? AND id = ?",
+          columns.staff_id, columns.work_date, columns.start_min, columns.end_min, columns.note, at, tenantId, id);
+      } else {
+        await run("INSERT INTO roster_shifts (id, tenant_id, staff_id, work_date, start_min, end_min, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          id, tenantId, columns.staff_id, columns.work_date, columns.start_min, columns.end_min, columns.note, at, at);
+      }
+      return shiftView(await first("SELECT * FROM roster_shifts WHERE tenant_id = ? AND id = ?", tenantId, id));
+    },
+    deleteShift: async (id) => (await run("DELETE FROM roster_shifts WHERE tenant_id = ? AND id = ?", tenantId, String(id))) > 0,
     listProducts,
     menuStamp,
     getProduct,

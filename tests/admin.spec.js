@@ -531,7 +531,7 @@ test("the console says Admin, and switches its own language without touching the
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日订单桌位预约候位外卖菜品库存打印报表账单营销设置顾客会员群发跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日订单桌位预约候位外卖菜品库存打印报表账单营销排班设置顾客会员群发跳转");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
@@ -568,12 +568,12 @@ test("orders, tables and printers stay out of the way until ordering is switched
   const nav = page.getByRole("navigation", { name: "管理模块" });
   // 报表 (money view) and 桌位 (table status) stay within reach even with the
   // board/printer toggle off — a manager needs them every service.
-  await expect(nav).toHaveText("今日桌位预约候位外卖菜品库存报表账单营销设置顾客会员群发跳转");
+  await expect(nav).toHaveText("今日桌位预约候位外卖菜品库存报表账单营销排班设置顾客会员群发跳转");
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示实时订单看板和打印机" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("今日订单桌位预约候位外卖菜品库存打印报表账单营销设置顾客会员群发跳转");
+  await expect(nav).toHaveText("今日订单桌位预约候位外卖菜品库存打印报表账单营销排班设置顾客会员群发跳转");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
