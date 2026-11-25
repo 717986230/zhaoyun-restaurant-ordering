@@ -1420,13 +1420,75 @@ html.bk-root body {
    lays these out in a column with its own gap.
    ------------------------------------------------------------------------ */
 
-/* The party sits on its own short line above the calendar, not full width. */
-.bk-party-field {
-  max-width: 150px;
+/* The party sits in a prominent full-width bar above the calendar with − / + steppers. */
+.bk-party-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-2);
 }
-.bk-party-field input#bookingParty {
+.bk-party-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+.bk-party-label span {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.bk-party-label small {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+}
+.bk-party-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.bk-party-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.bk-party-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.bk-party-stepper input#bookingParty {
+  width: 56px;
+  height: 38px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.bk-party-stepper input#bookingParty::-webkit-outer-spin-button,
+.bk-party-stepper input#bookingParty::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* The calendar. */

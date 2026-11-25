@@ -743,15 +743,25 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   return <div className="bk-form">
     {/* How many, which day, what time: a count, a calendar, then the times. */}
     <section className="bk-card bk-pick" id="bookingTimes">
-      <label className="bk-field bk-party-field"><span>{b(language, "party")}</span>
-        <input id="bookingParty" type="number" inputMode="numeric" min={1} max={info.maxParty} step={1} value={partyText}
-          onChange={(event) => {
-            setPartyText(event.target.value);
-            const count = Number(event.target.value);
-            if (Number.isInteger(count) && count >= 1 && count <= info.maxParty) setParty(count);
-          }}
-          onBlur={() => setPartyText(String(party))} />
-      </label>
+      <div className="bk-party-bar">
+        <label className="bk-party-label" htmlFor="bookingParty">
+          <span>{b(language, "party")}</span>
+          <small>{b(language, "partyOf", { n: party })}</small>
+        </label>
+        <div className="bk-party-stepper">
+          <button type="button" className="bk-party-btn" aria-label="-" disabled={party <= 1}
+            onClick={() => { const next = Math.max(1, party - 1); setParty(next); setPartyText(String(next)); }}>−</button>
+          <input id="bookingParty" type="number" inputMode="numeric" min={1} max={info.maxParty} step={1} value={partyText}
+            onChange={(event) => {
+              setPartyText(event.target.value);
+              const count = Number(event.target.value);
+              if (Number.isInteger(count) && count >= 1 && count <= info.maxParty) setParty(count);
+            }}
+            onBlur={() => setPartyText(String(party))} />
+          <button type="button" className="bk-party-btn" aria-label="+" disabled={party >= info.maxParty}
+            onClick={() => { const next = Math.min(info.maxParty, party + 1); setParty(next); setPartyText(String(next)); }}>+</button>
+        </div>
+      </div>
       <BookingCalendar language={language} value={date} onPick={(day) => { setDate(day); setError(""); }} bookable={bookable} today={info.today} lastDate={info.lastDate} />
       <div className="bk-times">
         <p className="bk-times-label">{b(language, "time")}</p>
