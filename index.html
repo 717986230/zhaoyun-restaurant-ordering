@@ -33,19 +33,19 @@
       .zy-crest{width:min(42vw,164px);height:min(42vw,164px)}
       .zy-ring{transform-origin:160px 160px;animation:zy-turn 4.5s linear infinite}
       @keyframes zy-turn{to{transform:rotate(360deg)}}
-      .zy-draw{stroke-dasharray:1400;stroke-dashoffset:1400;
-        animation:zy-ink 1.6s cubic-bezier(.2,.8,.2,1) .1s forwards}
+      .zy-draw{stroke-dasharray:600;stroke-dashoffset:600;
+        animation:zy-ink 1.2s cubic-bezier(.2,.8,.2,1) .08s forwards}
       @keyframes zy-ink{to{stroke-dashoffset:0}}
-      .zy-fx{opacity:0;animation:zy-in .9s ease .75s forwards}
+      .zy-fx{opacity:0;animation:zy-in .8s ease .55s forwards}
       @keyframes zy-in{to{opacity:1}}
-      .zy-pearl{transform-origin:238px 52px;animation:zy-breathe 2.6s ease-in-out 1.5s infinite}
-      @keyframes zy-breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.14);opacity:1}}
+      .zy-steam{animation:zy-float 2.8s ease-in-out 1.1s infinite}
+      @keyframes zy-float{0%,100%{transform:translateY(0);opacity:.75}50%{transform:translateY(-4px);opacity:1}}
       .zy-word{max-width:84vw;font-weight:600;font-size:clamp(22px,6.2vw,31px);letter-spacing:.14em;
         line-height:1.2;text-align:center;text-wrap:balance;color:#e9edee;padding-left:.14em;
         opacity:0;animation:zy-in .9s ease 1.05s forwards}
       .zy-word:empty{display:none}
       @media (prefers-reduced-motion:reduce){
-        .zy-ring,.zy-pearl{animation:none}
+        .zy-ring,.zy-steam{animation:none}
         .zy-draw{stroke-dashoffset:0;animation:none}
         .zy-fx,.zy-word{opacity:1;animation:none}
         .zy-splash{animation:zy-out .4s ease 1.4s forwards}
@@ -62,34 +62,23 @@
             <circle cx="160" cy="160" r="128" stroke="rgba(143,176,163,.55)" stroke-width="1.6"
                     stroke-dasharray="64 740" stroke-linecap="round"/>
           </g>
-          <circle cx="160" cy="160" r="116" stroke="rgba(233,238,240,.05)" stroke-width="1"/>
-          <!-- 团龙: a single celadon ribbon, coiled, chasing the pearl -->
+          <circle cx="160" cy="160" r="112" stroke="rgba(233,238,240,.06)" stroke-width="1"/>
+          <!-- Minimalist celadon bowl, chopsticks, and rising steam -->
           <g stroke="#8fb0a3" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <g class="zy-draw">
-              <path d="M182.6 98 A 66 66 0 1 0 222 137.4 C 231 130 236 122 233 113" stroke-width="8.5"/>
+              <path d="M96 164 H224 C224 202 196 220 160 220 C124 220 96 202 96 164 Z" stroke-width="5.5"/>
+              <path d="M136 218 L140 230 H180 L184 218" stroke-width="4.5"/>
             </g>
             <g class="zy-fx">
-              <g stroke-width="4.5">
-                <path d="M132.1 100.2 L127.0 89.3"/>
-                <path d="M102.8 127.0 L92.5 121.0"/>
-                <path d="M96.3 177.1 L84.7 180.2"/>
-                <path d="M127.0 217.2 L121.0 227.5"/>
-                <path d="M170 221 L172 233"/>
-              </g>
-              <path d="M150 222 C 160 236 176 238 186 230" stroke-width="6"/>
-              <path d="M186 230 l9 7 M188 224 l10 4 M182 236 l6 9" stroke-width="3.5"/>
-              <path d="M182.6 98 C 190 82 208 80 216 90 C 220 96 219 103 214 106" stroke-width="7.5"/>
-              <path d="M214 106 C 206 112 193 111 185 104" stroke-width="6.5"/>
-              <path d="M198 86 C 208 71 224 70 232 61" stroke-width="5.5"/>
-              <path d="M216 92 C 230 82 244 74 252 60" stroke-width="3.5"/>
+              <path d="M104 178 C126 184 194 184 216 178" stroke="rgba(143,176,163,.42)" stroke-width="2.5"/>
+              <path d="M156 154 L224 104" stroke="#a9c7ba" stroke-width="4.5"/>
+              <path d="M172 156 L232 118" stroke="#a9c7ba" stroke-width="4"/>
             </g>
-          </g>
-          <g class="zy-fx">
-            <circle cx="199" cy="95" r="4.2" fill="#0f1113" stroke="#8fb0a3" stroke-width="2.2"/>
-          </g>
-          <g class="zy-pearl zy-fx">
-            <circle cx="238" cy="52" r="12" stroke="#a9c7ba" stroke-width="3" fill="rgba(143,176,163,.14)"/>
-            <circle cx="234" cy="48" r="2.8" fill="#e9edee"/>
+            <g class="zy-steam zy-fx" stroke="#a9c7ba" stroke-width="3.2">
+              <path d="M122 146 Q116 132 124 118"/>
+              <path d="M142 140 Q136 124 144 108"/>
+              <path d="M162 146 Q156 132 164 118"/>
+            </g>
           </g>
         </svg>
         <div class="zy-word" id="zy-word"></div>
