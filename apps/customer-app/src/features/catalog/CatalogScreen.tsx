@@ -794,11 +794,11 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
       <b><RollingNumber text={String(cart.count)} value={cart.count} /></b><span>{g(state.language, "cart")}</span><em><RollingNumber text={formatPrice(cart.totalCents, state.language)} value={cart.totalCents} /></em>
       <svg className="cartbar-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" /></svg>
     </button>}
-    {/* Calling a waiter to the table this phone scanned: in the other bottom
-        corner from "back to top", above the cart when there is one. */}
-    {table && !activeProduct && <button type="button" id="callBtn" className={`call-waiter ${ordering.open && cart.count > 0 ? "above-cart" : ""}`}
+    {/* Calling a waiter to the table this phone scanned: a compact pill in the
+        bottom-right corner, stepping above "back to top" and the cart bar. */}
+    {table && !activeProduct && <button type="button" id="callBtn" className={`call-waiter ${ordering.open && cart.count > 0 ? "above-cart" : ""} ${farDown ? "above-top" : ""}`}
       aria-label={g(state.language, "callButton")} title={g(state.language, "callButton")}
-      onClick={() => dispatch({ type: "sheet", sheet: "service" })}><BellIcon /></button>}
+      onClick={() => dispatch({ type: "sheet", sheet: "service" })}><BellIcon /><span>{g(state.language, "callPill")}</span></button>}
     <button
       type="button"
       className={`to-top ${farDown && !activeProduct ? "on" : ""} ${ordering.open && cart.count > 0 ? "above-cart" : ""}`}

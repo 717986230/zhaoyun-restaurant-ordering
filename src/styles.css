@@ -3660,25 +3660,36 @@ button:focus-visible,
 .call-waiter {
   position: fixed;
   z-index: 45;
-  left: calc(16px + env(safe-area-inset-left));
+  right: calc(16px + env(safe-area-inset-right));
   bottom: calc(22px + env(safe-area-inset-bottom));
-  width: 46px;
-  height: 46px;
-  display: grid;
-  place-items: center;
-  padding: 0;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
   border: 1px solid var(--line-strong);
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--panel-glass);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   backdrop-filter: blur(14px) saturate(1.2);
   color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
   box-shadow: var(--shadow-2);
   cursor: pointer;
+  transition: bottom 0.22s ease, transform 0.15s ease;
+}
+
+.call-waiter.above-top {
+  bottom: calc(78px + env(safe-area-inset-bottom));
 }
 
 .call-waiter.above-cart {
   bottom: calc(90px + env(safe-area-inset-bottom));
+}
+
+.call-waiter.above-cart.above-top {
+  bottom: calc(146px + env(safe-area-inset-bottom));
 }
 
 .call-waiter:active {
@@ -3686,8 +3697,9 @@ button:focus-visible,
 }
 
 .call-waiter .scheme-icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .service-calls {
