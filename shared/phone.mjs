@@ -43,12 +43,14 @@ export function checkMobile(value, { country = "43" } = {}) {
   if (/^(\d)\1+$/.test(digits.slice(-9))) return { ok: false, reason: "FORMAT" };
   for (const [code, rule] of Object.entries(MOBILE)) {
     if (!digits.startsWith(code)) continue;
-    const national = digits.slice(code.length);
+    // A guest who keeps the trunk "0" after the country code ("+43 0681…",
+    // "0043 0664…") means the same number; E.164 drops that 0.
+    const national = digits.slice(code.length).replace(/^0+/, "");
     // A landline is a number, just not one to reach a guest on the way.
     if (!rule.prefix.test(national)) return { ok: false, reason: "NOT_MOBILE" };
     if (national.length < rule.min || national.length > rule.max) return { ok: false, reason: "FORMAT" };
     // As the floor reads it out and dials it: "+43 660 1234567".
-    return { ok: true, e164: `+${digits}`, display: `+${code} ${national.slice(0, 3)} ${national.slice(3)}` };
+    return { ok: true, e164: `+${code}${national}`, display: `+${code} ${national.slice(0, 3)} ${national.slice(3)}` };
   }
   return { ok: true, e164: `+${digits}`, display: `+${digits}` };
 }

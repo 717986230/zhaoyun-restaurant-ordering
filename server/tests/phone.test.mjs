@@ -7,6 +7,15 @@ test("a guest's mobile number is checked and written one way", () => {
   for (const typed of ["0660 1234567", "+43 660 1234567", "0043 660 123 45 67", "+43 (660) 123-4567", "0660/1234567"]) {
     assert.deepEqual(checkMobile(typed), { ok: true, e164: "+436601234567", display: "+43 660 1234567" }, typed);
   }
+  // A long 0681 web2phone number, however written — the bug a guest hit with +4368110858841.
+  for (const typed of ["+4368110858841", "+43 681 10858841", "0681 10858841", "0043 681 10858841"]) {
+    assert.deepEqual(checkMobile(typed), { ok: true, e164: "+4368110858841", display: "+43 681 10858841" }, typed);
+  }
+  // A guest who keeps the trunk "0" after the country code is the same number, not a landline.
+  for (const typed of ["+43 0681 10858841", "0043 0681 10858841", "+43 0660 1234567", "+49 0151 12345678"]) {
+    assert.equal(checkMobile(typed).ok, true, typed);
+  }
+  assert.equal(checkMobile("+43 0681 10858841").e164, "+4368110858841", "the trunk 0 is dropped in E.164");
   assert.equal(checkMobile("0664 123456").display, "+43 664 123456", "an old six-digit subscriber number");
   assert.equal(checkMobile("+49 151 12345678").display, "+49 151 12345678");
   assert.equal(checkMobile("+44 7911 123456").display, "+447911123456", "another country: by its length");
