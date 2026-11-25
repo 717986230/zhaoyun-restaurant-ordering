@@ -51,24 +51,19 @@ jobs:
       - name: Production dependency audit
         run: npm audit --omit=dev
 
-  # The browser tests, split three ways across three runners: some four
-  # hundred of them, each a real page load, were most of a fifteen-minute
-  # run on one. Each shard builds the site itself and serves that build
-  # (playwright.config.js), so they start at once instead of after checks.
+  # The browser tests, split six ways across six runners using the official
+  # Playwright container image (Chromium + WebKit + system libraries pre-baked),
+  # avoiding apt-get and browser downloads on every run.
   e2e:
-    name: Browser tests (${{ matrix.shard }}/3)
-    # Pinned, not ubuntu-latest: that label moved to Ubuntu 26, whose ICU is
-    # newer than the libicudata.so.74 the cached WebKit build links against, so
-    # WebKit (the iPhone projects) failed to launch. 24.04 ships ICU 74.
+    name: Browser tests (${{ matrix.shard }}/6)
     runs-on: ubuntu-24.04
-    # The install step below may take 18 minutes on a cold apt cache, and
-    # the shard's tests need a few minutes after it; 20 minutes was not
-    # enough headroom for both.
-    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v7
 
@@ -82,86 +77,8 @@ jobs:
       - name: Web build
         run: npm run build
 
-      # The browsers are kept between runs, by Playwright's own version: a
-      # download that stalls once cost a whole twenty-minute run. The runner
-      # image id is in the key too: a browser build is linked against that
-      # image's system libraries (libicu and friends), so when the image rolls
-      # the cached build must be re-downloaded or WebKit fails to launch with
-      # a "cannot open shared object file" on a now-missing .so.
-      - name: Playwright version
-        id: playwright
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        id: browsers
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ steps.playwright.outputs.version }}
-
-      # WebKit for the iPhone projects: every browser on iOS is WebKit. A
-      # stalled download is cut off after four minutes and tried again, up to
-      # three times; the lock a cut-off download leaves behind goes first, or
-      # the next try stops at once on "another installation in progress".
-      - name: Download Playwright Chromium and WebKit
-        if: steps.browsers.outputs.cache-hit != 'true'
-        run: |
-          for attempt in 1 2 3; do
-            rm -rf ~/.cache/ms-playwright/__dirlock
-            if timeout 240 npx playwright install chromium webkit; then exit 0; fi
-            echo "::warning::Browser download stalled or failed (attempt $attempt of 3)"
-          done
-          exit 1
-
-            # The .deb archives for the system libraries, cached between runs: a
-      # fresh runner downloads 126 MB from the apt mirror on every run, and
-      # the mirror stalls on the odd large file (libflite1, 13.6 MB) often
-      # enough that three 300-second attempts all died at the same place.
-      # With the archives cached, install-deps finds the packages locally
-      # and the mirror is out of the critical path after the first good run.
-      - name: Cache apt archives for browser libraries
-        uses: actions/cache@v6
-        with:
-          path: ~/apt-archives
-          key: apt-archives-${{ runner.os }}-${{ env.ImageOS }}-${{ steps.playwright.outputs.version }}
-          restore-keys: |
-            apt-archives-${{ runner.os }}-${{ env.ImageOS }}-
-
-      # The system libraries the browsers need, from apt, whether or not they
-      # came from the cache. The Azure apt mirror stalls on the odd package,
-      # so apt is told to retry a stalled file itself (three quick retries
-      # with a 60-second timeout each) instead of hanging until the outer
-      # `timeout` kills the whole transaction; each attempt is still cut off
-      # with its own `timeout` and tried again, refreshing the package lists
-      # between tries. A cut-off apt can leave its lock and a half-configured
-      # dpkg behind, so both are cleared before the next try. After a good
-      # install the downloaded archives are copied aside so the cache above
-      # can save them for the next run.
-      - name: Install the browsers' system libraries
-        timeout-minutes: 18
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo apt-get update || true
-          sudo cp ~/apt-archives/*.deb /var/cache/apt/archives/ 2>/dev/null || true
-          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\n' | sudo tee /etc/apt/apt.conf.d/99-playwright-retries >/dev/null
-          for attempt in 1 2; do
-            if sudo timeout 420 npx playwright install-deps chromium webkit; then
-              mkdir -p ~/apt-archives
-              sudo cp /var/cache/apt/archives/*.deb ~/apt-archives/ 2>/dev/null || true
-              exit 0
-            fi
-            echo "::warning::apt stalled installing browser libraries (attempt $attempt of 2)"
-            sudo pkill -9 -x apt-get || true
-            sudo pkill -9 -x dpkg || true
-            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend || true
-            sudo dpkg --configure -a || true
-            sudo apt-get update || true
-          done
-          exit 1
-
       - name: Responsive end-to-end tests
-        run: npx playwright test --shard=${{ matrix.shard }}/3
+        run: npx playwright test --shard=${{ matrix.shard }}/6
 
       - name: Upload Playwright report on failure
         if: failure()
