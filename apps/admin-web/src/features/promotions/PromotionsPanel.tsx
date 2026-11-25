@@ -49,16 +49,20 @@ function fromTime(value: string): number | null {
 
 interface Draft {
   nameZh: string; nameDe: string; nameEn: string;
-  percent: number; activeFrom: string; activeTo: string;
+  kind: "percent" | "amount";
+  percent: number; amountEuro: number; minSpendEuro: number;
+  activeFrom: string; activeTo: string;
   weekdays: number[]; startTime: string; endTime: string;
   priority: number; enabled: boolean;
 }
 
-const blankDraft: Draft = { nameZh: "", nameDe: "", nameEn: "", percent: 10, activeFrom: "", activeTo: "", weekdays: [], startTime: "", endTime: "", priority: 0, enabled: true };
+const blankDraft: Draft = { nameZh: "", nameDe: "", nameEn: "", kind: "percent", percent: 10, amountEuro: 5, minSpendEuro: 50, activeFrom: "", activeTo: "", weekdays: [], startTime: "", endTime: "", priority: 0, enabled: true };
 
 function draftOf(promo: ApiPromotion): Draft {
   return {
-    nameZh: promo.name.zh, nameDe: promo.name.de, nameEn: promo.name.en, percent: promo.percent,
+    nameZh: promo.name.zh, nameDe: promo.name.de, nameEn: promo.name.en,
+    kind: promo.kind, percent: promo.percent || 10,
+    amountEuro: (promo.amountCents || 500) / 100, minSpendEuro: (promo.minSpendCents || 0) / 100,
     activeFrom: promo.activeFrom ?? "", activeTo: promo.activeTo ?? "", weekdays: [...promo.weekdays],
     startTime: toTime(promo.startMin), endTime: toTime(promo.endMin), priority: promo.priority, enabled: promo.enabled
   };
@@ -94,14 +98,7 @@ export function PromotionsPanel({ api, timeZone, notify, failed }: Props) {
 
   async function save() {
     if (!editing) return;
-    const draft = editing.draft;
-    const input: AdminPromotionInput = {
-      name: { zh: draft.nameZh.trim(), de: draft.nameDe.trim(), en: draft.nameEn.trim() },
-      kind: "percent", percent: draft.percent, scope: "order",
-      activeFrom: draft.activeFrom || null, activeTo: draft.activeTo || null,
-      weekdays: draft.weekdays, startMin: fromTime(draft.startTime), endMin: fromTime(draft.endTime),
-      priority: draft.priority, enabled: draft.enabled
-    };
+    const input = draftToInput(editing.draft);
     setBusy(true);
     try {
       if (editing.id) await api.updatePromotion(editing.id, input); else await api.createPromotion(input);
@@ -127,7 +124,10 @@ export function PromotionsPanel({ api, timeZone, notify, failed }: Props) {
   function draftToInput(draft: Draft): AdminPromotionInput {
     return {
       name: { zh: draft.nameZh.trim(), de: draft.nameDe.trim(), en: draft.nameEn.trim() },
-      kind: "percent", percent: draft.percent, scope: "order",
+      kind: draft.kind, scope: "order",
+      ...(draft.kind === "amount"
+        ? { amountCents: Math.round(draft.amountEuro * 100), minSpendCents: Math.round(draft.minSpendEuro * 100) }
+        : { percent: draft.percent }),
       activeFrom: draft.activeFrom || null, activeTo: draft.activeTo || null,
       weekdays: draft.weekdays, startMin: fromTime(draft.startTime), endMin: fromTime(draft.endTime),
       priority: draft.priority, enabled: draft.enabled
@@ -153,7 +153,9 @@ export function PromotionsPanel({ api, timeZone, notify, failed }: Props) {
         const status = !promo.enabled ? "paused" : live ? "live" : "idle";
         return <tr key={promo.id} data-status={status}>
           <td><b>{nameOf(promo)}</b></td>
-          <td className="promo-discount">-{promo.percent}%</td>
+          <td className="promo-discount">{promo.kind === "amount"
+            ? (promo.minSpendCents > 0 ? t("promoAmountCell", { cut: `€${(promo.amountCents / 100).toFixed(2)}`, min: `€${(promo.minSpendCents / 100).toFixed(2)}` }) : `-€${(promo.amountCents / 100).toFixed(2)}`)
+            : `-${promo.percent}%`}</td>
           <td className="promo-when">{whenText(promo)}</td>
           <td><span className={`promo-pill promo-${status}`}>{t(status === "paused" ? "promoPaused" : status === "live" ? "promoLive" : "promoIdle")}</span></td>
           <td className="promo-actions">
@@ -172,7 +174,16 @@ export function PromotionsPanel({ api, timeZone, notify, failed }: Props) {
           <label><span>{t("promoNameZh")}</span><input value={editing.draft.nameZh} maxLength={80} onChange={(event) => setDraft({ nameZh: event.target.value })} /></label>
           <label><span>{t("promoNameDe")}</span><input value={editing.draft.nameDe} maxLength={80} onChange={(event) => setDraft({ nameDe: event.target.value })} /></label>
           <label><span>{t("promoNameEn")}</span><input value={editing.draft.nameEn} maxLength={80} onChange={(event) => setDraft({ nameEn: event.target.value })} /></label>
-          <label><span>{t("promoPercent")}</span><input type="number" min={1} max={100} inputMode="numeric" value={editing.draft.percent} onChange={(event) => setDraft({ percent: Math.max(1, Math.min(100, Number(event.target.value) || 0)) })} /></label>
+          <label><span>{t("promoKind")}</span><select value={editing.draft.kind} onChange={(event) => setDraft({ kind: event.target.value === "amount" ? "amount" : "percent" })}>
+            <option value="percent">{t("promoKindPercent")}</option>
+            <option value="amount">{t("promoKindAmount")}</option>
+          </select></label>
+          {editing.draft.kind === "percent"
+            ? <label><span>{t("promoPercent")}</span><input type="number" min={1} max={100} inputMode="numeric" value={editing.draft.percent} onChange={(event) => setDraft({ percent: Math.max(1, Math.min(100, Number(event.target.value) || 0)) })} /></label>
+            : <>
+                <label><span>{t("promoAmount")}</span><input type="number" min={0.01} max={1000} step="0.01" inputMode="decimal" value={editing.draft.amountEuro} onChange={(event) => setDraft({ amountEuro: Math.max(0, Math.min(1000, Number(event.target.value) || 0)) })} /></label>
+                <label><span>{t("promoMinSpend")}</span><input type="number" min={0} max={1000} step="0.01" inputMode="decimal" value={editing.draft.minSpendEuro} onChange={(event) => setDraft({ minSpendEuro: Math.max(0, Math.min(1000, Number(event.target.value) || 0)) })} /></label>
+              </>}
           <label><span>{t("promoFrom")}</span><input type="date" value={editing.draft.activeFrom} onChange={(event) => setDraft({ activeFrom: event.target.value })} /></label>
           <label><span>{t("promoTo")}</span><input type="date" value={editing.draft.activeTo} onChange={(event) => setDraft({ activeTo: event.target.value })} /></label>
           <div className="promo-weekdays"><span>{t("promoWeekdays")}</span>

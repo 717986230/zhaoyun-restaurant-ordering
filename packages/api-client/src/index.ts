@@ -162,8 +162,10 @@ export interface AdminProductInput {
 /** 营销活动: what the console sends to create or edit a promotion (shared/promotions.mjs). */
 export interface AdminPromotionInput {
   name: { zh: string; de: string; en: string };
-  kind?: "percent";
+  kind?: "percent" | "amount";
   percent?: number;
+  amountCents?: number;
+  minSpendCents?: number;
   scope?: "order";
   category?: string | null;
   activeFrom?: string | null;
@@ -641,7 +643,7 @@ export class PosApi {
   }
   floor(): Promise<{ tables: TableOverview[]; claims: PosClaim[]; deviceId: string; requests?: ApiServiceRequest[]; reservations?: ApiReservation[]; held?: HeldTable[]; delivery?: ApiDeliveryOrder[]; takeawayDiscountPercent: number; sepaPayment?: ApiSepaPayment }> { return this.#request("/api/pos/floor"); }
   /** 营销活动: the best promotion live right now, or null, for the till to apply as a whole-bill discount. */
-  activePromotion(): Promise<{ promotion: { id: string; name: { zh: string; de: string; en: string }; percent: number } | null }> { return this.#request("/api/pos/promotions/active"); }
+  activePromotion(): Promise<{ promotion: { id: string; name: { zh: string; de: string; en: string }; percent: number } | null; amountPromotion: { id: string; name: { zh: string; de: string; en: string }; amountCents: number; minSpendCents: number } | null }> { return this.#request("/api/pos/promotions/active"); }
   deliveryAction(id: string, action: DeliveryAction, options: { prepMinutes?: number; reason?: DeliveryRejectReason } = {}): Promise<{ order: ApiDeliveryOrder }> {
     return this.#request(`/api/admin/delivery/orders/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify(options) });
   }

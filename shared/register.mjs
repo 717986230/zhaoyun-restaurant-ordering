@@ -33,6 +33,8 @@ export const MAX_VOUCHER_CENTS = 100_000;
 export const MAX_TIP_CENTS = 50_000;
 /** 单品改价: a dish's new price is at most this much — a guard against a slip. */
 export const MAX_OVERRIDE_CENTS = 100_000;
+/** 满减: a whole-bill fixed cut is at most this much — a guard against a slip. */
+export const MAX_AMOUNT_DISCOUNT_CENTS = 100_000;
 
 /**
  * How much of an order line receipts have paid for. A receipt cancelled by
@@ -458,6 +460,44 @@ export function planCheckout(input, { itemRows, voucherRows, memberRows = [], re
     if (off) {
       vatParts.push(...split);
       lines.push({ kind: "discount", name: `Rabatt ${percent}%`, names: { zh: `折扣 ${percent}%`, de: `Rabatt ${percent}%`, en: `Discount ${percent}%` }, percent, quantity: 1, unitPriceCents: off, totalCents: off, vatSplit: split });
+    }
+  }
+
+  // 满减 (whole-bill fixed-amount discount): a euro cut off the dishes, never the
+  // vouchers (they are added below at 0%). It is spread across the VAT rates in
+  // proportion to what is left at each rate, by the largest-remainder method so
+  // the negative line sums to EXACTLY the cut — the tax split stays whole. The
+  // cut is capped to the dish subtotal so the dishes never go below zero, and a
+  // takeaway/owner 满减 carries no per-dish reason, like the percentage above.
+  const amountOff = Number(input.discountCents ?? 0);
+  if (!Number.isInteger(amountOff) || amountOff < 0 || amountOff > MAX_AMOUNT_DISCOUNT_CENTS) throw new Error("A discount is 0 to 1000 euros");
+  if (amountOff > 0 && lines.length) {
+    const byRate = new Map();
+    for (const part of vatParts) byRate.set(part.percent, (byRate.get(part.percent) || 0) + part.cents);
+    const rates = [...byRate].filter(([, cents]) => cents > 0).sort(([left], [right]) => left - right);
+    const subtotal = rates.reduce((sum, [, cents]) => sum + cents, 0);
+    const capped = Math.min(amountOff, subtotal);
+    if (capped > 0) {
+      // Proportional floor per rate, then hand the leftover cents one by one to
+      // the rates with the largest fractional part (ties to the earlier rate).
+      const shares = rates.map(([rate, cents]) => {
+        const raw = (capped * cents) / subtotal;
+        const floor = Math.floor(raw);
+        return { rate, floor, frac: raw - floor };
+      });
+      let left = capped - shares.reduce((sum, share) => sum + share.floor, 0);
+      for (const share of [...shares].sort((a, b) => b.frac - a.frac || a.rate - b.rate)) {
+        if (left <= 0) break;
+        share.floor += 1;
+        left -= 1;
+      }
+      const split = shares.map((share) => ({ percent: share.rate, cents: -share.floor })).filter((part) => part.cents !== 0);
+      const off = split.reduce((sum, part) => sum + part.cents, 0);
+      if (off) {
+        vatParts.push(...split);
+        const euros = (capped / 100).toFixed(2);
+        lines.push({ kind: "discount", name: `Rabatt €${euros}`, names: { zh: `满减 €${euros}`, de: `Rabatt €${euros}`, en: `Discount €${euros}` }, amountCents: capped, quantity: 1, unitPriceCents: off, totalCents: off, vatSplit: split });
+      }
     }
   }
 

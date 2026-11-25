@@ -238,3 +238,108 @@ test("a dish is repriced at its own VAT rate, keeps its list price, and says why
     payments: [{ type: "cash", amount: 12 }]
   }, common), /set menu/);
 });
+
+/**
+ * 满减 (whole-bill fixed cut): a euro amount off the dishes, spread across the
+ * VAT rates by the largest-remainder method so the negative line sums to exactly
+ * the cut — the tax split stays whole — capped so the bill never goes negative.
+ */
+test("a 满减 cut is spread across VAT rates and sums to exactly the cut", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 2000, vat_percent: 10, product_name: "Suppe", modifiers_json: "[]" },
+    { id: "i2", product_id: "p2", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 1000, vat_percent: 20, product_name: "Bier", modifiers_json: "[]" }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+
+  // 30.00 of dishes, 满减 5.00 off → 25.00. 5.00 split over 20.00@10% and
+  // 10.00@20% in proportion: 3.33 and 1.67, summing to exactly 5.00.
+  const { receipt } = planCheckout({
+    discountCents: 500,
+    items: [{ orderItemId: "i1", quantity: 1 }, { orderItemId: "i2", quantity: 1 }],
+    payments: [{ type: "cash", amount: 25 }]
+  }, common);
+  assert.equal(receipt.totalCents, 2500);
+  const discount = receipt.lines.find((line) => line.kind === "discount");
+  assert.equal(discount.amountCents, 500);
+  assert.equal(discount.percent, undefined);
+  assert.equal(discount.totalCents, -500);
+  assert.equal(discount.vatSplit.reduce((sum, part) => sum + part.cents, 0), -500);
+  assert.deepEqual(discount.vatSplit, [{ percent: 10, cents: -333 }, { percent: 20, cents: -167 }]);
+  // No 满减 reason is required (like the whole-bill percentage).
+  assert.equal(discount.reason, undefined);
+});
+
+test("a 满减 cut is capped to the dish subtotal so the bill never goes negative", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 1000, vat_percent: 10, product_name: "Suppe", modifiers_json: "[]" }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+
+  // A 50.00 cut on a 10.00 bill takes it to 0.00, not below.
+  const { receipt } = planCheckout({
+    discountCents: 5000,
+    items: [{ orderItemId: "i1", quantity: 1 }],
+    payments: []
+  }, common);
+  assert.equal(receipt.totalCents, 0);
+  const discount = receipt.lines.find((line) => line.kind === "discount");
+  assert.equal(discount.amountCents, 1000);
+  assert.equal(discount.totalCents, -1000);
+});
+
+test("满减 stacks after the whole-bill percentage, on what the percentage leaves", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 10000, vat_percent: 10, product_name: "Menü", modifiers_json: "[]" }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+
+  // 100.00 less 10% = 90.00, then 满减 5.00 = 85.00.
+  const { receipt } = planCheckout({
+    discountPercent: 10,
+    discountCents: 500,
+    items: [{ orderItemId: "i1", quantity: 1 }],
+    payments: [{ type: "cash", amount: 85 }]
+  }, common);
+  assert.equal(receipt.totalCents, 8500);
+  const percent = receipt.lines.find((line) => line.kind === "discount" && line.percent === 10);
+  const amount = receipt.lines.find((line) => line.kind === "discount" && line.amountCents === 500);
+  assert.equal(percent.totalCents, -1000);
+  assert.equal(amount.totalCents, -500);
+  // The VAT still balances: 85.00 gross at 10%.
+  assert.deepEqual(receipt.vat, [{ percent: 10, grossCents: 8500, netCents: 7727, vatCents: 773 }]);
+});
+
+test("满减 never touches a voucher sold on the same receipt", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 2000, vat_percent: 10, product_name: "Suppe", modifiers_json: "[]" }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+
+  // 20.00 dish less 满减 5.00 = 15.00, plus a 10.00 voucher (0%, undiscounted) = 25.00.
+  const { receipt } = planCheckout({
+    discountCents: 500,
+    items: [{ orderItemId: "i1", quantity: 1 }],
+    vouchers: [{ amount: 10 }],
+    payments: [{ type: "cash", amount: 25 }]
+  }, common);
+  assert.equal(receipt.totalCents, 2500);
+  const discount = receipt.lines.find((line) => line.kind === "discount");
+  assert.deepEqual(discount.vatSplit, [{ percent: 10, cents: -500 }]); // never the 0% voucher
+});
+
+test("a 满减 out of range is refused", () => {
+  const itemRows = [
+    { id: "i1", product_id: "p1", table_no: "05", status: "served", billed_at: null, quantity: 1, paid_quantity: 0, voided_quantity: 0, unit_price_cents: 2000, vat_percent: 10, product_name: "Suppe", modifiers_json: "[]" }
+  ];
+  const settings = { cashRegisterId: "K1" };
+  const common = { itemRows, voucherRows: [], receiptNo: 1, settings, role: "staff" };
+  assert.throws(() => planCheckout({
+    discountCents: 100001,
+    items: [{ orderItemId: "i1", quantity: 1 }],
+    payments: []
+  }, common), /0 to 1000 euros/);
+});

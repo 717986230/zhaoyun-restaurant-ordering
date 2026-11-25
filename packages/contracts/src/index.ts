@@ -306,17 +306,20 @@ export interface ApiReceipt {
 
 /**
  * 营销活动 — a promotion the restaurant runs, applied as a discount at
- * checkout. `kind: "percent"` is a whole-bill percentage off; `percent` is set
- * for that kind. The window is a date range (`activeFrom`/`activeTo`, either
- * open), the weekdays it runs (0=Sun..6=Sat; empty = every day) and a
- * time-of-day band (`startMin`/`endMin`, minutes from midnight; null = all
- * day). All read in the restaurant's time zone.
+ * checkout. `kind: "percent"` is a whole-bill percentage off (`percent`);
+ * `kind: "amount"` is 满减, a fixed cut (`amountCents`) once the dishes reach a
+ * threshold (`minSpendCents`, 0 = always). The window is a date range
+ * (`activeFrom`/`activeTo`, either open), the weekdays it runs (0=Sun..6=Sat;
+ * empty = every day) and a time-of-day band (`startMin`/`endMin`, minutes from
+ * midnight; null = all day). All read in the restaurant's time zone.
  */
 export interface ApiPromotion {
   id: string;
   name: { zh: string; de: string; en: string };
-  kind: "percent";
+  kind: "percent" | "amount";
   percent: number;
+  amountCents: number;
+  minSpendCents: number;
   scope: "order";
   category: string | null;
   activeFrom: string | null;
@@ -378,6 +381,8 @@ export interface CheckoutCommand {
   table?: string;
   /** Off the dishes, per VAT rate: a takeaway's pickup discount, say. */
   discountPercent?: number;
+  /** 满减: a whole-bill fixed cut in cents, off the dishes only, capped to the dish subtotal. */
+  discountCents?: number;
   /** Why a line was reduced; required when any dish is discounted or comped. */
   discountReason?: string;
   /** 单品折扣 scopes a discount to one line; 赠菜 (comp) gives it free; 单品改价 sets a new unit price (cents). */

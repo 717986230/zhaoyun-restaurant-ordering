@@ -6,18 +6,23 @@ import { parseJson } from "./core.mjs";
  * Worker, and every test here is a plain in/out check with no database.
  *
  * A promotion is a discount the till offers for the restaurant, the way a
- * member's level already earns one (POS PayScreen, setDiscount). For now one
- * kind, `percent` — a whole-bill percentage off — scoped to the whole order.
- * The window is a date range (`activeFrom`/`activeTo`, inclusive, either end
- * open), the weekdays it runs (`weekdays`, a set of 0=Sun..6=Sat; empty = every
- * day) and a time-of-day band (`startMin`/`endMin`, minutes from midnight; null
- * = all day, and a band that wraps past midnight is allowed). Everything is read
- * in the shop's own time zone, so "Friday, 17:00–19:00" means Friday in Vienna.
+ * member's level already earns one (POS PayScreen, setDiscount). Two kinds,
+ * both scoped to the whole order: `percent` — a whole-bill percentage off — and
+ * `amount` — 满减, a fixed cut (`amountCents`) once the dishes reach a threshold
+ * (`minSpendCents`, 0 = always). The window is a date range
+ * (`activeFrom`/`activeTo`, inclusive, either end open), the weekdays it runs
+ * (`weekdays`, a set of 0=Sun..6=Sat; empty = every day) and a time-of-day band
+ * (`startMin`/`endMin`, minutes from midnight; null = all day, and a band that
+ * wraps past midnight is allowed). Everything is read in the shop's own time
+ * zone, so "Friday, 17:00–19:00" means Friday in Vienna.
  */
 
-export const PROMOTION_KINDS = ["percent"];
+export const PROMOTION_KINDS = ["percent", "amount"];
 export const PROMOTION_SCOPES = ["order"];
 const MAX_NAME = 80;
+// 满减的减免和门槛都以分计，各封顶 1000 欧（和代金券同量级），避免误填天价。
+export const MAX_PROMO_AMOUNT_CENTS = 100_000;
+export const MAX_PROMO_SPEND_CENTS = 100_000;
 
 /** A reader of an instant's wall clock in a given time zone: its date, weekday and minute of day. */
 export function localClock(timeZone) {
@@ -77,6 +82,27 @@ export function bestOrderPromotion(promos, { at, timeZone }) {
   return { id: win.id, name: win.name, percent: win.percent };
 }
 
+/**
+ * The best whole-bill 满减 (fixed-amount) promotion live now, or null. "Best" is
+ * the biggest cut (`amountCents`), ties broken by `priority` then the most
+ * recently changed; `minSpendCents` rides along so the till only applies it once
+ * the dishes reach the threshold. The till decides applicability against the
+ * actual bill — the server does not see the subtotal here — so this returns the
+ * candidate, not a promise it applies.
+ */
+export function bestAmountPromotion(promos, { at, timeZone }) {
+  const live = (Array.isArray(promos) ? promos : [])
+    .filter((promo) => promo.kind === "amount" && promo.scope === "order" && Number(promo.amountCents) > 0)
+    .filter((promo) => promotionActive(promo, at, timeZone));
+  if (!live.length) return null;
+  live.sort((left, right) =>
+    (right.amountCents - left.amountCents) ||
+    ((right.priority ?? 0) - (left.priority ?? 0)) ||
+    String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")));
+  const win = live[0];
+  return { id: win.id, name: win.name, amountCents: win.amountCents, minSpendCents: win.minSpendCents };
+}
+
 /** Shape a stored promotion row into the API object. Config is read by kind. */
 export function promotionView(row) {
   const config = parseJson(row.config_json, {}) ?? {};
@@ -85,6 +111,8 @@ export function promotionView(row) {
     name: { zh: row.name_zh || "", de: row.name_de || "", en: row.name_en || "" },
     kind: row.kind,
     percent: row.kind === "percent" ? Number(config.percent ?? 0) : 0,
+    amountCents: row.kind === "amount" ? Number(config.amountCents ?? 0) : 0,
+    minSpendCents: row.kind === "amount" ? Number(config.minSpendCents ?? 0) : 0,
     scope: row.scope,
     category: row.category ?? null,
     activeFrom: row.active_from ?? null,
@@ -128,6 +156,14 @@ export function normalizePromotion(input) {
     const percent = Number(input.percent ?? 0);
     if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new Error("A discount is 1 to 100 percent");
     config = { percent };
+  }
+  if (kind === "amount") {
+    const amountCents = Number(input.amountCents ?? 0);
+    if (!Number.isInteger(amountCents) || amountCents < 1 || amountCents > MAX_PROMO_AMOUNT_CENTS) throw new Error("A 满减 cut is 0.01 to 1000 euros");
+    const minSpendCents = Number(input.minSpendCents ?? 0);
+    if (!Number.isInteger(minSpendCents) || minSpendCents < 0 || minSpendCents > MAX_PROMO_SPEND_CENTS) throw new Error("A 满减 threshold is 0 to 1000 euros");
+    if (minSpendCents > 0 && amountCents > minSpendCents) throw new Error("The cut cannot be larger than the threshold");
+    config = { amountCents, minSpendCents };
   }
 
   const from = cleanDate(input.activeFrom), to = cleanDate(input.activeTo);

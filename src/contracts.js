@@ -321,6 +321,9 @@ export const CheckoutBody = Type.Object({
   }), { maxItems: 200 })),
   vouchers: Type.Optional(Type.Array(Type.Object({ amount: Type.Number() }), { maxItems: 10 })),
   discountPercent: Type.Optional(Type.Number()),
+  // 满减: a whole-bill fixed cut in cents, off the dishes only (never vouchers),
+  // capped to the dish subtotal. No reason needed, like discountPercent.
+  discountCents: Type.Optional(Type.Integer({ minimum: 0, maximum: 100000 })),
   // Why a line was reduced (per-dish discount or a comp) — or a whole-bill
   // discount; required when any dish is discounted or comped, kept in the
   // journal for the audit (like a void's reason).
@@ -427,8 +430,11 @@ const PromotionMinute = Type.Union([Type.Integer({ minimum: 0, maximum: 1439 }),
 export const PromotionBody = Type.Object({
   id: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
   name: Names,
-  kind: Type.Optional(Type.Literal("percent")),
+  kind: Type.Optional(Type.Union([Type.Literal("percent"), Type.Literal("amount")])),
   percent: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  // 满减: a fixed cut and its threshold, in cents (0–1000 euros).
+  amountCents: Type.Optional(Type.Integer({ minimum: 1, maximum: 100000 })),
+  minSpendCents: Type.Optional(Type.Integer({ minimum: 0, maximum: 100000 })),
   scope: Type.Optional(Type.Literal("order")),
   category: Type.Optional(Type.Union([Category, Type.Null()])),
   activeFrom: Type.Optional(PromotionDay),
