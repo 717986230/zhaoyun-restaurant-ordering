@@ -4549,6 +4549,7 @@ em.voided {
 .res-when b {
   font-size: 20px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .res-when small {
@@ -4556,6 +4557,9 @@ em.voided {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   letter-spacing: 0.06em;
+  /* Keep 「已等 N 分钟」 on one line — in the narrow first column CJK would
+     otherwise break mid-word (已等 0 分 / 钟). */
+  white-space: nowrap;
 }
 
 .res-who {
@@ -5075,7 +5079,9 @@ em.voided {
 
 @media (max-width: 760px) {
   .res-row {
-    grid-template-columns: 64px minmax(0, 1fr);
+    /* First column sizes to its content (the time, or 「第 N 位 / 已等 N 分钟」)
+       instead of a fixed 64px that cut the waited text onto a third line. */
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .res-state,
