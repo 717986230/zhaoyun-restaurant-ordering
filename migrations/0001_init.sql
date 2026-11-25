@@ -439,6 +439,32 @@ CREATE TABLE birthday_greetings (
       sent_at TEXT NOT NULL,
       PRIMARY KEY (customer_id, year)
     );
+CREATE TABLE member_consent (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      marketing INTEGER NOT NULL DEFAULT 0,
+      token TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+CREATE TABLE broadcasts (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      segment_json TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sending','sent')),
+      audience INTEGER NOT NULL DEFAULT 0,
+      sent INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      sent_at TEXT
+    );
+CREATE TABLE broadcast_sends (
+      broadcast_id TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (broadcast_id, customer_id)
+    );
 CREATE TABLE guest_orders (
       order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
       tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
@@ -640,6 +666,8 @@ CREATE TABLE promotions (
 CREATE UNIQUE INDEX idx_receipts_one_storno ON receipts(refers_to) WHERE refers_to IS NOT NULL;
 CREATE INDEX idx_receipt_items_item ON receipt_items(order_item_id);
 CREATE INDEX idx_account_tokens_expiry ON account_tokens(expires_at);
+CREATE INDEX idx_member_consent_token ON member_consent(token);
+CREATE INDEX idx_broadcasts_tenant ON broadcasts(tenant_id, created_at);
 CREATE INDEX idx_email_codes_customer ON email_codes(customer_id, created_at);
 CREATE INDEX idx_drawer_sessions_closed ON drawer_sessions(closed_at);
 CREATE INDEX idx_drawer_movements_session ON drawer_movements(session_id);

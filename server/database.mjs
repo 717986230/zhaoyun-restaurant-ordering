@@ -593,6 +593,49 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, 
       PRIMARY KEY (customer_id, year)
     );
 
+    -- 会员营销授权 (GDPR opt-in, shared/customer-store.mjs): a member says yes
+    -- to marketing email, and the one-time token that unsubscribes them from
+    -- any message without their signing in. No row means no consent — a
+    -- broadcast is never sent to a member who has not opted in. A table of its
+    -- own, like the balances, because a deployed D1 takes a new table safely
+    -- but not a new column. See migrations/0114_member_marketing.sql.
+    CREATE TABLE IF NOT EXISTS member_consent (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      marketing INTEGER NOT NULL DEFAULT 0,
+      token TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_member_consent_token ON member_consent(token);
+
+    -- 群发营销 (member broadcasts, shared/store.mjs): a campaign the manager
+    -- composes and sends to a segment of consented members. The segment's rules
+    -- are kept as JSON so a past campaign still shows who it was for; audience
+    -- and sent count what it reached.
+    CREATE TABLE IF NOT EXISTS broadcasts (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      segment_json TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sending','sent')),
+      audience INTEGER NOT NULL DEFAULT 0,
+      sent INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      sent_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_broadcasts_tenant ON broadcasts(tenant_id, created_at);
+
+    -- Which member a broadcast has already been mailed, claimed before the send
+    -- so a retry (or two Worker isolates) mails each member once per campaign.
+    CREATE TABLE IF NOT EXISTS broadcast_sends (
+      broadcast_id TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (broadcast_id, customer_id)
+    );
+
     -- A guest's own order from the menu (shared/ordering.mjs): at the table or
     -- for pickup, by whom when signed in, and the points it spent.
     CREATE TABLE IF NOT EXISTS guest_orders (

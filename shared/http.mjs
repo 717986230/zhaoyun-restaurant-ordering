@@ -19,7 +19,7 @@ import {
   GuestOrderBody, CustomerRegisterBody, CustomerSignInBody, CustomerUpdateBody, CustomerDeleteBody, BirthdayBody, PointsAdjustBody, BalanceAdjustBody, TopUpBody, CustomerPasswordBody, TableOrderingBody,
   PrintBridgeClaimBody, PrintBridgeDoneBody, PrintBridgeFailBody, PrintBridgeReportBody, NumberedTablesBody, LetteredTablesBody, TableRenameBody, ClientErrorBody,
   ReservationBody, ReservationLookupBody, StaffReservationBody, ReservationUpdateBody, WaitlistBody, WaitlistUpdateBody, DeliveryActionBody, StockBody,
-  InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody, PromotionBody
+  InviteBody, SetPasswordBody, ForgotPasswordBody, OwnerPasswordBody, TenantBody, PromotionBody, BroadcastBody, SegmentBody, MarketingBody
 } from "../src/contracts.js";
 import {
   SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent,
@@ -27,7 +27,7 @@ import {
 } from "./http-response.mjs";
 
 export { SECURITY_HEADERS, body, coded, deliveryRefusal, fail, json, platformEvent, reservationRefusal, segments, tableRefusal, tokenMatches } from "./http-response.mjs";
-import { alertMessage, birthdayMessage, bookingMessage, codeMessage, createMailer, inviteMessage, mailStatus, resetMessage, testMessage, waitlistReadyMessage } from "./mail.mjs";
+import { alertMessage, birthdayMessage, bookingMessage, broadcastMessage, codeMessage, createMailer, inviteMessage, mailStatus, resetMessage, testMessage, waitlistReadyMessage } from "./mail.mjs";
 import { DEFAULT_TENANT_ID } from "./tenant.mjs";
 import { bestOrderPromotion } from "./promotions.mjs";
 import { isPhoneLogin, localDayIn } from "./customer.mjs";
@@ -41,6 +41,13 @@ import { ICON_APPS, ICON_SIZES, iconRequest, isPng, servedManifest, MAX_ICON_BYT
 import { createRateLimiter } from "./rate-limit.mjs";
 
 const TABLE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,7}$/;
+
+/** The page a marketing unsubscribe link lands on, in all three languages. */
+function unsubscribePage(restaurantName = "") {
+  const name = String(restaurantName || "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+  const from = name ? `<span class="r">${name}</span>` : "";
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Abgemeldet · Unsubscribed · 已退订</title><style>body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1.5rem;color:#1a1a1a;line-height:1.6}h1{font-size:1.3rem}p{color:#444;margin:.4rem 0}.r{font-weight:600;color:#1a1a1a}</style></head><body><h1>✓ 已退订 · Abgemeldet · Unsubscribed</h1><p>你已不再收到${from || "本店"}的活动邮件。</p><p>Sie erhalten keine Aktions-E-Mails mehr${from ? ` von ${from}` : ""}.</p><p>You will no longer receive marketing emails${from ? ` from ${from}` : ""}.</p></body></html>`;
+}
 
 const AUTH_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_MAX_FAILURES = 5;
@@ -549,6 +556,15 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       }
     }
 
+    // One-click unsubscribe from marketing email (GDPR): the token travels in
+    // the link, so no sign-in is needed. Always a friendly page, whether or not
+    // the token matched, so a link never reveals whether an address is a member.
+    if (path[0] === "api" && path[1] === "unsubscribe" && path.length === 3 && method === "GET") {
+      try { await store.customers.unsubscribe(decodeURIComponent(path[2])); } catch { /* a bad link still gets the page */ }
+      const settings = await store.getSettings();
+      return new Response(unsubscribePage(settings.restaurantName), { status: 200, headers: { "content-type": "text/html; charset=utf-8", ...SECURITY_HEADERS } });
+    }
+
     /**
      * Guests' own accounts (shared/customer.mjs, shared/customer-store.mjs).
      * The session travels in `x-customer-token` and opens nothing else.
@@ -638,6 +654,13 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           } catch (error) {
             return fail(error.message, 400);
           }
+        }
+        // 会员营销授权 (GDPR opt-in): the member's own switch for marketing email.
+        if (rest === "marketing" && method === "GET") return json({ marketing: await customers.marketingConsent(customer.id) });
+        if (rest === "marketing" && method === "PUT") {
+          const { value, invalid } = await body(request, MarketingBody);
+          if (invalid) return invalid;
+          return json({ marketing: await customers.setMarketing(customer.id, value.enabled) });
         }
         if (rest === "orders" && method === "GET") return json({ orders: await customers.orders(customer.id) });
         if (rest === "export" && method === "GET") return customerExport(customer.id);
@@ -1832,6 +1855,54 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
           return (await store.deletePromotion(path[3]))
             ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
             : fail("No such promotion", 404);
+        }
+      }
+
+      // /api/admin/broadcasts[/:id][/send] and /preview — 群发营销
+      // (shared/segments.mjs, shared/store.mjs), manager-only. A broadcast
+      // reaches only members who opted in (member_consent) and can be mailed;
+      // every message carries a one-click unsubscribe link.
+      if (path[2] === "broadcasts") {
+        try {
+          if (path.length === 3 && method === "GET") return json({ broadcasts: await store.listBroadcasts(limit) });
+          if (path.length === 4 && path[3] === "preview" && method === "POST") {
+            const { value, invalid } = await body(request, SegmentBody);
+            if (invalid) return invalid;
+            return json(await store.broadcastPreview(value.segment));
+          }
+          if (path.length === 3 && method === "POST") {
+            const { value, invalid } = await body(request, BroadcastBody);
+            if (invalid) return invalid;
+            return json({ broadcast: await store.createBroadcast(value) }, 201);
+          }
+          if (path.length === 4 && method === "DELETE") {
+            return (await store.deleteBroadcast(path[3]))
+              ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
+              : fail("No such broadcast, or it was already sent", 404);
+          }
+          if (path.length === 5 && path[4] === "send" && method === "POST") {
+            if (!mail) return json({ error: "Email is not set up", code: "MAIL_OFF" }, 409);
+            const broadcast = await store.getBroadcast(path[3]);
+            if (!broadcast) return fail("No such broadcast", 404);
+            if (broadcast.status === "sent") return json({ error: "This broadcast has already been sent", code: "ALREADY_SENT" }, 409);
+            const members = await store.audienceFor(broadcast.segment);
+            const reachable = members.filter((member) => member.marketing && member.emailable && member.token);
+            await store.markBroadcastSending(broadcast.id);
+            const settings = await store.getSettings();
+            // German where the menu offers it (an Austrian restaurant), else the menu's own language.
+            const offered = settings.menuLanguages ?? [];
+            const language = offered.includes("de") || !offered.length ? "de" : offered.includes("en") ? "en" : "zh";
+            for (const member of reachable) {
+              // Claimed before the send, so a retry (or two isolates) mails each member once.
+              if (!(await store.claimBroadcastSend(broadcast.id, member.id))) continue;
+              const unsubscribeUrl = `${url.origin}/api/unsubscribe/${encodeURIComponent(member.token)}`;
+              const message = broadcastMessage({ subject: broadcast.subject, body: broadcast.body, unsubscribeUrl, language, restaurant: settings.restaurantName });
+              if (!(await sendMail({ to: member.email, ...message }))) await store.releaseBroadcastSend(broadcast.id, member.id);
+            }
+            return json({ broadcast: await store.finishBroadcast(broadcast.id, reachable.length) });
+          }
+        } catch (error) {
+          return fail(error.message);
         }
       }
 

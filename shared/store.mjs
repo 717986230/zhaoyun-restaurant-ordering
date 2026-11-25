@@ -60,7 +60,7 @@ import {
   TENANT_BY_SLUG_SQL, TENANT_TOKEN_SQL, UPDATE_ACCOUNT_SQL, USE_ACCOUNT_TOKEN_SQL
 } from "./account.mjs";
 import {
-  customerView, earnPointsStatements, isOverdrawn, refundBalanceStatements, refundPointsStatements, reverseBalanceStatements,
+  customerView, earnPointsStatements, isOverdrawn, isPhoneLogin, refundBalanceStatements, refundPointsStatements, reverseBalanceStatements,
   reversePointsStatements, spendBalanceStatements, topUpBalanceStatements, topUpPointsStatements, welcomePointsStatements
 } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
@@ -71,6 +71,7 @@ import {
 } from "./drawer.mjs";
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
 import { normalizePromotion, promotionView } from "./promotions.mjs";
+import { matchesSegment, normalizeSegment } from "./segments.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
 import { createWaitlistStore } from "./waitlist-store.mjs";
 import { appIconsView } from "./app-icons.mjs";
@@ -1522,7 +1523,8 @@ export function createStore(driver, options = {}) {
     "day_closings", "delivery_orders", "discovered_printers", "email_codes",
     "journal", "mail_outbox", "media_files", "print_bridges", "reservation_reminders",
     "reservations", "restaurant_settings", "restaurant_tables", "service_requests",
-    "promotions", "staff_settlements", "table_claim_meta", "table_claims", "table_sessions",
+    "promotions", "member_consent", "broadcasts", "broadcast_sends",
+    "staff_settlements", "table_claim_meta", "table_claims", "table_sessions",
     "tenant_tokens", "waitlist",
     "order_items", "receipts", "customers", "accounts", "staff", "pos_devices",
     "printer_profiles", "products", "drawer_sessions",
@@ -1819,10 +1821,120 @@ export function createStore(driver, options = {}) {
     return promotionView(await first("SELECT * FROM promotions WHERE tenant_id = ? AND id = ?", tenantId, id));
   }
 
+  // 会员分群 + 群发营销 (shared/segments.mjs). A member's lifetime top-up, points,
+  // balance, birthday month, consent and last order, read in one pass so the
+  // segment engine can judge each one. The two subquery tenant filters bind
+  // first, the outer one last — hence tenantId three times.
+  const BROADCAST_AUDIENCE_SQL = `SELECT c.id AS id, c.email AS email, c.name AS name, c.points AS points, c.created_at AS created_at,
+      COALESCE(mb.balance_cents, 0) AS balance_cents,
+      COALESCE(g.growth_cents, 0) AS growth_cents,
+      bd.month AS birth_month,
+      COALESCE(mc.marketing, 0) AS marketing,
+      mc.token AS token,
+      lo.last_order_at AS last_order_at
+    FROM customers c
+    LEFT JOIN member_balances mb ON mb.customer_id = c.id
+    LEFT JOIN (SELECT customer_id, SUM(delta_cents) AS growth_cents FROM balance_ledger WHERE tenant_id = ? AND reason IN ('topup','reverse','adjust') GROUP BY customer_id) g ON g.customer_id = c.id
+    LEFT JOIN member_birthdays bd ON bd.customer_id = c.id
+    LEFT JOIN member_consent mc ON mc.customer_id = c.id
+    LEFT JOIN (SELECT customer_id, MAX(created_at) AS last_order_at FROM guest_orders WHERE tenant_id = ? GROUP BY customer_id) lo ON lo.customer_id = c.id
+    WHERE c.tenant_id = ?`;
+
+  const MAX_SUBJECT = 150;
+  const MAX_BODY = 5000;
+
+  function broadcastView(row) {
+    return row
+      ? {
+          id: row.id,
+          subject: row.subject,
+          body: row.body,
+          segment: normalizeSegment(parseJson(row.segment_json, {})),
+          status: row.status,
+          audience: row.audience,
+          sent: row.sent,
+          createdAt: row.created_at,
+          sentAt: row.sent_at ?? null,
+        }
+      : null;
+  }
+
+  function normalizeBroadcast(input) {
+    const subject = String(input?.subject ?? "").trim();
+    const body = String(input?.body ?? "").trim();
+    if (!subject) throw new Error("A broadcast needs a subject");
+    if (subject.length > MAX_SUBJECT) throw new Error("The subject is too long");
+    if (!body) throw new Error("A broadcast needs a message");
+    if (body.length > MAX_BODY) throw new Error("The message is too long");
+    return { subject, body, segment: normalizeSegment(input?.segment) };
+  }
+
+  /** Every member the segment picks, with whether they consented and can be mailed. */
+  async function audienceFor(segment) {
+    const { memberTiers, timeZone } = await getSettings();
+    const rules = normalizeSegment(segment);
+    const rows = await all(BROADCAST_AUDIENCE_SQL, tenantId, tenantId, tenantId);
+    const at = new Date();
+    const members = [];
+    for (const row of rows) {
+      const stats = {
+        growthCents: row.growth_cents ?? 0,
+        points: row.points ?? 0,
+        balanceCents: row.balance_cents ?? 0,
+        birthMonth: row.birth_month ?? null,
+        createdAt: row.created_at,
+        lastOrderAt: row.last_order_at ?? null,
+      };
+      if (!matchesSegment(stats, rules, { at, timeZone, memberTiers })) continue;
+      const emailable = Boolean(row.email) && !isPhoneLogin(row.email);
+      members.push({ id: row.id, email: row.email, name: row.name, token: row.token ?? null, marketing: Boolean(row.marketing), emailable });
+    }
+    return members;
+  }
+
+  /** How many a segment picks, and how many of those a broadcast can actually reach (consented + emailable). */
+  async function broadcastPreview(segment) {
+    const members = await audienceFor(segment);
+    const reachable = members.filter((member) => member.marketing && member.emailable);
+    return {
+      total: members.length,
+      reachable: reachable.length,
+      sample: reachable.slice(0, 8).map((member) => member.name || String(member.email).split("@")[0]),
+    };
+  }
+
   return {
     listPromotions,
     savePromotion,
     deletePromotion: async (id) => (await run("DELETE FROM promotions WHERE tenant_id = ? AND id = ?", tenantId, String(id))) > 0,
+    audienceFor,
+    broadcastPreview,
+    /** The restaurant's broadcasts, newest first. */
+    listBroadcasts: async (limit = 50) =>
+      (await all("SELECT * FROM broadcasts WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?", tenantId, boundedLimit(limit))).map(broadcastView),
+    getBroadcast: async (id) => broadcastView(await first("SELECT * FROM broadcasts WHERE tenant_id = ? AND id = ?", tenantId, String(id))),
+    /** Compose a draft. Throws a plain message on bad input. */
+    createBroadcast: async (input) => {
+      const { subject, body, segment } = normalizeBroadcast(input);
+      const id = uuid();
+      const at = now();
+      await run("INSERT INTO broadcasts (id, tenant_id, subject, body, segment_json, status, audience, sent, created_at) VALUES (?, ?, ?, ?, ?, 'draft', 0, 0, ?)",
+        id, tenantId, subject, body, JSON.stringify(segment), at);
+      return broadcastView(await first("SELECT * FROM broadcasts WHERE tenant_id = ? AND id = ?", tenantId, id));
+    },
+    deleteBroadcast: async (id) => (await run("DELETE FROM broadcasts WHERE tenant_id = ? AND id = ? AND status != 'sent'", tenantId, String(id))) > 0,
+    markBroadcastSending: async (id) => { await run("UPDATE broadcasts SET status = 'sending' WHERE tenant_id = ? AND id = ? AND status = 'draft'", tenantId, String(id)); },
+    /** Claim a member for this broadcast; 1 when this call has it, 0 when it was already mailed. */
+    claimBroadcastSend: async (broadcastId, customerId) =>
+      (await run("INSERT OR IGNORE INTO broadcast_sends (broadcast_id, tenant_id, customer_id, sent_at) VALUES (?, ?, ?, ?)", String(broadcastId), tenantId, String(customerId), now())) > 0,
+    releaseBroadcastSend: async (broadcastId, customerId) => { await run("DELETE FROM broadcast_sends WHERE tenant_id = ? AND broadcast_id = ? AND customer_id = ?", tenantId, String(broadcastId), String(customerId)); },
+    /** Close a broadcast: its audience fixed, its sent count read from the claim ledger. */
+    finishBroadcast: async (id, audience) => {
+      const at = now();
+      await run("UPDATE broadcasts SET status = 'sent', audience = ?, sent = (SELECT COUNT(*) FROM broadcast_sends WHERE broadcast_id = ?), sent_at = ? WHERE tenant_id = ? AND id = ?",
+        Number(audience) || 0, String(id), at, tenantId, String(id));
+      return broadcastView(await first("SELECT * FROM broadcasts WHERE tenant_id = ? AND id = ?", tenantId, String(id)));
+    },
     listProducts,
     menuStamp,
     getProduct,

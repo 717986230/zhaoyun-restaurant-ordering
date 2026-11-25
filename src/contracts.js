@@ -440,6 +440,31 @@ export const PromotionBody = Type.Object({
   priority: Type.Optional(Type.Integer({ minimum: 0, maximum: 1000 }))
 }, { additionalProperties: false });
 
+// 会员分群 (shared/segments.mjs): the rules that pick a broadcast's audience.
+// Every condition is optional; the engine bounds and cleans the values.
+const Segment = Type.Object({
+  tiers: Type.Optional(Type.Array(Type.String({ maxLength: 40 }), { maxItems: 12 })),
+  minPoints: Type.Optional(Type.Union([Type.Integer({ minimum: 0, maximum: 100000000 }), Type.Null()])),
+  minBalanceCents: Type.Optional(Type.Union([Type.Integer({ minimum: 0, maximum: 100000000 }), Type.Null()])),
+  minLifetimeCents: Type.Optional(Type.Union([Type.Integer({ minimum: 0, maximum: 100000000 }), Type.Null()])),
+  birthdayThisMonth: Type.Optional(Type.Boolean()),
+  joinedWithinDays: Type.Optional(Type.Union([Type.Integer({ minimum: 0, maximum: 3650 }), Type.Null()])),
+  inactiveDays: Type.Optional(Type.Union([Type.Integer({ minimum: 0, maximum: 3650 }), Type.Null()]))
+}, { additionalProperties: false });
+
+// Previewing a segment's reach: just the rules.
+export const SegmentBody = Type.Object({ segment: Type.Optional(Segment) }, { additionalProperties: false });
+
+// 群发营销 (shared/store.mjs): a broadcast the manager composes for a segment.
+export const BroadcastBody = Type.Object({
+  subject: Type.String({ minLength: 1, maxLength: 150 }),
+  body: Type.String({ minLength: 1, maxLength: 5000 }),
+  segment: Type.Optional(Segment)
+}, { additionalProperties: false });
+
+// 会员营销授权 (GDPR opt-in): the member's own marketing-email switch.
+export const MarketingBody = Type.Object({ enabled: Type.Boolean() }, { additionalProperties: false });
+
 // A storno always says why.
 export const StornoBody = Type.Object({ reason: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false });
 

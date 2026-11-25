@@ -78,6 +78,7 @@ const COPY = {
     birthdayOffer: "整个生日月来店用餐，报手机号或邮箱给收银员，即享会员价 {percent}% off。",
     birthdayPlain: "感谢你一直以来的支持，期待再见到你。",
     birthdayStop: "不想再收到生日邮件？在账户里清除生日即可。",
+    broadcastUnsub: "不想再收到这类活动邮件？点此随时退订：",
     inviteSubject: "{restaurant}：请设置你的管理密码",
     inviteLead: "你好，你被邀请管理 {restaurant}：",
     inviteSet: "请在下面链接设置你的密码：",
@@ -115,6 +116,7 @@ const COPY = {
     birthdayOffer: "Den ganzen Geburtstagsmonat erhalten Sie bei uns {percent}% Mitgliedspreis – einfach an der Kassa Ihre Nummer oder E-Mail nennen.",
     birthdayPlain: "Danke für Ihre Treue – wir freuen uns auf Ihren nächsten Besuch.",
     birthdayStop: "Keine Geburtstagsmails mehr? Löschen Sie Ihren Geburtstag im Konto.",
+    broadcastUnsub: "Keine solchen Aktions-E-Mails mehr? Jederzeit hier abmelden:",
     inviteSubject: "{restaurant}: Bitte lege dein Admin-Passwort fest",
     inviteLead: "Hallo, du wurdest eingeladen, {restaurant} zu verwalten:",
     inviteSet: "Lege dein Passwort unter diesem Link fest:",
@@ -152,6 +154,7 @@ const COPY = {
     birthdayOffer: "All through your birthday month you get {percent}% member price with us – just give the cashier your number or email.",
     birthdayPlain: "Thank you for being our guest – we look forward to seeing you again.",
     birthdayStop: "No more birthday emails? Clear your birthday in your account.",
+    broadcastUnsub: "No more emails like this? Unsubscribe any time here:",
     inviteSubject: "{restaurant}: please set your admin password",
     inviteLead: "Hi, you have been invited to manage {restaurant}:",
     inviteSet: "Set your password at this link:",
@@ -324,6 +327,30 @@ export function birthdayMessage(name, { language = "de", restaurant = "", discou
     subject: fill(copy.birthdaySubject, values),
     text: `${lead}\n\n${body}\n\n${stop}\n`,
     html: `<p style="font-size:20px">🎂 ${escapeHtml(lead)}</p><p>${escapeHtml(body)}</p><p style="color:#666;font-size:12px">${escapeHtml(stop)}</p>`
+  };
+}
+
+/**
+ * 群发营销 (member broadcast): the subject and message the manager wrote, sent
+ * to a segment of consented members. Every message carries a one-click
+ * unsubscribe link (GDPR) in the member's own token, so a reader can opt out
+ * without signing in. The body is plain text the manager typed; blank lines
+ * separate paragraphs, and nothing in it is treated as markup.
+ */
+export function broadcastMessage({ subject = "", body = "", unsubscribeUrl = "", language = "de", restaurant = "" } = {}) {
+  const copy = COPY[language] ?? COPY.de;
+  const paragraphs = String(body)
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const stop = copy.broadcastUnsub;
+  const head = fill(subject, { restaurant: restaurant || "Restaurant" });
+  return {
+    subject: head,
+    text: `${paragraphs.join("\n\n")}\n\n${stop} ${unsubscribeUrl}\n`,
+    html: `${paragraphs
+      .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
+      .join("")}<p style="color:#666;font-size:12px">${escapeHtml(stop)} <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeUrl)}</a></p>`,
   };
 }
 

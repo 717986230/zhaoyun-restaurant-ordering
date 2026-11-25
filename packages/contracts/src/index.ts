@@ -330,6 +330,37 @@ export interface ApiPromotion {
   updatedAt: string;
 }
 
+// 会员分群 (shared/segments.mjs): the rules that pick a broadcast's audience.
+export interface ApiSegment {
+  tiers?: string[];
+  minPoints?: number;
+  minBalanceCents?: number;
+  minLifetimeCents?: number;
+  birthdayThisMonth?: boolean;
+  joinedWithinDays?: number;
+  inactiveDays?: number;
+}
+
+// 群发营销 (shared/store.mjs): a campaign the manager sends to a segment.
+export interface ApiBroadcast {
+  id: string;
+  subject: string;
+  body: string;
+  segment: ApiSegment;
+  status: "draft" | "sending" | "sent";
+  audience: number;
+  sent: number;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+// How many a segment picks, and how many of those a broadcast can reach.
+export interface ApiBroadcastPreview {
+  total: number;
+  reachable: number;
+  sample: string[];
+}
+
 export interface CheckoutCommand {
   clientRequestId?: string;
   table?: string;
