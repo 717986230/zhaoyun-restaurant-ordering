@@ -69,7 +69,8 @@ test("searchReceipts filters by table, payment, type, text and day range", async
   }
 
   // The restaurant's own days: today holds all three; a day long past holds none.
-  const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const { timeZone } = await database.getSettings();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   assert.equal((await database.searchReceipts({ from: today, to: today })).length, 3);
   assert.equal((await database.searchReceipts({ from: "2000-01-01", to: "2000-01-02" })).length, 0);
 
