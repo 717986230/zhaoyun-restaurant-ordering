@@ -67,6 +67,7 @@ const incremental = [
   { file: "0108_shared_table_claims.sql", drop: "DROP TABLE table_claim_meta;" },
   { file: "0109_order_item_notes.sql", drop: "DROP TABLE order_item_notes;" },
   { file: "0110_order_item_holds.sql", drop: "DROP TABLE order_item_holds;" },
+  { file: "0113_promotions.sql", drop: "DROP INDEX idx_promotions_tenant; DROP TABLE promotions;" },
   // 0112 rebuilds every tenant table under the new definition: the drop
   // restores the pre-tenant shape of each one from a fixture built from the
   // 0001 that shipped before tenants.

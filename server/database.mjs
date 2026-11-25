@@ -817,6 +817,35 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, 
       PRIMARY KEY (tenant_id, address, port)
     );
 
+    -- 营销活动 (shared/promotions.mjs): the restaurant's own promotions — a
+    -- time-limited discount the till applies for them, the way a member's
+    -- level already earns one. Config lives in config_json by kind
+    -- ('percent' is a whole-bill % off; later kinds add their own shape), so
+    -- a new kind needs no column. The window is a date range, the weekdays it
+    -- runs (csv of 0=Sun..6=Sat; empty = every day) and a time-of-day band in
+    -- minutes from midnight (null = all day), all read in the shop's own time
+    -- zone. See migrations/0113_promotions.sql.
+    CREATE TABLE IF NOT EXISTS promotions (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),
+      name_zh TEXT NOT NULL DEFAULT '',
+      name_de TEXT NOT NULL DEFAULT '',
+      name_en TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'percent',
+      config_json TEXT NOT NULL DEFAULT '{}',
+      scope TEXT NOT NULL DEFAULT 'order',
+      category TEXT,
+      active_from TEXT,
+      active_to TEXT,
+      weekdays TEXT NOT NULL DEFAULT '',
+      start_min INTEGER,
+      end_min INTEGER,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      priority INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     INSERT INTO accounts (id, login, name, password_hash, password_salt, password_iterations, created_at, updated_at)
     SELECT 'owner', 'admin', 'Admin', password_hash, password_salt, password_iterations, updated_at, updated_at
     FROM admin_gate WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM accounts);
@@ -843,6 +872,7 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, 
     CREATE INDEX IF NOT EXISTS idx_guest_orders_customer ON guest_orders(tenant_id, customer_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(tenant_id, status, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(tenant_id, at DESC);
+    CREATE INDEX IF NOT EXISTS idx_promotions_tenant ON promotions(tenant_id, enabled);
     CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(tenant_id, date, time);
     CREATE INDEX IF NOT EXISTS idx_waitlist_status ON waitlist(tenant_id, status, created_at);
     CREATE INDEX IF NOT EXISTS idx_reservations_customer ON reservations(tenant_id, customer_id, date);

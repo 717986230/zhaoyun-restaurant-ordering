@@ -70,6 +70,7 @@ import {
   INSERT_MOVEMENT_SQL, movementView, OPEN_DRAWER_SQL, planMovement
 } from "./drawer.mjs";
 import { assertStock, normalizeStockInput, restaurantDay, RETURN_STOCK_SQL, setStockStatement, stockDemand, stockView, takeStockStatements } from "./stock.mjs";
+import { normalizePromotion, promotionView } from "./promotions.mjs";
 import { createReservationStore } from "./reservation-store.mjs";
 import { createWaitlistStore } from "./waitlist-store.mjs";
 import { appIconsView } from "./app-icons.mjs";
@@ -1521,7 +1522,7 @@ export function createStore(driver, options = {}) {
     "day_closings", "delivery_orders", "discovered_printers", "email_codes",
     "journal", "mail_outbox", "media_files", "print_bridges", "reservation_reminders",
     "reservations", "restaurant_settings", "restaurant_tables", "service_requests",
-    "staff_settlements", "table_claim_meta", "table_claims", "table_sessions",
+    "promotions", "staff_settlements", "table_claim_meta", "table_claims", "table_sessions",
     "tenant_tokens", "waitlist",
     "order_items", "receipts", "customers", "accounts", "staff", "pos_devices",
     "printer_profiles", "products", "drawer_sessions",
@@ -1794,7 +1795,34 @@ export function createStore(driver, options = {}) {
 
   const deliveryStore = createDeliveryStore(driver, { settings: getSettings, tenantId });
 
+  const PROMOTION_COLUMNS = "name_zh, name_de, name_en, kind, config_json, scope, category, active_from, active_to, weekdays, start_min, end_min, enabled, priority";
+  /** The restaurant's promotions, newest-effective first (shared/promotions.mjs). */
+  async function listPromotions() {
+    const rows = await all("SELECT * FROM promotions WHERE tenant_id = ? ORDER BY priority DESC, updated_at DESC", tenantId);
+    return rows.map(promotionView);
+  }
+  /** Create (no id) or update (id present) a promotion; null when an id names none. Throws a plain message on bad input. */
+  async function savePromotion(input) {
+    const columns = normalizePromotion(input);
+    const timestamp = now();
+    const id = input.id ? String(input.id) : uuid();
+    if (input.id && !(await first("SELECT id FROM promotions WHERE tenant_id = ? AND id = ?", tenantId, id))) return null;
+    const values = [columns.name_zh, columns.name_de, columns.name_en, columns.kind, columns.config_json, columns.scope,
+      columns.category, columns.active_from, columns.active_to, columns.weekdays, columns.start_min, columns.end_min, columns.enabled, columns.priority];
+    if (input.id) {
+      await run(`UPDATE promotions SET name_zh=?, name_de=?, name_en=?, kind=?, config_json=?, scope=?, category=?, active_from=?, active_to=?, weekdays=?, start_min=?, end_min=?, enabled=?, priority=?, updated_at=? WHERE tenant_id=? AND id=?`,
+        ...values, timestamp, tenantId, id);
+    } else {
+      await run(`INSERT INTO promotions (id, tenant_id, ${PROMOTION_COLUMNS}, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, tenantId, ...values, timestamp, timestamp);
+    }
+    return promotionView(await first("SELECT * FROM promotions WHERE tenant_id = ? AND id = ?", tenantId, id));
+  }
+
   return {
+    listPromotions,
+    savePromotion,
+    deletePromotion: async (id) => (await run("DELETE FROM promotions WHERE tenant_id = ? AND id = ?", tenantId, String(id))) > 0,
     listProducts,
     menuStamp,
     getProduct,
@@ -2278,21 +2306,39 @@ export function createStore(driver, options = {}) {
       if (type === "sale" || type === "storno") { where.push("type = ?"); args.push(type); }
       if (payment) { where.push("payments_json LIKE ?"); args.push(`%"type":"${String(payment).replace(/[^a-z]/gi, "")}"%`); }
       const text = String(q ?? "").trim();
-      if (text) {
-        // A plain number is a receipt number — matched exactly, not as a
-        // substring, so it does not collide with the figures inside the bill.
-        if (/^\d+$/.test(text)) { where.push("receipt_no = ?"); args.push(Number(text)); }
-        else {
-          const like = `%${text.replace(/[%_\\]/g, (ch) => `\\${ch}`)}%`;
-          where.push("(table_no LIKE ? ESCAPE '\\' OR staff_name LIKE ? ESCAPE '\\' OR lines_json LIKE ? ESCAPE '\\')");
-          args.push(like, like, like);
-        }
+      // A plain number is a receipt number — matched exactly, not as a
+      // substring, so it does not collide with the figures inside the bill.
+      const numberQuery = text && /^\d+$/.test(text);
+      // A word query narrows the SQL read to rows that carry it somewhere (a
+      // cheap superset), then a JS pass keeps only the rows where it is in the
+      // human-visible text — the table, the waiter, or a dish's name. The raw
+      // lines_json also holds opaque ids (order-item and product UUIDs), and
+      // "B2" must not match a bill because its UUID happens to contain "b2".
+      const wordQuery = text && !numberQuery;
+      if (numberQuery) { where.push("receipt_no = ?"); args.push(Number(text)); }
+      else if (wordQuery) {
+        const like = `%${text.replace(/[%_\\]/g, (ch) => `\\${ch}`)}%`;
+        where.push("(table_no LIKE ? ESCAPE '\\' OR staff_name LIKE ? ESCAPE '\\' OR lines_json LIKE ? ESCAPE '\\')");
+        args.push(like, like, like);
       }
       const capped = boundedLimit(limit, 200);
-      // With no day range the SQL window already bounds the read, so cap it there.
-      if (!range) args.push(capped);
-      const rows = await all(`SELECT * FROM receipts WHERE ${where.join(" AND ")} ORDER BY receipt_no DESC${range ? "" : " LIMIT ?"}`, ...args);
-      if (!range) return receiptDetails(rows);
+      // With no day range and no word pass the SQL window already bounds the read.
+      if (!range && !wordQuery) args.push(capped);
+      let rows = await all(`SELECT * FROM receipts WHERE ${where.join(" AND ")} ORDER BY receipt_no DESC${range || wordQuery ? "" : " LIMIT ?"}`, ...args);
+      if (wordQuery) {
+        const needle = text.toLowerCase();
+        const visible = (row) => {
+          const parts = [row.table_no, row.staff_name];
+          for (const line of parseJson(row.lines_json, [])) {
+            parts.push(line.name);
+            if (line.names) parts.push(line.names.zh, line.names.de, line.names.en);
+            if (Array.isArray(line.modifiers)) parts.push(...line.modifiers);
+          }
+          return parts.filter(Boolean).join("\u0001").toLowerCase().includes(needle);
+        };
+        rows = rows.filter(visible);
+      }
+      if (!range) return receiptDetails(rows.slice(0, capped));
       // Keep only the rows whose restaurant-local day is inside the picked range.
       const timeZone = (await getSettings()).timeZone;
       const localDay = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: timeZone || "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));

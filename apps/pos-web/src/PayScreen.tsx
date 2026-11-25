@@ -56,6 +56,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   // 单品改价: orderItemId → the new unit price as typed (euros), for this bill.
   const [override, setOverride] = useState<Record<string, string>>({});
   const [discountReason, setDiscountReason] = useState("");
+  // 营销活动: the promotion live right now, if any — its percent is offered as the whole-bill discount.
+  const [promo, setPromo] = useState<{ name: { zh: string; de: string; en: string }; percent: number } | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [busy, setBusy] = useState(false);
   const [sepa, setSepa] = useState<ApiSepaPayment | null>(null);
@@ -87,6 +89,11 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     api.floor().then((floor) => {
       if (takeaway) setDiscount(floor.takeawayDiscountPercent);
       setSepa(floor.sepaPayment ?? null);
+    }).catch(() => undefined);
+    // Offer the best live promotion as the whole-bill discount, never below a
+    // bigger one already set (a takeaway's, or one the waiter keyed in).
+    api.activePromotion().then(({ promotion }) => {
+      if (promotion) { setPromo({ name: promotion.name, percent: promotion.percent }); setDiscount((current) => Math.max(current, promotion.percent)); }
     }).catch(() => undefined);
     void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
@@ -315,6 +322,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     </div>
 
     <div className="pos-pay-panel">
+      {promo && <div className="pos-promo">{t("posPromoActive", { name: promo.name[language] || promo.name.zh || promo.name.en || promo.name.de, percent: String(promo.percent) })}</div>}
       <label className="pos-discount"><span>{t("discount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={discount} onChange={(event) => setDiscount(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
       {reduced && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>

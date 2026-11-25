@@ -264,6 +264,8 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-line-was { color: var(--p-muted); margin-right: 4px; font-weight: 400; }
 .pos-discount-reason { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .pos-discount-reason input { flex: 1; min-width: 0; min-height: 44px; }
+/* 营销活动: the live promotion the till is applying. */
+.pos-promo { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--p-accent); background: var(--p-accent-wash); color: var(--p-accent); font-weight: 600; font-size: 14px; }
 .pos-lines.pay li.picked { color: var(--p-ink); background: var(--p-accent-wash); }
 .pos-lines li > span:first-child { display: grid; min-width: 0; overflow-wrap: anywhere; }
 .pos-lines small { color: var(--p-muted); }
