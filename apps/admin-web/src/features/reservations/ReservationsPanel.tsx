@@ -74,6 +74,10 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
     setBusy(true);
     try {
       await api.updateReservation(reservation.id, command);
+      const targetTable = command.table ?? reservation.table;
+      if (command.status === "seated" && targetTable) {
+        await api.setTableOrdering(targetTable, true).catch(() => undefined);
+      }
       notify(t(done));
       await load();
     } catch (error) { failed(error); } finally { setBusy(false); }

@@ -48,7 +48,7 @@ const initialState: AdminState = {
   gate: { checking: true, registered: false, busy: false, error: null, reachable: true },
   auditEntries: [],
   connected: false, connectionError: null, products: [], printers: [], printBridges: [], printQueue: null, printFound: [],
-  orders: [], requests: [], failedJobs: [], deliveryOrders: [], bill: null, tables: [], tableOverview: [], staffActivity: [], boardBusy: false,
+  orders: [], requests: [], failedJobs: [], deliveryOrders: [], bill: null, tables: [], tableOverview: [], todayBookings: [], staffActivity: [], boardBusy: false,
   discoveredPrinters: [], editingProduct: null, editingPrinter: null, productFilter: "all", settings: null, toast: null
 };
 
@@ -194,13 +194,14 @@ export function App() {
       const deliveryOrders = await adminApi.deliveryKitchen().then(({ orders: cooking }) => cooking, () => []);
       // The kitchen screen may only read orders; asking for the rest would 403.
       const floor = roleRef.current === "kitchen"
-        ? { requests: [], jobs: [], tables: [], staff: [] }
+        ? { requests: [], jobs: [], tables: [], staff: [], bookings: [] }
         : await Promise.all([
           adminApi.serviceRequests(), adminApi.printJobs("failed"), adminApi.tableOverview(),
           // Who is on the floor and their shift: the manager's to see.
-          roleRef.current === "manager" ? adminApi.staffActivity() : Promise.resolve({ staff: [] })
-        ]).then(([a, b, c, d]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables, staff: d.staff }));
-      setState((current) => ({ ...current, orders, deliveryOrders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables, staffActivity: floor.staff }));
+          roleRef.current === "manager" ? adminApi.staffActivity() : Promise.resolve({ staff: [] }),
+          roleRef.current === "manager" ? adminApi.today().then(({ today }) => today.bookings, () => []) : Promise.resolve([])
+        ]).then(([a, b, c, d, e]) => ({ requests: a.requests, jobs: b.jobs, tables: c.tables, staff: d.staff, bookings: e }));
+      setState((current) => ({ ...current, orders, deliveryOrders, requests: floor.requests, failedJobs: floor.jobs, tableOverview: floor.tables, todayBookings: floor.bookings, staffActivity: floor.staff }));
     } catch (error) {
       if (!silent) failed(error, "boardLoadFailed");
     }
@@ -744,6 +745,9 @@ export function App() {
       {state.tab === "tables" && <TablesPanel
         tables={state.tableOverview}
         staff={state.staffActivity}
+        requests={state.requests}
+        bookings={state.todayBookings}
+        onRequestStatus={(id: string, status: ApiServiceRequest["status"]) => runBoardAction(() => adminApi.updateServiceRequestStatus(id, status), t("callHandled"))}
         bill={state.bill}
         role={state.role}
         busy={state.boardBusy}

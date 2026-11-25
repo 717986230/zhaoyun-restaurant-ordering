@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import type { RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
-import type { ApiBill, MenuLanguage, PosStaffActivity } from "@zhaoyun/contracts";
+import type { ApiBill, ApiServiceRequest, ApiToday, MenuLanguage, PosStaffActivity } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import { ORDER_STATUS_KEYS } from "../board/BoardPanel";
@@ -22,6 +22,9 @@ interface Props {
   tables: TableOverview[];
   /** The waiters now (the manager's view; empty otherwise). */
   staff: PosStaffActivity[];
+  requests?: ApiServiceRequest[];
+  bookings?: ApiToday["bookings"];
+  onRequestStatus?: (id: string, status: ApiServiceRequest["status"]) => Promise<void>;
   bill: ApiBill | null;
   role: StaffRole | null;
   busy: boolean;
@@ -240,11 +243,18 @@ export function TablesPanel(props: Props) {
       const held = Boolean(table.openOn);
       const holder = table.openOn?.staffName ?? "?";
       const lockedTitle = held ? t("tableLockedOnPosHint", { name: holder }) : "";
-      return <article className={`table-tile ${table.state} ${held ? "claimed" : ""} ${takeawayTile ? "takeaway" : ""}`} key={table.table} data-table={table.table}>
+      const openCalls = takeawayTile ? [] : (props.requests ?? []).filter((req) => req.status === "open" && req.table.toUpperCase() === table.table.toUpperCase());
+      const nextBooking = takeawayTile ? undefined : (props.bookings ?? []).find((booking) => booking.table?.toUpperCase() === table.table.toUpperCase() && booking.status !== "seated");
+      return <article className={`table-tile ${table.state} ${held ? "claimed" : ""} ${takeawayTile ? "takeaway" : ""} ${openCalls.length ? "has-call" : ""}`} key={table.table} data-table={table.table}>
       <div className="table-tile-head">
         <b>{t("table", { table: table.table })}</b>
         <span className={`status ${table.state}`}>{t(STATE_KEYS[table.state])}</span>
       </div>
+      {nextBooking && <p className="table-booking-badge">📅 {t("tableBookingBadge", { time: nextBooking.time, name: nextBooking.name, n: nextBooking.party })}</p>}
+      {openCalls.length > 0 && <ul className="table-calls">{openCalls.map((req) => <li key={req.id}>
+        <span>🔔 {req.type}</span>
+        {props.onRequestStatus && <button type="button" className="ghost-action" disabled={props.busy} onClick={() => void props.onRequestStatus!(req.id, "completed")}>{t("tableCallDone")}</button>}
+      </li>)}</ul>}
       {held && <span className="table-open-on" title={lockedTitle}>{t("tableLockedOnPos", { name: holder })}</span>}
       {table.orderingUntil && <span className="table-ordering">{t("tableOrderingUntil", { time: formatTime(table.orderingUntil, language) })}</span>}
       {(() => {

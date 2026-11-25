@@ -3,7 +3,7 @@ import type { StaffRole } from "@zhaoyun/api-client";
 import type { ApiDeliveryOrder, ApiOrder, ApiPrintJob, ApiServiceRequest } from "@zhaoyun/contracts";
 import { formatMoney, formatTime, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
-import { loadAnnounceMode, nextAnnounceMode, saveAnnounceMode, unlockAudio, useOrderAnnouncer } from "./announce";
+import { loadAnnounceMode, nextAnnounceMode, saveAnnounceMode, unlockAudio, useOrderAnnouncer, useRequestAnnouncer } from "./announce";
 import type { AnnounceMode } from "./announce";
 
 const ANNOUNCE_KEYS: Record<AnnounceMode, CopyKey> = {
@@ -69,6 +69,7 @@ export function BoardPanel(props: Props) {
   // The bell is this tablet's own choice: tap to cycle silent → chime → voice.
   const [announce, setAnnounce] = useState<AnnounceMode>(loadAnnounceMode);
   useOrderAnnouncer(props.orders, announce, language);
+  useRequestAnnouncer(props.requests, announce, language);
   function cycleAnnounce() {
     const next = nextAnnounceMode(announce);
     if (next !== "off") unlockAudio();

@@ -1251,6 +1251,42 @@ em.voided {
 }
 
 /* Online-pickup orders live under their own heading, apart from the floor. */
+.table-tile.has-call {
+  border-color: #d97706;
+}
+.table-booking-badge {
+  margin: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: var(--a-panel, rgba(143, 176, 163, 0.12));
+  color: var(--a-ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+.table-calls {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.table-calls li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+}
+.table-calls li button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
 .takeaway-section {
   margin-top: 24px;
 }

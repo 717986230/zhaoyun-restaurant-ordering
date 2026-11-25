@@ -13,7 +13,7 @@
  * that lacks them simply stays quiet.
  */
 import { useEffect, useRef } from "react";
-import type { ApiOrder } from "@zhaoyun/contracts";
+import type { ApiOrder, ApiServiceRequest } from "@zhaoyun/contracts";
 import type { AdminLanguage } from "../../app/i18n";
 
 export type AnnounceMode = "off" | "beep" | "voice";
@@ -160,6 +160,17 @@ export function useOrderAnnouncer(orders: ApiOrder[], mode: AnnounceMode, langua
   const primed = useRef(false);
 
   useEffect(() => {
+    if (mode === "off") return undefined;
+    const wake = () => unlockAudio();
+    window.addEventListener("pointerdown", wake, { once: true, passive: true });
+    window.addEventListener("keydown", wake, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, [mode]);
+
+  useEffect(() => {
     const pending = pendingNew(orders);
 
     if (!primed.current || mode === "off") {
@@ -182,4 +193,39 @@ export function useOrderAnnouncer(orders: ApiOrder[], mode: AnnounceMode, langua
     for (const id of [...seen.current]) if (!live.has(id)) seen.current.delete(id);
     for (const id of [...nudgedAt.current.keys()]) if (!live.has(id)) nudgedAt.current.delete(id);
   }, [orders, mode, language, overdueMs]);
+}
+
+const REQUEST_LABEL: Record<AdminLanguage, Record<string, string>> = {
+  zh: { waiter: "呼叫服务员", bill: "买单", water: "加水", utensils: "餐具", napkin: "纸巾", takeaway: "打包盒", clear: "收台" },
+  de: { waiter: "Kellner", bill: "Zahlen", water: "Wasser", utensils: "Besteck", napkin: "Servietten", takeaway: "Mitnehmen", clear: "Abräumen" },
+  en: { waiter: "Waiter", bill: "Bill", water: "Water", utensils: "Cutlery", napkin: "Napkins", takeaway: "Box", clear: "Clear" }
+};
+
+/** Announce newly arrived open service requests (e.g. water, bill) with sound/voice. */
+export function useRequestAnnouncer(requests: ApiServiceRequest[], mode: AnnounceMode, language: AdminLanguage): void {
+  const seen = useRef<Set<string>>(new Set());
+  const primed = useRef(false);
+
+  useEffect(() => {
+    const open = requests.filter((req) => req.status === "open");
+    if (!primed.current || mode === "off") {
+      for (const req of open) seen.current.add(req.id);
+      primed.current = true;
+    } else {
+      const fresh = open.filter((req) => !seen.current.has(req.id));
+      for (const req of fresh) seen.current.add(req.id);
+      if (fresh.length > 0) {
+        playChime(2);
+        if (mode === "voice") {
+          const text = fresh.map((req) => {
+            const label = REQUEST_LABEL[language][req.type] ?? req.type;
+            return language === "zh" ? `${req.table}桌，${label}` : language === "de" ? `Tisch ${req.table}, ${label}` : `Table ${req.table}, ${label}`;
+          }).join("，");
+          speak(language, text);
+        }
+      }
+    }
+    const live = new Set(open.map((req) => req.id));
+    for (const id of [...seen.current]) if (!live.has(id)) seen.current.delete(id);
+  }, [requests, mode, language]);
 }

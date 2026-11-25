@@ -9,6 +9,7 @@ import type { PosKey } from "./i18n";
 import { DeliveryOrders } from "./Delivery";
 import { BookingScanner } from "./BookingScanner";
 import type { Scanned } from "./BookingScanner";
+import { useFloorAlerts } from "./sound";
 
 const TAKEAWAY = /^TA-/i;
 /** The poll under the live channel: quick while it is down, slow while it is up. */
@@ -270,6 +271,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
     return () => window.clearInterval(timer);
   }, [load, pos.live]);
   useLiveReload(pos, (event) => event.type !== "catalog.changed" && event.type !== "print.queued", () => void load());
+  useFloorAlerts(requests, tables, pos.language);
 
   const claimOf = (table: string) => claims.find((claim) => claim.table === table.toUpperCase());
   const calling = new Set(requests.map((request) => request.table.toUpperCase()));
