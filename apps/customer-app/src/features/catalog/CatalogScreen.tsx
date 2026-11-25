@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
-import { deconstruct, drinkTabs, LANGUAGE_INFO, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
+import { deconstruct, defaultCategoryLabel, drinkTabs, LANGUAGE_INFO, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
 import { RollingNumber } from "../../components/RollingNumber";
 import { CalendarIcon, MoonIcon, PersonIcon, SunIcon } from "../../components/LineIcons";
@@ -549,7 +549,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const visible = (query ? products : onFavorites ? favorites : dishes).filter((product) => {
     const categoryMatch = query || onFavorites || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE
       || (state.category === DRINKS_PAGE ? product.kind === "drink" : product.category === state.category);
-    const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category, ...Object.values(navLabels[product.category] ?? {})].join(" ").toLowerCase();
+    const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category, defaultCategoryLabel(product.category, state.language), ...Object.values(navLabels[product.category] ?? {})].join(" ").toLowerCase();
     return categoryMatch && (!query || text.includes(query));
   });
   // The owner's three first, the rest in their usual order: the promotions
@@ -572,7 +572,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
     ? `✦ ${featured?.title || t(state.language, "featuredDefault")}`
     : category === FAVORITES_PAGE ? g(state.language, "favoritesPage")
     : navLabels[category]?.[state.language]
-      || (category === SETS_PAGE ? t(state.language, "setsPage") : category === DRINKS_PAGE ? t(state.language, "drinksPage") : category === "ALLE" ? t(state.language, "allCategories") : category));
+      || (category === SETS_PAGE ? t(state.language, "setsPage") : category === DRINKS_PAGE ? t(state.language, "drinksPage") : category === "ALLE" ? t(state.language, "allCategories") : defaultCategoryLabel(category, state.language)));
 
   // A guest's first look this visit is the menu's first tab: the one the
   // owner put first, or the promotions page when they chose none and there

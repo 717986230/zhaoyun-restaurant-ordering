@@ -1,3 +1,5 @@
+import type { MenuLanguage } from "./languages.js";
+
 /**
  * The order of the menu's tabs.
  *
@@ -42,4 +44,33 @@ export function drinkTabs(categories: readonly string[], drinkCategories: Readon
     else if (!tabs.includes(NAV_DRINKS)) tabs.push(NAV_DRINKS);
   }
   return tabs;
+}
+
+const DEFAULT_CATEGORY_ZH: Record<string, string> = {
+  RAMEN: "拉面",
+  SPECIALS: "特色菜",
+  BAO: "刈包",
+  NIGIRI: "握寿司",
+  MAKI: "细卷",
+  "MAKI SESAM": "芝麻卷",
+  SASHIMI: "刺身",
+  "URAMAKI ROLLS": "反卷",
+  "MAIN DISHES": "主菜",
+  STARTER: "前菜",
+  "FRIED UDON": "炒乌冬",
+  "SIDE DISHES": "配菜",
+  DESSERT: "甜品",
+  "NON-ALCOHOLIC": "无酒精饮品",
+  BEER: "啤酒",
+  "WINE APERITIF": "红酒与开胃酒",
+  COFFEE: "咖啡",
+  SET: "套餐"
+};
+
+/** Default display label for a menu category when no custom navLabel is set. */
+export function defaultCategoryLabel(category: string, language: MenuLanguage): string {
+  if (language === "zh") {
+    return DEFAULT_CATEGORY_ZH[category.trim().toUpperCase()] ?? category;
+  }
+  return category;
 }

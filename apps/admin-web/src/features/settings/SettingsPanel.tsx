@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AdminApi, AdminStorage, AuditEntry, StaffRole } from "@zhaoyun/api-client";
 import type { AccountUpdateCommand, ApiAccount, ApiSettings, ColorScheme, MenuLanguage, NavLabels, VatPercent } from "@zhaoyun/contracts";
 import type { Product } from "@zhaoyun/domain";
-import { DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME, drinkTabs, FEATURED_TEMPLATES, festiveThemeInSeason, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themeOutOfSeason, themePattern } from "@zhaoyun/domain";
+import { DEFAULT_MENU_LANGUAGES, DEFAULT_MENU_THEME, defaultCategoryLabel, drinkTabs, FEATURED_TEMPLATES, festiveThemeInSeason, LANGUAGE_INFO, MENU_LANGUAGES, MENU_THEMES, NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs, themeGarland, themeOutOfSeason, themePattern } from "@zhaoyun/domain";
 import { translate, useI18n } from "../../app/i18n";
 import type { AdminLanguage, CopyKey } from "../../app/i18n";
 import { StaffCard } from "./StaffCard";
@@ -164,12 +164,12 @@ function NavOrder({ settings, products, onSave }: { settings: ApiSettings; produ
  *  the rest by the name they gave it in this language, else the default. */
 function navLabel(settings: ApiSettings, t: ReturnType<typeof useI18n>["t"], language: AdminLanguage) {
   return (tab: string) => tab === NAV_FEATURED ? `✦ ${settings.featuredTitle || t("navFeatured")}`
-    : settings.navLabels[tab]?.[language] || (tab === NAV_SETS ? t("navSets") : tab === NAV_DRINKS ? t("navDrinks") : tab === NAV_ALL ? t("navAll") : tab);
+    : settings.navLabels[tab]?.[language] || (tab === NAV_SETS ? t("navSets") : tab === NAV_DRINKS ? t("navDrinks") : tab === NAV_ALL ? t("navAll") : defaultCategoryLabel(tab, language));
 }
 
 /** The menu's own name for a tab in a language: what an empty field means. */
 function defaultTabName(tab: string, language: MenuLanguage) {
-  return tab === NAV_ALL ? translate(language, "navAll") : tab === NAV_SETS ? translate(language, "navSets") : tab === NAV_DRINKS ? translate(language, "navDrinks") : tab;
+  return tab === NAV_ALL ? translate(language, "navAll") : tab === NAV_SETS ? translate(language, "navSets") : tab === NAV_DRINKS ? translate(language, "navDrinks") : defaultCategoryLabel(tab, language);
 }
 
 /** How the server will write a category name, so a merge is known before it is sent. */

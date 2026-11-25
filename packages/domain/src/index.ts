@@ -205,7 +205,7 @@ export type { FeaturedTemplate, FeaturedTemplateId } from "./featured.js";
 export type { MenuTheme, MenuThemeId, Season, MonthDay } from "./themes.js";
 export { DEFAULT_MENU_LANGUAGES, LANGUAGE_INFO, MENU_LANGUAGES, resolveMenuLanguage } from "./languages.js";
 export type { MenuLanguage } from "./languages.js";
-export { NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_PINNED_MAX, NAV_SETS, drinkTabs, orderNavTabs } from "./navigation.js";
+export { NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_PINNED_MAX, NAV_SETS, defaultCategoryLabel, drinkTabs, orderNavTabs } from "./navigation.js";
 export { memberTierTheme, memberTierVisual, tierNumeral } from "./member-tier.js";
 export { serverErrorText } from "./server-errors.js";
 export type { MemberTierTheme, MemberTierSkin, MemberTierVisual } from "./member-tier.js";
