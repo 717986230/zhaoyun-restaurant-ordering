@@ -643,8 +643,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 .pos-calls li.urgent {
   padding: 6px 8px;
+  border: 1px solid var(--p-seated);
   border-radius: var(--r-sm);
-  background: rgba(217, 119, 6, 0.14);
+  background: var(--p-seated-wash);
 }
 .pos-calls-actions {
   display: inline-flex;
