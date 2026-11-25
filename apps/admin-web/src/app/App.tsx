@@ -310,10 +310,10 @@ export function App() {
     return () => { window.clearTimeout(pending); stop(); setLive(false); };
   }, [state.role, floorTab, loadBoard]);
 
-  // The bookings follow the floor live too: a guest's booking online shows at once.
+  // The bookings, waitlist, delivery and today overview follow the floor live too.
   const [reservationTick, setReservationTick] = useState(0);
   useEffect(() => {
-    if (!state.role || (state.tab !== "reservations" && state.tab !== "delivery")) return undefined;
+    if (!state.role || (state.tab !== "reservations" && state.tab !== "delivery" && state.tab !== "waitlist" && state.tab !== "today")) return undefined;
     let pending: number | undefined;
     const stop = adminApi.live((event) => {
       if (event.type !== "floor.changed") return;
