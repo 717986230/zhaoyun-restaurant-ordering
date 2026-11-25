@@ -568,8 +568,12 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const paging = !query && categories.length > 1;
   const nextPage = paging ? categories[pageIndex + 1] : undefined;
   const prevPage = paging && pageIndex > 0 ? categories[pageIndex - 1] : undefined;
+  const featuredHeading = navLabels[FEATURED_PAGE]?.[state.language]
+    || (featured?.title && (state.language === "zh" || (featured.title !== "今日推荐" && featured.title !== "精选推荐"))
+      ? featured.title
+      : t(state.language, "featuredDefault"));
   const pageName = (category: string) => (category === FEATURED_PAGE
-    ? `✦ ${featured?.title || t(state.language, "featuredDefault")}`
+    ? `✦ ${featuredHeading}`
     : category === FAVORITES_PAGE ? g(state.language, "favoritesPage")
     : navLabels[category]?.[state.language]
       || (category === SETS_PAGE ? t(state.language, "setsPage") : category === DRINKS_PAGE ? t(state.language, "drinksPage") : category === "ALLE" ? t(state.language, "allCategories") : defaultCategoryLabel(category, state.language)));
@@ -738,7 +742,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           initial={enter}
           animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
-          {onFeatured && featured ? <FeaturedPage title={featured.title || t(state.language, "featuredDefault")} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
+          {onFeatured && featured ? <FeaturedPage title={featuredHeading} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : visible.length ? visible.slice(0, rowLimit).map((product, index) =>
               <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
