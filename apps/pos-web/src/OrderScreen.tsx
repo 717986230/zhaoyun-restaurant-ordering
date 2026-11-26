@@ -73,7 +73,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     // would be free to merge onto it. PayScreen keeps the same pattern.
     void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
-    return () => { window.clearInterval(hold); void api.release(table).catch(() => undefined); };
+    const releaseNow = () => { void api.release(table).catch(() => undefined); };
+    window.addEventListener("pagehide", releaseNow);
+    return () => { window.clearInterval(hold); window.removeEventListener("pagehide", releaseNow); releaseNow(); };
   }, [table, loadBill, pos.failed]);
 
   // A guest ordering at this table by QR, a move to it: the sent lines follow.

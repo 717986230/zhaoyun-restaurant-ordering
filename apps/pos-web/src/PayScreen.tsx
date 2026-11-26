@@ -108,7 +108,9 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     }).catch(() => undefined);
     void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
-    return () => { window.clearInterval(hold); void api.release(table).catch(() => undefined); };
+    const releaseNow = () => { void api.release(table).catch(() => undefined); };
+    window.addEventListener("pagehide", releaseNow);
+    return () => { window.clearInterval(hold); window.removeEventListener("pagehide", releaseNow); releaseNow(); };
   }, [table, takeaway, load, pos.failed]);
 
   useLiveReload(pos, (event) => event.type === "floor.changed" && event.table === table, () => void load(separate ? "keep" : "all"));
