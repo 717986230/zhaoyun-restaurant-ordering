@@ -94,28 +94,34 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     } catch (error) { pos.failed(error); return null; }
   }, [table, pos.failed]);
 
-  useEffect(() => {
-    void load("all");
+  const loadMeta = useCallback(() => {
     // The floor also carries the shop's SEPA account, for the pay-by-transfer QR.
     api.floor().then((floor) => {
-      if (takeaway) setDiscount(floor.takeawayDiscountPercent);
+      if (takeaway) setDiscount((current) => Math.max(current, floor.takeawayDiscountPercent));
       setSepa(floor.sepaPayment ?? null);
     }).catch(() => undefined);
     // Offer the best live promotion as the whole-bill discount, never below a
     // bigger one already set (a takeaway's, or one the waiter keyed in).
     api.activePromotion().then(({ promotion, amountPromotion }) => {
-      if (promotion) { setPromo({ name: promotion.name, percent: promotion.percent }); setDiscount((current) => Math.max(current, promotion.percent)); }
+      setPromo(promotion ? { name: promotion.name, percent: promotion.percent } : null);
+      if (promotion) setDiscount((current) => Math.max(current, promotion.percent));
       // 满减 is applied once the running bill reaches its threshold (effect below).
-      if (amountPromotion) setAmountPromo({ name: amountPromotion.name, amountCents: amountPromotion.amountCents, minSpendCents: amountPromotion.minSpendCents });
+      setAmountPromo(amountPromotion ? { name: amountPromotion.name, amountCents: amountPromotion.amountCents, minSpendCents: amountPromotion.minSpendCents } : null);
     }).catch(() => undefined);
+  }, [takeaway]);
+
+  useEffect(() => {
+    void load("all");
+    loadMeta();
     void api.claim(table).catch(pos.failed);
     const hold = window.setInterval(() => { api.claim(table).catch(pos.failed); }, HOLD_MS);
     const releaseNow = () => { void api.release(table).catch(() => undefined); };
     window.addEventListener("pagehide", releaseNow);
     return () => { window.clearInterval(hold); window.removeEventListener("pagehide", releaseNow); releaseNow(); };
-  }, [table, takeaway, load, pos.failed]);
+  }, [table, load, loadMeta, pos.failed]);
 
-  useLiveReload(pos, (event) => event.type === "floor.changed" && event.table === table, () => void load(separate ? "keep" : "all"));
+  useLiveReload(pos, (event) => event.type === "floor.changed" && (!event.table || event.table === table), () => void load(separate ? "keep" : "all"));
+  useLiveReload(pos, (event) => event.type === "catalog.changed", () => void loadMeta());
 
   const lines = bill?.items ?? [];
   // 单品改价: what one line's price is, read from the (euro) text the waiter
