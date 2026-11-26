@@ -134,7 +134,7 @@ function NavOrder({ settings, products, onSave }: { settings: ApiSettings; produ
   const drinks = new Set(dishes.filter((product) => product.kind === "drink").map((product) => product.category));
   const categories = drinkTabs([...new Set(dishes.map((product) => product.category))], drinks);
   // In the menu's usual order, which is also the order the rest keep.
-  const options = [...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories];
+  const options = Array.from(new Set([...(settings.featuredEnabled ? [NAV_FEATURED] : []), ...(hasSets ? [NAV_SETS] : []), NAV_ALL, ...categories]));
   // A choice whose tab has since gone (an emptied category, a page switched
   // off) is shown as unset here, but kept behind the others while there is
   // room: switched back on, the page takes its place again.
@@ -190,7 +190,7 @@ function TabNames({ settings, products, onSave, onRename }: { settings: ApiSetti
   for (const product of products) counts.set(product.category, (counts.get(product.category) ?? 0) + 1);
   // The drinks page is named here like the other pages; the drinks'
   // own categories keep their rows, to rename or merge them.
-  const tabs = [NAV_ALL, NAV_SETS, ...(products.some((product) => product.kind === "drink") ? [NAV_DRINKS] : []), ...counts.keys()];
+  const tabs = Array.from(new Set([NAV_ALL, NAV_SETS, ...(products.some((product) => product.kind === "drink") ? [NAV_DRINKS] : []), ...counts.keys()]));
   const offered = settings.menuLanguages;
 
   function save(event: FormEvent<HTMLFormElement>) {
