@@ -356,6 +356,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     <div className="pos-menu">
       <form className="pos-number" onSubmit={byNumber}>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("dishNumber")} aria-label={t("dishNumber")} autoFocus />
+        {query && <button type="button" className="pos-number-clear" aria-label="×" onClick={() => setQuery("")}>×</button>}
       </form>
       <div className="pos-dish-modes">
         <button type="button" className={`pos-soldout-mode ${soldOutMode ? "on" : ""}`} aria-pressed={soldOutMode} onClick={() => { setSoldOutMode((on) => !on); setStockMode(false); }}>{t(soldOutMode ? "soldOutModeOn" : "soldOutMode")}</button>

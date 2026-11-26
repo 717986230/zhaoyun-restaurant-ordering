@@ -394,12 +394,15 @@ export function CatalogPanel(props: Props) {
   const [order, setOrder] = useState<Product[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [sortError, setSortError] = useState("");
+  const [catalogQuery, setCatalogQuery] = useState("");
   const productIndex = useMemo(() => new Map(props.products.map((item) => [item.id, item])), [props.products]);
   // A set shows its dishes' pictures, so only a dish of its own can be missing one.
   const missingPhoto = (product: Product) => !product.bundleItems?.length && !product.media.length;
   const missingCount = props.products.filter(missingPhoto).length;
-  const rows = props.products.filter((product) => props.filter === "all"
-    || (props.filter === "sets" ? Boolean(product.bundleItems?.length) : props.filter === "nophoto" ? missingPhoto(product) : product.kind === props.filter));
+  const queryNeedle = catalogQuery.trim().toLowerCase();
+  const rows = props.products.filter((product) => (props.filter === "all"
+    || (props.filter === "sets" ? Boolean(product.bundleItems?.length) : props.filter === "nophoto" ? missingPhoto(product) : product.kind === props.filter))
+    && (!queryNeedle || [product.sku, product.category, product.names.zh, product.names.de, product.names.en].some((v) => v?.toLowerCase().includes(queryNeedle))));
   const kindLabels: Record<Product["kind"], string> = { food: t("kindFood"), drink: t("kindDrink"), sushi: t("kindSushi") };
   const stationOptions: Array<[AdminProductInput["printStation"], string]> = [
     ["kitchen", t("stationKitchen")], ["bar", t("stationBar")], ["sushi", t("stationSushi")], ["front", t("stationFront")]
@@ -629,6 +632,7 @@ export function CatalogPanel(props: Props) {
       <div className="filter-tabs">{(["all", "sets", "food", "drink", "sushi"] as const).map((value) => <button key={value} className={props.filter === value ? "active" : ""} onClick={() => props.onFilter(value as ProductFilter)}>{value === "all" ? t("filterAll") : value === "sets" ? t("filterSets") : kindLabels[value]}</button>)}
         {/* Only while some dish has no picture: the guests see a drawn mark in its place. */}
         {(missingCount > 0 || props.filter === "nophoto") && <button id="filterNoPhoto" className={props.filter === "nophoto" ? "active" : ""} onClick={() => props.onFilter("nophoto")}>{t("filterNoPhoto", { count: missingCount })}</button>}</div>
+      <input type="search" className="bundle-search catalog-search" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder={t("bundleSearch")} aria-label={t("bundleSearch")} />
       {batchMode && <div className="batch-bar">
         <div className="batch-select">
           <span className="batch-count">{t("batchSelected", { n: selected.size })}</span>

@@ -641,6 +641,25 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   color: var(--p-muted);
 }
 
+.pos-number {
+  position: relative;
+}
+.pos-number-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--p-line);
+  color: var(--p-ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .pos-update-banner {
   display: block;
   width: 100%;
