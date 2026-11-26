@@ -34,6 +34,22 @@ export const KDS_OPEN_STATUSES: ApiOrder["status"][] = ["new", "preparing", "rea
 
 const TOKEN_KEY = "zy_kitchen_token";
 
+function initialKitchenToken(): string {
+  try {
+    const direct = sessionStorage.getItem(TOKEN_KEY);
+    if (direct) return direct;
+  } catch { /* private mode */ }
+  for (const key of ["zy_admin_session", "zy_pos_session"]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { token?: string };
+      if (parsed?.token) return parsed.token;
+    } catch { /* ignore invalid stored JSON */ }
+  }
+  return "";
+}
+
 function baseUrl(): string {
   try {
     const stored = localStorage.getItem("zy_api_base");
@@ -120,12 +136,9 @@ const STATION_KEY: Record<PrintStationName, "stationKitchen" | "stationBar" | "s
 export function Kitchen() {
   const [language] = useState<PosLanguage>(initialLanguage);
   const t = translator(language);
-  const [token, setToken] = useState(() => {
-    try { return sessionStorage.getItem(TOKEN_KEY) ?? ""; } catch { return ""; }
-  });
-  const [authed, setAuthed] = useState(() => {
-    try { return Boolean(sessionStorage.getItem(TOKEN_KEY)); } catch { return false; }
-  });
+  const [token, setToken] = useState(initialKitchenToken);
+  const [authed, setAuthed] = useState(() => Boolean(initialKitchenToken()));
+  const [busyAuth, setBusyAuth] = useState(false);
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [soldOut, setSoldOut] = useState<ApiCatalogProduct[] | null>(null);
   const [soldOutBlocked, setSoldOutBlocked] = useState(false);
@@ -163,20 +176,35 @@ export function Kitchen() {
     setSoldOutBlocked(false);
   }, []);
 
-  const enter = useCallback(async (entered: string) => {
-    const trimmed = entered.trim();
-    if (!trimmed) return;
-    tokenRef.current = trimmed;
-    setToken(trimmed);
+  const signInAccount = useCallback(async (loginInput: string, passwordInput: string) => {
+    const login = loginInput.trim();
+    if (!login || !passwordInput) return;
+    setBusyAuth(true);
     setError("");
     try {
-      const response = await fetch(`${baseUrl()}/api/orders?limit=1`, { headers: { "x-admin-token": trimmed } });
-      if (response.status === 401 || response.status === 403) { setError("kitchenWrongToken"); return; }
+      const response = await fetch(`${baseUrl()}/api/account/sign-in`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ login, password: passwordInput })
+      });
+      if (response.status === 401 || response.status === 403) {
+        setError("kitchenWrongAccount");
+        return;
+      }
       if (!response.ok) throw new Error(`Request failed (${response.status})`);
-      try { sessionStorage.setItem(TOKEN_KEY, trimmed); } catch { /* not kept */ }
+      const data = (await response.json()) as { token?: string };
+      if (!data.token) {
+        setError("kitchenWrongAccount");
+        return;
+      }
+      tokenRef.current = data.token;
+      setToken(data.token);
+      try { sessionStorage.setItem(TOKEN_KEY, data.token); } catch { /* not kept */ }
       setAuthed(true);
     } catch {
-      setError("kitchenWrongToken");
+      setError("kitchenWrongAccount");
+    } finally {
+      setBusyAuth(false);
     }
   }, []);
 
@@ -221,12 +249,13 @@ export function Kitchen() {
   if (!authed) {
     return <div className="pos-shell">
       <main className="pos-main">
-        <form className="pos-card pos-signin" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); void enter(new FormData(event.currentTarget).get("token") as string); }}>
+        <form className="pos-card pos-signin" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); void signInAccount(String(data.get("login") ?? ""), String(data.get("password") ?? "")); }}>
           <h1>{t("kitchenTitle")}</h1>
-          <p>{t("kitchenTokenHint")}</p>
-          <label><span>{t("kitchenToken")}</span><input name="token" type="password" autoComplete="current-password" autoCapitalize="none" spellCheck={false} /></label>
+          <p>{t("kitchenAccountHint")}</p>
+          <label><span>{t("accountLogin")}</span><input name="login" required autoComplete="username" autoCapitalize="none" spellCheck={false} /></label>
+          <label><span>{t("managerPassword")}</span><input name="password" type="password" required autoComplete="current-password" /></label>
           {error && <p className="pos-error" role="alert">{t(error as PosKey)}</p>}
-          <button className="pos-primary" type="submit">{t("kitchenEnter")}</button>
+          <button className="pos-primary" type="submit" disabled={busyAuth}>{t("kitchenEnter")}</button>
           <p className="pos-muted">{t("kitchenPrinterNote")}</p>
         </form>
       </main>
