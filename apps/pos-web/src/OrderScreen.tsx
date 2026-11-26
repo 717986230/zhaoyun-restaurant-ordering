@@ -318,7 +318,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
             <button type="button" className="pos-line-holdbtn" aria-label={t("hold")} aria-pressed={line.hold === true} onClick={() => toggleHold(line.key)}>{t("holdShort")}</button>
             <button type="button" className="pos-line-notebtn" aria-label={t("itemNote")} aria-pressed={noteFor === line.key} onClick={() => setNoteFor(noteFor === line.key ? null : line.key)}>✎</button>
             <button type="button" aria-label="−" onClick={() => change(line.key, -1)}>−</button>
-            <button type="button" className="pos-qty-btn" onClick={() => setQtyLine(line)}>{line.quantity}</button>
+            <button type="button" className="pos-qty-btn" onClick={() => setQtyLine(line)}><b>{line.quantity}</b></button>
             <button type="button" aria-label="+" onClick={() => change(line.key, 1)}>+</button>
           </span>
         </div>
