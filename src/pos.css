@@ -641,6 +641,20 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   color: var(--p-muted);
 }
 
+.pos-update-banner {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--p-line);
+  background: var(--p-accent);
+  color: var(--p-accent-ink);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  cursor: pointer;
+}
+
 .pos-stepper button.pos-qty-btn {
   min-width: 32px;
   width: auto;

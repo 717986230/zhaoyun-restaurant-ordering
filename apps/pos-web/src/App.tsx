@@ -13,6 +13,7 @@ import { OrderScreen } from "./OrderScreen";
 import { PayScreen } from "./PayScreen";
 import { Records } from "./Records";
 import { TopUp } from "./TopUp";
+import { useAppUpdate } from "./update";
 
 export const api = new PosApi();
 
@@ -115,6 +116,8 @@ export function App() {
   // 断网补发: orders that could not reach the server wait in this device's
   // outbox and go out on their own once it is back online.
   const [pending, setPending] = useState(() => readOutbox(localStorage).length);
+  const checkHealth = useCallback(() => api.health(), []);
+  const updateReady = useAppUpdate(checkHealth);
   const queueOffline = useCallback((command: CreateOrderCommand, count: number) => {
     setPending(enqueue(localStorage, { ...command, count, queuedAt: Date.now() }).length);
   }, []);
@@ -219,6 +222,7 @@ export function App() {
         {staff && <button type="button" onClick={() => { void api.signOut().finally(() => { setStaff(null); setScreen({ name: "floor" }); }); }}>{t("signOut")}</button>}
       </span>
     </header>
+    {updateReady && <button type="button" className="pos-update-banner" onClick={() => window.location.reload()}>↻ {t("appUpdateReady")}</button>}
     <main ref={mainRef} className="pos-main">{body}</main>
     <div className={`pos-toast ${toast ? `show ${toast.kind}` : ""}`} role="status">{toast?.message ?? ""}</div>
   </div>;

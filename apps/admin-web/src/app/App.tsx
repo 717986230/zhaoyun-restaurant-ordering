@@ -24,6 +24,7 @@ import { TodayPanel } from "../features/reports/TodayPanel";
 import { ReservationsPanel } from "../features/reservations/ReservationsPanel";
 import { DeliveryPanel } from "../features/delivery/DeliveryPanel";
 import { BackToTop } from "./BackToTop";
+import { useAppUpdate } from "./update";
 
 const adminApi = new AdminApi();
 
@@ -123,6 +124,8 @@ export function App() {
   // that callback (and restarting the timer) on every reconnect.
   const roleRef = useRef<StaffRole | null>(null);
   const storage = useMemo(() => adminApi.storage, [state.connected, state.tab]);
+  const checkHealth = useCallback(() => adminApi.health(), []);
+  const updateReady = useAppUpdate(checkHealth);
   const restaurantName = state.settings?.restaurantName ?? "";
 
   useEffect(() => {
@@ -718,6 +721,7 @@ export function App() {
       >{t(TAB_KEYS[tab])}</button>)}
     </nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
+    {updateReady && <button type="button" className="admin-update-banner" onClick={() => window.location.reload()}>↻ {t("appUpdateReady")}</button>}
     </div>
     <main ref={mainRef}>
       {state.tab === "catalog" && <CatalogPanel products={state.products} printers={state.printers} editing={state.editingProduct} filter={state.productFilter} mediaUrl={(path) => adminApi.mediaUrl(path)} onFilter={(productFilter: ProductFilter) => setState((current) => ({ ...current, productFilter }))} onEdit={(editingProduct) => setState((current) => ({ ...current, editingProduct }))} onSave={saveProduct} onBulkSave={bulkSaveProducts} onDelete={deleteProduct} onDuplicate={duplicateProduct} featuredIds={state.settings?.featuredProductIds ?? []} onToggleFeatured={toggleFeatured} onRefresh={async () => { await connect(); }} />}

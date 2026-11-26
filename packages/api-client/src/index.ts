@@ -376,7 +376,7 @@ export class AdminApi {
   }
 
   mediaUrl(path: string): string { return `${this.storage.baseUrl}${path}`; }
-  health(): Promise<{ ok: boolean }> { return this.#request("/api/health"); }
+  health(): Promise<{ ok: boolean; version?: string }> { return this.#request("/api/health"); }
   /** Whether the guests' email codes go out, and a test email to the owner (shared/mail.mjs). */
   mailStatus(): Promise<ApiMailStatus> { return this.#request("/api/admin/mail"); }
   sendTestMail(to: string, language?: string): Promise<{ sent: boolean }> { return this.#request("/api/admin/mail/test", { method: "POST", body: JSON.stringify({ to, ...(language ? { language } : {}) }) }); }
@@ -656,6 +656,7 @@ export class PosApi {
     return this.#request(`/api/admin/members/${encodeURIComponent(customerId)}/visit`, { method: "POST", body: "{}" });
   }
   /** The tickets the print bridge gave up on, for the waiter to see and send again. */
+  health(): Promise<{ ok: boolean; version?: string }> { return this.#request("/api/health"); }
   /** A guest's call claimed by a waiter: other phones see it is being handled. */
   acknowledgeServiceRequest(id: string): Promise<{ request: ApiServiceRequest }> {
     return this.#request(`/api/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status: "acknowledged" }) });

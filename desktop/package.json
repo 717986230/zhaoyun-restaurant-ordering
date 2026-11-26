@@ -1,0 +1,44 @@
+{
+  "name": "chiri-kitchen-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chiri Kitchen Desktop App (POS & Admin)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "at.chiri.kitchen.desktop",
+    "productName": "Chiri Kitchen",
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

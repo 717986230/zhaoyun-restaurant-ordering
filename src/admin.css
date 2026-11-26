@@ -1251,6 +1251,20 @@ em.voided {
 }
 
 /* Online-pickup orders live under their own heading, apart from the floor. */
+.admin-update-banner {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--a-line);
+  background: var(--a-accent);
+  color: var(--a-on-accent);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  cursor: pointer;
+}
+
 .tables-compact-btn {
   margin-left: auto;
 }

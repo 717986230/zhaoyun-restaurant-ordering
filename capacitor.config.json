@@ -1,7 +1,14 @@
 {
   "appId": "at.zhaoyun.restaurant.ordering",
-  "appName": "Zhao Yun Ordering",
+  "appName": "Chiri Kitchen POS",
   "webDir": "dist/web",
+  "server": {
+    "url": "https://ck.uuoo.workers.dev/pos.html",
+    "cleartext": false,
+    "allowNavigation": [
+      "ck.uuoo.workers.dev"
+    ]
+  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0,

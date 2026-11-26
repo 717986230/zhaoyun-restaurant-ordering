@@ -1,0 +1,66 @@
+name: Build Desktop & Android Apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  desktop:
+    name: Build Desktop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            cmd: npm run dist:mac
+            artifact: chiri-kitchen-desktop-macos
+            files: desktop/dist/*.dmg
+          - os: windows-latest
+            cmd: npm run dist:win
+            artifact: chiri-kitchen-desktop-windows
+            files: desktop/dist/*.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install
+      - name: Package desktop installer
+        working-directory: desktop
+        run: ${{ matrix.cmd }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          retention-days: 30
+
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Build Android debug APK
+        run: npm run android:debug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: chiri-kitchen-pos-android
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
