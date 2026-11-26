@@ -2037,7 +2037,14 @@ export function createStore(driver, options = {}) {
     listStaff: async (activeOnly = false) => (await all("SELECT * FROM staff WHERE tenant_id = ? ORDER BY active DESC, name", tenantId)).filter((row) => !activeOnly || row.active).map(staffView),
     saveStaff,
     posSignIn,
-    posSignOut: async (token) => (token ? (await run("DELETE FROM pos_sessions WHERE tenant_id = ? AND token_hash = ?", tenantId, await hashSessionToken(token))) > 0 : false),
+    posSignOut: async (token) => {
+      if (!token) return false;
+      const hash = await hashSessionToken(token);
+      const row = await first("SELECT staff_id, device_id FROM pos_sessions WHERE tenant_id = ? AND token_hash = ?", tenantId, hash);
+      const changes = await run("DELETE FROM pos_sessions WHERE tenant_id = ? AND token_hash = ?", tenantId, hash);
+      if (row) await run("DELETE FROM table_claims WHERE tenant_id = ? AND staff_id = ? AND device_id = ?", tenantId, row.staff_id, row.device_id);
+      return changes > 0;
+    },
     claimTable,
     holdsTable,
     voidItem,

@@ -6,7 +6,7 @@ import type { Product } from "@zhaoyun/domain";
 import { LANGUAGE_INFO, serverErrorText } from "@zhaoyun/domain";
 import { formatEuro, initialLanguage, POS_LANGUAGES, translator } from "./i18n";
 import type { PosKey, PosLanguage } from "./i18n";
-import { enqueue, flushOutbox, readOutbox } from "./offline-queue";
+import { OUTBOX_KEY, enqueue, flushOutbox, readOutbox } from "./offline-queue";
 import { Floor } from "./Floor";
 import { Kitchen } from "./Kitchen";
 import { OrderScreen } from "./OrderScreen";
@@ -96,7 +96,15 @@ export function App() {
   const [lastReceipt, setLastReceipt] = useState<{ id: string; no: string } | null>(null);
   const listeners = useRef(new Set<LiveListener>());
   const t = translator(language);
-  const unpair = useCallback(() => { api.unpair(); setPaired(false); }, []);
+  const unpair = useCallback(() => {
+    api.unpair();
+    try { localStorage.removeItem(OUTBOX_KEY); } catch { /* private mode */ }
+    setPending(0);
+    setLastReceipt(null);
+    setStaff(null);
+    setScreen({ name: "floor" });
+    setPaired(false);
+  }, []);
   const onLive = useCallback((listener: LiveListener) => {
     listeners.current.add(listener);
     return () => { listeners.current.delete(listener); };
@@ -112,10 +120,32 @@ export function App() {
   }, []);
   const failed = useCallback((error: unknown) => {
     const message = error instanceof Error ? error.message : "";
-    // A session that ran out, or a waiter switched off: back to the names.
-    if (/401|authentication required/i.test(message) || (error as { status?: number })?.status === 401) setStaff(null);
+    // A session that ran out, kicked out by another device, or switched off: clear local session & return to sign-in.
+    if (/401|authentication required/i.test(message) || (error as { status?: number })?.status === 401) {
+      try { localStorage.removeItem("zy_pos_session"); } catch { /* private mode */ }
+      setLastReceipt(null);
+      setStaff(null);
+      setScreen({ name: "floor" });
+    }
     notify(message ? serverErrorText(message, language) : translator(language)("failed"), "error");
   }, [notify, language]);
+
+  // Keep POS tabs in sync when device pairing or staff session changes in another tab.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "zy_pos_device") {
+        const hasDevice = Boolean(event.newValue);
+        setPaired(hasDevice);
+        if (!hasDevice) { setStaff(null); setLastReceipt(null); setScreen({ name: "floor" }); }
+      } else if (event.key === "zy_pos_session") {
+        setStaff(api.session?.staff ?? null);
+        setLastReceipt(null);
+        if (!event.newValue) setScreen({ name: "floor" });
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   // 断网补发: orders that could not reach the server wait in this device's
   // outbox and go out on their own once it is back online.
@@ -235,7 +265,7 @@ export function App() {
 
   let body;
   if (!paired) body = <Pair t={t} onPaired={() => setPaired(true)} />;
-  else if (!staff) body = <SignIn t={t} onSignedIn={setStaff} onUnpair={unpair} failed={failed} />;
+  else if (!staff) body = <SignIn t={t} onSignedIn={(signedIn) => { setLastReceipt(null); setStaff(signedIn); }} onUnpair={unpair} failed={failed} />;
   else {
     const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive, refreshMenu: loadCatalog, queueOffline, lastReceipt, onReceiptIssued: setLastReceipt };
     body = screen.name === "order" ? <OrderScreen pos={pos} table={screen.table} pickupNo={screen.pickupNo} go={setScreen} />
@@ -254,7 +284,7 @@ export function App() {
         {staff && pending > 0 && <span className="pos-queue" role="status" title={t(pending === 1 ? "queuePendingOne" : "queuePendingMany", { count: pending })}>⟳ {pending}</span>}
         {staff && screen.name === "floor" && <button type="button" onClick={() => setScreen({ name: "records" })}>{t("records")}</button>}
         {languages}
-        {staff && <button type="button" onClick={() => { void api.signOut().finally(() => { setStaff(null); setScreen({ name: "floor" }); }); }}>{t("signOut")}</button>}
+        {staff && <button type="button" onClick={() => { void api.signOut().finally(() => { setLastReceipt(null); setStaff(null); setScreen({ name: "floor" }); }); }}>{t("signOut")}</button>}
       </span>
     </header>
     {updateReady && <button type="button" className="pos-update-banner" onClick={() => window.location.reload()}>↻ {t("appUpdateReady")}</button>}

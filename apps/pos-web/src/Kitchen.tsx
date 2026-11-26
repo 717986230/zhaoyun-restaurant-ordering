@@ -208,6 +208,35 @@ export function Kitchen() {
     }
   }, []);
 
+  // Keep Kitchen synced when Admin or POS account session changes in another tab.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== "zy_admin_session" && event.key !== "zy_pos_session") return;
+      let next = "";
+      for (const key of ["zy_admin_session", "zy_pos_session"]) {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(key) || "null") as { token?: string } | null;
+          if (parsed?.token) { next = parsed.token; break; }
+        } catch { /* ignore invalid stored JSON */ }
+      }
+      if (!next) {
+        try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ }
+        tokenRef.current = "";
+        setToken("");
+        setAuthed(false);
+        return;
+      }
+      if (next !== tokenRef.current) {
+        try { sessionStorage.setItem(TOKEN_KEY, next); } catch { /* private mode */ }
+        tokenRef.current = next;
+        setToken(next);
+        setAuthed(true);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   // One live channel while signed in, plus a clock for the waiting minutes.
   useEffect(() => {
     if (!authed) return undefined;
