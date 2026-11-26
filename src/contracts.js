@@ -374,7 +374,14 @@ export const StaffBody = Type.Object({
   active: Type.Optional(Type.Boolean())
 }, { additionalProperties: false });
 export const DeviceBody = Type.Object({ name: Type.String({ maxLength: 64 }) }, { additionalProperties: false });
-export const PosSignInBody = Type.Object({ staffId: Type.String({ minLength: 1, maxLength: 64 }), pin: Type.String({ maxLength: 12 }) }, { additionalProperties: false });
+export const PosSignInBody = Type.Object(
+  {
+    staffId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+    name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+    pin: Type.String({ maxLength: 12 })
+  },
+  { additionalProperties: false }
+);
 export const MoveTableBody = Type.Object(
   {
     to: Type.String({ minLength: 1, maxLength: 8 }),

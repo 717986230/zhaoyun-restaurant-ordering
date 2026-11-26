@@ -1123,8 +1123,14 @@ export function createStore(driver, options = {}) {
     }
   }
 
-  async function posSignIn(device, staffId, pin) {
-    const row = await first("SELECT * FROM staff WHERE tenant_id = ? AND id = ?", tenantId, String(staffId ?? ""));
+  async function posSignIn(device, target, pin) {
+    const staffId = typeof target === "string" ? target : target?.staffId;
+    const name = typeof target === "object" && target ? String(target.name ?? "").trim() : "";
+    const row = staffId
+      ? await first("SELECT * FROM staff WHERE tenant_id = ? AND id = ?", tenantId, String(staffId))
+      : name
+        ? await first("SELECT * FROM staff WHERE tenant_id = ? AND LOWER(TRIM(name)) = LOWER(?)", tenantId, name)
+        : null;
     const stored = row ? { hash: row.pin_hash, salt: row.pin_salt, iterations: row.pin_iterations } : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
     const correct = await verifyPassword(String(pin ?? ""), stored);
     if (!row || !row.active || !correct) return null;

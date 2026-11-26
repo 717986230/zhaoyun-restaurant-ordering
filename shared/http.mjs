@@ -912,10 +912,12 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (!device) return fail("This device is not paired with the POS", 401);
         const { value, invalid } = await body(request, PosSignInBody);
         if (invalid) return invalid;
+        const staffKey = value.staffId || String(value.name ?? "").trim().toLowerCase();
+        if (!staffKey) return fail("Staff name or ID is required", 400);
         // A PIN is four to six digits: the waiter's, from any of the paired devices, counts too.
-        const budget = await guessBudget(ctx, "pin", value.staffId);
+        const budget = await guessBudget(ctx, "pin", staffKey);
         if (budget.denied) return budget.denied;
-        const session = await store.posSignIn(device, value.staffId, value.pin);
+        const session = await store.posSignIn(device, { staffId: value.staffId, name: value.name }, value.pin);
         if (!session) {
           throttle.fail();
           await budget.fail();

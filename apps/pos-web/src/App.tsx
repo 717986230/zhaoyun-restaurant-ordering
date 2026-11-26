@@ -293,53 +293,78 @@ function Pair({ t, onPaired }: { t: (key: PosKey) => string; onPaired: () => voi
   </form>;
 }
 
-/** A waiter's name, then their PIN on a keypad big enough for a thumb. */
+/** Direct staff sign-in: username + PIN (with both keyboard input and thumb keypad). */
 function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof translator>; onSignedIn: (staff: PosStaff) => void; onUnpair: () => void; failed: (error: unknown) => void }) {
-  const [staff, setStaff] = useState<PosStaff[] | null>(null);
-  const [chosen, setChosen] = useState<PosStaff | null>(null);
+  const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.staff().then(({ staff: list }) => setStaff(list)).catch((failure) => {
+    api.staff().catch((failure) => {
       // The manager unpaired this device: back to pairing.
       if ((failure as { status?: number })?.status === 401) onUnpair();
-      else { failed(failure); setStaff([]); }
+      else failed(failure);
     });
   }, [failed, onUnpair]);
 
-  async function enter(code: string) {
-    if (!chosen) return;
+  async function submit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || pin.length < 4 || busy) return;
+    setBusy(true);
+    setError("");
     try {
-      onSignedIn(await api.signIn(chosen.id, code));
+      onSignedIn(await api.signIn({ name: trimmed }, pin));
     } catch {
       setError(t("wrongPin"));
       setPin("");
+    } finally {
+      setBusy(false);
     }
   }
   const press = (digit: string) => {
     setError("");
-    const next = `${pin}${digit}`.slice(0, 6);
-    setPin(next);
+    setPin((current) => `${current}${digit}`.slice(0, 6));
   };
 
-  if (!chosen) {
-    return <section className="pos-card pos-signin">
-      <h1>{t("whoAreYou")}</h1>
-      {staff && !staff.length && <p>{t("noStaff")}</p>}
-      <div className="pos-names">{(staff ?? []).map((person) => <button key={person.id} type="button" onClick={() => { setChosen(person); setPin(""); setError(""); }}>{person.name}</button>)}</div>
-      <button type="button" className="pos-link" onClick={() => { if (window.confirm(t("unpairConfirm"))) onUnpair(); }}>{t("unpair")}</button>
-    </section>;
-  }
-  return <section className="pos-card pos-signin">
-    <h1>{t("enterPin", { name: chosen.name })}</h1>
+  return <form className="pos-card pos-signin" onSubmit={(event) => void submit(event)}>
+    <h1>{t("posSignInTitle")}</h1>
+    <label>
+      <span>{t("staffUsername")}</span>
+      <input
+        name="username"
+        value={name}
+        required
+        maxLength={64}
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
+        placeholder={t("staffUsernameHint")}
+        onChange={(event) => { setError(""); setName(event.target.value); }}
+      />
+    </label>
+    <label>
+      <span>PIN</span>
+      <input
+        name="pin"
+        type="password"
+        inputMode="numeric"
+        maxLength={6}
+        value={pin}
+        autoComplete="current-password"
+        placeholder="4–6 位数字"
+        onChange={(event) => { setError(""); setPin(event.target.value.replace(/\D/g, "").slice(0, 6)); }}
+      />
+    </label>
     <div className="pos-pin" aria-label="PIN">{Array.from({ length: Math.max(4, pin.length) }, (_, index) => <i key={index} className={index < pin.length ? "on" : ""} />)}</div>
     {error && <p className="pos-error" role="alert">{error}</p>}
     <div className="pos-keypad">
       {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => <button key={digit} type="button" onClick={() => press(digit)}>{digit}</button>)}
-      <button type="button" onClick={() => setChosen(null)}>{t("back")}</button>
+      <button type="button" aria-label={t("back")} onClick={() => { setError(""); setPin((current) => current.slice(0, -1)); }}>⌫</button>
       <button type="button" onClick={() => press("0")}>0</button>
-      <button type="button" className="pos-primary" disabled={pin.length < 4} onClick={() => void enter(pin)}>OK</button>
+      <button type="submit" className="pos-primary" disabled={!name.trim() || pin.length < 4 || busy}>OK</button>
     </div>
-  </section>;
+    <button type="button" className="pos-link" onClick={() => { if (window.confirm(t("unpairConfirm"))) onUnpair(); }}>{t("unpair")}</button>
+  </form>;
 }

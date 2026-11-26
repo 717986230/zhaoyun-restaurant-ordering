@@ -60,7 +60,7 @@ async function pairAndSignIn(page, device, name, pin) {
   await page.getByLabel("账户名").fill(LOGIN);
   await page.getByLabel("账户密码").fill(PASSWORD);
   await page.getByRole("button", { name: "配对" }).click();
-  await page.getByRole("button", { name, exact: true }).click();
+  await page.getByLabel("用户名").fill(name);
   for (const digit of pin) await page.locator(".pos-keypad").getByRole("button", { name: digit, exact: true }).click();
   await page.getByRole("button", { name: "OK" }).click();
   await expect(page.locator(".pos-who")).toContainText(name);
