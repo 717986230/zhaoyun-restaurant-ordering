@@ -298,7 +298,7 @@ export function TablesPanel(props: Props) {
       {takeawayTile
         ? <div className="board-actions">
           {table.orders.length > 0 && (table.total <= 0 && props.onCancelOrders && table.orders.some((order) => order.status !== "completed")
-            ? <button className="danger-action" disabled={props.busy} onClick={() => void props.onCancelOrders!(table.orders.filter((order) => order.status !== "completed").map((order) => order.id))}>{t("tableCancelZero")}</button>
+            ? <button className="danger-action" disabled={props.busy} onClick={() => { if (window.confirm(t("tableCancelZeroConfirm", { table: table.table }))) void props.onCancelOrders!(table.orders.filter((order) => order.status !== "completed").map((order) => order.id)); }}>{t("tableCancelZero")}</button>
             : <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>)}
         </div>
         : editing ? (renaming === table.table
@@ -329,7 +329,7 @@ export function TablesPanel(props: Props) {
           {t(table.orderingUntil ? "closeForOrdering" : "openForOrdering")}
         </button>
         {table.orders.length > 0 && (table.total <= 0 && props.onCancelOrders && table.orders.some((order) => order.status !== "completed")
-          ? <button className="danger-action" disabled={props.busy} onClick={() => void props.onCancelOrders!(table.orders.filter((order) => order.status !== "completed").map((order) => order.id))}>{t("tableCancelZero")}</button>
+          ? <button className="danger-action" disabled={props.busy} onClick={() => { if (window.confirm(t("tableCancelZeroConfirm", { table: table.table }))) void props.onCancelOrders!(table.orders.filter((order) => order.status !== "completed").map((order) => order.id)); }}>{t("tableCancelZero")}</button>
           : <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(table.table)}>{t("tableSettle")}</button>)}
       </div>}
     </article>;

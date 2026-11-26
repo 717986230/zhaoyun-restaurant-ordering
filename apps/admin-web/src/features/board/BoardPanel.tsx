@@ -95,7 +95,7 @@ export function BoardPanel(props: Props) {
             {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}
             <div className="board-actions">
               {next && <button className="primary-action" disabled={props.busy} onClick={() => void props.onOrderStatus(order.id, next)}>{t("boardAdvance", { status: t(ORDER_STATUS_KEYS[next]) })}</button>}
-              {floor && <button className="ghost-action" disabled={props.busy} onClick={() => void props.onOrderStatus(order.id, "cancelled")}>{t("boardCancel")}</button>}
+              {floor && <button className="ghost-action" disabled={props.busy} onClick={() => { if (window.confirm(t("orderCancelConfirm", { no: order.no }))) void props.onOrderStatus(order.id, "cancelled"); }}>{t("boardCancel")}</button>}
             </div>
           </article>;
         }) : <div className="admin-empty">{t("boardNoOrders")}</div>}</div>
