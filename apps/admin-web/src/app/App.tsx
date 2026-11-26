@@ -715,8 +715,7 @@ export function App() {
       {TAB_GROUPS.map((group) => {
         const visibleTabs = group.tabs.filter((tab) => tabs.includes(tab));
         if (!visibleTabs.length) return null;
-        return <div className="admin-tab-group" key={group.label}>
-          <span className="admin-tab-group-tag" aria-hidden="true">{t(group.label)}</span>
+        return <div className="admin-tab-group" key={group.label} title={t(group.label)} data-group={group.label}>
           {visibleTabs.map((tab) => <button
             key={tab}
             ref={state.tab === tab ? activeTabRef : undefined}
