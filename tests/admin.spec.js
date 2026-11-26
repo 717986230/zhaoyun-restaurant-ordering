@@ -576,7 +576,7 @@ test("orders, tables and printers stay out of the way until ordering is switched
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示实时订单看板和打印机" }).click();
   await expect.poll(() => appSettings.showOrdering).toBe(true);
-  await expect(nav).toHaveText("今日订单桌位预约外卖菜品库存打印报表账单营销设置会员跳转");
+  await expect(nav).toHaveText("今日会员桌位预约订单外卖菜品库存打印报表账单营销设置跳转");
 });
 
 test("a dish is copied in one tap, and the copy opens ready to change", async ({ page }) => {
