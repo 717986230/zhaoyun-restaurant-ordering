@@ -363,6 +363,14 @@ const zh = {
   queueDropped: "{table} 桌 {count} 道菜补发被拒：{reason}",
   queuePendingOne: "1 单菜等联网补发",
   queuePendingMany: "{count} 单菜等联网补发",
+  quickCard: "全额刷卡",
+  quickCash: "全额现金",
+  scanMember: "扫会员码",
+  reprintLast: "补打小票 {no}",
+  filterAll: "全部",
+  filterSeated: "在座",
+  filterAttention: "待处理",
+  floorSeatedSum: "{count} 桌在座 · {amount}",
 };
 
 type Copy = typeof zh;
@@ -724,6 +732,14 @@ const de: Copy = {
   queueDropped: "Tisch {table}, {count} Posten abgelehnt: {reason}",
   queuePendingOne: "1 Bon wartet auf Verbindung",
   queuePendingMany: "{count} Bons warten auf Verbindung",
+  quickCard: "Karte gesamt",
+  quickCash: "Bar gesamt",
+  scanMember: "Mitglied scannen",
+  reprintLast: "Kopie Beleg {no}",
+  filterAll: "Alle",
+  filterSeated: "Besetzt",
+  filterAttention: "Offen",
+  floorSeatedSum: "{count} besetzt · {amount}",
 };
 
 const en: Copy = {
@@ -1083,6 +1099,14 @@ const en: Copy = {
   queueDropped: "Table {table}: {count} items rejected: {reason}",
   queuePendingOne: "1 ticket waiting to send",
   queuePendingMany: "{count} tickets waiting to send",
+  quickCard: "Full card",
+  quickCash: "Full cash",
+  scanMember: "Scan member QR",
+  reprintLast: "Reprint #{no}",
+  filterAll: "All",
+  filterSeated: "Seated",
+  filterAttention: "Attention",
+  floorSeatedSum: "{count} seated · {amount}",
 };
 
 const copies: Record<PosLanguage, Copy> = { zh, de, en };

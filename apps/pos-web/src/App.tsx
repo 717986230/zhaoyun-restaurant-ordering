@@ -34,6 +34,9 @@ export interface Pos {
   refreshMenu: () => void;
   /** 断网补发: an order that could not reach the server, kept on this device to send again once it is back online. */
   queueOffline: (command: CreateOrderCommand, count: number) => void;
+  /** Latest receipt issued in this session for quick one-tap reprint. */
+  lastReceipt: { id: string; no: string } | null;
+  onReceiptIssued: (receipt: { id: string; no: string }) => void;
 }
 
 type LiveListener = (event: RealtimeEnvelope) => void;
@@ -90,6 +93,7 @@ export function App() {
   const [screen, setScreen] = useState<Screen>(() => screenFromHash() ?? { name: "floor" });
   const [toast, setToast] = useState<{ message: string; kind: "ok" | "error" } | null>(null);
   const [live, setLive] = useState(false);
+  const [lastReceipt, setLastReceipt] = useState<{ id: string; no: string } | null>(null);
   const listeners = useRef(new Set<LiveListener>());
   const t = translator(language);
   const unpair = useCallback(() => { api.unpair(); setPaired(false); }, []);
@@ -202,7 +206,7 @@ export function App() {
   if (!paired) body = <Pair t={t} onPaired={() => setPaired(true)} />;
   else if (!staff) body = <SignIn t={t} onSignedIn={setStaff} onUnpair={unpair} failed={failed} />;
   else {
-    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive, refreshMenu: loadCatalog, queueOffline };
+    const pos: Pos = { t, language, money: (cents) => formatEuro(cents, language), staff, products, notify, failed, live, onLive, refreshMenu: loadCatalog, queueOffline, lastReceipt, onReceiptIssued: setLastReceipt };
     body = screen.name === "order" ? <OrderScreen pos={pos} table={screen.table} pickupNo={screen.pickupNo} go={setScreen} />
       : screen.name === "pay" ? <PayScreen pos={pos} table={screen.table} go={setScreen} />
       : screen.name === "topup" ? <TopUp pos={pos} go={setScreen} />
@@ -217,6 +221,7 @@ export function App() {
       {staff && <i className={`pos-live ${live ? "on" : ""}`} role="img" aria-label={t(live ? "liveOn" : "liveOff")} title={t(live ? "liveOn" : "liveOff")} />}
       <span className="pos-head-actions">
         {staff && pending > 0 && <span className="pos-queue" role="status" title={t(pending === 1 ? "queuePendingOne" : "queuePendingMany", { count: pending })}>⟳ {pending}</span>}
+        {staff && screen.name === "floor" && <button type="button" onClick={() => { location.search = "?view=kitchen"; }}>{t("kitchenTitle")}</button>}
         {staff && screen.name === "floor" && <button type="button" onClick={() => setScreen({ name: "records" })}>{t("records")}</button>}
         {languages}
         {staff && <button type="button" onClick={() => { void api.signOut().finally(() => { setStaff(null); setScreen({ name: "floor" }); }); }}>{t("signOut")}</button>}

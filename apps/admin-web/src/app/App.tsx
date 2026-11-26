@@ -712,13 +712,20 @@ export function App() {
       </div>
     </header>
     <nav className="admin-tabs" aria-label={t("modules")}>
-      {TAB_GROUPS.flatMap((group) => group.tabs).filter((tab) => tabs.includes(tab)).map((tab) => <button
-        key={tab}
-        ref={state.tab === tab ? activeTabRef : undefined}
-        className={state.tab === tab ? "active" : ""}
-        aria-current={state.tab === tab ? "page" : undefined}
-        onClick={() => setTab(tab)}
-      >{t(TAB_KEYS[tab])}</button>)}
+      {TAB_GROUPS.map((group) => {
+        const visibleTabs = group.tabs.filter((tab) => tabs.includes(tab));
+        if (!visibleTabs.length) return null;
+        return <div className="admin-tab-group" key={group.label}>
+          <span className="admin-tab-group-tag" aria-hidden="true">{t(group.label)}</span>
+          {visibleTabs.map((tab) => <button
+            key={tab}
+            ref={state.tab === tab ? activeTabRef : undefined}
+            className={state.tab === tab ? "active" : ""}
+            aria-current={state.tab === tab ? "page" : undefined}
+            onClick={() => setTab(tab)}
+          >{t(TAB_KEYS[tab])}</button>)}
+        </div>;
+      })}
     </nav>
     {!state.connected && state.connectionError && <p className="admin-banner" role="alert">{t("offline")} · {state.connectionError}</p>}
     {updateReady && <button type="button" className="admin-update-banner" onClick={() => window.location.reload()}>↻ {t("appUpdateReady")}</button>}
@@ -775,7 +782,15 @@ export function App() {
       {state.tab === "orders" && state.settings && <OrdersPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} notify={notify} />}
       {state.tab === "stock" && <StockPanel api={adminApi} products={state.products} onRefresh={async () => { await connect(); }} notify={notify} failed={reportFailed} />}
       {state.tab === "promos" && state.settings && <PromotionsPanel api={adminApi} timeZone={state.settings.timeZone} notify={notify} failed={reportFailed} />}
-      {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} onNavigate={setTab} />}
+      {state.tab === "today" && <TodayPanel
+        api={adminApi}
+        failed={reportFailed}
+        liveTick={reservationTick + state.orders.length}
+        onNavigate={setTab}
+        failedPrintsCount={state.failedJobs.length}
+        openCallsCount={state.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled").length}
+        orders={state.orders}
+      />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} restaurantName={state.settings?.restaurantName ?? ""} menuLanguages={state.settings?.menuLanguages ?? []} />}
       {state.tab === "members" && <MembersPanel api={adminApi} settings={state.settings} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "system" && <SettingsPanel

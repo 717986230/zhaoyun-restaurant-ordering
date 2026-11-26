@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi } from "@zhaoyun/api-client";
-import type { ApiToday } from "@zhaoyun/contracts";
+import type { ApiOrder, ApiToday } from "@zhaoyun/contracts";
 import { formatMoney, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import type { AdminTab } from "../../app/types";
@@ -13,7 +13,17 @@ const STATUS_KEYS: Record<string, CopyKey> = { pending: "todayPending", confirme
  * what they still owe, and the day's bookings by time. Refreshed every half
  * minute and whenever the live channel says something changed.
  */
-export function TodayPanel({ api, failed, liveTick, onNavigate }: { api: AdminApi; failed: (error: unknown) => void; liveTick: number; onNavigate?: (tab: AdminTab) => void }) {
+export function TodayPanel({
+  api, failed, liveTick, onNavigate, failedPrintsCount = 0, openCallsCount = 0, orders = []
+}: {
+  api: AdminApi;
+  failed: (error: unknown) => void;
+  liveTick: number;
+  onNavigate?: (tab: AdminTab) => void;
+  failedPrintsCount?: number;
+  openCallsCount?: number;
+  orders?: ApiOrder[];
+}) {
   const { t, language } = useI18n();
   const [today, setToday] = useState<ApiToday | null>(null);
   const money = (cents: number) => formatMoney(cents, language);
@@ -33,8 +43,16 @@ export function TodayPanel({ api, failed, liveTick, onNavigate }: { api: AdminAp
 
   if (!today) return <section id="todayPanel" className="admin-panel active"><div className="settings-page"><p className="admin-empty">…</p></div></section>;
   const dateLabel = new Date(`${today.date}T12:00:00Z`).toLocaleDateString(language === "zh" ? "zh-CN" : language === "de" ? "de-AT" : "en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+  const voidedToday = orders
+    .filter((order) => order.createdAt.slice(0, 10) === today.date)
+    .reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + (item.voided ?? 0), 0), 0);
   return <section id="todayPanel" className="admin-panel active"><div className="settings-page">
     <h1 className="settings-title">{t("todayTitle")} <small className="today-date">{dateLabel}</small></h1>
+    {(failedPrintsCount > 0 || openCallsCount > 0 || voidedToday > 0) && <div className="today-alerts">
+      {failedPrintsCount > 0 && <button type="button" className="today-alert danger" onClick={() => onNavigate?.("board")}>⚠ {t("todayFailedPrints", { count: failedPrintsCount })}</button>}
+      {openCallsCount > 0 && <button type="button" className="today-alert warn" onClick={() => onNavigate?.("board")}>🔔 {t("todayOpenCalls", { count: openCallsCount })}</button>}
+      {voidedToday > 0 && <button type="button" className="today-alert info" onClick={() => onNavigate?.("orders")}>↺ {t("todayVoidLabel", { count: voidedToday })}</button>}
+    </div>}
     <div className="report-tiles" id="todayTiles">
       <button type="button" className="report-tile report-tile-link" onClick={() => onNavigate?.("reports")}><small>{t("todayTakings")}</small><b id="todayGross">{money(today.grossCents)}</b></button>
       <button type="button" className="report-tile report-tile-link" onClick={() => onNavigate?.("orders")}><small>{t("todayReceipts")}</small><b>{today.receipts}</b></button>

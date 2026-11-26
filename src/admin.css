@@ -6080,3 +6080,65 @@ button.report-tile-link:hover {
   color: var(--a-ink);
   text-align: left;
 }
+
+.admin-tab-group {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.admin-tab-group + .admin-tab-group {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--a-line-soft);
+}
+
+.admin-tab-group-tag {
+  align-self: center;
+  margin-right: 4px;
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+  background: var(--a-rail);
+  color: var(--a-faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.today-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.today-alert {
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--a-line);
+  background: var(--a-card);
+  color: var(--a-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.today-alert.danger {
+  border-color: var(--a-danger-line);
+  background: var(--a-danger-wash);
+  color: var(--a-danger);
+}
+
+.today-alert.warn {
+  border-color: var(--a-accent-line);
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+}
+
+.today-alert.info {
+  border-color: var(--a-line-2);
+  background: var(--a-sunken);
+  color: var(--a-muted);
+}

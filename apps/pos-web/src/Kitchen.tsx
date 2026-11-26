@@ -245,6 +245,7 @@ export function Kitchen() {
       <i className={`pos-live ${live ? "on" : ""}`} role="img" aria-label={t(live ? "liveOn" : "liveOff")} title={t(live ? "liveOn" : "liveOff")} />
       <span className="pos-head-actions">
         <span>{t("kitchenUpdated", { time: time(updatedAt) })}</span>
+        <button type="button" onClick={() => { location.search = ""; }}>POS</button>
         <button type="button" onClick={() => { try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* not kept */ } setToken(""); setAuthed(false); }}>{t("signOut")}</button>
       </span>
     </header>

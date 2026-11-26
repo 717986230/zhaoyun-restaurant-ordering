@@ -274,6 +274,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const [scanning, setScanning] = useState(false);
   // A booking being seated: the free-table picker is open for it.
   const [seating, setSeating] = useState<ApiReservation | null>(null);
+  const [tableFilter, setTableFilter] = useState<"all" | "seated" | "attention">("all");
   // This device: the tables it has open are its own, every other device's are locked to it.
   const [deviceId, setDeviceId] = useState("");
 
@@ -311,6 +312,14 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   for (const entry of held) heldAt.set(entry.table.toUpperCase(), entry.time);
   const room = tables.filter((table) => !TAKEAWAY.test(table.table));
   const takeaways = tables.filter((table) => TAKEAWAY.test(table.table) && table.state !== "free");
+  const isAttention = (table: TableOverview) => {
+    const code = table.table.toUpperCase();
+    return calling.has(code) || table.state === "locked" || heldAt.has(code) || bookedAt.has(code);
+  };
+  const seatedRoom = room.filter((table) => table.state !== "free");
+  const seatedTotalCents = seatedRoom.reduce((sum, table) => sum + Math.round(table.total * 100), 0);
+  const attentionRoom = room.filter(isAttention);
+  const shownRoom = tableFilter === "seated" ? seatedRoom : tableFilter === "attention" ? attentionRoom : room;
 
   async function newTakeaway() {
     try {
@@ -373,12 +382,20 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
       </form>
       <button type="button" className="pos-scan-open" id="posScanBooking" onClick={() => setScanning(true)}>{t("scanBooking")}</button>
       <button type="button" className="pos-topup-open" onClick={() => go({ name: "topup" })}>{t("topUp")}</button>
+      {pos.lastReceipt && <button type="button" onClick={() => { void api.reprintReceipt(pos.lastReceipt!.id).then(() => pos.notify(t("reprinted", { no: pos.lastReceipt!.no }))).catch(pos.failed); }}>🖨 {t("reprintLast", { no: pos.lastReceipt.no })}</button>}
       <button type="button" className="pos-primary" onClick={() => void newTakeaway()}>{t("newTakeaway")}</button>
     </div>
     {scanning && <BookingScanner pos={pos} bookings={bookings} onFound={(code) => { setScanning(false); void scanned(pos, code, bookings, () => void load(), setSeating); }} onClose={() => setScanning(false)} />}
     {seating && <SeatDialog pos={pos} booking={seating} tables={tables} onCancel={() => setSeating(null)} onSeat={(table) => void doSeat(seating, table)} />}
-    <h2>{t("tables")}</h2>
-    <div className="pos-table-grid">{room.map(tile)}</div>
+    <div className="pos-floor-head">
+      <h2>{t("tables")}{seatedRoom.length > 0 && <small className="pos-floor-summary">{t("floorSeatedSum", { count: seatedRoom.length, amount: money(seatedTotalCents) })}</small>}</h2>
+      <div className="pos-floor-filters" role="group" aria-label={t("tables")}>
+        <button type="button" className={tableFilter === "all" ? "on" : ""} aria-pressed={tableFilter === "all"} onClick={() => setTableFilter("all")}>{t("filterAll")} ({room.length})</button>
+        <button type="button" className={tableFilter === "seated" ? "on" : ""} aria-pressed={tableFilter === "seated"} onClick={() => setTableFilter("seated")}>{t("filterSeated")} ({seatedRoom.length})</button>
+        <button type="button" className={tableFilter === "attention" ? "on" : ""} aria-pressed={tableFilter === "attention"} onClick={() => setTableFilter("attention")}>{t("filterAttention")} ({attentionRoom.length})</button>
+      </div>
+    </div>
+    <div className="pos-table-grid">{shownRoom.map(tile)}</div>
     {takeaways.length > 0 && <>
       <h2>{t("takeaways")}</h2>
       <div className="pos-table-grid">{takeaways.map(tile)}</div>

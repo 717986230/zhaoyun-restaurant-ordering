@@ -3,6 +3,8 @@ import type { ApiBill, ApiSepaPayment, PaymentType } from "@zhaoyun/contracts";
 import { epcQrPayload } from "../../../shared/giro.mjs";
 import { api, useLiveReload } from "./App";
 import type { Pos, Screen } from "./App";
+import { BookingScanner } from "./BookingScanner";
+import type { Scanned } from "./BookingScanner";
 import { TierChip } from "./TierChip";
 
 const HOLD_MS = 30_000;
@@ -68,6 +70,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [busy, setBusy] = useState(false);
   const [sepa, setSepa] = useState<ApiSepaPayment | null>(null);
   const [showSepa, setShowSepa] = useState(false);
+  const [scanningMember, setScanningMember] = useState(false);
   // AA 均分: how many people share this bill equally.
   const [splitN, setSplitN] = useState(2);
   const requestId = useRef(crypto.randomUUID());
@@ -150,7 +153,12 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       byRate.set(part.percent, (byRate.get(part.percent) ?? 0) + part.cents - off);
     }
   }
-  const offCents = [...byRate.values()].reduce((sum, cents) => sum + Math.round((cents * discount) / 100), 0);
+  const offFor = (pct: number) => [...byRate.values()].reduce((sum, cents) => sum + Math.round((cents * pct) / 100), 0);
+  const totalFor = (pct: number) => {
+    const net = itemsCents - itemOffCents - offFor(pct);
+    return net - Math.min(Math.max(0, amountDiscount), Math.max(0, net));
+  };
+  const offCents = offFor(discount);
   // The dishes net of per-item and whole-bill percentage discounts: the base the
   // 满减 fixed cut then comes off, capped so the bill never goes below zero —
   // exactly as the server works it out (shared/register.mjs).
@@ -256,6 +264,42 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     }
   }
 
+  async function scanMemberCode(code: Scanned) {
+    setScanningMember(false);
+    if (code.kind !== "member") {
+      pos.notify(t("memberUnknown"), "error");
+      return;
+    }
+    try {
+      const visit = await api.memberVisit(code.id);
+      const login = visit.customer.phone || visit.customer.email;
+      const { member } = await api.member(login);
+      const memberName = member.name || member.phone || member.email;
+      const memberDiscount = member.membership?.discountPercent ?? 0;
+      const adjustedTotal = totalFor(Math.max(discount, memberDiscount));
+      if (memberDiscount > 0) setDiscount((current) => Math.max(current, memberDiscount));
+      const balanceCents = member.balanceCents ?? 0;
+      if (balanceCents > 0) {
+        const covered = payments.reduce((sum, entry) => sum + toCents(entry.amount), 0);
+        const due = Math.max(0, adjustedTotal - covered);
+        const take = Math.min(due || adjustedTotal, balanceCents);
+        setPayments((current) => [...current, {
+          type: "balance",
+          amount: toAmount(take),
+          tendered: "",
+          voucherCode: "",
+          balanceCents,
+          tip: "",
+          memberLogin: login,
+          memberId: member.id,
+          memberName,
+          memberTierLevel: member.membership?.tierLevel ?? 0
+        }]);
+      }
+      pos.notify(`${memberName} · ${t("balance", { amount: money(balanceCents) })}`);
+    } catch (error) { pos.failed(error); }
+  }
+
   async function issue() {
     setBusy(true);
     try {
@@ -285,6 +329,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
           ...(payment.type !== "voucher" && payment.type !== "balance" && toCents(payment.tip) > 0 ? { tip: toCents(payment.tip) / 100 } : {})
         }))
       });
+      pos.onReceiptIssued({ id: receipt.id, no: String(receipt.receiptNo) });
       const given = receipt.payments.find((payment) => payment.changeCents);
       const tipped = receipt.payments.reduce((sum, payment) => sum + (payment.tipCents ?? 0), 0);
       pos.notify(t("issued", { no: receipt.receiptNo, change: (given?.changeCents ? t("issuedChange", { amount: money(given.changeCents) }) : "") + (tipped ? t("issuedTip", { amount: money(tipped) }) : "") }));
@@ -309,6 +354,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       <div className="pos-ticket-head">
         <button type="button" onClick={() => go({ name: "order", table })}>← {t("back")}</button>
         <h1>{t("payTitle", { table })}</h1>
+        {pos.lastReceipt && <button type="button" onClick={() => { void api.reprintReceipt(pos.lastReceipt!.id).then(() => pos.notify(t("reprinted", { no: pos.lastReceipt!.no }))).catch(pos.failed); }}>🖨 {t("reprintLast", { no: pos.lastReceipt.no })}</button>}
       </div>
       <p className="pos-unsigned" role="note">{t("unsigned")}</p>
       <div className="pos-mode" role="group">
@@ -350,6 +396,11 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       <label className="pos-discount"><span>{t("amountDiscount")}</span><input type="number" min={0} max={1000} step="0.01" inputMode="decimal" value={amountDiscount ? (amountDiscount / 100).toFixed(2) : ""} placeholder="0" onChange={(event) => { amountTouched.current = true; const cents = Math.round((Number(event.target.value) || 0) * 100); setAmountDiscount(Math.max(0, Math.min(100000, cents))); }} /></label>
       {reduced && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>
+      {totalCents > 0 && remaining > 0 && <div className="pos-quick-pay">
+        <button type="button" className="pos-primary" onClick={() => setPayments((current) => [...current, { type: "card", amount: toAmount(remaining), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }])}>{t("quickCard")}</button>
+        <button type="button" onClick={() => setPayments((current) => [...current, { type: "cash", amount: toAmount(remaining), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }])}>{t("quickCash")}</button>
+        <button type="button" onClick={() => setScanningMember(true)}>📷 {t("scanMember")}</button>
+      </div>}
       <div className="pos-pay-types">{(["cash", "card", "voucher", "balance"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
       <div className="pos-split">
         <span>{t("splitEvenly")}</span>
@@ -361,7 +412,9 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
       <ul className="pos-payments">{payments.map((payment, index) => <li key={index}>
         <b>{t(PAY_KEYS[payment.type])}</b>
         <label><span>{t("amount")}</span><input inputMode="decimal" value={payment.amount} onChange={(event) => edit(index, { amount: event.target.value })} /></label>
-        {payment.type === "cash" && <label><span>{t("tendered")}</span><input inputMode="decimal" placeholder={toAmount(toCents(payment.amount) + toCents(payment.tip))} value={payment.tendered} onChange={(event) => edit(index, { tendered: event.target.value })} /></label>}
+        {payment.type === "cash" && <label><span>{t("tendered")}</span><input inputMode="decimal" placeholder={toAmount(toCents(payment.amount) + toCents(payment.tip))} value={payment.tendered} onChange={(event) => edit(index, { tendered: event.target.value })} />
+          <span className="pos-cash-presets">{[10, 20, 50, 100].map((bill) => <button key={bill} type="button" onClick={() => edit(index, { tendered: bill.toFixed(2) })}>€{bill}</button>)}</span>
+        </label>}
         {payment.type !== "voucher" && payment.type !== "balance" && <label className="pos-tip"><span>{t("tip")}</span><input inputMode="decimal" placeholder="0.00" value={payment.tip} onChange={(event) => edit(index, { tip: event.target.value })} /><button type="button" data-action="round-up" onClick={() => roundUp(index)}>{t("roundUp")}</button></label>}
         {payment.type === "voucher" && <label><span>{t("voucherCode")}</span><input value={payment.voucherCode} autoCapitalize="characters" onChange={(event) => edit(index, { voucherCode: event.target.value.toUpperCase(), balanceCents: null })} onBlur={() => void checkVoucher(index)} /></label>}
         {payment.type === "balance" && <label><span>{t("memberLogin")}</span><input value={payment.memberLogin} inputMode="email" autoCapitalize="none" spellCheck={false} placeholder={t("memberLoginHint")} onChange={(event) => edit(index, { memberLogin: event.target.value, memberId: "", memberName: "", balanceCents: null, memberTierLevel: 0 })} onBlur={() => void checkMember(index)} /></label>}
@@ -378,6 +431,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     </div>
 
     {showSepa && sepa && <SepaDialog sepa={sepa} amountCents={totalCents} reference={table} money={money} t={t} onClose={() => setShowSepa(false)} />}
+    {scanningMember && <BookingScanner pos={pos} bookings={[]} onFound={(code) => void scanMemberCode(code)} onClose={() => setScanningMember(false)} />}
   </section>;
 }
 
