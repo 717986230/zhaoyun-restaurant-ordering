@@ -252,7 +252,6 @@ export function App() {
       {staff && <i className={`pos-live ${live ? "on" : ""}`} role="img" aria-label={t(live ? "liveOn" : "liveOff")} title={t(live ? "liveOn" : "liveOff")} />}
       <span className="pos-head-actions">
         {staff && pending > 0 && <span className="pos-queue" role="status" title={t(pending === 1 ? "queuePendingOne" : "queuePendingMany", { count: pending })}>⟳ {pending}</span>}
-        {staff && screen.name === "floor" && <button type="button" onClick={() => { location.search = "?view=kitchen"; }}>{t("kitchenTitle")}</button>}
         {staff && screen.name === "floor" && <button type="button" onClick={() => setScreen({ name: "records" })}>{t("records")}</button>}
         {languages}
         {staff && <button type="button" onClick={() => { void api.signOut().finally(() => { setStaff(null); setScreen({ name: "floor" }); }); }}>{t("signOut")}</button>}

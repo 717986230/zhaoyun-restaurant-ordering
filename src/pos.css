@@ -156,12 +156,12 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-live.on { background: var(--p-live); box-shadow: 0 0 0 3px var(--p-live-ring); }
 /* 待补发: orders held on this device while offline, waiting to send again. */
 .pos-queue { align-self: center; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: var(--r-pill); background: var(--p-queue); color: var(--p-queue-ink); font-weight: 700; font-size: 13px; white-space: nowrap; }
-.pos-head-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
-.pos-head-actions button { min-height: 40px; border-color: var(--p-head-line); background: transparent; color: var(--p-accent-ink); }
+.pos-head-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-left: auto; min-width: 0; }
+.pos-head-actions button { min-height: 36px; padding: 6px 10px; border-color: var(--p-head-line); background: transparent; color: var(--p-accent-ink); white-space: nowrap; flex-shrink: 0; font-size: 13px; }
 /* The language picker is the guest menu's flag capsule, the same one the admin
    console wears, so all three surfaces switch language the same way. */
-.pos-languages { display: flex; padding: 2px; border: 1px solid var(--p-head-line); border-radius: var(--r-pill); }
-.pos-languages button { width: 38px; min-height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; }
+.pos-languages { display: flex; flex-shrink: 0; padding: 2px; border: 1px solid var(--p-head-line); border-radius: var(--r-pill); }
+.pos-languages button { width: 32px; min-height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; }
 .pos-languages button.on { background: var(--p-head-2); }
 .pos-languages img { width: 22px; height: 15px; border-radius: var(--r-hair); object-fit: cover; }
 
@@ -190,10 +190,12 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .pos-keypad button { min-height: 68px; font-size: 26px; font-weight: 600; }
 
-.pos-floor-bar { display: flex; flex-wrap: wrap; gap: 10px; }
-.pos-open-table { display: flex; gap: 8px; flex: 1 1 260px; }
+.pos-floor-bar { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.pos-floor-bar::-webkit-scrollbar { display: none; }
+.pos-open-table { display: flex; gap: 6px; flex: 1 1 160px; min-width: 140px; }
 .pos-open-table input { min-width: 0; flex: 1 1 auto; }
 .pos-open-table button { white-space: nowrap; flex: none; }
+.pos-floor-bar > button { white-space: nowrap; flex: none; padding: 8px 12px; font-size: 14px; }
 .pos-floor h2 { margin: 18px 0 10px; font-size: 16px; color: var(--p-muted); }
 
 .pos-table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
