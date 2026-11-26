@@ -418,11 +418,14 @@ test("the table page shows what is on each table, and locking stops it ordering"
   await page.getByRole("button", { name: "桌位" }).click();
 
   const seven = page.locator(".table-tile", { hasText: "桌 07" });
-  // What a manager asked for: the state, and what has actually been ordered.
+  // Compact square tiles show state & total outside; clicking opens the ordered dishes.
   await expect(seven.locator(".status").first()).toHaveText("用餐中");
-  await expect(seven).toContainText("蔬菜拉面");
-  await expect(seven).toContainText("加面");
   await expect(seven).toContainText("€27.40");
+  await seven.click();
+  const detail = page.getByRole("dialog", { name: "桌 07" });
+  await expect(detail).toContainText("蔬菜拉面");
+  await expect(detail).toContainText("加面");
+  await detail.getByRole("button", { name: "关闭" }).click();
   await expect(page.locator(".table-tile", { hasText: "桌 08" }).locator(".status").first()).toHaveText("空闲");
   await expect(page.locator(".table-tile", { hasText: "桌 09" }).locator(".status").first()).toHaveText("已锁定");
   // A table already locked offers the way back, not a second lock.

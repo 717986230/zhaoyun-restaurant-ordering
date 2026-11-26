@@ -115,6 +115,7 @@ export function TablesPanel(props: Props) {
   // Which tables the grid shows: everything, or one state at a time.
   const [filter, setFilter] = useState<"all" | TableOverview["state"]>("all");
   const [compact, setCompact] = useState(false);
+  const [selectedTableName, setSelectedTableName] = useState<string | null>(null);
   // The printable QR cards for the room.
   const [showCards, setShowCards] = useState(false);
   // The one-click generator (shown in edit mode): by letter (A1, A2 …) or by number.
@@ -257,7 +258,25 @@ export function TablesPanel(props: Props) {
       const lockedTitle = held ? t("tableLockedOnPosHint", { name: holder }) : "";
       const openCalls = takeawayTile ? [] : (props.requests ?? []).filter((req) => req.status === "open" && req.table.toUpperCase() === table.table.toUpperCase());
       const nextBooking = takeawayTile ? undefined : (props.bookings ?? []).find((booking) => booking.table?.toUpperCase() === table.table.toUpperCase() && booking.status !== "seated");
-      return <article className={`table-tile ${table.state} ${held ? "claimed" : ""} ${takeawayTile ? "takeaway" : ""} ${openCalls.length ? "has-call" : ""}`} key={table.table} data-table={table.table}>
+      const dishCount = table.orders.reduce(
+        (sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + Math.max(0, item.qty - (item.voided ?? 0)), 0),
+        0
+      );
+      const summaryLabel = language === "zh"
+        ? `${table.orders.length} 单 · ${dishCount} 份菜品`
+        : language === "de"
+          ? `${table.orders.length} Best. · ${dishCount} Pos.`
+          : `${table.orders.length} order${table.orders.length === 1 ? "" : "s"} · ${dishCount} item${dishCount === 1 ? "" : "s"}`;
+      const viewHint = language === "zh" ? "点开看菜品 ›" : language === "de" ? "Details ›" : "View ›";
+      return <article
+        className={`table-tile ${table.state} ${held ? "claimed" : ""} ${takeawayTile ? "takeaway" : ""} ${openCalls.length ? "has-call" : ""}`}
+        key={table.table}
+        data-table={table.table}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("button, a, input, form, label")) return;
+          setSelectedTableName(table.table);
+        }}
+      >
       <div className="table-tile-head">
         <b>{t("table", { table: table.table })}</b>
         <span className={`status ${table.state}`}>{t(STATE_KEYS[table.state])}</span>
@@ -280,18 +299,10 @@ export function TablesPanel(props: Props) {
       })()}
 
       {table.orders.length ? <>
-        <ul className="table-tile-orders">{table.orders.map((order) => <li key={order.id}>
-          <div className="table-tile-order-head">
-            <span>{order.no}{order.staffName ? ` · ${order.staffName}` : ""}{order.channel ? ` · ${t(order.channel === "pickup" ? "channelPickup" : "channelDineIn")}` : ""}{order.pickupNo ? ` · ${t("pickupShort", { no: order.pickupNo })}` : ""}</span>
-            <span className={`status ${order.status}`}>{t(ORDER_STATUS_KEYS[order.status])}</span>
-          </div>
-          <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>
-            {item.qty} × {item.name || item.id}
-            {item.voided ? <em className="voided"> {t("voidedCount", { count: item.voided })}</em> : null}
-            {item.modifiers?.length ? <em> ({item.modifiers.map((modifier) => modifier.name).join(" · ")})</em> : null}
-          </li>)}</ul>
-          {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}
-        </li>)}</ul>
+        <div className="table-tile-summary">
+          <span>{summaryLabel}</span>
+          <small>{viewHint}</small>
+        </div>
         <div className="table-tile-total"><span>{t("tableOpen")}</span><b>{formatMoney(euro(table.total), language)}</b></div>
       </> : null}
 
@@ -347,6 +358,75 @@ export function TablesPanel(props: Props) {
         <div className="table-grid">{takeaway.map(renderTile)}</div>
       </section>}
     </>;
+    })()}
+
+    {(() => {
+      const selected = selectedTableName ? props.tables.find((table) => table.table === selectedTableName) ?? null : null;
+      if (!selected) return null;
+      const takeawayTile = selected.table.startsWith("TA-");
+      const held = Boolean(selected.openOn);
+      const holder = selected.openOn?.staffName ?? "?";
+      const lockedTitle = held ? t("tableLockedOnPosHint", { name: holder }) : "";
+      const openCalls = takeawayTile ? [] : (props.requests ?? []).filter((req) => req.status === "open" && req.table.toUpperCase() === selected.table.toUpperCase());
+      const nextBooking = takeawayTile ? undefined : (props.bookings ?? []).find((booking) => booking.table?.toUpperCase() === selected.table.toUpperCase() && booking.status !== "seated");
+      const meta = [
+        selected.label,
+        selected.since ? t("tableSince", { time: formatTime(selected.since, language) }) : "",
+        selected.registered ? "" : t("tableUnregistered"),
+        selected.enabled ? "" : t("tableDisabled")
+      ].filter(Boolean).join(" · ");
+      return <div className="bill-overlay" onClick={(event) => { if (event.target === event.currentTarget) setSelectedTableName(null); }}>
+        <div className="bill-sheet table-detail-sheet" role="dialog" aria-modal="true" aria-label={t("table", { table: selected.table })}>
+          <div className="board-card-head">
+            <div className="table-detail-title">
+              <b>{t("table", { table: selected.table })}</b>
+              <span className={`status ${selected.state}`}>{t(STATE_KEYS[selected.state])}</span>
+            </div>
+            <button type="button" className="ghost-action" onClick={() => setSelectedTableName(null)}>{t("close")}</button>
+          </div>
+          {nextBooking && <p className="table-booking-badge">📅 {t("tableBookingBadge", { time: nextBooking.time, name: nextBooking.name, n: nextBooking.party })}</p>}
+          {openCalls.length > 0 && <ul className="table-calls">{openCalls.map((req) => <li key={req.id}>
+            <span>🔔 {req.type}</span>
+            {props.onRequestStatus && <button type="button" className="ghost-action" disabled={props.busy} onClick={() => void props.onRequestStatus!(req.id, "completed")}>{t("tableCallDone")}</button>}
+          </li>)}</ul>}
+          {held && <span className="table-open-on" title={lockedTitle}>{t("tableLockedOnPos", { name: holder })}</span>}
+          {selected.orderingUntil && <span className="table-ordering">{t("tableOrderingUntil", { time: formatTime(selected.orderingUntil, language) })}</span>}
+          {meta && <small className="table-tile-meta">{meta}</small>}
+
+          {selected.orders.length ? <>
+            <ul className="table-tile-orders table-detail-orders">{selected.orders.map((order) => <li key={order.id}>
+              <div className="table-tile-order-head">
+                <span>{order.no}{order.staffName ? ` · ${order.staffName}` : ""}{order.channel ? ` · ${t(order.channel === "pickup" ? "channelPickup" : "channelDineIn")}` : ""}{order.pickupNo ? ` · ${t("pickupShort", { no: order.pickupNo })}` : ""}</span>
+                <span className={`status ${order.status}`}>{t(ORDER_STATUS_KEYS[order.status])}</span>
+              </div>
+              <ul>{order.items.map((item, index) => <li key={`${order.id}-${item.id}-${index}`}>
+                {item.qty} × {item.name || item.id}
+                {item.voided ? <em className="voided"> {t("voidedCount", { count: item.voided })}</em> : null}
+                {item.modifiers?.length ? <em> ({item.modifiers.map((modifier) => modifier.name).join(" · ")})</em> : null}
+              </li>)}</ul>
+              {order.note && <p className="board-note">{t("note", { note: order.note })}</p>}
+            </li>)}</ul>
+            <div className="table-tile-total"><span>{t("tableOpen")}</span><b>{formatMoney(euro(selected.total), language)}</b></div>
+          </> : <div className="admin-empty">{t("billEmpty")}</div>}
+
+          <div className="board-actions">
+            {!takeawayTile && <>
+              <button
+                className="ghost-action"
+                disabled={props.busy || !selected.registered || held}
+                title={held ? lockedTitle : selected.registered ? "" : t("tableRegisterFirst")}
+                onClick={() => void props.onLock(selected.table, !selected.locked)}
+              >{t(selected.locked ? "tableUnlock" : "tableLock")}</button>
+              <button className="ghost-action" disabled={props.busy || held} title={lockedTitle} onClick={() => void props.onOrdering(selected.table, !selected.orderingUntil)}>
+                {t(selected.orderingUntil ? "closeForOrdering" : "openForOrdering")}
+              </button>
+            </>}
+            {selected.orders.length > 0 && (selected.total <= 0 && props.onCancelOrders && selected.orders.some((order) => order.status !== "completed")
+              ? <button className="danger-action" disabled={props.busy} onClick={() => { if (window.confirm(t("tableCancelZeroConfirm", { table: selected.table }))) void props.onCancelOrders!(selected.orders.filter((order) => order.status !== "completed").map((order) => order.id)); }}>{t("tableCancelZero")}</button>
+              : <button className="primary-action" disabled={props.busy} onClick={() => void props.onOpenBill(selected.table)}>{t("tableSettle")}</button>)}
+          </div>
+        </div>
+      </div>;
     })()}
 
     {props.bill && <div className="bill-overlay" onClick={(event) => { if (event.target === event.currentTarget) props.onCloseBill(); }}>
