@@ -291,12 +291,12 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
 
         <MarketingToggle language={language} dispatch={dispatch} />
         <ProfileForm language={language} account={account} dispatch={dispatch} />
-        <div className="guest-privacy">
-          <button type="button" className="link-button" onClick={() => void downloadMyData(language, dispatch)}>⬇ {g(language, "downloadData")}</button>
-          <PrivacyNotice language={language} restaurantName={restaurantName} />
-        </div>
       </div>
     </details>
+    <div className="guest-privacy">
+      <button type="button" className="link-button" onClick={() => void downloadMyData(language, dispatch)}>⬇ {g(language, "downloadData")}</button>
+      <PrivacyNotice language={language} restaurantName={restaurantName} />
+    </div>
   </div>;
 }
 

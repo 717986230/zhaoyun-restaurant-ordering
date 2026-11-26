@@ -164,6 +164,10 @@ jobs:
         with:
           path: dist/web
 
+      # Allow GitHub's artifact index a few seconds to become readable by deploy-pages.
+      - name: Wait for Pages artifact indexing
+        run: sleep 10
+
       - uses: actions/deploy-pages@v5
         id: deployment
 
