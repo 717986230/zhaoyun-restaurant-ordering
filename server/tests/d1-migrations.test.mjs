@@ -73,7 +73,8 @@ const incremental = [
   // 0112 rebuilds every tenant table under the new definition: the drop
   // restores the pre-tenant shape of each one from a fixture built from the
   // 0001 that shipped before tenants.
-  { file: "0112_multi_tenancy.sql", drop: readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "pre-tenant-schema.sql"), "utf8") }
+  { file: "0112_multi_tenancy.sql", drop: readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "pre-tenant-schema.sql"), "utf8") },
+  { file: "0118_query_indexes.sql", drop: "DROP INDEX idx_product_media_tenant_product; DROP INDEX idx_orders_open; DROP INDEX idx_service_requests_status;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")

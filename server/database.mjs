@@ -35,6 +35,8 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, 
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = ${Number(busyTimeoutMs) || 0};
     PRAGMA synchronous = NORMAL;
+    PRAGMA temp_store = MEMORY;
+    PRAGMA cache_size = -16000;
 
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
@@ -956,6 +958,9 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, 
     CREATE INDEX IF NOT EXISTS idx_printer_status_bridge ON printer_status(bridge_id);
     CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(tenant_id, email);
     CREATE INDEX IF NOT EXISTS idx_tenant_tokens_tenant ON tenant_tokens(tenant_id, role);
+    CREATE INDEX IF NOT EXISTS idx_service_requests_status ON service_requests(tenant_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_orders_open ON orders(tenant_id, billed_at, table_no, created_at);
+    CREATE INDEX IF NOT EXISTS idx_product_media_tenant_product ON product_media(tenant_id, product_id, sort_order);
   `;
   // The tables first: on a database from before tenants the indexes name
   // columns that do not exist yet, so they are created only after the
