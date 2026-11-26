@@ -2,7 +2,7 @@ import type { PosStaffActivity, ApiAccount, ApiBill, ApiDeliveryOrder, ApiDiscov
 import type { AuditEntry, RestaurantTable, StaffRole, TableOverview } from "@zhaoyun/api-client";
 import type { DiscoveredPrinter, PrinterProfile, Product } from "@zhaoyun/domain";
 
-export type AdminTab = "catalog" | "stock" | "board" | "tables" | "reservations" | "waitlist" | "delivery" | "reports" | "orders" | "promos" | "roster" | "printers" | "guests" | "members" | "casts" | "system" | "links" | "today";
+export type AdminTab = "catalog" | "stock" | "board" | "tables" | "reservations" | "delivery" | "reports" | "orders" | "promos" | "printers" | "members" | "system" | "links" | "today";
 /** "sets" is every dish that packages others, whatever its kind; "nophoto" every dish (not set) with no picture or video. */
 export type ProductFilter = "all" | "food" | "drink" | "sushi" | "sets" | "nophoto";
 

@@ -14,18 +14,14 @@ import { TablesPanel } from "../features/tables/TablesPanel";
 import { CatalogPanel } from "../features/catalog/CatalogPanel";
 import { PrintersPanel } from "../features/printers/PrintersPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
-import { GuestsPanel } from "../features/guests/GuestsPanel";
 import { MembersPanel } from "../features/members/MembersPanel";
 import { LinksPanel } from "../features/links/LinksPanel";
 import { ReportsPanel } from "../features/reports/ReportsPanel";
 import { OrdersPanel } from "../features/orders/OrdersPanel";
 import { StockPanel } from "../features/stock/StockPanel";
 import { PromotionsPanel } from "../features/promotions/PromotionsPanel";
-import { BroadcastsPanel } from "../features/broadcasts/BroadcastsPanel";
-import { RosterPanel } from "../features/roster/RosterPanel";
 import { TodayPanel } from "../features/reports/TodayPanel";
 import { ReservationsPanel } from "../features/reservations/ReservationsPanel";
-import { WaitlistPanel } from "../features/waitlist/WaitlistPanel";
 import { DeliveryPanel } from "../features/delivery/DeliveryPanel";
 import { BackToTop } from "./BackToTop";
 
@@ -66,14 +62,14 @@ const LIVE_SETTLE_MS = 250;
  */
 function tabsFor(role: StaffRole, showOrdering: boolean): AdminTab[] {
   if (role === "kitchen") return ["board"];
-  if (role === "staff") return ["board", "tables", "reservations", "waitlist", "delivery", "links"];
+  if (role === "staff") return ["board", "tables", "reservations", "delivery", "links"];
   // 报表 (the money view) and 桌位 (table status — who is seated, which bills are
   // open) are what a manager needs every service, whether or not the live orders
   // board and the printer setup are shown. The POS opens tables and writes the
   // receipts both read, so they do not belong behind the guest-ordering-era
   // gate; only the realtime 订单 board and 打印 setup stay behind showOrdering,
   // and the toggle's label now says exactly those two.
-  return showOrdering ? ["today", "catalog", "stock", "board", "tables", "reservations", "waitlist", "delivery", "reports", "orders", "promos", "roster", "printers", "guests", "members", "casts", "system", "links"] : ["today", "reports", "orders", "promos", "roster", "tables", "catalog", "stock", "reservations", "waitlist", "delivery", "guests", "members", "casts", "system", "links"];
+  return showOrdering ? ["today", "catalog", "stock", "board", "tables", "reservations", "delivery", "reports", "orders", "promos", "printers", "members", "system", "links"] : ["today", "reports", "orders", "promos", "tables", "catalog", "stock", "reservations", "delivery", "members", "system", "links"];
 }
 
 const TAB_KEYS: Record<AdminTab, CopyKey> = {
@@ -82,16 +78,12 @@ const TAB_KEYS: Record<AdminTab, CopyKey> = {
   board: "tabBoard",
   tables: "tabTables",
   reservations: "tabReservations",
-  waitlist: "tabWaitlist",
   delivery: "tabDelivery",
   reports: "tabReports",
   orders: "tabOrders",
   promos: "tabPromos",
-  roster: "tabRoster",
   printers: "tabPrinters",
-  guests: "tabGuests",
   members: "tabMembers",
-  casts: "tabCasts",
   system: "tabSettings",
   links: "tabLinks",
   today: "tabToday"
@@ -108,10 +100,10 @@ const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "
  * does not get a tab does not get its group either.
  */
 const TAB_GROUPS: Array<{ label: CopyKey; tabs: AdminTab[] }> = [
-  { label: "navGroupFloor", tabs: ["today", "board", "tables", "reservations", "waitlist", "delivery"] },
+  { label: "navGroupFloor", tabs: ["today", "board", "tables", "reservations", "delivery"] },
   { label: "navGroupMenu", tabs: ["catalog", "stock", "printers"] },
-  { label: "navGroupBusiness", tabs: ["reports", "orders", "promos", "roster", "system"] },
-  { label: "navGroupGuests", tabs: ["guests", "members", "casts", "links"] }
+  { label: "navGroupBusiness", tabs: ["reports", "orders", "promos", "system"] },
+  { label: "navGroupGuests", tabs: ["members", "links"] }
 ];
 
 /**
@@ -311,10 +303,10 @@ export function App() {
     return () => { window.clearTimeout(pending); stop(); setLive(false); };
   }, [state.role, floorTab, loadBoard]);
 
-  // The bookings, waitlist, delivery and today overview follow the floor live too.
+  // The bookings, delivery and today overview follow the floor live too.
   const [reservationTick, setReservationTick] = useState(0);
   useEffect(() => {
-    if (!state.role || (state.tab !== "reservations" && state.tab !== "delivery" && state.tab !== "waitlist" && state.tab !== "today")) return undefined;
+    if (!state.role || (state.tab !== "reservations" && state.tab !== "delivery" && state.tab !== "today")) return undefined;
     let pending: number | undefined;
     const stop = adminApi.live((event) => {
       if (event.type !== "floor.changed") return;
@@ -775,17 +767,13 @@ export function App() {
       {state.tab === "printers" && <PrintersPanel printers={state.printers} bridges={state.printBridges} queue={state.printQueue} found={state.printFound} dishesPerStation={dishesPerStation} apiBase={adminApi.storage.baseUrl} onDelete={deletePrinter} onTestRemote={testPrinterRemote} onPairBridge={pairPrintBridge} discovered={state.discoveredPrinters} editing={state.editingPrinter} native={nativePrinter.isNative()} onEdit={(editingPrinter) => setState((current) => ({ ...current, editingPrinter }))} onDiscover={discoverPrinters} onSave={savePrinter} onTest={testPrinter} />}
       {state.tab === "delivery" && <DeliveryPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
       {state.tab === "reservations" && <ReservationsPanel api={adminApi} role={state.role} settings={state.settings} notify={notify} failed={reportFailed} onSaveSettings={saveSettings} liveTick={reservationTick} />}
-      {state.tab === "waitlist" && <WaitlistPanel api={adminApi} notify={notify} failed={reportFailed} liveTick={reservationTick} />}
       {state.tab === "reports" && state.settings && <ReportsPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} />}
       {state.tab === "orders" && state.settings && <OrdersPanel api={adminApi} timeZone={state.settings.timeZone} failed={reportFailed} notify={notify} />}
       {state.tab === "stock" && <StockPanel api={adminApi} products={state.products} onRefresh={async () => { await connect(); }} notify={notify} failed={reportFailed} />}
       {state.tab === "promos" && state.settings && <PromotionsPanel api={adminApi} timeZone={state.settings.timeZone} notify={notify} failed={reportFailed} />}
-      {state.tab === "roster" && <RosterPanel api={adminApi} notify={notify} failed={reportFailed} />}
       {state.tab === "today" && <TodayPanel api={adminApi} failed={reportFailed} liveTick={reservationTick + state.orders.length} onNavigate={setTab} />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} restaurantName={state.settings?.restaurantName ?? ""} menuLanguages={state.settings?.menuLanguages ?? []} />}
-      {state.tab === "guests" && <GuestsPanel api={adminApi} settings={state.settings} products={state.products} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
       {state.tab === "members" && <MembersPanel api={adminApi} settings={state.settings} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
-      {state.tab === "casts" && state.settings && <BroadcastsPanel api={adminApi} tierNames={(state.settings.memberTiers?.tiers ?? []).map((tier) => tier.name)} notify={notify} failed={reportFailed} />}
       {state.tab === "system" && <SettingsPanel
         api={adminApi}
         notify={notify}
