@@ -16,6 +16,14 @@
   "build": {
     "appId": "at.chiri.kitchen.desktop",
     "productName": "Chiri Kitchen",
+    "icon": "build/icon.png",
+    "files": [
+      "main.js",
+      "bridge-preload.js",
+      "print-bridge.mjs",
+      "build/**/*",
+      "package.json"
+    ],
     "directories": {
       "output": "dist"
     },

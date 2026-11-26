@@ -208,4 +208,5 @@ export type { MenuLanguage } from "./languages.js";
 export { NAV_ALL, NAV_DRINKS, NAV_FEATURED, NAV_PINNED_MAX, NAV_SETS, defaultCategoryLabel, drinkTabs, orderNavTabs } from "./navigation.js";
 export { memberTierTheme, memberTierVisual, tierNumeral } from "./member-tier.js";
 export { serverErrorText } from "./server-errors.js";
+export { matchesTextOrPinyin, pinyinInitials } from "./pinyin.js";
 export type { MemberTierTheme, MemberTierSkin, MemberTierVisual } from "./member-tier.js";

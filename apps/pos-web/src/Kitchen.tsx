@@ -88,6 +88,25 @@ export function groupByStation(orders: ApiOrder[]): Array<{ station: PrintStatio
   return KDS_STATIONS.filter((station) => byStation.has(station)).map((station) => ({ station, cards: byStation.get(station) ?? [] }));
 }
 
+/** Sum active (new/preparing, non-held) quantities per dish for batch cooking. */
+export function batchSummary(columns: Array<{ station: PrintStationName; cards: StationCard[] }>): Array<{ name: string; qty: number }> {
+  const counts = new Map<string, number>();
+  for (const column of columns) {
+    for (const { order, items } of column.cards) {
+      if (order.status !== "new" && order.status !== "preparing") continue;
+      for (const item of items) {
+        if (item.held) continue;
+        const label = item.name?.trim();
+        if (!label) continue;
+        counts.set(label, (counts.get(label) ?? 0) + item.qty);
+      }
+    }
+  }
+  return [...counts.entries()]
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name, "zh-CN"));
+}
+
 /** Sold out, in red: switched off (available) or counted down to zero today
  *  (leftToday, shared/stock.mjs). A dish with no limit never lands here. */
 export function soldOutProducts(products: ApiCatalogProduct[]): ApiCatalogProduct[] {
@@ -216,6 +235,7 @@ export function Kitchen() {
 
   const columns = groupByStation(orders);
   const shown = station === "all" ? columns : columns.filter((column) => column.station === station);
+  const batch = batchSummary(shown);
   const open = openOrders(orders);
   const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("de-AT", { timeZone: "Europe/Vienna", hour: "2-digit", minute: "2-digit" }) : "—");
 
@@ -241,6 +261,13 @@ export function Kitchen() {
         >{choice === "all" ? t("kitchenAll") : t(STATION_KEY[choice])}</button>)}
         <button type="button" onClick={() => void load().catch(() => setError("liveOff"))}>⟳</button>
       </div>
+      {batch.length > 0 && <div data-testid="kds-batch-summary" aria-label={t("kitchenBatch")}
+        style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 12, padding: "8px 10px", border: "1px solid #888", borderRadius: 8 }}>
+        <strong style={{ marginRight: 4 }}>{t("kitchenBatch")}:</strong>
+        {batch.map((entry) => <span key={entry.name} style={{ border: "1px solid #ccc", borderRadius: 6, padding: "2px 8px", fontSize: 15 }}>
+          {entry.name} ×{entry.qty}
+        </span>)}
+      </div>}
       {open.length === 0
         ? <p className="pos-muted">{t("kitchenNoOrders")}</p>
         : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>

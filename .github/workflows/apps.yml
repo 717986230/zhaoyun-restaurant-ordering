@@ -1,10 +1,14 @@
 name: Build Desktop & Android Apps
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    paths-ignore: ['docs/**', 'tests/**', 'migrations/**', '*.md']
+  workflow_dispatch:
+
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   desktop:
@@ -28,6 +32,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Bundle standalone print bridge into desktop app
+        env:
+          BRIDGE_OUT_DIR: desktop
+        run: npx vite build -c vite.bridge.config.js
       - name: Install desktop dependencies
         working-directory: desktop
         run: npm install

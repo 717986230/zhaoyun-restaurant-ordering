@@ -69,7 +69,17 @@
                     stroke-dasharray="64 740" stroke-linecap="round"/>
           </g>
           <circle cx="160" cy="160" r="112" stroke="rgba(233,238,240,.06)" stroke-width="1"/>
-          <!-- Flowing C treasure-basin + powder-particle converging K -->
+          <defs>
+            <g id="zy-coin">
+              <circle r="5.2" fill="rgba(216,194,140,.14)" stroke="#d8c28c" stroke-width="1.25"/>
+              <rect x="-1.75" y="-1.75" width="3.5" height="3.5" fill="rgba(15,17,19,.85)" stroke="#d8c28c" stroke-width="1.05"/>
+            </g>
+            <g id="zy-ingot">
+              <path d="M-6.4,-0.8 Q0,1.4 6.4,-0.8 L4.4,3.1 Q0,4.3 -4.4,3.1 Z" fill="rgba(216,194,140,.2)" stroke="#d8c28c" stroke-width="1.2"/>
+              <path d="M-3.1,-0.8 Q0,-4.2 3.1,-0.8" fill="rgba(216,194,140,.14)" stroke="#d8c28c" stroke-width="1.15"/>
+            </g>
+          </defs>
+          <!-- Flowing C treasure-basin + powder-particle converging K with subtle coins & ingots -->
           <g fill="none" stroke-linecap="round" stroke-linejoin="round">
             <g class="zy-draw">
               <path d="M102 164 C102 220 218 220 218 164" stroke="#8fb0a3" stroke-width="4.8"/>
@@ -82,11 +92,11 @@
             <circle class="zy-p" cx="108" cy="150" r="2.0" style="--dx:-66px;--dy:34px;--d:.40s"/>
             <circle class="zy-p" cx="118" cy="150" r="2.3" style="--dx:-54px;--dy:-48px;--d:.44s"/>
             <circle class="zy-p" cx="129" cy="150" r="2.5" style="--dx:-44px;--dy:58px;--d:.48s"/>
-            <circle class="zy-p" cx="140" cy="150" r="2.6" style="--dx:-28px;--dy:-66px;--d:.52s"/>
-            <circle class="zy-p" cx="151" cy="150" r="2.8" style="--dx:-16px;--dy:72px;--d:.56s"/>
+            <circle class="zy-p" cx="140" cy="150" r="2.4" style="--dx:-28px;--dy:-66px;--d:.52s"/>
+            <circle class="zy-p" cx="151" cy="150" r="2.6" style="--dx:-16px;--dy:72px;--d:.56s"/>
             <circle class="zy-p" cx="160" cy="150" r="2.4" style="--dx:0px;--dy:-78px;--d:.58s"/>
-            <circle class="zy-p" cx="169" cy="150" r="2.8" style="--dx:16px;--dy:72px;--d:.56s"/>
-            <circle class="zy-p" cx="180" cy="150" r="2.6" style="--dx:28px;--dy:-66px;--d:.52s"/>
+            <circle class="zy-p" cx="169" cy="150" r="2.6" style="--dx:16px;--dy:72px;--d:.56s"/>
+            <circle class="zy-p" cx="180" cy="150" r="2.4" style="--dx:28px;--dy:-66px;--d:.52s"/>
             <circle class="zy-p" cx="191" cy="150" r="2.5" style="--dx:44px;--dy:58px;--d:.48s"/>
             <circle class="zy-p" cx="202" cy="150" r="2.3" style="--dx:54px;--dy:-48px;--d:.44s"/>
             <circle class="zy-p" cx="212" cy="150" r="2.0" style="--dx:66px;--dy:34px;--d:.40s"/>
@@ -105,12 +115,19 @@
             <!-- Fine dust motes converging from lower & side arcs -->
             <circle class="zy-p" cx="155" cy="136" r="1.3" style="--dx:-40px;--dy:66px;--d:.70s;--op:.7"/>
             <circle class="zy-p" cx="165" cy="134" r="1.4" style="--dx:40px;--dy:66px;--d:.74s;--op:.75"/>
-            <circle class="zy-p" cx="160" cy="124" r="1.8" style="--dx:0px;--dy:82px;--d:.80s;--op:.9"/>
             <circle class="zy-p" cx="134" cy="144" r="1.1" style="--dx:-82px;--dy:10px;--d:.66s;--op:.55"/>
             <circle class="zy-p" cx="186" cy="144" r="1.1" style="--dx:82px;--dy:10px;--d:.66s;--op:.55"/>
             <circle class="zy-p" cx="149" cy="160" r="1.3" style="--dx:-48px;--dy:54px;--d:.78s;--op:.6"/>
             <circle class="zy-p" cx="171" cy="160" r="1.3" style="--dx:48px;--dy:54px;--d:.78s;--op:.6"/>
             <circle class="zy-p" cx="160" cy="164" r="1.6" style="--dx:0px;--dy:76px;--d:.84s;--op:.75"/>
+          </g>
+          <!-- 5 muted champagne-gold coins & ingots descending into the basin rim (Option A) -->
+          <g stroke-linecap="round" stroke-linejoin="round">
+            <g transform="translate(120,130) rotate(-14)"><use href="#zy-coin" class="zy-p" style="--dx:-66px;--dy:-52px;--d:.54s;--op:.88"/></g>
+            <g transform="translate(200,130) rotate(16)"><use href="#zy-ingot" class="zy-p" style="--dx:66px;--dy:-52px;--d:.58s;--op:.9"/></g>
+            <g transform="translate(160,124)"><use href="#zy-ingot" class="zy-p" style="--dx:0px;--dy:-78px;--d:.70s;--op:.94"/></g>
+            <g transform="translate(142,152) rotate(-8)"><use href="#zy-coin" class="zy-p" style="--dx:-52px;--dy:52px;--d:.66s;--op:.85"/></g>
+            <g transform="translate(178,152) rotate(10)"><use href="#zy-coin" class="zy-p" style="--dx:52px;--dy:52px;--d:.68s;--op:.85"/></g>
           </g>
           <!-- Fine semi-translucent K core so the shape holds cleanly while keeping granular particle texture -->
           <g class="zy-k-solid" fill="none" stroke="#a9c7ba" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiOrder } from "@zhaoyun/contracts";
 import {
-  KDS_OVERDUE_MINUTES, groupByStation, isOverdue, minutesWaiting, nextStatus, openOrders, soldOutProducts, Kitchen
+  KDS_OVERDUE_MINUTES, batchSummary, groupByStation, isOverdue, minutesWaiting, nextStatus, openOrders, soldOutProducts, Kitchen
 } from "../src/Kitchen";
 
 // Vitest runs without globals, so RTL cannot register its own cleanup.
@@ -55,6 +55,16 @@ describe("KDS board logic (no browser needed)", () => {
     expect(groupByStation([noStation]).map((column) => column.station)).toEqual(["kitchen"]);
   });
 
+  it("totals open non-held dishes across stations for batch cooking, highest first", () => {
+    const o1 = order({ id: "o1", status: "new", items: [{ id: "p1", name: "拉面", qty: 2, printStation: "kitchen" }, { id: "p2", name: "寿司", qty: 1, printStation: "sushi", held: true }] });
+    const o2 = order({ id: "o2", status: "preparing", items: [{ id: "p1", name: "拉面", qty: 3, printStation: "kitchen" }, { id: "p4", name: "水煮牛肉", qty: 1, printStation: "kitchen" }] });
+    const o3 = order({ id: "o3", status: "ready", items: [{ id: "p5", name: "可乐", qty: 4, printStation: "bar" }] });
+    expect(batchSummary(groupByStation([o1, o2, o3]))).toEqual([
+      { name: "拉面", qty: 5 },
+      { name: "水煮牛肉", qty: 1 }
+    ]);
+  });
+
   it("marks sold out in red: switched off, or counted down to zero today", () => {
     const products = [
       { id: "a", sku: "A", available: false, names: { zh: "甲", de: "A", en: "A" } },
@@ -92,6 +102,7 @@ describe("KDS board on screen", () => {
     // The held sushi line is marked 等叫, not cooked; the 25-minute-old
     // order is past the 20-minute line and says so.
     expect(getAllByText("等叫", { exact: false }).length).toBe(2); // card badge + the held line itself
+    expect(getByText("拉面 ×2")).toBeTruthy();
     expect(getAllByText("超时 5 分钟", { exact: false }).length).toBe(2);
     // A kitchen token cannot read the sold-out list: the board says so
     // instead of failing.

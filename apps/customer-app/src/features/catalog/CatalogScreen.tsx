@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
-import { deconstruct, defaultCategoryLabel, drinkTabs, LANGUAGE_INFO, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
+import { deconstruct, defaultCategoryLabel, drinkTabs, LANGUAGE_INFO, matchesTextOrPinyin, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
 import { RollingNumber } from "../../components/RollingNumber";
 import { CalendarIcon, MoonIcon, PersonIcon, SunIcon } from "../../components/LineIcons";
@@ -549,8 +549,9 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   const visible = (query ? products : onFavorites ? favorites : dishes).filter((product) => {
     const categoryMatch = query || onFavorites || state.category === "ALLE" || state.category === FEATURED_PAGE || state.category === SETS_PAGE
       || (state.category === DRINKS_PAGE ? product.kind === "drink" : product.category === state.category);
-    const text = [product.sku, product.names.zh, product.names.de, product.names.en, product.category, defaultCategoryLabel(product.category, state.language), ...Object.values(navLabels[product.category] ?? {})].join(" ").toLowerCase();
-    return categoryMatch && (!query || text.includes(query));
+    const candidates = [product.sku, product.names.zh, product.names.de, product.names.en, product.category, defaultCategoryLabel(product.category, state.language), ...Object.values(navLabels[product.category] ?? {})];
+    const text = candidates.join(" ").toLowerCase();
+    return categoryMatch && (!query || text.includes(query) || matchesTextOrPinyin(query, candidates));
   });
   // The owner's three first, the rest in their usual order: the promotions
   // page, the set menus, everything, then the categories.

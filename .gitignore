@@ -19,3 +19,6 @@ playwright-report/
 .dev.vars
 print-bridge.config.json
 playwright.local.config.mjs
+desktop/node_modules/
+desktop/dist/
+desktop/print-bridge.mjs

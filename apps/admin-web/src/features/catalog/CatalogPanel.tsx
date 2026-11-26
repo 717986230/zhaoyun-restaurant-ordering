@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from "react";
 import { ALLERGENS } from "../../../../../src/allergens.js";
 import { TAG_COLORS } from "../../../../../src/tag-colors.js";
 import type { BundleItem, ModifierGroup, PrinterProfile, Product, ProductMedia, VatPercent } from "@zhaoyun/domain";
+import { matchesTextOrPinyin } from "@zhaoyun/domain";
 import type { AdminProductInput } from "@zhaoyun/api-client";
 import type { ProductFilter } from "../../app/types";
 import { formatMoney, useI18n } from "../../app/i18n";
@@ -402,7 +403,7 @@ export function CatalogPanel(props: Props) {
   const queryNeedle = catalogQuery.trim().toLowerCase();
   const rows = props.products.filter((product) => (props.filter === "all"
     || (props.filter === "sets" ? Boolean(product.bundleItems?.length) : props.filter === "nophoto" ? missingPhoto(product) : product.kind === props.filter))
-    && (!queryNeedle || [product.sku, product.category, product.names.zh, product.names.de, product.names.en].some((v) => v?.toLowerCase().includes(queryNeedle))));
+    && matchesTextOrPinyin(queryNeedle, [product.sku, product.category, product.names.zh, product.names.de, product.names.en]));
   const kindLabels: Record<Product["kind"], string> = { food: t("kindFood"), drink: t("kindDrink"), sushi: t("kindSushi") };
   const stationOptions: Array<[AdminProductInput["printStation"], string]> = [
     ["kitchen", t("stationKitchen")], ["bar", t("stationBar")], ["sushi", t("stationSushi")], ["front", t("stationFront")]

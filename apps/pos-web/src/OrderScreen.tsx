@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { ApiBill, PosClaim } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
+import { matchesTextOrPinyin } from "@zhaoyun/domain";
 import { ApiError } from "@zhaoyun/api-client";
 import { TAG_COLORS } from "../../../src/tag-colors.js";
 import { api, useLiveReload } from "./App";
@@ -86,7 +87,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const shown = useMemo(() => {
     const text = query.trim().toLowerCase();
     return menu.filter((product) => (!category || product.category === category)
-      && (!text || product.sku.toLowerCase().startsWith(text) || Object.values(product.names).some((value) => value?.toLowerCase().includes(text))));
+      && (!text || product.sku.toLowerCase().startsWith(text) || matchesTextOrPinyin(text, Object.values(product.names))));
   }, [menu, category, query]);
 
   function add(product: Product, modifiers: CartLine["modifiers"] = [], qty = 1) {
