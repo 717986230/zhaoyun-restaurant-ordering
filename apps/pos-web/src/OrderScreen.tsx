@@ -1,8 +1,8 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { ApiBill, PosClaim } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
-import { matchesTextOrPinyin } from "@zhaoyun/domain";
+import { pinyinInitials } from "@zhaoyun/domain";
 import { ApiError } from "@zhaoyun/api-client";
 import { TAG_COLORS } from "../../../src/tag-colors.js";
 import { api, useLiveReload } from "./App";
@@ -86,12 +86,31 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // A stable, distinct colour per category (by its order on the menu), so a
   // waiter tells categories apart at a glance: the chip's dot and the dish's stripe.
   const catColor = useCallback((entry: string) => TAG_COLORS[Math.max(0, categories.indexOf(entry)) % TAG_COLORS.length]!, [categories]);
-  const deferredQuery = useDeferredValue(query);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const updateFilter = useCallback((next: string) => {
+    startTransition(() => setQuery(next));
+  }, []);
+  const clearSearch = useCallback(() => {
+    if (searchInputRef.current) searchInputRef.current.value = "";
+    setQuery("");
+  }, []);
+  // Precompute a flat lowercase search string (sku + all names + pinyin initials)
+  // once per menu update so filtering never allocates or recomputes pinyin per keystroke.
+  const searchIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const product of menu) {
+      const names = Object.values(product.names);
+      const initials = names.map((entry) => pinyinInitials(entry));
+      map.set(product.id, [product.sku, ...names, ...initials].join("\n").toLowerCase());
+    }
+    return map;
+  }, [menu]);
   const shown = useMemo(() => {
-    const text = deferredQuery.trim().toLowerCase();
+    const text = query.trim().toLowerCase();
     return menu.filter((product) => (!category || product.category === category)
-      && (!text || product.sku.toLowerCase().startsWith(text) || matchesTextOrPinyin(text, Object.values(product.names))));
-  }, [menu, category, deferredQuery]);
+      && (!text || (searchIndex.get(product.id)?.includes(text) ?? false)));
+  }, [menu, category, query, searchIndex]);
 
   function add(product: Product, modifiers: CartLine["modifiers"] = [], qty = 1) {
     const key = lineKey(product, modifiers);
@@ -197,7 +216,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
    */
   function byNumber(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const raw = query.trim();
+    const raw = (searchInputRef.current?.value ?? query).trim();
     if (!raw) return;
     const parts = raw.match(/^(.+?)\s*(?:[*xX×＊]\s*|\s+)(\d{1,2})$/);
     const code = (parts ? parts[1]! : raw).trim().toLowerCase();
@@ -205,7 +224,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     const match = menu.find((product) => product.sku.toLowerCase() === code);
     if (!match) return pos.notify(t("notFound", { code: parts ? parts[1]!.trim() : raw }), "error");
     pick(match, qty);
-    setQuery("");
+    clearSearch();
   }
 
   async function send() {
@@ -359,35 +378,46 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
 
     <div className="pos-menu">
       <form className="pos-number" onSubmit={byNumber}>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("dishNumber")} aria-label={t("dishNumber")} autoFocus />
-        {query && <button type="button" className="pos-number-clear" aria-label="×" onClick={() => setQuery("")}>×</button>}
+        <input
+          ref={searchInputRef}
+          defaultValue=""
+          onCompositionStart={() => { isComposingRef.current = true; }}
+          onCompositionEnd={(event) => { isComposingRef.current = false; updateFilter(event.currentTarget.value); }}
+          onChange={(event) => { if (!isComposingRef.current) updateFilter(event.target.value); }}
+          placeholder={t("dishNumber")}
+          aria-label={t("dishNumber")}
+          autoFocus
+        />
+        {query && <button type="button" className="pos-number-clear" aria-label="×" onClick={clearSearch}>×</button>}
       </form>
       <div className="pos-dish-modes">
         <button type="button" className={`pos-soldout-mode ${soldOutMode ? "on" : ""}`} aria-pressed={soldOutMode} onClick={() => { setSoldOutMode((on) => !on); setStockMode(false); }}>{t(soldOutMode ? "soldOutModeOn" : "soldOutMode")}</button>
         <button type="button" className={`pos-soldout-mode pos-stock-mode ${stockMode ? "on" : ""}`} aria-pressed={stockMode} onClick={() => { setStockMode((on) => !on); setSoldOutMode(false); }}>{t(stockMode ? "stockModeOn" : "stockMode")}</button>
       </div>
-      <nav className="pos-categories">
-        <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
-        {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>
-          <span className="pos-cat-dot" aria-hidden="true" style={{ background: catColor(entry) }} />{entry}
-        </button>)}
-      </nav>
-      <div className={`pos-dishes ${soldOutMode || stockMode ? "choosing-soldout" : ""}`}>{shown.map((product) => {
-        const left = product.leftToday ?? null;
-        const out = !product.available || left === 0;
-        const inCart = cartCountById.get(product.id) ?? 0;
-        return <button key={product.id} type="button" data-sku={product.sku}
-          style={{ "--tag": product.tagColor || catColor(product.category) } as CSSProperties}
-          className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
-          onPointerDown={() => startPress(product)} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress}
-          onClick={() => { if (press.current.fired) { press.current.fired = false; return; } void (soldOutMode ? toggleSoldOut(product) : stockMode ? setStockFor(product) : pick(product)); }}>
-          <small>{product.sku}</small>
-          <b>{name(product)}</b>
-          <span>{!product.available ? t("soldOut") : left === 0 ? t("stockOut") : money(product.priceCents)}</span>
-          {left !== null && left > 0 && <em className="pos-stock-left" data-left={left}>{t("stockLeft", { n: left })}</em>}
-          {inCart > 0 && <em className="pos-dish-count" aria-label={t("inCart", { n: inCart })}>{inCart}</em>}
-        </button>;
-      })}</div>
+      <div className="pos-menu-split">
+        <nav className="pos-categories" aria-label={t("all")}>
+          <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
+          {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>
+            <span className="pos-cat-dot" aria-hidden="true" style={{ background: catColor(entry) }} />{entry}
+          </button>)}
+        </nav>
+        <div className={`pos-dishes ${soldOutMode || stockMode ? "choosing-soldout" : ""}`}>{shown.map((product) => {
+          const left = product.leftToday ?? null;
+          const out = !product.available || left === 0;
+          const inCart = cartCountById.get(product.id) ?? 0;
+          return <button key={product.id} type="button" data-sku={product.sku}
+            style={{ "--tag": product.tagColor || catColor(product.category) } as CSSProperties}
+            className={out ? "soldout" : ""} aria-disabled={out && !soldOutMode && !stockMode}
+            onPointerDown={() => startPress(product)} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress}
+            onClick={() => { if (press.current.fired) { press.current.fired = false; return; } void (soldOutMode ? toggleSoldOut(product) : stockMode ? setStockFor(product) : pick(product)); }}>
+            <small>{product.sku}</small>
+            <b>{name(product)}</b>
+            <span>{!product.available ? t("soldOut") : left === 0 ? t("stockOut") : money(product.priceCents)}</span>
+            {left !== null && left > 0 && <em className="pos-stock-left" data-left={left}>{t("stockLeft", { n: left })}</em>}
+            {inCart > 0 && <em className="pos-dish-count" aria-label={t("inCart", { n: inCart })}>{inCart}</em>}
+          </button>;
+        })}</div>
+      </div>
     </div>
 
     {moving && <MoveDialog pos={pos} from={table} onCancel={() => setMoving(false)} onMove={(to, merge) => void move(to, merge)} />}
