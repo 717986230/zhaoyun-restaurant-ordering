@@ -41,7 +41,8 @@
       .zy-p{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px)) scale(.25);
         animation:zy-gather 1.0s cubic-bezier(.16,.9,.24,1) var(--d,.32s) forwards}
       @keyframes zy-gather{to{opacity:var(--op,1);transform:translate(0,0) scale(1)}}
-      .zy-k-solid{opacity:0;animation:zy-in .6s ease .95s forwards}
+      .zy-k-solid{opacity:0;animation:zy-k-settle .7s ease .92s forwards}
+      @keyframes zy-k-settle{to{opacity:.65}}
       .zy-word{max-width:84vw;font-weight:500;font-size:clamp(22px,6vw,30px);letter-spacing:.28em;
         line-height:1.25;text-align:center;text-wrap:balance;color:#e5e9e7;padding-left:.28em;
         font-variant-caps:small-caps;text-shadow:0 2px 16px rgba(143,176,163,.22);
@@ -50,7 +51,8 @@
       @media (prefers-reduced-motion:reduce){
         .zy-ring{animation:none}
         .zy-draw{stroke-dashoffset:0;animation:none}
-        .zy-fx,.zy-k-solid,.zy-word{opacity:1;animation:none}
+        .zy-fx,.zy-word{opacity:1;animation:none}
+        .zy-k-solid{opacity:.65;animation:none}
         .zy-p{opacity:var(--op,1);transform:none;animation:none}
         .zy-splash{animation:zy-out .4s ease 1.4s forwards}
       }
@@ -70,8 +72,8 @@
           <!-- Flowing C treasure-basin + powder-particle converging K -->
           <g fill="none" stroke-linecap="round" stroke-linejoin="round">
             <g class="zy-draw">
-              <path d="M102 164 C102 220 218 220 218 164" stroke="#8fb0a3" stroke-width="6"/>
-              <path d="M124 186 C140 202 180 202 196 186" stroke="rgba(169,199,186,.36)" stroke-width="2.2"/>
+              <path d="M102 164 C102 220 218 220 218 164" stroke="#8fb0a3" stroke-width="4.8"/>
+              <path d="M124 186 C140 202 180 202 196 186" stroke="rgba(169,199,186,.32)" stroke-width="1.8"/>
             </g>
           </g>
           <g fill="#a9c7ba">
@@ -110,8 +112,8 @@
             <circle class="zy-p" cx="171" cy="160" r="1.3" style="--dx:48px;--dy:54px;--d:.78s;--op:.6"/>
             <circle class="zy-p" cx="160" cy="164" r="1.6" style="--dx:0px;--dy:76px;--d:.84s;--op:.75"/>
           </g>
-          <!-- Solid K settles cleanly as the particles finish gathering -->
-          <g class="zy-k-solid" fill="none" stroke="#a9c7ba" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Fine semi-translucent K core so the shape holds cleanly while keeping granular particle texture -->
+          <g class="zy-k-solid" fill="none" stroke="#a9c7ba" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
             <path d="M96 150 H224"/>
             <path d="M150 150 L123 111"/>
             <path d="M170 150 L197 111"/>
