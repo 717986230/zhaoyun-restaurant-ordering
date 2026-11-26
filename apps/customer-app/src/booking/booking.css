@@ -1735,19 +1735,49 @@ html[data-elder="true"] .bk-party-label span {
 
 html[data-elder="true"] .bk-party-btn,
 html[data-elder="true"] .bk-primary,
-html[data-elder="true"] .bk-secondary {
+html[data-elder="true"] .bk-secondary,
+html[data-elder="true"] .bk-danger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   min-height: 56px;
   font-size: 18px;
+  line-height: 1.25;
+}
+
+html[data-elder="true"] .bk-party-presets button,
+html[data-elder="true"] .bk-cal-day,
+html[data-elder="true"] .bk-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 48px;
+  font-size: 17px;
+  line-height: 1.2;
 }
 
 html[data-elder="true"] .bk-slots {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
   gap: 10px;
 }
 
 html[data-elder="true"] .bk-slot {
-  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 56px;
   font-size: 18px;
+}
+
+html[data-elder="true"] .bk-note,
+html[data-elder="true"] .bk-privacy,
+html[data-elder="true"] #bookingForm .bk-field:has(#bookingNotes) {
+  display: none;
 }
 
 html[data-elder="true"] .bk-field input,
@@ -1760,4 +1790,15 @@ html[data-elder="true"] .bk-error,
 html[data-elder="true"] .bk-field-error {
   font-size: 16px;
   font-weight: 600;
+}
+
+@media (max-width: 390px) {
+  .bk-page {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .bk-card {
+    padding: 12px;
+  }
 }
