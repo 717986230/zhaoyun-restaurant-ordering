@@ -145,7 +145,7 @@ export function ReservationsPanel({ api, role, settings, notify, failed, onSaveS
       {reservations.map((reservation) => <article key={reservation.id} className={`res-row ${ACTIVE.includes(reservation.status) ? "" : "res-done"}`} data-status={reservation.status} data-reference={reservation.reference}>
         <div className="res-when"><b>{reservation.time}</b><small>{reservation.reference}</small></div>
         <div className="res-who">
-          <strong>{reservation.name || "—"} <span className="res-party">· {reservation.party} 👤</span></strong>
+          <strong>{reservation.name || "—"} <span className="res-party">· {reservation.party} 👤</span>{reservation.customerId && <span className="res-member-badge">★ {t("resMember")}</span>}</strong>
           <span className="res-contact">
             {reservation.phone && <a href={`tel:${reservation.phone.replace(/[^+\d]/g, "")}`}>{reservation.phone}</a>}
             {reservation.email && <a href={`mailto:${reservation.email}`}>{reservation.email}</a>}

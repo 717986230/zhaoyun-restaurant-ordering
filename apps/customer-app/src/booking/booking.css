@@ -1490,6 +1490,29 @@ html.bk-root body {
   -webkit-appearance: none;
   margin: 0;
 }
+.bk-party-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bk-party-presets button {
+  flex: 1 1 0;
+  min-width: 64px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.bk-party-presets button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
 
 /* The calendar. */
 .bk-cal-head {

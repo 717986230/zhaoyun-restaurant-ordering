@@ -32,6 +32,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   const [choosing, setChoosing] = useState<{ product: Product; qty: number } | null>(null);
   // 长按菜品：弹数量键盘问「点几份」。
   const [qtyFor, setQtyFor] = useState<Product | null>(null);
+  const [qtyLine, setQtyLine] = useState<CartLine | null>(null);
   // 退菜: the sent line being voided. 沽清: tapping a dish switches it off or on instead of adding it.
   const [voiding, setVoiding] = useState<ApiBill["items"][number] | null>(null);
   const [soldOutMode, setSoldOutMode] = useState(false);
@@ -167,6 +168,9 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     const quantity = line.quantity + by;
     return quantity > 0 ? [{ ...line, quantity }] : [];
   }));
+
+  // 点击购物车数字直接设份数。
+  const setLineQty = (key: string, qty: number) => setCart((current) => current.map((line) => (line.key === key ? { ...line, quantity: Math.max(1, Math.min(99, qty)) } : line)));
 
   // 逐菜备注：把某行的备注写上（空串则清掉）。
   const setLineNote = (key: string, text: string) => setCart((current) => current.map((line) => {
@@ -314,7 +318,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
             <button type="button" className="pos-line-holdbtn" aria-label={t("hold")} aria-pressed={line.hold === true} onClick={() => toggleHold(line.key)}>{t("holdShort")}</button>
             <button type="button" className="pos-line-notebtn" aria-label={t("itemNote")} aria-pressed={noteFor === line.key} onClick={() => setNoteFor(noteFor === line.key ? null : line.key)}>✎</button>
             <button type="button" aria-label="−" onClick={() => change(line.key, -1)}>−</button>
-            <b>{line.quantity}</b>
+            <button type="button" className="pos-qty-btn" onClick={() => setQtyLine(line)}>{line.quantity}</button>
             <button type="button" aria-label="+" onClick={() => change(line.key, 1)}>+</button>
           </span>
         </div>
@@ -385,6 +389,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
     {stockFor && <StockDialog pos={pos} product={stockFor} onCancel={() => setStockFor(null)} onSet={(leftToday) => void askStock(stockFor, leftToday)} />}
     {voiding && <VoidDialog pos={pos} item={voiding} onCancel={() => setVoiding(null)} onVoid={(quantity, reason) => void voidLine(voiding, quantity, reason)} />}
     {qtyFor && <QtyDialog pos={pos} product={qtyFor} onCancel={() => setQtyFor(null)} onPick={(qty) => { setQtyFor(null); pick(qtyFor, qty); }} />}
+    {qtyLine && <QtyDialog pos={pos} product={qtyLine.product} onCancel={() => setQtyLine(null)} onPick={(qty) => { setLineQty(qtyLine.key, qty); setQtyLine(null); }} />}
     {choosing && <ModifierPicker pos={pos} product={choosing.product} initialQty={choosing.qty} onCancel={() => setChoosing(null)} onAdd={(modifiers, qty) => { add(choosing.product, modifiers, qty); setChoosing(null); }} />}
   </section>;
 }

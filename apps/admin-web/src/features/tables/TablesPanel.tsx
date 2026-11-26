@@ -114,6 +114,7 @@ export function TablesPanel(props: Props) {
   const [renaming, setRenaming] = useState<string | null>(null);
   // Which tables the grid shows: everything, or one state at a time.
   const [filter, setFilter] = useState<"all" | TableOverview["state"]>("all");
+  const [compact, setCompact] = useState(false);
   // The printable QR cards for the room.
   const [showCards, setShowCards] = useState(false);
   // The one-click generator (shown in edit mode): by letter (A1, A2 …) or by number.
@@ -184,6 +185,7 @@ export function TablesPanel(props: Props) {
         const count = value === "all" ? props.tables.length : props.tables.filter((table) => table.state === value).length;
         return <button key={value} className={filter === value ? "active" : ""} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === "all" ? t("filterAll") : t(STATE_KEYS[value])} · {count}</button>;
       })}
+      <button type="button" className={`tables-compact-btn ${compact ? "active" : ""}`} aria-pressed={compact} onClick={() => setCompact((on) => !on)}>{t("tablesCompact")}</button>
     </div>
 
     {editing && <section className="table-editor" aria-label={t("tablesEdit")}>
@@ -235,7 +237,17 @@ export function TablesPanel(props: Props) {
     // rode in the same grid as the real tables and read as a phantom table
     // nobody could clear; give it its own section so the floor list is only
     // the floor. Both lists honour the state filter above.
-    const dineIn = visible.filter((table) => !table.table.startsWith("TA-"));
+    const callTables = new Set((props.requests ?? []).filter((req) => req.status === "open").map((req) => req.table.toUpperCase()));
+    const bookedTables = new Set((props.bookings ?? []).filter((b) => b.table && b.status !== "seated").map((b) => b.table!.toUpperCase()));
+    const priorityOf = (table: TableOverview) => {
+      const code = table.table.toUpperCase();
+      if (callTables.has(code)) return 0;
+      if (table.state === "seated") return 1;
+      if (table.state === "locked") return 2;
+      if (bookedTables.has(code)) return 3;
+      return 4;
+    };
+    const dineIn = visible.filter((table) => !table.table.startsWith("TA-")).sort((a, b) => priorityOf(a) - priorityOf(b));
     const takeaway = visible.filter((table) => table.table.startsWith("TA-"));
     const renderTile = (table: TableOverview) => {
       const takeawayTile = table.table.startsWith("TA-");
@@ -323,7 +335,7 @@ export function TablesPanel(props: Props) {
     </article>;
     };
     return <>
-      <div className="table-grid">{dineIn.length ? dineIn.map(renderTile) : <div className="admin-empty">
+      <div className={`table-grid ${compact ? "compact" : ""}`}>{dineIn.length ? dineIn.map(renderTile) : <div className="admin-empty">
         <p>{t("tablesEmpty")}</p>
         {manager && !editing && props.tables.length === 0 && <button className="primary-action" data-action="generate-tables" disabled={props.busy} onClick={() => void startEditing()}>{t("tablesGenerate")}</button>}
       </div>}</div>

@@ -762,6 +762,10 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
             onClick={() => { const next = Math.min(info.maxParty, party + 1); setParty(next); setPartyText(String(next)); }}>+</button>
         </div>
       </div>
+      {[2, 4, 6, 8].filter((n) => n <= info.maxParty).length > 0 && <div className="bk-party-presets" role="group" aria-label={b(language, "party")}>
+        {[2, 4, 6, 8].filter((n) => n <= info.maxParty).map((n) => <button key={n} type="button" className={party === n ? "active" : ""} aria-pressed={party === n}
+          onClick={() => { setParty(n); setPartyText(String(n)); }}>{b(language, "partyOf", { n })}</button>)}
+      </div>}
       <BookingCalendar language={language} value={date} onPick={(day) => { setDate(day); setError(""); }} bookable={bookable} today={info.today} lastDate={info.lastDate} />
       <div className="bk-times">
         <p className="bk-times-label">{b(language, "time")}</p>

@@ -1251,6 +1251,34 @@ em.voided {
 }
 
 /* Online-pickup orders live under their own heading, apart from the floor. */
+.tables-compact-btn {
+  margin-left: auto;
+}
+.table-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+.table-grid.compact .table-tile {
+  padding: 10px 12px;
+  gap: 6px;
+}
+.table-grid.compact .table-tile-meta,
+.table-grid.compact .table-tile-orders,
+.table-grid.compact .board-actions {
+  display: none;
+}
+.res-member-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--a-accent-wash);
+  color: var(--a-accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
 .table-tile.has-call {
   border-color: var(--a-warn-solid);
 }

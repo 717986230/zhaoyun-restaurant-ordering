@@ -641,6 +641,14 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   color: var(--p-muted);
 }
 
+.pos-stepper button.pos-qty-btn {
+  min-width: 32px;
+  width: auto;
+  padding: 0 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .pos-calls li.urgent {
   padding: 6px 8px;
   border: 1px solid var(--p-seated);
