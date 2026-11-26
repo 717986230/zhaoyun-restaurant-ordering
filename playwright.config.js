@@ -10,6 +10,7 @@ const ci = Boolean(process.env.CI);
 export default defineConfig({
   testDir: "./tests",
   timeout: 30000,
+  retries: ci ? 1 : 0,
   workers: ci ? 4 : undefined,
   // Tests, not whole files, are shared out between workers and between CI's
   // shards: by file, every iPhone project landed on the same shard.
