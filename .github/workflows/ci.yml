@@ -107,6 +107,9 @@ jobs:
     # and the `github-pages` environment refuses a branch that is not the
     # default one anyway, before a single step of this job can run.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
