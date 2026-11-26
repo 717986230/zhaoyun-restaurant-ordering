@@ -71,6 +71,8 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
   const [sepa, setSepa] = useState<ApiSepaPayment | null>(null);
   const [showSepa, setShowSepa] = useState(false);
   const [scanningMember, setScanningMember] = useState(false);
+  const [showDiscounts, setShowDiscounts] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
   // AA 均分: how many people share this bill equally.
   const [splitN, setSplitN] = useState(2);
   const requestId = useRef(crypto.randomUUID());
@@ -381,7 +383,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
         const changed = isComp || pct > 0 || price.overridden;
         return <li key={item.orderItemId} className={count ? "picked" : ""}>
           <span>{item.names?.[language] || item.name}{item.modifiers?.length ? <small>{item.modifiers.map((modifier) => modifier.name).join(" · ")}</small> : null}
-            {count > 0 && <span className="pos-line-reduce">
+            {count > 0 && (showDiscounts || isComp || pct > 0 || price.overridden) && <span className="pos-line-reduce">
               {!isComp && price.singleRate && <label className={price.bad ? "pos-line-price bad" : "pos-line-price"}><span>{t("newPrice")}</span><input inputMode="decimal" value={price.raw} placeholder={(price.menuUnit / 100).toFixed(2)} onChange={(event) => setPrice(item.orderItemId, event.target.value)} /></label>}
               {!isComp && <label className="pos-line-discount"><span>{t("itemDiscount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={pct || ""} placeholder="0" onChange={(event) => setItemPct(item.orderItemId, Number(event.target.value))} />%</label>}
               <button type="button" className={isComp ? "pos-comp on" : "pos-comp"} aria-pressed={isComp} onClick={() => toggleComp(item.orderItemId)}>{t("comp")}</button>
@@ -400,23 +402,29 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     <div className="pos-pay-panel">
       {promo && <div className="pos-promo">{t("posPromoActive", { name: promo.name[language] || promo.name.zh || promo.name.en || promo.name.de, percent: String(promo.percent) })}</div>}
       {amountPromo && <div className="pos-promo">{t("posAmountPromoActive", { name: amountPromo.name[language] || amountPromo.name.zh || amountPromo.name.en || amountPromo.name.de, cut: money(amountPromo.amountCents), min: money(amountPromo.minSpendCents) })}</div>}
-      <label className="pos-discount"><span>{t("discount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={discount} onChange={(event) => setDiscount(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
-      <label className="pos-discount"><span>{t("amountDiscount")}</span><input type="number" min={0} max={1000} step="0.01" inputMode="decimal" value={amountDiscount ? (amountDiscount / 100).toFixed(2) : ""} placeholder="0" onChange={(event) => { amountTouched.current = true; const cents = Math.round((Number(event.target.value) || 0) * 100); setAmountDiscount(Math.max(0, Math.min(100000, cents))); }} /></label>
-      {reduced && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
       <div className="pos-total"><span>{t("total")}</span><b>{money(totalCents)}</b></div>
       {totalCents > 0 && remaining > 0 && <div className="pos-quick-pay">
         <button type="button" className="pos-primary" onClick={() => setPayments((current) => [...current, { type: "card", amount: toAmount(remaining), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }])}>{t("quickCard")}</button>
         <button type="button" onClick={() => setPayments((current) => [...current, { type: "cash", amount: toAmount(remaining), tendered: "", voucherCode: "", balanceCents: null, tip: "", memberLogin: "", memberId: "", memberName: "", memberTierLevel: 0 }])}>{t("quickCash")}</button>
-        <button type="button" onClick={() => setScanningMember(true)}>📷 {t("scanMember")}</button>
       </div>}
       <div className="pos-pay-types">{(["cash", "card", "voucher", "balance"] as PaymentType[]).map((type) => <button key={type} type="button" disabled={!totalCents} onClick={() => addPayment(type)}>+ {t(PAY_KEYS[type])}</button>)}</div>
-      <div className="pos-split">
+      <div className="pos-pay-extras">
+        <button type="button" className={showDiscounts ? "on" : ""} aria-pressed={showDiscounts} onClick={() => setShowDiscounts((on) => !on)}>{language === "zh" ? "优惠 / 改价" : language === "de" ? "Rabatt / Preis" : "Discount"}</button>
+        <button type="button" className={showSplit ? "on" : ""} aria-pressed={showSplit} onClick={() => setShowSplit((on) => !on)}>{t("splitEvenly")}</button>
+        <button type="button" onClick={() => setScanningMember(true)}>📷 {t("scanMember")}</button>
+        {sepa?.enabled && sepa.iban && totalCents > 0 && <button type="button" onClick={() => setShowSepa(true)}>⃔ {t("sepaScan")}</button>}
+      </div>
+      {(showDiscounts || Boolean(promo) || Boolean(amountPromo) || discount > 0 || amountDiscount > 0 || reduced) && <>
+        <label className="pos-discount"><span>{t("discount")}</span><input type="number" min={0} max={100} step={1} inputMode="numeric" value={discount} onChange={(event) => setDiscount(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /></label>
+        <label className="pos-discount"><span>{t("amountDiscount")}</span><input type="number" min={0} max={1000} step="0.01" inputMode="decimal" value={amountDiscount ? (amountDiscount / 100).toFixed(2) : ""} placeholder="0" onChange={(event) => { amountTouched.current = true; const cents = Math.round((Number(event.target.value) || 0) * 100); setAmountDiscount(Math.max(0, Math.min(100000, cents))); }} /></label>
+        {reduced && <label className="pos-discount-reason"><span>{t("discountReason")}</span><input value={discountReason} maxLength={200} placeholder={t("discountReasonHint")} onChange={(event) => setDiscountReason(event.target.value)} /></label>}
+      </>}
+      {showSplit && <div className="pos-split">
         <span>{t("splitEvenly")}</span>
         <input type="number" min={2} max={20} step={1} inputMode="numeric" aria-label={t("splitPeople")} value={splitN} onChange={(event) => setSplitN(Math.max(2, Math.min(20, Math.round(Number(event.target.value) || 2))))} />
         <span>{t("splitPeople")}</span>
         <button type="button" disabled={!totalCents} onClick={() => splitEvenly(splitN)}>{t("splitDo", { n: splitN })}</button>
-      </div>
-      {sepa?.enabled && sepa.iban && totalCents > 0 && <button type="button" className="pos-sepa-btn" onClick={() => setShowSepa(true)}>⃔ {t("sepaScan")}</button>}
+      </div>}
       <ul className="pos-payments">{payments.map((payment, index) => <li key={index}>
         <b>{t(PAY_KEYS[payment.type])}</b>
         <label><span>{t("amount")}</span><input inputMode="decimal" value={payment.amount} onChange={(event) => edit(index, { amount: event.target.value })} /></label>

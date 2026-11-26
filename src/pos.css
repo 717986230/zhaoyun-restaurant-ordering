@@ -392,6 +392,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-total { display: flex; justify-content: space-between; align-items: baseline; }
 .pos-total b { font-size: 30px; font-variant-numeric: tabular-nums; }
 .pos-pay-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
+.pos-pay-extras { display: flex; flex-wrap: wrap; gap: 6px; }
+.pos-pay-extras button { min-height: 36px; padding: 4px 10px; font-size: 13px; color: var(--p-muted); }
+.pos-pay-extras button.on { border-color: var(--p-accent); background: var(--p-accent-wash); color: var(--p-ink); font-weight: 600; }
 /* AA 均分: the headcount box and the split button. */
 .pos-split { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--p-muted); font-size: 14px; }
 .pos-split input { width: 64px; min-height: 40px; padding: 2px 6px; text-align: right; }

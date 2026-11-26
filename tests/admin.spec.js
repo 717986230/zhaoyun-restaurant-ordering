@@ -361,7 +361,7 @@ test("a kitchen screen sees orders without billing or service calls", async ({ p
   await expect(page.getByRole("button", { name: /更新为：制作中/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "取消订单" })).toHaveCount(0);
   await expect(page.getByText("结账")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "桌位" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "桌位", exact: true })).toHaveCount(0);
 });
 
 test("a table card carries the entry link a guest phone will scan", async ({ page }) => {
@@ -415,7 +415,7 @@ test("the table page shows what is on each table, and locking stops it ordering"
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ table: { table: "07", label: "窗边", token: "t", enabled: true, locked: true, lockedAt: new Date().toISOString() } }) });
   });
   await page.goto("/admin.html");
-  await page.getByRole("button", { name: "桌位" }).click();
+  await page.getByRole("button", { name: "桌位", exact: true }).click();
 
   const seven = page.locator(".table-tile", { hasText: "桌 07" });
   // Compact square tiles show state & total outside; clicking opens the ordered dishes.
@@ -458,7 +458,7 @@ test("a table's bill prints for the guest, and payment is taken at the POS", asy
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bill: { table: "07", orderNos: [], orderIds: [], items: [], vatBreakdown: [], total: 12.5, issuedAt: new Date().toISOString(), fiscalReceipt: false, printJobId: "job-1" } }) });
   });
   await page.goto("/admin.html");
-  await page.getByRole("button", { name: "桌位" }).click();
+  await page.getByRole("button", { name: "桌位", exact: true }).click();
   await page.locator(".table-tile", { hasText: "桌 07" }).getByRole("button", { name: "结账" }).click();
 
   // The bill is for the guest to read; printing it pays nothing.
@@ -571,7 +571,7 @@ test("orders, tables and printers stay out of the way until ordering is switched
   const nav = page.getByRole("navigation", { name: "管理模块" });
   // 报表 (money view) and 桌位 (table status) stay within reach even with the
   // board/printer toggle off — a manager needs them every service.
-  await expect(nav).toHaveText("今日桌位预约外卖菜品库存报表账单营销设置会员跳转");
+  await expect(nav).toHaveText("今日会员桌位预约外卖菜品库存报表账单营销设置跳转");
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("switch", { name: "显示实时订单看板和打印机" }).click();
@@ -732,7 +732,7 @@ test("the menu's QR code downloads as a PNG that a phone can scan", async ({ pag
     { table: "12", label: "窗边", enabled: true, locked: false, lockedAt: null, registered: true, state: "free", total: 0, since: null, orders: [] }
   ] }) }));
   await page.goto("/admin.html");
-  await page.getByRole("button", { name: "桌位" }).click();
+  await page.getByRole("button", { name: "桌位", exact: true }).click();
 
   /** The downloaded file, decoded in the page by a real QR reader. */
   const scan = async (trigger) => {
@@ -1240,7 +1240,7 @@ test("tables 1–20 get their QR cards in one go, each with its own code, ready 
   page.on("dialog", (dialog) => { dialogs.push(dialog.message()); void dialog.accept(); });
 
   await page.goto("/admin.html");
-  await page.getByRole("button", { name: "桌位" }).click();
+  await page.getByRole("button", { name: "桌位", exact: true }).click();
 
   // The defaults are set up once, from the Tables page's own edit button —
   // not from settings, where the one-click setup used to live.
@@ -1305,7 +1305,7 @@ test("the manager adds, renumbers and removes tables, and a table open on a POS 
   page.on("dialog", (dialog) => { dialogs.push(dialog.message()); void dialog.accept(); });
 
   await page.goto("/admin.html");
-  await page.getByRole("button", { name: "桌位" }).click();
+  await page.getByRole("button", { name: "桌位", exact: true }).click();
 
   // Open on a POS: locked, whose it is, and nothing here to press.
   const two = page.locator(".table-tile[data-table='2']");

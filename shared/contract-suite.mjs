@@ -1946,19 +1946,20 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const tablet = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Tablet R" } })).json.token;
       const phone = (await call("POST", "/api/admin/pos-devices", { admin: true, body: { name: "Phone R" } })).json.token;
       const sun = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Sun", pin: "2468" } })).json.staff;
+      const other = (await call("POST", "/api/admin/staff", { admin: true, body: { name: "Li2", pin: "2469" } })).json.staff;
       const asSun = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: tablet, body: { staffId: sun.id, pin: "2468" } })).json.token };
-      const asSunElsewhere = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: phone, body: { staffId: sun.id, pin: "2468" } })).json.token };
+      const asOtherDevice = { token: (await call("POST", "/api/pos/sign-in", { deviceToken: phone, body: { staffId: other.id, pin: "2469" } })).json.token };
       assert.equal((await call("POST", "/api/pos/tables/R3/claim", asSun)).status, 200);
       const tabletFloor = (await call("GET", "/api/pos/floor", asSun)).json;
       const holder = tabletFloor.claims.find((claim) => claim.table === "R3");
       assert.equal(holder.deviceId, tabletFloor.deviceId, "the floor says which tables are this device's own");
-      assert.notEqual((await call("GET", "/api/pos/floor", asSunElsewhere)).json.deviceId, holder.deviceId);
+      assert.notEqual((await call("GET", "/api/pos/floor", asOtherDevice)).json.deviceId, holder.deviceId);
       assert.equal((await call("GET", "/api/admin/tables/overview", { role: "staff" })).json.tables.find((table) => table.table === "R3").openOn.staffName, "Sun");
-      assert.equal((await call("POST", "/api/pos/tables/R3/claim", asSunElsewhere)).status, 409, "the same waiter on another device too");
+      assert.equal((await call("POST", "/api/pos/tables/R3/claim", asOtherDevice)).status, 409, "another device cannot claim it");
       const locked = await call("POST", "/api/admin/tables/R3/lock", { role: "staff", body: { locked: true } });
       assert.deepEqual([locked.status, locked.json.code], [409, "TABLE_CLAIMED"], "the console may not touch it");
       assert.equal((await call("POST", "/api/admin/tables/R3/ordering", { role: "staff", body: { open: true } })).status, 409);
-      assert.equal((await call("POST", "/api/admin/tables/R3/ordering", { ...asSunElsewhere, body: { open: true } })).status, 409);
+      assert.equal((await call("POST", "/api/admin/tables/R3/ordering", { ...asOtherDevice, body: { open: true } })).status, 409);
       assert.equal((await call("PATCH", "/api/admin/tables/R3", { admin: true, body: { table: "R5" } })).status, 409);
       assert.equal((await call("DELETE", "/api/admin/tables/R3", { admin: true })).status, 409);
       assert.equal((await call("POST", "/api/admin/tables/R3/ordering", { ...asSun, body: { open: true } })).status, 200, "the device that has it may");
@@ -1969,6 +1970,7 @@ export function contractChecks(call, assert, { liveBase } = {}) {
 
       for (const table of ["R2", "R3"]) assert.equal((await call("DELETE", `/api/admin/tables/${table}`, { admin: true })).status, 204);
       await call("PUT", `/api/admin/staff/${sun.id}`, { admin: true, body: { active: false } });
+      await call("PUT", `/api/admin/staff/${other.id}`, { admin: true, body: { active: false } });
       for (const device of (await call("GET", "/api/admin/pos-devices", { admin: true })).json.devices) await call("DELETE", `/api/admin/pos-devices/${device.id}`, { admin: true });
     }],
 
