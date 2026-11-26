@@ -1248,6 +1248,7 @@ em.voided {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 /* Online-pickup orders live under their own heading, apart from the floor. */
@@ -1525,6 +1526,8 @@ em.voided {
   list-style: none;
   display: grid;
   gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .table-tile-orders > li {

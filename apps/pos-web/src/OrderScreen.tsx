@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { ApiBill, PosClaim } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
@@ -84,11 +84,12 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // A stable, distinct colour per category (by its order on the menu), so a
   // waiter tells categories apart at a glance: the chip's dot and the dish's stripe.
   const catColor = useCallback((entry: string) => TAG_COLORS[Math.max(0, categories.indexOf(entry)) % TAG_COLORS.length]!, [categories]);
+  const deferredQuery = useDeferredValue(query);
   const shown = useMemo(() => {
-    const text = query.trim().toLowerCase();
+    const text = deferredQuery.trim().toLowerCase();
     return menu.filter((product) => (!category || product.category === category)
       && (!text || product.sku.toLowerCase().startsWith(text) || matchesTextOrPinyin(text, Object.values(product.names))));
-  }, [menu, category, query]);
+  }, [menu, category, deferredQuery]);
 
   function add(product: Product, modifiers: CartLine["modifiers"] = [], qty = 1) {
     const key = lineKey(product, modifiers);

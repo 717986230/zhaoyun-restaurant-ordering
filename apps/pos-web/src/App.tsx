@@ -190,6 +190,37 @@ export function App() {
     return () => { stop(); setLive(false); };
   }, [staff, loadCatalog]);
 
+  // Left-edge swipe right to go back on touch devices (iOS/Android/tablets).
+  useEffect(() => {
+    if (!staff || screen.name === "floor") return undefined;
+    let startX = 0, startY = 0, active = false;
+    const onStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1) { active = false; return; }
+      const touch = event.touches[0]!;
+      startX = touch.clientX;
+      startY = touch.clientY;
+      active = startX <= 40;
+    };
+    const onEnd = (event: TouchEvent) => {
+      if (!active) return;
+      active = false;
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+      const dx = touch.clientX - startX;
+      const dy = Math.abs(touch.clientY - startY);
+      if (dx >= 68 && dy < 60 && dx > dy * 1.4) {
+        if (screen.name === "pay") setScreen({ name: "order", table: screen.table });
+        else setScreen({ name: "floor" });
+      }
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchend", onEnd);
+    };
+  }, [staff, screen]);
+
   const languages = <div className="pos-languages" role="group" aria-label="Language">{POS_LANGUAGES.map((option) => <button
     key={option} type="button" className={option === language ? "on" : ""} aria-pressed={option === language} aria-label={LANGUAGE_INFO[option].name} onClick={() => setLanguage(option)}
   ><img src={LANGUAGE_INFO[option].flag} alt="" /></button>)}</div>;
