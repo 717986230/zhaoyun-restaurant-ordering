@@ -6013,6 +6013,48 @@ button.report-tile-link:hover {
   gap: 10px;
 }
 
+.announce-lang-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.announce-lang-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--a-line);
+  border-radius: 999px;
+  background: var(--a-sunken);
+  color: var(--a-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.announce-lang-tab img {
+  width: 18px;
+  height: 13px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.announce-lang-tab.on {
+  border-color: var(--a-accent);
+  background: var(--a-accent-soft);
+  color: var(--a-ink);
+}
+
+.announce-lang-tab.filled::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--a-accent);
+}
+
 .announce-lang {
   display: grid;
   gap: 8px;

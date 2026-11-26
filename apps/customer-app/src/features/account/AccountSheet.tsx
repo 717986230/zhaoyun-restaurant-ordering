@@ -10,6 +10,8 @@ import { formatPrice, productName, t } from "../../app/i18n";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import type { OrderingState } from "../../app/ordering";
 import { Sheet } from "../../components/Sheet";
+import { COUNTRY_DIAL_CODES, validateEmailOrPhone } from "../../app/contactInput";
+import { useElderMode } from "../../app/useElderMode";
 import type { CustomerAccount } from "./useCustomer";
 import { MemberBadge } from "./MemberBadge";
 import { useTierEntry } from "./useTierEntry";
@@ -86,7 +88,9 @@ function message(language: CustomerState["language"], error: unknown): string {
 }
 
 function SignInForm({ language, account, restaurantName, signupPoints }: { language: Language; account: CustomerAccount; restaurantName: string; signupPoints: number }) {
+  const [elder, toggleElder] = useElderMode();
   const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
+  const [dialCode, setDialCode] = useState("43");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -95,17 +99,31 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
   const [error, setError] = useState("");
   const registering = mode === "register";
   const mismatch = registering && repeat.length > 0 && password !== repeat;
-  // An email or a mobile number: the server says which, and what is wrong with it.
-  const ready = email.trim().length >= 3 && (registering ? password.length >= PASSWORD_MIN && password === repeat : password.length > 0);
+  const ready = email.trim().length > 0 && password.length > 0 && (!registering || repeat.length > 0);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!ready || busy) return;
+    if (busy) return;
+    const contact = validateEmailOrPhone(email, dialCode);
+    if (!contact.ok) {
+      if (contact.reason === "EMAIL_FORMAT") setError(g(language, "emailInvalid"));
+      else if (contact.reason === "NOT_MOBILE") setError(g(language, "phoneNotMobile"));
+      else setError(g(language, "loginInvalid"));
+      return;
+    }
+    if (registering && password.length < PASSWORD_MIN) {
+      setError(g(language, "passwordTooShort", { n: PASSWORD_MIN }));
+      return;
+    }
+    if (registering && password !== repeat) {
+      setError(g(language, "passwordMismatch"));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      if (registering) await account.register({ email: email.trim(), password, ...(name.trim() ? { name: name.trim() } : {}) });
-      else await account.signIn(email.trim(), password);
+      if (registering) await account.register({ email: contact.value, password, ...(name.trim() ? { name: name.trim() } : {}) });
+      else await account.signIn(contact.value, password);
     } catch (failure) {
       setError(message(language, failure));
     } finally {
@@ -114,19 +132,31 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
   }
 
   return <form className="guest-form" onSubmit={submit}>
+    <div className="sheet-mode-row">
+      <button type="button" className={`elder-pill ${elder ? "on" : ""}`} aria-pressed={elder} onClick={toggleElder}>
+        {elder ? `Aa · ${g(language, "standardMode")}` : `Aa · ${g(language, "elderMode")}`}
+      </button>
+    </div>
     <p className="sheet-lead">{g(language, "signInLead")}</p>
     {/* What signing up brings. */}
     {signupPoints > 0 ? <p className="signup-bonus" id="signupBonusHint">{g(language, "signupBonusHint", { n: signupPoints })}</p> : null}
     <div className="segmented" role="tablist">
-      <button type="button" role="tab" aria-selected={!registering} className={!registering ? "on" : ""} onClick={() => setMode("sign-in")}>{g(language, "signIn")}</button>
-      <button type="button" role="tab" aria-selected={registering} className={registering ? "on" : ""} onClick={() => setMode("register")}>{g(language, "register")}</button>
+      <button type="button" role="tab" aria-selected={!registering} className={!registering ? "on" : ""} onClick={() => { setMode("sign-in"); setError(""); }}>{g(language, "signIn")}</button>
+      <button type="button" role="tab" aria-selected={registering} className={registering ? "on" : ""} onClick={() => { setMode("register"); setError(""); }}>{g(language, "register")}</button>
     </div>
-    <label>{g(language, "login")}<input name="email" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="0660 1234567 / name@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-    {registering && <label>{g(language, "name")}<input name="name" autoComplete="nickname" maxLength={40} value={name} onChange={(event) => setName(event.target.value)} /></label>}
-    <label>{g(language, "password")}{registering && <small> · {g(language, "passwordHint")}</small>}
-      <input name="password" type="password" autoComplete={registering ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />
+    <label>{g(language, "login")}
+      <div className="phone-input-group">
+        <select className="dial-code-select" aria-label={g(language, "dialCode")} value={dialCode} onChange={(event) => { setDialCode(event.target.value); setError(""); }}>
+          {COUNTRY_DIAL_CODES.map((entry) => <option key={entry.code} value={entry.code}>{entry.flag} {entry.label}</option>)}
+        </select>
+        <input name="email" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="0660 1234567 / name@example.com" value={email} onChange={(event) => { setEmail(event.target.value); if (error) setError(""); }} required />
+      </div>
     </label>
-    {registering && <label>{g(language, "passwordRepeat")}<input name="password-repeat" type="password" autoComplete="new-password" value={repeat} onChange={(event) => setRepeat(event.target.value)} required /></label>}
+    {registering && !elder && <label>{g(language, "name")}<input name="name" autoComplete="nickname" maxLength={40} value={name} onChange={(event) => setName(event.target.value)} /></label>}
+    <label>{g(language, "password")}{registering && <small> · {g(language, "passwordHint")}</small>}
+      <input name="password" type="password" autoComplete={registering ? "new-password" : "current-password"} value={password} onChange={(event) => { setPassword(event.target.value); if (error) setError(""); }} required />
+    </label>
+    {registering && <label>{g(language, "passwordRepeat")}<input name="password-repeat" type="password" autoComplete="new-password" value={repeat} onChange={(event) => { setRepeat(event.target.value); if (error) setError(""); }} required /></label>}
     {mismatch && <p className="cart-error">{g(language, "passwordMismatch")}</p>}
     {error && <p className="cart-error" role="alert">{error}</p>}
     <button type="submit" className="primary" disabled={!ready || busy}>{busy ? "…" : g(language, registering ? "register" : "signIn")}</button>
@@ -138,6 +168,7 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
 
 function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, ordering, restaurantName }: Props) {
   const language = state.language;
+  const [elder, toggleElder] = useElderMode();
   const customer = account.customer!;
   const byId = new Map(products.map((product) => [product.id, product]));
   const rewards = (loyalty?.rewards ?? []).flatMap((reward) => {
@@ -169,8 +200,11 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
     dispatch({ type: "sheet", sheet: "cart" });
   }
 
-  const [showQr, setShowQr] = useState(false);
+  const [showQr, setShowQr] = useState(() => elder);
   const [qrSrc, setQrSrc] = useState("");
+  useEffect(() => {
+    if (elder) setShowQr(true);
+  }, [elder]);
   useEffect(() => {
     setQrSrc("");
     if (!showQr) return;
@@ -192,6 +226,11 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
     className={`guest-account${visual ? " member-themed" : ""}${visual?.skin ? ` tier-skin-${visual.skin}` : ""}${entering ? " tier-entering" : ""}`}
     data-tier-theme={visual?.theme}
   >
+    <div className="sheet-mode-row">
+      <button type="button" className={`elder-pill ${elder ? "on" : ""}`} aria-pressed={elder} onClick={toggleElder}>
+        {elder ? `Aa · ${g(language, "standardMode")}` : `Aa · ${g(language, "elderMode")}`}
+      </button>
+    </div>
     <div className={`guest-card member-hero${visual ? " member-crest" : ""}`} data-tier-theme={visual?.theme}>
       <div className="member-hero-top">
         {visual && <div className="member-crest-art">
@@ -219,7 +258,14 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
           {g(language, showQr ? "hideMemberCode" : "showMemberCode")}
         </button>
       </div>
-      {showQr && qrSrc && <div className="member-qr-box"><img src={qrSrc} alt={g(language, "memberQrAlt")} width="180" height="180" /></div>}
+      {showQr && qrSrc && <div className="member-qr-box">
+        <div className="member-qr-tile"><img src={qrSrc} alt={g(language, "memberQrAlt")} width="132" height="132" /></div>
+        <div className="member-qr-info">
+          <strong>{displayName}</strong>
+          {customer.membership?.tier && <span className="member-qr-tier">{customer.membership.tier}</span>}
+          <small>{g(language, "memberQrHint")}</small>
+        </div>
+      </div>}
     </div>
     {account.signupBonus > 0 && <p className="signup-bonus" id="signupBonusGot" role="status">{g(language, "signupBonusGot", { n: account.signupBonus })}</p>}
 
@@ -260,7 +306,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
       <button type="button" className="secondary" onClick={() => void account.signOut()}>{g(language, "signOut")}</button>
     </div>
 
-    <details className="guest-preferences">
+    {!elder && <details className="guest-preferences">
       <summary>
         <span>{g(language, "preferences")}</span>
         {saved && birthdayPerk && <small>🎂 {saved.month}/{saved.day}</small>}
@@ -292,7 +338,7 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
         <MarketingToggle language={language} dispatch={dispatch} />
         <ProfileForm language={language} account={account} dispatch={dispatch} />
       </div>
-    </details>
+    </details>}
     <div className="guest-privacy">
       <button type="button" className="link-button" onClick={() => void downloadMyData(language, dispatch)}>⬇ {g(language, "downloadData")}</button>
       <PrivacyNotice language={language} restaurantName={restaurantName} />

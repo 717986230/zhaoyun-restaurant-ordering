@@ -9,7 +9,8 @@ import { Sheet } from "../components/Sheet";
 import { CalendarIcon, PersonIcon, QrIcon, RefreshIcon } from "../components/LineIcons";
 import { b, bookingError, formatDay, formatMonth, initialLanguage, weekdayInitials } from "./booking-i18n";
 import type { BookingErrorKey, BookingLanguage } from "./booking-i18n";
-import { checkMobile } from "../../../../shared/phone.mjs";
+import { COUNTRY_DIAL_CODES, validateEmailOrPhone } from "../app/contactInput";
+import { useElderMode } from "../app/useElderMode";
 
 // The guest's session is the menu's own (the same account, the same phone); the table this phone scanned, if any, for the sign-up bonus.
 const api = new RestaurantApi({ baseUrl: apiBaseUrl, headers: () => ({ "x-customer-token": customerToken() }) });
@@ -187,8 +188,14 @@ export function BookingPage({ language: menuLanguage, onClose }: { language?: Bo
   const latest = mine.find((entry) => entry.phone);
   const recent = useMemo(() => (latest ? { name: latest.name, phone: latest.phone } : null), [latest?.name, latest?.phone]);
 
+  const [elder, toggleElder] = useElderMode();
   return <Sheet id="bookingModal" className="bk-modal" title={booking ? b(language, "myBooking") : b(language, "title")} closeLabel={b(language, "close")} onClose={onClose}>
   <div className="bk-page">
+    <div className="sheet-mode-row">
+      <button type="button" className={`elder-pill ${elder ? "on" : ""}`} aria-pressed={elder} onClick={toggleElder}>
+        {elder ? `Aa · ${b(language, "standardMode")}` : `Aa · ${b(language, "elderMode")}`}
+      </button>
+    </div>
     {notFound && !booking ? <section className="bk-card bk-message" id="bookingNotFound">
       <p>{b(language, "notFound")}</p>
       <button type="button" className="bk-secondary" onClick={startOver}>{b(language, "another")}</button>
@@ -421,6 +428,7 @@ function pointsRules(language: BookingLanguage, info: ApiBookingInfo): string {
 
 function SignInCard({ language, info, onSignedIn }: { language: BookingLanguage; info: ApiBookingInfo; onSignedIn: (session: { token: string; customer: ApiCustomer }) => void }) {
   const [mode, setMode] = useState<"signIn" | "register">("signIn");
+  const [dialCode, setDialCode] = useState("43");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -430,17 +438,18 @@ function SignInCard({ language, info, onSignedIn }: { language: BookingLanguage;
     event.preventDefault();
     event.stopPropagation();
     // Registering: an email or a mobile number that could be real, said before the guest waits for the server.
-    const problem = mode === "register" ? loginProblem(language, email) : "";
-    if (problem) {
-      setError(problem);
+    const check = validateEmailOrPhone(email, dialCode);
+    if (mode === "register" && !check.ok) {
+      setError(check.reason === "EMAIL_FORMAT" ? b(language, "emailInvalid") : check.reason === "NOT_MOBILE" ? b(language, "phoneNotMobile") : b(language, "loginInvalid"));
       return;
     }
+    const resolved = check.ok ? check.value : email.trim();
     setBusy(true);
     setError("");
     try {
       onSignedIn(mode === "signIn"
-        ? await api.signInCustomer(email, password)
-        : await api.registerCustomer({ email, password }));
+        ? await api.signInCustomer(resolved, password)
+        : await api.registerCustomer({ email: resolved, password }));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) setError(b(language, "wrongLogin"));
       else if (failure instanceof ApiError && failure.code === "EMAIL_TAKEN") setError(b(language, "emailTaken"));
@@ -459,7 +468,14 @@ function SignInCard({ language, info, onSignedIn }: { language: BookingLanguage;
       {(["signIn", "register"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => { setMode(key); setError(""); }}>{b(language, key)}</button>)}
     </div>
     <form className="bk-signin" onSubmit={(event) => void submit(event)}>
-      <label className="bk-field"><span>{b(language, "loginEmail")}</span><input id="bookingEmailLogin" type="text" required maxLength={254} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={b(language, "contactHint")} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+      <label className="bk-field"><span>{b(language, "loginEmail")}</span>
+        <div className="phone-input-group">
+          <select className="dial-code-select" aria-label={b(language, "dialCode")} value={dialCode} onChange={(event) => { setDialCode(event.target.value); setError(""); }}>
+            {COUNTRY_DIAL_CODES.map((entry) => <option key={entry.code} value={entry.code}>{entry.flag} {entry.label}</option>)}
+          </select>
+          <input id="bookingEmailLogin" type="text" required maxLength={254} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={b(language, "contactHint")} value={email} onChange={(event) => { setEmail(event.target.value); if (error) setError(""); }} />
+        </div>
+      </label>
       <label className="bk-field"><span>{b(language, "password")}</span><input id="bookingPassword" type="password" required minLength={mode === "register" ? 6 : 1} maxLength={200} autoComplete={mode === "register" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} />{mode === "register" ? <small>{b(language, "passwordHint")}</small> : null}</label>
       {mode === "signIn" ? <p className="bk-privacy">{b(language, "forgot")}</p> : null}
       {error ? <p className="bk-error" role="alert">{error}</p> : null}
@@ -470,9 +486,6 @@ function SignInCard({ language, info, onSignedIn }: { language: BookingLanguage;
 
 /** Party sizes offered as one tap each; a list holds the rest, where there are more. */
 const PARTY_CHIPS = 8;
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** The hour that splits lunch from dinner: a time before it is 午市, at or after it 晚市. */
 const DINNER_FROM_HOUR = 16;
 
 /** The day's times split into lunch and dinner, each group kept only when it has times. */
@@ -485,24 +498,17 @@ function groupSlots(slots: ApiReservationSlot[]): Array<{ key: "lunch" | "dinner
   ];
 }
 
-/** What is wrong with the email or mobile number a guest signs up with, or "": no code is sent, the number is checked to be one that could be real. */
-function loginProblem(language: BookingLanguage, value: string): string {
-  const clean = value.trim();
-  if (clean.includes("@")) return EMAIL_SHAPE.test(clean) ? "" : b(language, "emailInvalid");
-  const mobile = checkMobile(clean);
-  return mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "loginInvalid");
-}
-
 /**
  * What is wrong with how the guest left to be reached, or "": an email (it
  * has an @) or a mobile number (the server's own check, shared/phone.mjs).
  */
-function contactProblem(language: BookingLanguage, value: string): string {
-  const clean = value.trim();
-  if (!clean) return b(language, "contactMissing");
-  if (clean.includes("@")) return EMAIL_SHAPE.test(clean) ? "" : b(language, "emailInvalid");
-  const mobile = checkMobile(clean);
-  return mobile.ok ? "" : b(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid");
+function contactProblem(language: BookingLanguage, value: string, dialCode = "43"): string {
+  const check = validateEmailOrPhone(value, dialCode);
+  if (check.ok) return "";
+  if (check.reason === "EMPTY") return b(language, "contactMissing");
+  if (check.reason === "EMAIL_FORMAT") return b(language, "emailInvalid");
+  if (check.reason === "NOT_MOBILE") return b(language, "phoneNotMobile");
+  return b(language, "phoneInvalid");
 }
 
 /** The name and mobile number (or email) a guest booked with last, kept on this phone only. */
@@ -641,6 +647,7 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
   const [tables, setTables] = useState<ApiTableChoice[] | null>(null);
   const [table, setTable] = useState("");
   const [name, setName] = useState("");
+  const [dialCode, setDialCode] = useState("43");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   // Where mail goes out, a guest proves their email before booking (shared/email-verify.mjs).
@@ -718,13 +725,14 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
       return;
     }
     // The same check the server makes, before the guest waits for it.
-    const problem = contactProblem(language, phone);
+    const problem = contactProblem(language, phone, dialCode);
     if (problem) {
       setPhoneError(problem);
       document.getElementById("bookingContact")?.focus();
       return;
     }
-    const contact = phone.trim();
+    const checked = validateEmailOrPhone(phone, dialCode);
+    const contact = checked.ok ? checked.value : phone.trim();
     const byEmail = contact.includes("@");
     setBusy(true);
     setError("");
@@ -823,9 +831,14 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
         <h2>{b(language, "details")}</h2>
         <label className="bk-field"><span>{b(language, "name")}</span><input id="bookingName" required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="bk-field"><span>{b(language, "contact")}</span>
-          <input id="bookingContact" required maxLength={254} autoComplete="tel email" placeholder={b(language, "contactHint")} aria-invalid={phoneError ? true : undefined} value={phone}
-            onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }}
-            onBlur={() => setPhoneError(phone.trim() ? contactProblem(language, phone) : "")} />
+          <div className="phone-input-group">
+            <select className="dial-code-select" aria-label={b(language, "dialCode")} value={dialCode} onChange={(event) => { setDialCode(event.target.value); setPhoneError(""); }}>
+              {COUNTRY_DIAL_CODES.map((entry) => <option key={entry.code} value={entry.code}>{entry.flag} {entry.label}</option>)}
+            </select>
+            <input id="bookingContact" required maxLength={254} autoComplete="tel email" placeholder={b(language, "contactHint")} aria-invalid={phoneError ? true : undefined} value={phone}
+              onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }}
+              onBlur={() => setPhoneError(phone.trim() ? contactProblem(language, phone, dialCode) : "")} />
+          </div>
           {phoneError ? <small className="bk-field-error" id="bookingContactError" role="alert">{phoneError}</small> : null}
         </label>
         <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>

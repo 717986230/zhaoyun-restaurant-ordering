@@ -42,7 +42,8 @@ const copy = {
     allCategories: "全部", searchPlaceholder: "搜索菜名或编号", tableLabel: "桌 {table}",
     nextPage: "下一页", prevPage: "上一页", releaseToTurn: "松手翻页", pullForNext: "上拉或轻点翻页", endOfMenu: "菜单到底了", photo: "照片", featuredDefault: "精选推荐", featuredEyebrow: "主厨精选", featuredView: "查看详情", setsPage: "套餐", drinksPage: "酒水", setsEyebrow: "精心搭配", backToTop: "回到顶部",
     installTitle: "把菜单装到桌面", installText: "下次一点就打开，不用再扫码或输入网址", installAction: "安装", installLater: "以后再说", installStepsIos: "点底部的分享按钮 ⎋，再选「添加到主屏幕」", installStepsSafari: "在菜单栏选「文件」→「添加到程序坞」",
-    announceTitle: "公告", announceOk: "我知道了", announceClose: "关闭"
+    announceTitle: "公告", announceOk: "我知道了", announceClose: "关闭",
+    elderMode: "长辈大字版", standardMode: "退出长辈版", elderShowDetails: "查看配料与过敏原"
   },
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
@@ -81,7 +82,8 @@ const copy = {
     allCategories: "Alle", searchPlaceholder: "Gericht oder Nummer suchen", tableLabel: "Tisch {table}",
     nextPage: "Weiter", prevPage: "Zurück", releaseToTurn: "Loslassen zum Blättern", pullForNext: "Hochziehen oder tippen", endOfMenu: "Ende der Karte", photo: "Foto", featuredDefault: "Empfehlungen", featuredEyebrow: "Vom Küchenchef", featuredView: "Details", setsPage: "Menüs", drinksPage: "Getränke", setsEyebrow: "Zusammengestellt", backToTop: "Nach oben",
     installTitle: "Karte auf den Startbildschirm", installText: "Beim nächsten Mal mit einem Tipp offen, ohne Scannen", installAction: "Installieren", installLater: "Später", installStepsIos: "Teilen-Taste ⎋ unten tippen, dann „Zum Home-Bildschirm“", installStepsSafari: "In der Menüleiste Ablage → „Zum Dock hinzufügen“",
-    announceTitle: "Hinweis", announceOk: "Verstanden", announceClose: "Schließen"
+    announceTitle: "Hinweis", announceOk: "Verstanden", announceClose: "Schließen",
+    elderMode: "Senioren-Ansicht", standardMode: "Standard-Ansicht", elderShowDetails: "Zutaten & Allergene ansehen"
   },
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
@@ -120,7 +122,8 @@ const copy = {
     allCategories: "All", searchPlaceholder: "Search dish or number", tableLabel: "Table {table}",
     nextPage: "Next", prevPage: "Previous", releaseToTurn: "Release to turn the page", pullForNext: "Pull up or tap", endOfMenu: "End of the menu", photo: "Photo", featuredDefault: "Signature", featuredEyebrow: "Chef's selection", featuredView: "View", setsPage: "Set menus", drinksPage: "Drinks", setsEyebrow: "Put together", backToTop: "Back to top",
     installTitle: "Put the menu on your home screen", installText: "One tap to open it next time, no scanning", installAction: "Install", installLater: "Not now", installStepsIos: "Tap the Share button ⎋ below, then “Add to Home Screen”", installStepsSafari: "In the menu bar, File → “Add to Dock”",
-    announceTitle: "Notice", announceOk: "Got it", announceClose: "Close"
+    announceTitle: "Notice", announceOk: "Got it", announceClose: "Close",
+    elderMode: "Simple large view", standardMode: "Standard view", elderShowDetails: "Ingredients & allergens"
   }
 } as const;
 

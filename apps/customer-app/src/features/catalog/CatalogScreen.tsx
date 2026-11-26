@@ -20,6 +20,7 @@ import { g } from "../../app/guest-i18n";
 import type { OrderingState } from "../../app/ordering";
 import { cartKey } from "../../app/cart";
 import type { CartSummary } from "../../app/cart";
+import { useElderMode } from "../../app/useElderMode";
 import type { CustomerAccount } from "../account/useCustomer";
 
 interface Props {
@@ -101,16 +102,31 @@ function localized(names: { zh: string; de: string; en: string }, language: Cust
  * photo that cannot load — a tablet offline, a file removed — falls back to the
  * dish's generated artwork, so a row is never an empty grey box.
  */
+const decodedMedia = new Set<string>();
+
 function ProductMedia({ product, size = "feature" }: { product: Product; size?: "feature" | "thumb" }) {
   const media = product.media[0];
+  const imgRef = useRef<HTMLImageElement>(null);
   // Remembered per URL, not per row: the menu first draws from the copy the
   // app ships with and then from the server, and a photo that is replaced
   // gets a new URL — neither may inherit the old one's failure.
-  const [loaded, setLoaded] = useState<string | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
   const reduced = useReducedMotion();
   const art = <div className={`art ${size === "thumb" ? "art-thumb " : ""}${product.appearance.pattern}`} style={{ "--art": product.appearance.art } as React.CSSProperties} />;
   const source = media ? restaurantApi.mediaUrl(media.url) : null;
+  const [loaded, setLoaded] = useState<string | null>(() => (source && decodedMedia.has(source) ? source : null));
+  const [failed, setFailed] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    if (!source) return;
+    if (decodedMedia.has(source)) {
+      setLoaded(source);
+      return;
+    }
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      decodedMedia.add(source);
+      setLoaded(source);
+    }
+  }, [source]);
   if (!media || !source || failed === source) return art;
   const className = `${size === "thumb" ? "dish-media dish-media-thumb" : "dish-media"} ${loaded === source ? "loaded" : ""}`;
   if (media.type === "video") {
@@ -127,6 +143,7 @@ function ProductMedia({ product, size = "feature" }: { product: Product; size?: 
     return <video className={`${className} loaded`} src={source} poster={poster} playsInline muted loop autoPlay preload="metadata" onError={() => setFailed(source)} />;
   }
   return <img
+    ref={imgRef}
     className={className}
     src={source}
     alt={size === "thumb" ? "" : product.names.zh || product.names.de}
@@ -134,7 +151,7 @@ function ProductMedia({ product, size = "feature" }: { product: Product; size?: 
     height={size === "thumb" ? 48 : 360}
     loading="lazy"
     decoding="async"
-    onLoad={() => setLoaded(source)}
+    onLoad={() => { decodedMedia.add(source); setLoaded(source); }}
     onError={() => setFailed(source)}
   />;
 }
@@ -402,10 +419,10 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
     }}>
     {/* Rises toward the guest, tilted back a few degrees, and settles flat. */}
     <m.div className="dish-detail-card" data-detail-id={product.id}
-      initial={reduceMotion ? false : { opacity: 0, y: 22, scale: 0.96 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 26, scale: 0.93 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 14, scale: 0.98 }}
-      transition={{ duration: seconds(DURATION.card), ease: EASE }}>
+      exit={{ opacity: 0, y: 14, scale: 0.96 }}
+      transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 360, damping: 28, mass: 0.85 }}>
       <button className="detail-close" aria-label={t(state.language, "close")} onClick={() => dispatch({ type: "close-product" })}>×</button>
       <div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
@@ -589,6 +606,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories.join("|"), state.category, dispatch]);
 
+  const [elder, toggleElder] = useElderMode();
   const stackRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const chipsRef = useRef<HTMLElement>(null);
@@ -725,6 +743,11 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
       {categories.map((category) => <button key={category} className={`chip ${category === FEATURED_PAGE ? "chip-featured" : ""} ${category === SETS_PAGE ? "chip-sets" : ""} ${state.category === category ? "on" : ""}`} aria-pressed={state.category === category} onClick={() => turnTo(category)}>{pageName(category)}</button>)}
     </nav>
     <div className="festive-garland" aria-hidden="true" />
+    <div className="menu-mode-bar">
+      <button type="button" className={`elder-pill ${elder ? "on" : ""}`} aria-pressed={elder} onClick={toggleElder}>
+        {elder ? `Aa · ${t(state.language, "standardMode")}` : `Aa · ${t(state.language, "elderMode")}`}
+      </button>
+    </div>
     {/* Behind an open dish the list only shows through, dimmed: out of reach of taps, the keyboard and screen readers. */}
     <div id="stack" ref={stackRef} className="stack" inert={Boolean(activeProduct)}>
       <div ref={sheetRef} className="page-sheet">

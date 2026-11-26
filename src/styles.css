@@ -1761,7 +1761,7 @@ html.plt-android .menu.detail-open .stack {
   inset: 0;
   transform-style: preserve-3d;
   transform: rotateY(0deg);
-  transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.56s cubic-bezier(0.34, 1.18, 0.24, 1);
   will-change: transform;
 }
 
@@ -1774,7 +1774,7 @@ html.plt-android .menu.detail-open .stack {
   border: 0;
   background: transparent;
   box-shadow: none;
-  perspective: 1600px;
+  perspective: 1150px;
 }
 
 .detail-face {
@@ -4164,8 +4164,8 @@ button:focus-visible,
 .guest-card.member-hero {
   display: grid;
   align-items: stretch;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 15px 16px;
   border-radius: 16px;
 }
 
@@ -4242,17 +4242,62 @@ button:focus-visible,
 }
 
 .member-qr-box {
-  display: grid;
-  justify-items: center;
-  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
   border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background: var(--wash);
+}
+
+.member-qr-tile {
+  flex: none;
+  padding: 8px;
+  border-radius: 10px;
   background: var(--light-panel);
 }
 
-.member-qr-box img {
+.member-qr-tile img {
   display: block;
-  width: 180px;
-  height: 180px;
+  width: 132px;
+  height: 132px;
+}
+
+.member-qr-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.member-qr-info strong {
+  font-size: 16px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.member-qr-tier {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.member-qr-info small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (max-width: 360px) {
+  .member-qr-tile img {
+    width: 108px;
+    height: 108px;
+  }
 }
 
 .guest-preferences {
@@ -5141,4 +5186,149 @@ button:focus-visible,
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* ── Phone / Email grouped input with country dial code ─────────────────── */
+.phone-input-group {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.dial-code-select {
+  min-width: 86px;
+  padding: 0 28px 0 10px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ── Elder / Senior Ultra-Minimal Mode across Menu & Member ─────────────── */
+.menu-mode-bar,
+.sheet-mode-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-mode-bar {
+  max-width: var(--page);
+  width: 100%;
+  margin: 0 auto;
+  padding: 4px 18px 2px;
+}
+
+.elder-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--wash);
+  color: var(--ink-2);
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.elder-pill.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+html[data-elder="true"] .elder-pill {
+  padding: 7px 14px;
+  font-size: 15px;
+}
+
+html[data-elder="true"] .chip {
+  padding: 11px 18px;
+  font-size: 16px;
+}
+
+html[data-elder="true"] .dish-card {
+  margin: 0 0 10px;
+  border-radius: 14px;
+  border-color: var(--line-strong);
+}
+
+html[data-elder="true"] .dish-card .summary {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 16px;
+}
+
+html[data-elder="true"] .dish-card .summary:has(.quick-add) {
+  grid-template-columns: 72px minmax(0, 1fr) auto 50px;
+}
+
+html[data-elder="true"] .dish-card .summary .dish-media.dish-media-thumb,
+html[data-elder="true"] .dish-card .summary .art.art-thumb {
+  width: 72px;
+  height: 72px;
+}
+
+html[data-elder="true"] .row-text h3 {
+  font-size: 21px;
+  line-height: 1.3;
+}
+
+html[data-elder="true"] .row-text p {
+  display: none;
+}
+
+html[data-elder="true"] .row-price {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+html[data-elder="true"] .quick-add {
+  width: 50px;
+  height: 50px;
+  font-size: 28px;
+}
+
+html[data-elder="true"] .quick-sub {
+  width: 36px;
+  height: 28px;
+  font-size: 18px;
+}
+
+html[data-elder="true"] .cartbar,
+html[data-elder="true"] .primary,
+html[data-elder="true"] .secondary {
+  min-height: 56px;
+  font-size: 18px;
+}
+
+html[data-elder="true"] .detail-heading h3 {
+  font-size: 26px;
+}
+
+html[data-elder="true"] .detail-scroll p,
+html[data-elder="true"] .detail-flip-cue {
+  font-size: 16px;
+}
+
+html[data-elder="true"] .points-balance b,
+html[data-elder="true"] .member-metric b {
+  font-size: 32px;
+}
+
+html[data-elder="true"] .guest-section h3,
+html[data-elder="true"] .member-hero-greeting {
+  font-size: 21px;
+}
+
+html[data-elder="true"] .guest-form input,
+html[data-elder="true"] .dial-code-select {
+  min-height: 54px;
+  font-size: 18px;
+}
+
+html[data-elder="true"] .cart-error {
+  font-size: 16px;
+  font-weight: 600;
 }

@@ -346,34 +346,45 @@ function AnnouncementEditor({ settings, onSave }: { settings: ApiSettings; onSav
   const { t, language } = useI18n();
   const announcement = settings.announcement;
   const offered = settings.menuLanguages;
+  const [activeLang, setActiveLang] = useState<MenuLanguage>(() => (offered.includes(language as MenuLanguage) ? (language as MenuLanguage) : offered[0] ?? "zh"));
   const [title, setTitle] = useState<Partial<Record<MenuLanguage, string>>>(announcement.title);
   const [body, setBody] = useState<Partial<Record<MenuLanguage, string>>>(announcement.body);
   // Keyed on the saved text so the fields reset to what the server kept once a
   // save comes back (trimmed), and start from it after a reload.
   const savedKey = JSON.stringify([announcement.title, announcement.body]);
   const dirty = JSON.stringify([title, body]) !== savedKey;
+  const currentLang = offered.includes(activeLang) ? activeLang : (offered[0] ?? "zh");
 
   const clean = (map: Partial<Record<MenuLanguage, string>>): Partial<Record<MenuLanguage, string>> => {
     const out: Partial<Record<MenuLanguage, string>> = {};
     for (const lang of offered) { const value = (map[lang] ?? "").trim(); if (value) out[lang] = value; }
     return out;
   };
-  const pick = (map: Partial<Record<MenuLanguage, string>>): string => map[language] ?? Object.values(map).find((value) => value) ?? "";
+  const pick = (map: Partial<Record<MenuLanguage, string>>): string => map[currentLang] ?? map[language] ?? Object.values(map).find((value) => value) ?? "";
 
   return <div className="announce-settings" key={savedKey}>
     <Toggle checked={announcement.enabled} label={t("announceEnable")} hint={t("announceEnableHint")} onChange={(enabled) => onSave({ ...announcement, enabled })} />
-    <div className="announce-fields">
-      {offered.map((lang) => <div key={lang} className="announce-lang">
-        <div className="announce-lang-head"><img src={LANGUAGE_INFO[lang].flag} alt="" /><span>{LANGUAGE_INFO[lang].name}</span></div>
-        <label><span>{t("announceTitleLabel")}</span>
-          <input maxLength={120} value={title[lang] ?? ""} placeholder={t("announceTitlePlaceholder")}
-            onChange={(event) => setTitle((prev) => ({ ...prev, [lang]: event.target.value }))} />
-        </label>
-        <label><span>{t("announceBodyLabel")}</span>
-          <textarea rows={4} maxLength={2000} value={body[lang] ?? ""} placeholder={t("announceBodyPlaceholder")}
-            onChange={(event) => setBody((prev) => ({ ...prev, [lang]: event.target.value }))} />
-        </label>
-      </div>)}
+    {offered.length > 1 && <div className="announce-lang-tabs" role="tablist">
+      {offered.map((lang) => {
+        const hasText = Boolean((body[lang] ?? "").trim() || (title[lang] ?? "").trim());
+        return <button key={lang} type="button" role="tab" aria-selected={currentLang === lang}
+          className={`announce-lang-tab ${currentLang === lang ? "on" : ""} ${hasText ? "filled" : ""}`}
+          onClick={() => setActiveLang(lang)}>
+          <img src={LANGUAGE_INFO[lang].flag} alt="" />
+          <span>{LANGUAGE_INFO[lang].name}</span>
+        </button>;
+      })}
+    </div>}
+    <div className="announce-lang">
+      <div className="announce-lang-head"><img src={LANGUAGE_INFO[currentLang].flag} alt="" /><span>{LANGUAGE_INFO[currentLang].name}</span></div>
+      <label><span>{t("announceTitleLabel")}</span>
+        <input maxLength={120} value={title[currentLang] ?? ""} placeholder={t("announceTitlePlaceholder")}
+          onChange={(event) => setTitle((prev) => ({ ...prev, [currentLang]: event.target.value }))} />
+      </label>
+      <label><span>{t("announceBodyLabel")}</span>
+        <textarea rows={4} maxLength={2000} value={body[currentLang] ?? ""} placeholder={t("announceBodyPlaceholder")}
+          onChange={(event) => setBody((prev) => ({ ...prev, [currentLang]: event.target.value }))} />
+      </label>
     </div>
     <button type="button" className="primary-action" disabled={!dirty} onClick={() => onSave({ ...announcement, title: clean(title), body: clean(body) })}>
       {dirty ? t("announcePublish") : t("announcePublished")}

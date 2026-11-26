@@ -20,6 +20,7 @@ const copy = {
     reference: "预约号", showPass: "点按出示预约二维码", qrHint: "到店出示，服务员扫码签到", qrAlt: "预约二维码 {reference}", backToTime: "点按看时间", when: "{date} {time}", partyOf: "{n} 位", keepLink: "请保存这个链接，可以随时查看或取消预约：", copy: "复制链接", copied: "已复制", addToCalendar: "加入日历", calendarTitle: "餐桌预约",
     cancel: "取消预约", cancelConfirm: "确定要取消这次预约吗？", cancelDone: "预约已取消", cannotCancel: "现在不能在线取消了，请直接致电餐厅。",
     another: "再订一桌", myBooking: "我的预约", notFound: "找不到这个预约，链接可能不完整。",
+    dialCode: "国家区号", elderMode: "长辈大字版", standardMode: "标准版",
     errors: {
       SLOT_FULL: "这个时间刚刚订满了，请换一个时间。", SLOT_UNAVAILABLE: "这个时间不能在线预约，请换一个时间或致电餐厅。", PARTY_TOO_LARGE: "人数较多，请直接致电餐厅。",
       RESERVATIONS_OFF: "目前不接受在线预约。", TABLE_TAKEN: "这张桌刚刚被订走了，请选另一张。", TABLE_REQUIRED: "请选择餐桌。", TABLE_TOO_SMALL: "这张桌坐不下这么多人，请选大一点的。",
@@ -41,6 +42,7 @@ const copy = {
     reference: "Reservierungsnummer", showPass: "Antippen: QR-Code zeigen", qrHint: "Beim Eintreffen zeigen – wir scannen ihn ein", qrAlt: "QR-Code der Reservierung {reference}", backToTime: "Antippen: Uhrzeit zeigen", when: "{date}, {time} Uhr", partyOf: "{n} Personen", keepLink: "Bitte diesen Link aufheben – damit können Sie die Reservierung jederzeit ansehen oder stornieren:", copy: "Link kopieren", copied: "Kopiert", addToCalendar: "Zum Kalender", calendarTitle: "Tischreservierung",
     cancel: "Reservierung stornieren", cancelConfirm: "Diese Reservierung wirklich stornieren?", cancelDone: "Die Reservierung ist storniert", cannotCancel: "Online nicht mehr stornierbar – bitte rufen Sie uns an.",
     another: "Noch einen Tisch reservieren", myBooking: "Meine Reservierung", notFound: "Reservierung nicht gefunden – ist der Link vollständig?",
+    dialCode: "Vorwahl", elderMode: "Senioren-Ansicht", standardMode: "Standard",
     errors: {
       SLOT_FULL: "Diese Uhrzeit ist gerade ausgebucht – bitte eine andere wählen.", SLOT_UNAVAILABLE: "Diese Uhrzeit ist online nicht buchbar – bitte eine andere wählen oder anrufen.", PARTY_TOO_LARGE: "Für größere Gruppen bitte anrufen.",
       RESERVATIONS_OFF: "Online-Reservierungen sind derzeit nicht möglich.", TABLE_TAKEN: "Dieser Tisch wurde gerade reserviert – bitte einen anderen wählen.", TABLE_REQUIRED: "Bitte einen Tisch wählen.", TABLE_TOO_SMALL: "An diesem Tisch ist nicht genug Platz – bitte einen größeren wählen.",
@@ -62,6 +64,7 @@ const copy = {
     reference: "Booking number", showPass: "Tap to show your QR code", qrHint: "Show it when you arrive – we scan it to check you in", qrAlt: "Booking QR code {reference}", backToTime: "Tap for the time", when: "{date} at {time}", partyOf: "{n} guests", keepLink: "Keep this link to see or cancel your booking at any time:", copy: "Copy link", copied: "Copied", addToCalendar: "Add to calendar", calendarTitle: "Table reservation",
     cancel: "Cancel booking", cancelConfirm: "Cancel this booking?", cancelDone: "Your booking is cancelled", cannotCancel: "It can no longer be cancelled online – please call us.",
     another: "Book another table", myBooking: "My booking", notFound: "Booking not found – is the link complete?",
+    dialCode: "Country code", elderMode: "Simple large view", standardMode: "Standard",
     errors: {
       SLOT_FULL: "That time has just filled up – please pick another.", SLOT_UNAVAILABLE: "That time cannot be booked online – please pick another or call us.", PARTY_TOO_LARGE: "For larger groups, please call us.",
       RESERVATIONS_OFF: "Online booking is not available right now.", TABLE_TAKEN: "That table has just been booked – please pick another.", TABLE_REQUIRED: "Please pick a table.", TABLE_TOO_SMALL: "That table is too small for your party – please pick a larger one.",

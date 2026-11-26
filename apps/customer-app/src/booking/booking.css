@@ -1721,3 +1721,43 @@ html.bk-root body {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* ── Elder / Senior Booking Mode ────────────────────────────────────────── */
+html[data-elder="true"] .bk-card {
+  padding: 18px;
+  gap: 14px;
+}
+
+html[data-elder="true"] .bk-card h2,
+html[data-elder="true"] .bk-party-label span {
+  font-size: 20px;
+}
+
+html[data-elder="true"] .bk-party-btn,
+html[data-elder="true"] .bk-primary,
+html[data-elder="true"] .bk-secondary {
+  min-height: 56px;
+  font-size: 18px;
+}
+
+html[data-elder="true"] .bk-slots {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+html[data-elder="true"] .bk-slot {
+  min-height: 54px;
+  font-size: 18px;
+}
+
+html[data-elder="true"] .bk-field input,
+html[data-elder="true"] .bk-field textarea {
+  min-height: 54px;
+  font-size: 18px;
+}
+
+html[data-elder="true"] .bk-error,
+html[data-elder="true"] .bk-field-error {
+  font-size: 16px;
+  font-weight: 600;
+}
