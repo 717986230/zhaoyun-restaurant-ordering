@@ -3667,12 +3667,10 @@ button:focus-visible,
   align-items: center;
   gap: 6px;
   padding: 0 14px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--accent-line);
   border-radius: 999px;
-  background: var(--panel-glass);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  backdrop-filter: blur(14px) saturate(1.2);
-  color: var(--ink);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 13px;
   font-weight: 600;
   box-shadow: var(--shadow-2);
