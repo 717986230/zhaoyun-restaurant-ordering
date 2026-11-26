@@ -26,8 +26,8 @@
     <style>
       .zy-splash{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
         background:#0f1113;pointer-events:none;
-        font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;
-        animation:zy-out .55s ease 1.95s forwards}
+        font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","KaiTi","Cormorant Garamond",Georgia,serif;
+        animation:zy-out .55s ease 2.2s forwards}
       @keyframes zy-out{from{opacity:1}to{opacity:0;visibility:hidden}}
       .zy-splash .zy-in{display:flex;flex-direction:column;align-items:center;gap:28px}
       .zy-crest{width:min(42vw,164px);height:min(42vw,164px)}
@@ -38,12 +38,13 @@
       @keyframes zy-ink{to{stroke-dashoffset:0}}
       .zy-fx{opacity:0;animation:zy-in .8s ease .55s forwards}
       @keyframes zy-in{to{opacity:1}}
-      .zy-p{opacity:0;transform:translate(var(--dx,0px),var(--dy,-18px)) scale(.35);
-        animation:zy-gather .95s cubic-bezier(.16,.9,.24,1) var(--d,.45s) forwards}
+      .zy-p{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px)) scale(.25);
+        animation:zy-gather 1.05s cubic-bezier(.16,.9,.24,1) var(--d,.35s) forwards}
       @keyframes zy-gather{to{opacity:var(--op,1);transform:translate(0,0) scale(1)}}
-      .zy-word{max-width:84vw;font-weight:600;font-size:clamp(22px,6.2vw,31px);letter-spacing:.14em;
-        line-height:1.2;text-align:center;text-wrap:balance;color:#e9edee;padding-left:.14em;
-        opacity:0;animation:zy-in .9s ease 1.05s forwards}
+      .zy-word{max-width:84vw;font-weight:500;font-size:clamp(22px,6vw,30px);letter-spacing:.28em;
+        line-height:1.25;text-align:center;text-wrap:balance;color:#e5e9e7;padding-left:.28em;
+        font-variant-caps:small-caps;text-shadow:0 2px 16px rgba(143,176,163,.22);
+        opacity:0;animation:zy-in .9s ease 1.15s forwards}
       .zy-word:empty{display:none}
       @media (prefers-reduced-motion:reduce){
         .zy-ring{animation:none}
@@ -73,40 +74,40 @@
             </g>
           </g>
           <g fill="#a9c7ba">
-            <!-- K horizontal rim formed by converging powder particles -->
-            <circle class="zy-p" cx="98" cy="150" r="1.5" style="--dx:-18px;--dy:-12px;--d:.42s;--op:.75"/>
-            <circle class="zy-p" cx="108" cy="150" r="2.0" style="--dx:-12px;--dy:-16px;--d:.46s"/>
-            <circle class="zy-p" cx="118" cy="150" r="2.3" style="--dx:-8px;--dy:-10px;--d:.50s"/>
-            <circle class="zy-p" cx="129" cy="150" r="2.5" style="--dx:-6px;--dy:-18px;--d:.54s"/>
-            <circle class="zy-p" cx="140" cy="150" r="2.6" style="--dx:-4px;--dy:-14px;--d:.58s"/>
-            <circle class="zy-p" cx="151" cy="150" r="2.8" style="--dx:-2px;--dy:-20px;--d:.62s"/>
-            <circle class="zy-p" cx="160" cy="150" r="2.4" style="--dx:0px;--dy:-22px;--d:.64s"/>
-            <circle class="zy-p" cx="169" cy="150" r="2.8" style="--dx:2px;--dy:-20px;--d:.62s"/>
-            <circle class="zy-p" cx="180" cy="150" r="2.6" style="--dx:4px;--dy:-14px;--d:.58s"/>
-            <circle class="zy-p" cx="191" cy="150" r="2.5" style="--dx:6px;--dy:-18px;--d:.54s"/>
-            <circle class="zy-p" cx="202" cy="150" r="2.3" style="--dx:8px;--dy:-10px;--d:.50s"/>
-            <circle class="zy-p" cx="212" cy="150" r="2.0" style="--dx:12px;--dy:-16px;--d:.46s"/>
-            <circle class="zy-p" cx="222" cy="150" r="1.5" style="--dx:18px;--dy:-12px;--d:.42s;--op:.75"/>
-            <!-- K left & right rising wings in converging powder -->
-            <circle class="zy-p" cx="146" cy="142" r="2.4" style="--dx:-14px;--dy:-24px;--d:.66s"/>
-            <circle class="zy-p" cx="140" cy="134" r="2.2" style="--dx:-18px;--dy:-28px;--d:.70s"/>
-            <circle class="zy-p" cx="134" cy="126" r="2.0" style="--dx:-22px;--dy:-30px;--d:.74s"/>
-            <circle class="zy-p" cx="128" cy="118" r="1.7" style="--dx:-26px;--dy:-32px;--d:.78s;--op:.85"/>
-            <circle class="zy-p" cx="123" cy="111" r="1.2" style="--dx:-28px;--dy:-34px;--d:.82s;--op:.65"/>
-            <circle class="zy-p" cx="174" cy="142" r="2.4" style="--dx:14px;--dy:-24px;--d:.66s"/>
-            <circle class="zy-p" cx="180" cy="134" r="2.2" style="--dx:18px;--dy:-28px;--d:.70s"/>
-            <circle class="zy-p" cx="186" cy="126" r="2.0" style="--dx:22px;--dy:-30px;--d:.74s"/>
-            <circle class="zy-p" cx="192" cy="118" r="1.7" style="--dx:26px;--dy:-32px;--d:.78s;--op:.85"/>
-            <circle class="zy-p" cx="197" cy="111" r="1.2" style="--dx:28px;--dy:-34px;--d:.82s;--op:.65"/>
-            <!-- Fine golden-celadon dust motes settling into the basin -->
-            <circle class="zy-p" cx="155" cy="136" r="1.3" style="--dx:-6px;--dy:-28px;--d:.76s;--op:.7"/>
-            <circle class="zy-p" cx="165" cy="134" r="1.4" style="--dx:6px;--dy:-30px;--d:.80s;--op:.75"/>
-            <circle class="zy-p" cx="160" cy="124" r="1.8" style="--dx:0px;--dy:-34px;--d:.86s;--op:.9"/>
-            <circle class="zy-p" cx="134" cy="144" r="1.1" style="--dx:-12px;--dy:-20px;--d:.72s;--op:.55"/>
-            <circle class="zy-p" cx="186" cy="144" r="1.1" style="--dx:12px;--dy:-20px;--d:.72s;--op:.55"/>
-            <circle class="zy-p" cx="149" cy="160" r="1.3" style="--dx:-4px;--dy:-18px;--d:.84s;--op:.6"/>
-            <circle class="zy-p" cx="171" cy="160" r="1.3" style="--dx:4px;--dy:-18px;--d:.84s;--op:.6"/>
-            <circle class="zy-p" cx="160" cy="164" r="1.6" style="--dx:0px;--dy:-20px;--d:.88s;--op:.75"/>
+            <!-- K horizontal rim formed by powder particles gathering from all directions -->
+            <circle class="zy-p" cx="98" cy="150" r="1.5" style="--dx:-78px;--dy:-18px;--d:.36s;--op:.75"/>
+            <circle class="zy-p" cx="108" cy="150" r="2.0" style="--dx:-66px;--dy:34px;--d:.40s"/>
+            <circle class="zy-p" cx="118" cy="150" r="2.3" style="--dx:-54px;--dy:-48px;--d:.44s"/>
+            <circle class="zy-p" cx="129" cy="150" r="2.5" style="--dx:-44px;--dy:58px;--d:.48s"/>
+            <circle class="zy-p" cx="140" cy="150" r="2.6" style="--dx:-28px;--dy:-66px;--d:.52s"/>
+            <circle class="zy-p" cx="151" cy="150" r="2.8" style="--dx:-16px;--dy:72px;--d:.56s"/>
+            <circle class="zy-p" cx="160" cy="150" r="2.4" style="--dx:0px;--dy:-78px;--d:.58s"/>
+            <circle class="zy-p" cx="169" cy="150" r="2.8" style="--dx:16px;--dy:72px;--d:.56s"/>
+            <circle class="zy-p" cx="180" cy="150" r="2.6" style="--dx:28px;--dy:-66px;--d:.52s"/>
+            <circle class="zy-p" cx="191" cy="150" r="2.5" style="--dx:44px;--dy:58px;--d:.48s"/>
+            <circle class="zy-p" cx="202" cy="150" r="2.3" style="--dx:54px;--dy:-48px;--d:.44s"/>
+            <circle class="zy-p" cx="212" cy="150" r="2.0" style="--dx:66px;--dy:34px;--d:.40s"/>
+            <circle class="zy-p" cx="222" cy="150" r="1.5" style="--dx:78px;--dy:-18px;--d:.36s;--op:.75"/>
+            <!-- K left & right rising wings gathering radially -->
+            <circle class="zy-p" cx="146" cy="142" r="2.4" style="--dx:-62px;--dy:26px;--d:.60s"/>
+            <circle class="zy-p" cx="140" cy="134" r="2.2" style="--dx:-72px;--dy:-28px;--d:.64s"/>
+            <circle class="zy-p" cx="134" cy="126" r="2.0" style="--dx:-52px;--dy:-62px;--d:.68s"/>
+            <circle class="zy-p" cx="128" cy="118" r="1.7" style="--dx:-34px;--dy:-74px;--d:.72s;--op:.85"/>
+            <circle class="zy-p" cx="123" cy="111" r="1.2" style="--dx:-76px;--dy:-52px;--d:.76s;--op:.65"/>
+            <circle class="zy-p" cx="174" cy="142" r="2.4" style="--dx:62px;--dy:26px;--d:.60s"/>
+            <circle class="zy-p" cx="180" cy="134" r="2.2" style="--dx:72px;--dy:-28px;--d:.64s"/>
+            <circle class="zy-p" cx="186" cy="126" r="2.0" style="--dx:52px;--dy:-62px;--d:.68s"/>
+            <circle class="zy-p" cx="192" cy="118" r="1.7" style="--dx:34px;--dy:-74px;--d:.72s;--op:.85"/>
+            <circle class="zy-p" cx="197" cy="111" r="1.2" style="--dx:76px;--dy:-52px;--d:.76s;--op:.65"/>
+            <!-- Fine dust motes converging from lower & side arcs -->
+            <circle class="zy-p" cx="155" cy="136" r="1.3" style="--dx:-40px;--dy:66px;--d:.70s;--op:.7"/>
+            <circle class="zy-p" cx="165" cy="134" r="1.4" style="--dx:40px;--dy:66px;--d:.74s;--op:.75"/>
+            <circle class="zy-p" cx="160" cy="124" r="1.8" style="--dx:0px;--dy:82px;--d:.80s;--op:.9"/>
+            <circle class="zy-p" cx="134" cy="144" r="1.1" style="--dx:-82px;--dy:10px;--d:.66s;--op:.55"/>
+            <circle class="zy-p" cx="186" cy="144" r="1.1" style="--dx:82px;--dy:10px;--d:.66s;--op:.55"/>
+            <circle class="zy-p" cx="149" cy="160" r="1.3" style="--dx:-48px;--dy:54px;--d:.78s;--op:.6"/>
+            <circle class="zy-p" cx="171" cy="160" r="1.3" style="--dx:48px;--dy:54px;--d:.78s;--op:.6"/>
+            <circle class="zy-p" cx="160" cy="164" r="1.6" style="--dx:0px;--dy:76px;--d:.84s;--op:.75"/>
           </g>
         </svg>
         <div class="zy-word" id="zy-word"></div>
