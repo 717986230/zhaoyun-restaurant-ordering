@@ -8,7 +8,7 @@ const copy = {
   zh: {
     start: "开始点餐", orders: "订单状态", service: "呼叫服务员", staff: "员工看板",
     menu: "菜单", cart: "购物车", search: "搜索菜品", clear: "清除", empty: "没有找到商品", noResults: "没有找到「{query}」", noResultsHint: "换个词试试，或者看看全部菜品", showAll: "查看全部", unavailable: "菜单暂时不可用，请呼叫服务员",
-    add: "加入购物车", customize: "口味与加料", bundleIncludes: "套餐包含", close: "关闭详情", flip: "点击卡片翻转查看详情", flipHint: "轻触卡片查看配料与过敏原", back: "返回正面",
+    add: "加入购物车", customize: "口味与加料", bundleIncludes: "套餐包含", close: "关闭详情", flip: "点击卡片翻转查看详情", flipHint: "轻触翻看食材拆解与说明", back: "返回正面",
     ingredients: "主要食材", allergens: "过敏原", time: "制作时间", portion: "份量 / 难度",
     submit: "确认下单", total: "合计", note: "订单备注", emptyCart: "购物车还是空的",
     backMenu: "返回菜单", noOrders: "还没有已提交订单", order: "订单", serviceSent: "请求已发送",
@@ -47,7 +47,7 @@ const copy = {
   de: {
     start: "Bestellen", orders: "Bestellstatus", service: "Service rufen", staff: "Mitarbeiter",
     menu: "Speisekarte", cart: "Warenkorb", search: "Gericht suchen", clear: "Löschen", empty: "Keine Gerichte gefunden", noResults: "Nichts gefunden für „{query}“", noResultsHint: "Ein anderes Wort versuchen oder die ganze Karte ansehen", showAll: "Ganze Karte", unavailable: "Speisekarte nicht verfügbar, bitte Service rufen",
-    add: "In den Warenkorb", customize: "Geschmack & Extras", bundleIncludes: "Im Set enthalten", close: "Details schließen", flip: "Karte für Details antippen", flipHint: "Für Zutaten & Allergene antippen", back: "Vorderseite",
+    add: "In den Warenkorb", customize: "Geschmack & Extras", bundleIncludes: "Im Set enthalten", close: "Details schließen", flip: "Karte für Details antippen", flipHint: "Karte für Rezept & Hinweise drehen", back: "Vorderseite",
     ingredients: "Zutaten", allergens: "Allergene", time: "Zubereitungszeit", portion: "Portion / Schärfe",
     submit: "Bestellung bestätigen", total: "Gesamt", note: "Bestellnotiz", emptyCart: "Der Warenkorb ist leer",
     backMenu: "Zur Speisekarte", noOrders: "Noch keine Bestellung", order: "Bestellung", serviceSent: "Anfrage gesendet",
@@ -86,7 +86,7 @@ const copy = {
   en: {
     start: "Start order", orders: "Order status", service: "Call service", staff: "Staff board",
     menu: "Menu", cart: "Cart", search: "Search dishes", clear: "Clear", empty: "No dishes found", noResults: "Nothing found for “{query}”", noResultsHint: "Try another word, or browse the whole menu", showAll: "Whole menu", unavailable: "Menu unavailable, please call service",
-    add: "Add to cart", customize: "Flavors & extras", bundleIncludes: "Included in this set", close: "Close details", flip: "Tap card to see details", flipHint: "Tap for ingredients & allergens", back: "Front side",
+    add: "Add to cart", customize: "Flavors & extras", bundleIncludes: "Included in this set", close: "Close details", flip: "Tap card to see details", flipHint: "Tap card for breakdown & info", back: "Front side",
     ingredients: "Ingredients", allergens: "Allergens", time: "Preparation time", portion: "Portion / level",
     submit: "Place order", total: "Total", note: "Order note", emptyCart: "Your cart is empty",
     backMenu: "Back to menu", noOrders: "No orders yet", order: "Order", serviceSent: "Request sent",
