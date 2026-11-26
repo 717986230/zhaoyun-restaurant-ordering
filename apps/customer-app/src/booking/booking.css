@@ -1673,3 +1673,51 @@ html.bk-root body {
     transform: none;
   }
 }
+
+.bk-submit-summary {
+  margin: 2px 0 0;
+  padding: 9px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--wash);
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.bk-account-hero {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(150deg, var(--accent-wash), transparent 60%), var(--panel-2);
+}
+
+.bk-account-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bk-account-name {
+  display: block;
+  font-size: 17px;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.bk-account-tier {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+}

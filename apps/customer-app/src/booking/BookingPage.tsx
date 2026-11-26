@@ -248,9 +248,17 @@ function AccountPanel({ language, info, customer, onRefreshed, onSignOut }: {
     api.customer().then(({ customer: fresh }) => onRefreshed(fresh)).catch(() => { /* What is on screen stays. */ });
   }, []);
   return <div className="bk-account-panel" id="bookingAccount">
-    <p className="bk-account-email">{customer.email}</p>
-    <p className="bk-account-points"><b id="bookingPoints">{b(language, "pointsBalance", { points: customer.points })}</b></p>
-    {info && pointsRules(language, info) ? <p className="bk-muted" id="bookingMemberRule">{pointsRules(language, info)}</p> : null}
+    <div className="bk-account-hero">
+      <div className="bk-account-head">
+        <div>
+          {customer.name ? <strong className="bk-account-name">{customer.name}</strong> : null}
+          <p className="bk-account-email">{customer.email}</p>
+        </div>
+        {customer.membership?.tier ? <span className="bk-account-tier">{customer.membership.tier}</span> : null}
+      </div>
+      <p className="bk-account-points"><b id="bookingPoints">{b(language, "pointsBalance", { points: customer.points })}</b></p>
+      {info && pointsRules(language, info) ? <p className="bk-muted" id="bookingMemberRule">{pointsRules(language, info)}</p> : null}
+    </div>
     <MemberCode language={language} customer={customer} id="accountMemberQr" />
     <button type="button" className="bk-text-button bk-sign-out" id="bookingSignOut" onClick={onSignOut}>{b(language, "signOut")}</button>
   </div>;
@@ -823,9 +831,10 @@ function BookingForm({ language, info, customer, recent, onSignedIn, onVerified,
         <label className="bk-field"><span>{b(language, "notes")}</span><textarea id="bookingNotes" maxLength={500} rows={2} placeholder={b(language, "notesHint")} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
         {info.note ? <p className="bk-note">{info.note}</p> : null}
         {error ? <p className="bk-error" role="alert" id="bookingError">{error}</p> : null}
+        {!short && time ? <p className="bk-submit-summary" id="bookingSummaryLine">{`${formatDay(language, date)} · ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}${info.bookingPoints ? ` · ${b(language, "bookingCost", { n: info.bookingPoints })}` : ""}`}</p> : null}
         {/* Short of the points it takes, the button stays, greyed, and says how many are missing (the card above says how to get them). */}
         <button type="submit" className="bk-primary" id="bookingSubmit" disabled={busy || short}>
-          {short ? b(language, "needPoints", { missing: Math.max(0, (info.minPoints ?? 0) - (customer?.points ?? 0)) }) : busy ? b(language, "submitting") : time ? `${b(language, "submit")} · ${formatDay(language, date)} ${time} · ${b(language, "partyOf", { n: party })}${table ? ` · ${b(language, "tableName", { table })}` : ""}${info.bookingPoints ? ` · ${b(language, "bookingCost", { n: info.bookingPoints })}` : ""}` : b(language, "submit")}
+          {short ? b(language, "needPoints", { missing: Math.max(0, (info.minPoints ?? 0) - (customer?.points ?? 0)) }) : busy ? b(language, "submitting") : b(language, "submit")}
         </button>
       </form> : null}
     </div>
@@ -1009,16 +1018,10 @@ function BookingDetails({ language, booking, held, info, customer, onChange, onA
       {/* What the booking cost, and what is left; a cancel says the points came back. */}
       {info?.bookingPoints && customer && (active || booking.status === "cancelled") ? <div><dt>{b(language, "pointsLabel")}</dt><dd id="bookingPointsLeft">{b(language, active ? "pointsSpent" : "pointsBack", { n: info.bookingPoints, points: customer.points })}</dd></div> : null}
     </dl>
-    {active ? <div className="bk-link">
-      <p>{b(language, "keepLink")}</p>
-      <div className="bk-link-row">
-        <input readOnly value={link} id="bookingLink" onFocus={(event) => event.target.select()} />
-        <button type="button" className="bk-secondary" onClick={() => void copy()}>{copied ? b(language, "copied") : b(language, "copy")}</button>
-      </div>
-    </div> : null}
     {error ? <p className="bk-error" role="alert">{error}</p> : null}
     <div className="bk-actions">
       {active ? <button type="button" className="bk-secondary bk-add-cal" id="bookingAddCalendar" onClick={addToCalendar}><CalendarIcon />{b(language, "addToCalendar")}</button> : null}
+      {active ? <button type="button" className="bk-secondary" id="bookingCopyLink" onClick={() => void copy()}>{copied ? b(language, "copied") : b(language, "copy")}</button> : null}
       {active && booking.cancellable !== false ? <button type="button" className="bk-danger" id="bookingCancel" disabled={busy} onClick={() => void cancel()}>{b(language, "cancel")}</button> : null}
       {active && booking.cancellable === false ? <p className="bk-muted">{b(language, "cannotCancel")}</p> : null}
       {info?.enabled ? <button type="button" className="bk-secondary" id="bookingAnother" onClick={onAnother}>{b(language, "another")}</button> : null}

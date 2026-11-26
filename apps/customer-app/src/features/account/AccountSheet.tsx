@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiBirthday, ApiMenuSettings } from "@zhaoyun/contracts";
 import { ApiError } from "@zhaoyun/api-client";
@@ -169,38 +169,59 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
     dispatch({ type: "sheet", sheet: "cart" });
   }
 
+  const [showQr, setShowQr] = useState(false);
+  const [qrSrc, setQrSrc] = useState("");
+  useEffect(() => {
+    setQrSrc("");
+    if (!showQr) return;
+    let current = true;
+    void import("qrcode").then(({ default: QRCode }) =>
+      QRCode.toString(`ZYMEM:${customer.id}`, { type: "svg", errorCorrectionLevel: "M", margin: 2, color: { dark: "#000000", light: "#ffffff" } })
+    ).then((svg) => {
+      if (current) setQrSrc(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+    }).catch(() => {});
+    return () => { current = false; };
+  }, [showQr, customer.id]);
+
   const tierLevel = customer.membership?.tierLevel ?? 0;
   const visual = memberTierVisual(tierLevel);
   const { entering, muted, toggleMuted } = useTierEntry(visual?.theme ?? null);
+  const displayName = customer.name || customer.email.split("@")[0] || customer.email;
 
   return <div
     className={`guest-account${visual ? " member-themed" : ""}${visual?.skin ? ` tier-skin-${visual.skin}` : ""}${entering ? " tier-entering" : ""}`}
     data-tier-theme={visual?.theme}
   >
-    {visual && <div className="member-crest" data-tier-theme={visual.theme}>
-      <div className="member-crest-art">
-        <MemberBadge level={tierLevel} rank={tierRank(language, visual.theme)} size="lg" animate={entering} initial={customer.name || customer.email} />
+    <div className={`guest-card member-hero${visual ? " member-crest" : ""}`} data-tier-theme={visual?.theme}>
+      <div className="member-hero-top">
+        {visual && <div className="member-crest-art">
+          <MemberBadge level={tierLevel} rank={tierRank(language, visual.theme)} size="md" animate={entering} initial={displayName} />
+        </div>}
+        <div className="member-hero-identity">
+          {visual && <span className="member-crest-rank">{tierRank(language, visual.theme)} · {customer.membership?.tier}</span>}
+          <strong className={visual ? "member-hero-greeting" : ""}>{g(language, "welcome", { name: displayName })}</strong>
+          <small>{customer.email}</small>
+          <span className="member-crest-meta">
+            {customer.membership && customer.membership.discountPercent > 0 && <em>{g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}</em>}
+            {!visual && customer.membership?.tier && <small>{customer.membership.tier}</small>}
+            {visual && <small>{g(language, "memberGrowth", { amount: formatPrice(customer.membership?.growthCents ?? 0, language) })}</small>}
+          </span>
+          {visual?.skin && <span className="member-crest-skin">{g(language, visual.skin === "gilded" ? "exclusiveGilded" : "exclusiveDark")}</span>}
+        </div>
+        {visual && <button type="button" className="member-mute member-mute-icon" onClick={toggleMuted} aria-pressed={!muted} aria-label={g(language, muted ? "soundOff" : "soundOn")} title={g(language, muted ? "soundOff" : "soundOn")}>
+          {muted ? "🔕" : "🔔"}
+        </button>}
       </div>
-      <div className="member-crest-text">
-        <span className="member-crest-rank">{tierRank(language, visual.theme)}</span>
-        <strong className="member-crest-name">{customer.membership?.tier}</strong>
-        <span className="member-crest-meta">
-          {customer.membership && customer.membership.discountPercent > 0 && <em>{g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}</em>}
-          <small>{g(language, "memberGrowth", { amount: formatPrice(customer.membership?.growthCents ?? 0, language) })}</small>
-        </span>
-        {visual.skin && <span className="member-crest-skin">{g(language, visual.skin === "gilded" ? "exclusiveGilded" : "exclusiveDark")}</span>}
-        <button type="button" className="member-mute" onClick={toggleMuted} aria-pressed={!muted}>{muted ? "🔕" : "🔔"} {g(language, muted ? "soundOff" : "soundOn")}</button>
+      <div className="member-hero-metrics">
+        {loyalty && <div className="points-balance" aria-label={g(language, "points")}><b>{customer.points}</b><small>{g(language, "points")}</small></div>}
+        {(customer.balanceCents ?? 0) > 0 && <div className="member-metric" aria-label={g(language, "myBalance")}><b>{formatPrice(customer.balanceCents ?? 0, language)}</b><small>{g(language, "myBalance")}</small></div>}
+        <button type="button" className="secondary member-qr-toggle" id="accountShowQr" aria-expanded={showQr} onClick={() => setShowQr((v) => !v)}>
+          {g(language, showQr ? "hideMemberCode" : "showMemberCode")}
+        </button>
       </div>
-    </div>}
-    {account.signupBonus > 0 && <p className="signup-bonus" id="signupBonusGot" role="status">{g(language, "signupBonusGot", { n: account.signupBonus })}</p>}
-    <div className="guest-card">
-      <div>
-        <strong>{g(language, "welcome", { name: customer.name || customer.email.split("@")[0] || customer.email })}</strong>
-        <small>{customer.email}</small>
-        {customer.membership?.tier && !visual && <small className="member-tier">{g(language, "myTier")}: {customer.membership.tier}{customer.membership.discountPercent > 0 ? ` · ${g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}` : ""}</small>}
-      </div>
-      {loyalty && <div className="points-balance" aria-label={g(language, "points")}><b>{customer.points}</b><small>{g(language, "points")}</small></div>}
+      {showQr && qrSrc && <div className="member-qr-box"><img src={qrSrc} alt={g(language, "memberQrAlt")} width="180" height="180" /></div>}
     </div>
+    {account.signupBonus > 0 && <p className="signup-bonus" id="signupBonusGot" role="status">{g(language, "signupBonusGot", { n: account.signupBonus })}</p>}
 
     {loyalty && <section className="guest-section">
       <h3>{g(language, "rewards")}</h3>
@@ -223,7 +244,6 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
 
     {(customer.balanceCents ?? 0) > 0 && <section className="guest-section">
       <h3>{g(language, "myBalance")}</h3>
-      <div className="points-balance" aria-label={g(language, "myBalance")}><b>{formatPrice(customer.balanceCents ?? 0, language)}</b></div>
       <p className="cart-hint">{g(language, "topUpAtCounter")}</p>
       <button type="button" className="link-button" onClick={() => setShowTopUps(!showTopUps)}>{g(language, "topUpHistory")} {showTopUps ? "▴" : "▾"}</button>
       {showTopUps && <ul className="points-history">
@@ -235,41 +255,48 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
       </ul>}
     </section>}
 
-    {birthdayPerk && <section className="guest-section">
-      <h3>{g(language, "myBirthday")}</h3>
-      {customer.membership?.birthdayMonth
-        ? <p className="cart-hint">{g(language, "birthdayMonthNote", { percent: birthdayPerk.discountPercent })}</p>
-        : <p className="cart-hint">{g(language, "birthdayHint", { percent: birthdayPerk.discountPercent })}</p>}
-      {birthdayPerk.email && <p className="cart-hint">{g(language, "birthdayEmailNote")}</p>}
-      <div className="birthday-fields">
-        <label><span>{g(language, "birthMonth")}</span>
-          <select value={bMonth} onChange={(event) => setBMonth(Number(event.target.value))}>
-            <option value={0}>—</option>
-            {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => <option key={month} value={month}>{month}</option>)}
-          </select>
-        </label>
-        <label><span>{g(language, "birthDay")}</span>
-          <select value={bDay} onChange={(event) => setBDay(Number(event.target.value))}>
-            <option value={0}>—</option>
-            {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => <option key={day} value={day}>{day}</option>)}
-          </select>
-        </label>
-        <button type="button" className="primary birthday-save" disabled={!bMonth || !bDay || (saved?.month === bMonth && saved?.day === bDay)} onClick={() => void saveBirthday()}>{g(language, "birthdaySave")}</button>
-      </div>
-    </section>}
-
-    <MarketingToggle language={language} dispatch={dispatch} />
-
     <div className="guest-actions">
       <button type="button" className="secondary" onClick={() => dispatch({ type: "sheet", sheet: "orders" })}>{g(language, "myOrders")}</button>
       <button type="button" className="secondary" onClick={() => void account.signOut()}>{g(language, "signOut")}</button>
     </div>
 
-    <ProfileForm language={language} account={account} dispatch={dispatch} />
-    <div className="guest-privacy">
-      <button type="button" className="link-button" onClick={() => void downloadMyData(language, dispatch)}>⬇ {g(language, "downloadData")}</button>
-      <PrivacyNotice language={language} restaurantName={restaurantName} />
-    </div>
+    <details className="guest-preferences">
+      <summary>
+        <span>{g(language, "preferences")}</span>
+        {saved && birthdayPerk && <small>🎂 {saved.month}/{saved.day}</small>}
+      </summary>
+      <div className="guest-preferences-body">
+        {birthdayPerk && <section className="guest-section">
+          <h3>{g(language, "myBirthday")}</h3>
+          {customer.membership?.birthdayMonth
+            ? <p className="cart-hint">{g(language, "birthdayMonthNote", { percent: birthdayPerk.discountPercent })}</p>
+            : <p className="cart-hint">{g(language, "birthdayHint", { percent: birthdayPerk.discountPercent })}</p>}
+          {birthdayPerk.email && <p className="cart-hint">{g(language, "birthdayEmailNote")}</p>}
+          <div className="birthday-fields">
+            <label><span>{g(language, "birthMonth")}</span>
+              <select value={bMonth} onChange={(event) => setBMonth(Number(event.target.value))}>
+                <option value={0}>—</option>
+                {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => <option key={month} value={month}>{month}</option>)}
+              </select>
+            </label>
+            <label><span>{g(language, "birthDay")}</span>
+              <select value={bDay} onChange={(event) => setBDay(Number(event.target.value))}>
+                <option value={0}>—</option>
+                {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => <option key={day} value={day}>{day}</option>)}
+              </select>
+            </label>
+            <button type="button" className="primary birthday-save" disabled={!bMonth || !bDay || (saved?.month === bMonth && saved?.day === bDay)} onClick={() => void saveBirthday()}>{g(language, "birthdaySave")}</button>
+          </div>
+        </section>}
+
+        <MarketingToggle language={language} dispatch={dispatch} />
+        <ProfileForm language={language} account={account} dispatch={dispatch} />
+        <div className="guest-privacy">
+          <button type="button" className="link-button" onClick={() => void downloadMyData(language, dispatch)}>⬇ {g(language, "downloadData")}</button>
+          <PrivacyNotice language={language} restaurantName={restaurantName} />
+        </div>
+      </div>
+    </details>
   </div>;
 }
 

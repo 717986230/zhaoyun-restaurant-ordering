@@ -73,7 +73,7 @@
 
 /* ── the crest: badge + level text at the top of the account ─────────────── */
 .member-crest {
-  display: flex; align-items: center; gap: 16px;
+  display: grid; gap: 14px;
   padding: 18px 18px 16px; margin-bottom: 14px; border-radius: 16px;
   position: relative; overflow: hidden;
   border: 1px solid var(--badge-ring);
