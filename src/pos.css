@@ -192,6 +192,8 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 
 .pos-floor-bar { display: flex; flex-wrap: wrap; gap: 10px; }
 .pos-open-table { display: flex; gap: 8px; flex: 1 1 260px; }
+.pos-open-table input { min-width: 0; flex: 1 1 auto; }
+.pos-open-table button { white-space: nowrap; flex: none; }
 .pos-floor h2 { margin: 18px 0 10px; font-size: 16px; color: var(--p-muted); }
 
 .pos-table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
