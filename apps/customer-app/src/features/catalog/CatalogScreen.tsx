@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { deconstruct, defaultCategoryLabel, drinkTabs, LANGUAGE_INFO, matchesTextOrPinyin, NAV_DRINKS, NAV_FEATURED, NAV_SETS, orderNavTabs } from "@zhaoyun/domain";
 import { InstallOffer } from "./InstallOffer";
@@ -18,6 +18,7 @@ import { usePageTurn } from "./usePageTurn";
 import type { TurnDirection } from "./usePageTurn";
 import { g } from "../../app/guest-i18n";
 import type { OrderingState } from "../../app/ordering";
+import { cartKey } from "../../app/cart";
 import type { CartSummary } from "../../app/cart";
 import type { CustomerAccount } from "../account/useCustomer";
 
@@ -435,6 +436,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
               : <DishOptions product={product} language={state.language} />}
             <SetList product={product} byId={byId} language={state.language} />
             {facts(product).length > 0 && <div className="meta">{facts(product).map((fact) => <span key={fact}>{fact}</span>)}</div>}
+            <p className="detail-flip-cue"><span>{t(state.language, "flipHint")}</span> <span aria-hidden="true">↻</span></p>
           </div>
           <div className="detail-buy">
             <div className="buyline"><span className="buy-price"><strong>{formatPrice(ordering.open ? product.priceCents + optionsCents : product.priceCents, state.language)}</strong><FewLeft product={product} language={state.language} /></span>
@@ -745,23 +747,11 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
           {onFeatured && featured ? <FeaturedPage title={featuredHeading} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
-            : visible.length ? visible.slice(0, rowLimit).map((product, index) =>
-              <article key={product.id} className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
-            <div className="summary">
-              <DishPicture product={product} byId={byId} size="thumb" />
-              {/* The code sits on its own small line above the name: drink
-                  codes like BEER-NONALC are far wider than R1, and in a
-                  column of their own they ran into the name. */}
-              <div className="row-text">
-                <span className="number">{product.sku}</span>
-                <h3>{productName(product, state.language)}</h3>
-                {secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}
-                <FewLeft product={product} language={state.language} />
-              </div>
-              {/* A menu without prices sends a guest into every dish to find one. */}
-              <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
-              {/* One tap from the list to the cart; options are chosen on the card. */}
-              {ordering.open && <button type="button" className="quick-add" aria-label={`${g(state.language, "addToCart")}: ${productName(product, state.language)}`}
+            : visible.length ? visible.slice(0, rowLimit).map((product, index, shownRows) => {
+              const showDivider = (state.category === "ALLE" || Boolean(query)) && !onFavorites && (index === 0 || shownRows[index - 1]?.category !== product.category);
+              const plainKey = cartKey(product.id, []);
+              const plainCount = state.cart[plainKey]?.quantity ?? 0;
+              const quickAddButton = ordering.open && <button type="button" className="quick-add" aria-label={`${g(state.language, "addToCart")}: ${productName(product, state.language)}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   // A 必选 group can't be answered from the list, so open the card to choose.
@@ -769,9 +759,38 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
                   flyToCart(event.currentTarget);
                   dispatch({ type: "add-to-cart", productId: product.id, quantity: 1, modifiers: [] });
                   dispatch({ type: "toast", message: g(state.language, "added", { name: productName(product, state.language) }) });
-                }}>+{inCart.get(product.id) ? <b className="quick-add-count" aria-hidden="true">{inCart.get(product.id)}</b> : null}</button>}
-            </div>
-          </article>) : query && products.length
+                }}>+{inCart.get(product.id) ? <b className="quick-add-count" aria-hidden="true">{inCart.get(product.id)}</b> : null}</button>;
+              const level = product.details.level?.trim();
+              return <Fragment key={product.id}>
+                {showDivider && <div className="cat-divider"><span>{pageName(product.category)}</span></div>}
+                <article className={`dish-card ${product.id === state.activeProductId ? "selected" : ""}`} data-id={product.id} style={index < 12 ? { "--row": index } as React.CSSProperties : undefined} onClick={() => dispatch({ type: "open-product", productId: product.id })}>
+                  <div className="summary">
+                    <DishPicture product={product} byId={byId} size="thumb" />
+                    {/* The code sits on its own small line above the name: drink
+                        codes like BEER-NONALC are far wider than R1, and in a
+                        column of their own they ran into the name. */}
+                    <div className="row-text">
+                      <span className="number">{product.sku}</span>
+                      <h3>{productName(product, state.language)}</h3>
+                      {secondaryName(product, state.language) && <p>{secondaryName(product, state.language)}</p>}
+                      {(level || (product.leftToday !== undefined && product.leftToday !== null && product.leftToday > 0 && product.leftToday <= FEW_LEFT)) && <div className="row-tags">
+                        {level && <span className="row-tag">{level}</span>}
+                        <FewLeft product={product} language={state.language} />
+                      </div>}
+                    </div>
+                    {/* A menu without prices sends a guest into every dish to find one. */}
+                    <span className="row-price">{formatPrice(product.priceCents, state.language)}</span>
+                    {/* One tap from the list to the cart; options are chosen on the card. */}
+                    {ordering.open && (plainCount > 0 && !unmetGroup(product, [])
+                      ? <div className="quick-actions" onClick={(event) => event.stopPropagation()}>
+                        {quickAddButton}
+                        <button type="button" className="quick-sub" aria-label="−" onClick={() => dispatch({ type: "cart-quantity", key: plainKey, quantity: plainCount - 1 })}>−</button>
+                      </div>
+                      : quickAddButton)}
+                  </div>
+                </article>
+              </Fragment>;
+            }) : query && products.length
             // A search that found nothing says what was looked for and offers the way back.
             ? <div className="empty search-empty">
               <strong>{t(state.language, "noResults").replace("{query}", () => state.query.trim())}</strong>

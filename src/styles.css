@@ -684,6 +684,19 @@ html.plt-android .screen.active {
   background: var(--accent);
 }
 
+@media (max-width: 440px) {
+  .flag,
+  .icon-btn.scheme-toggle,
+  .icon-btn.guest-toggle {
+    width: 30px;
+  }
+
+  .flag img {
+    width: 17px;
+    height: 11px;
+  }
+}
+
 .icon-btn.scheme-toggle {
   font-size: 18px;
   line-height: 1;
@@ -3536,6 +3549,83 @@ button:focus-visible,
 
 .quick-add:active {
   transform: scale(0.92);
+}
+
+.quick-actions {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+}
+
+.quick-sub {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.quick-sub:active {
+  transform: scale(0.9);
+}
+
+.cat-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 2px 8px;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cat-divider:first-child {
+  margin-top: 4px;
+}
+
+.cat-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line-soft);
+}
+
+.row-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.row-tag {
+  font-size: 11px;
+  line-height: 1.25;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line-soft);
+  background: var(--wash);
+  color: var(--ink-2);
+}
+
+.detail-flip-cue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 10px 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 
 /* The account (or orders) button: one more segment of the top bar's capsule,
