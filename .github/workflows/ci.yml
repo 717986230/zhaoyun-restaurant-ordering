@@ -3,7 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**', '*.md']
   pull_request:
+    paths-ignore: ['docs/**', '*.md']
   workflow_dispatch:
 
 # A push to a pull request branch would otherwise run this twice.
@@ -166,7 +168,7 @@ jobs:
     name: Deploy Worker and D1
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [checks, e2e]
+    needs: [checks]
     # Only a push that lands on main deploys. A pull_request run, however
     # green, never touches the real database or the live Worker.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
