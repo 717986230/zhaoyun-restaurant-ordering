@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminApi } from "@zhaoyun/api-client";
-import type { ApiOrder, ApiToday } from "@zhaoyun/contracts";
+import type { ApiOrder, ApiSettings, ApiToday } from "@zhaoyun/contracts";
 import { formatMoney, useI18n } from "../../app/i18n";
 import type { CopyKey } from "../../app/i18n";
 import type { AdminTab } from "../../app/types";
@@ -14,7 +14,8 @@ const STATUS_KEYS: Record<string, CopyKey> = { pending: "todayPending", confirme
  * minute and whenever the live channel says something changed.
  */
 export function TodayPanel({
-  api, failed, liveTick, onNavigate, failedPrintsCount = 0, openCallsCount = 0, orders = []
+  api, failed, liveTick, onNavigate, failedPrintsCount = 0, openCallsCount = 0, orders = [],
+  settings = null, productsCount, tablesCount, printersReady
 }: {
   api: AdminApi;
   failed: (error: unknown) => void;
@@ -23,6 +24,10 @@ export function TodayPanel({
   failedPrintsCount?: number;
   openCallsCount?: number;
   orders?: ApiOrder[];
+  settings?: ApiSettings | null;
+  productsCount?: number;
+  tablesCount?: number;
+  printersReady?: boolean;
 }) {
   const { t, language } = useI18n();
   const [today, setToday] = useState<ApiToday | null>(null);
@@ -46,6 +51,14 @@ export function TodayPanel({
   const voidedToday = orders
     .filter((order) => order.createdAt.slice(0, 10) === today.date)
     .reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + (item.voided ?? 0), 0), 0);
+  const checks = settings ? [
+    { key: "company", label: t("goLiveCompany"), ok: Boolean(settings.companyName.trim() && settings.companyUid.trim()), tab: "system" as AdminTab },
+    { key: "tables", label: t("goLiveTables"), ok: (tablesCount ?? 0) > 0 || settings.floorTables > 0, tab: "tables" as AdminTab },
+    { key: "catalog", label: t("goLiveCatalog"), ok: (productsCount ?? 0) > 0, tab: "catalog" as AdminTab },
+    ...(settings.showOrdering ? [{ key: "printers", label: t("goLivePrinters"), ok: Boolean(printersReady), tab: "printers" as AdminTab }] : [])
+  ] : [];
+  const doneCount = checks.filter((item) => item.ok).length;
+  const allReady = checks.length > 0 && doneCount === checks.length;
   return <section id="todayPanel" className="admin-panel active"><div className="settings-page">
     <h1 className="settings-title">{t("todayTitle")} <small className="today-date">{dateLabel}</small></h1>
     {(failedPrintsCount > 0 || openCallsCount > 0 || voidedToday > 0) && <div className="today-alerts">
@@ -79,5 +92,17 @@ export function TodayPanel({
         </li>)}</ul> : <p className="settings-hint">{t("todayNoBookings")}</p>}
       </section>
     </div>
+    {checks.length > 0 && <details className={`go-live-card ${allReady ? "ready" : ""}`} open={!allReady}>
+      <summary>
+        <span>{allReady ? `✓ ${t("goLiveReady")}` : t("goLiveTitle")}</span>
+        <small>{t("goLiveProgress", { done: doneCount, total: checks.length })}</small>
+      </summary>
+      <div className="go-live-list">
+        {checks.map((item) => <button key={item.key} type="button" className={`go-live-item ${item.ok ? "ok" : "pending"}`} onClick={() => onNavigate?.(item.tab)}>
+          <span>{item.ok ? "✓" : "!"} {item.label}</span>
+          <em>→</em>
+        </button>)}
+      </div>
+    </details>}
   </div></section>;
 }

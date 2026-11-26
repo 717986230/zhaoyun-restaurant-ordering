@@ -789,6 +789,10 @@ export function App() {
         failedPrintsCount={state.failedJobs.length}
         openCallsCount={state.requests.filter((request) => request.status !== "completed" && request.status !== "cancelled").length}
         orders={state.orders}
+        settings={state.settings}
+        productsCount={state.products.filter((product) => product.published && product.available).length}
+        tablesCount={state.tables.length}
+        printersReady={state.printers.length > 0 || state.printBridges.length > 0}
       />}
       {state.tab === "links" && <LinksPanel apiBase={adminApi.storage.baseUrl} restaurantName={state.settings?.restaurantName ?? ""} menuLanguages={state.settings?.menuLanguages ?? []} />}
       {state.tab === "members" && <MembersPanel api={adminApi} settings={state.settings} notify={notify} failed={(error) => failed(error, "saveFailed")} onSaveSettings={saveSettings} />}
