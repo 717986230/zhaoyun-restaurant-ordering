@@ -6176,7 +6176,7 @@ button.report-tile-link:hover {
   margin-top: 16px;
   border: 1px solid var(--a-line);
   border-radius: var(--r-lg);
-  background: var(--a-surface);
+  background: var(--a-card);
   overflow: hidden;
 }
 
