@@ -264,17 +264,11 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     }
   }
 
-  async function scanMemberCode(code: Scanned) {
-    setScanningMember(false);
-    if (code.kind !== "member") {
-      pos.notify(t("memberUnknown"), "error");
-      return;
-    }
+  async function attachMemberByLogin(login: string) {
     try {
-      const visit = await api.memberVisit(code.id);
-      const login = visit.customer.phone || visit.customer.email;
       const { member } = await api.member(login);
-      const memberName = member.name || member.phone || member.email;
+      const memberLogin = member.phone || member.email || login;
+      const memberName = member.name || memberLogin;
       const memberDiscount = member.membership?.discountPercent ?? 0;
       const adjustedTotal = totalFor(Math.max(discount, memberDiscount));
       if (memberDiscount > 0) setDiscount((current) => Math.max(current, memberDiscount));
@@ -290,13 +284,25 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
           voucherCode: "",
           balanceCents,
           tip: "",
-          memberLogin: login,
+          memberLogin,
           memberId: member.id,
           memberName,
           memberTierLevel: member.membership?.tierLevel ?? 0
         }]);
       }
       pos.notify(`${memberName} · ${t("balance", { amount: money(balanceCents) })}`);
+    } catch (error) { pos.failed(error); }
+  }
+
+  async function scanMemberCode(code: Scanned) {
+    setScanningMember(false);
+    if (code.kind !== "member") {
+      pos.notify(t("memberUnknown"), "error");
+      return;
+    }
+    try {
+      const visit = await api.memberVisit(code.id);
+      await attachMemberByLogin(visit.customer.phone || visit.customer.email);
     } catch (error) { pos.failed(error); }
   }
 
@@ -431,7 +437,7 @@ export function PayScreen({ pos, table, go }: { pos: Pos; table: string; go: (sc
     </div>
 
     {showSepa && sepa && <SepaDialog sepa={sepa} amountCents={totalCents} reference={table} money={money} t={t} onClose={() => setShowSepa(false)} />}
-    {scanningMember && <BookingScanner pos={pos} bookings={[]} onFound={(code) => void scanMemberCode(code)} onClose={() => setScanningMember(false)} />}
+    {scanningMember && <BookingScanner pos={pos} bookings={[]} mode="member" onFound={(code) => void scanMemberCode(code)} onMemberLogin={(login) => { setScanningMember(false); void attachMemberByLogin(login); }} onClose={() => setScanningMember(false)} />}
   </section>;
 }
 

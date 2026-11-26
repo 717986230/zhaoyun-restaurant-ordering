@@ -52,7 +52,7 @@ async function detector(): Promise<Detect> {
  * the number goes to `onFound`; the floor does the rest. A member's code
  * (the booking page shows it to a guest short of points) goes there too.
  */
-export function BookingScanner({ pos, bookings, onFound, onClose }: { pos: Pos; bookings: ApiReservation[]; onFound: (scanned: Scanned) => void; onClose: () => void }) {
+export function BookingScanner({ pos, bookings, mode = "booking", onFound, onMemberLogin, onClose }: { pos: Pos; bookings: ApiReservation[]; mode?: "booking" | "member"; onFound: (scanned: Scanned) => void; onMemberLogin?: (login: string) => void; onClose: () => void }) {
   const { t } = pos;
   const video = useRef<HTMLVideoElement>(null);
   const [cameraFailed, setCameraFailed] = useState(false);
@@ -120,14 +120,20 @@ export function BookingScanner({ pos, bookings, onFound, onClose }: { pos: Pos; 
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const reference = bookingReferenceFrom(typed);
-    if (reference) onFound({ kind: "booking", reference });
+    const scanned = scannedFrom(typed);
+    if (scanned) return onFound(scanned);
+    if (mode === "booking") {
+      const reference = bookingReferenceFrom(typed);
+      if (reference) onFound({ kind: "booking", reference });
+    }
   }
 
-  return <div className="pos-scan" role="dialog" aria-modal="true" aria-label={t("scanBooking")} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  const manualReady = Boolean(scannedFrom(typed) || (mode === "booking" && bookingReferenceFrom(typed)));
+
+  return <div className="pos-scan" role="dialog" aria-modal="true" aria-label={t(mode === "member" ? "scanMember" : "scanBooking")} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="pos-scan-card">
       <header>
-        <h2>{t("scanBooking")}</h2>
+        <h2>{t(mode === "member" ? "scanMember" : "scanBooking")}</h2>
         <button type="button" className="pos-quiet" onClick={onClose} aria-label={t("close")}>×</button>
       </header>
       {cameraFailed
@@ -135,24 +141,30 @@ export function BookingScanner({ pos, bookings, onFound, onClose }: { pos: Pos; 
         : <div className="pos-scan-view"><video ref={video} muted playsInline /><i aria-hidden="true" /></div>}
       {!cameraFailed && <p className="pos-scan-note">{t("scanHint")}</p>}
       <form className="pos-scan-manual" onSubmit={submit}>
-        <input id="posScanReference" value={typed} onChange={(event) => setTyped(event.target.value.toUpperCase())} placeholder={t("scanTypeReference")}
-          autoCapitalize="characters" autoComplete="off" spellCheck={false} maxLength={14} aria-label={t("scanTypeReference")} />
-        <button type="submit" className="pos-primary" disabled={!bookingReferenceFrom(typed)}>{t("scanCheckIn")}</button>
+        <input id="posScanReference" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder={mode === "member" ? "ZYMEM:..." : t("scanTypeReference")}
+          autoCapitalize="none" autoComplete="off" spellCheck={false} maxLength={80} aria-label={mode === "member" ? t("scanMember") : t("scanTypeReference")} />
+        <button type="submit" className="pos-primary" disabled={!manualReady}>{t("scanCheckIn")}</button>
       </form>
-      <div className="pos-scan-find">
-        <input id="posScanSearch" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("scanSearchName")}
-          autoComplete="off" spellCheck={false} maxLength={40} aria-label={t("scanSearchName")} />
-        {search.trim()
-          ? matches.length
-            ? <ul className="pos-scan-matches">{matches.map((booking) => <li key={booking.id}>
-                <button type="button" data-reference={booking.reference} onClick={() => onFound({ kind: "booking", reference: booking.reference.toUpperCase() })}>
-                  <span><b>{booking.time}</b> · {booking.name} · {booking.party} 👤{booking.table ? ` · ${t("table", { table: booking.table })}` : ""}</span>
-                  <em>{t("scanSeat")}</em>
-                </button>
-              </li>)}</ul>
-            : <p className="pos-scan-note">{t("scanSearchNone")}</p>
-          : null}
-      </div>
+      {mode === "member" && onMemberLogin
+        ? <form className="pos-scan-manual" onSubmit={(event) => { event.preventDefault(); if (search.trim()) onMemberLogin(search.trim()); }}>
+          <input id="posScanSearch" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("memberLoginHint")}
+            autoComplete="off" spellCheck={false} maxLength={80} aria-label={t("memberLogin")} />
+          <button type="submit" className="pos-primary" disabled={!search.trim()}>{t("memberLogin")}</button>
+        </form>
+        : <div className="pos-scan-find">
+          <input id="posScanSearch" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("scanSearchName")}
+            autoComplete="off" spellCheck={false} maxLength={40} aria-label={t("scanSearchName")} />
+          {search.trim()
+            ? matches.length
+              ? <ul className="pos-scan-matches">{matches.map((booking) => <li key={booking.id}>
+                  <button type="button" data-reference={booking.reference} onClick={() => onFound({ kind: "booking", reference: booking.reference.toUpperCase() })}>
+                    <span><b>{booking.time}</b> · {booking.name} · {booking.party} 👤{booking.table ? ` · ${t("table", { table: booking.table })}` : ""}</span>
+                    <em>{t("scanSeat")}</em>
+                  </button>
+                </li>)}</ul>
+              : <p className="pos-scan-note">{t("scanSearchNone")}</p>
+            : null}
+        </div>}
     </section>
   </div>;
 }
