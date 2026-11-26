@@ -3710,14 +3710,22 @@ button:focus-visible,
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 56px;
+  min-height: 54px;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: transparent;
+  border-radius: 12px;
+  background: var(--panel-2);
   color: var(--ink);
   padding: 10px 14px;
   font-size: 15px;
+  font-weight: 500;
   text-align: left;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+
+.service-call:active {
+  transform: scale(0.97);
 }
 
 .service-call span {
@@ -3726,7 +3734,10 @@ button:focus-visible,
 
 .service-call.primary {
   grid-column: 1 / -1;
+  justify-content: center;
   border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 
