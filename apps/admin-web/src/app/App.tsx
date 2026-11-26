@@ -101,10 +101,10 @@ const ROLE_KEYS: Record<StaffRole, CopyKey> = { manager: "roleManager", staff: "
  * does not get a tab does not get its group either.
  */
 const TAB_GROUPS: Array<{ label: CopyKey; tabs: AdminTab[] }> = [
-  { label: "navGroupFloor", tabs: ["today", "board", "tables", "reservations", "delivery"] },
+  { label: "navGroupFloor", tabs: ["today", "members", "tables", "reservations", "board", "delivery"] },
   { label: "navGroupMenu", tabs: ["catalog", "stock", "printers"] },
   { label: "navGroupBusiness", tabs: ["reports", "orders", "promos", "system"] },
-  { label: "navGroupGuests", tabs: ["members", "links"] }
+  { label: "navGroupGuests", tabs: ["links"] }
 ];
 
 /**

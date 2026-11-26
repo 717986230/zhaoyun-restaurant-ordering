@@ -340,7 +340,7 @@ test("a waiter tablet only gets the board, never the catalog", async ({ page }) 
   await expect(page.getByText("服务员")).toBeVisible();
   // A waiter runs the floor, so the board and the room are theirs; the menu,
   // the printers and the table tokens are not. Taking payment is the POS's.
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("订单桌位预约外卖跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("桌位预约订单外卖跳转");
   await expect(page.getByRole("button", { name: "菜品", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打印", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
@@ -531,7 +531,7 @@ test("the console says Admin, and switches its own language without touching the
   const head = page.locator(".admin-head");
   await expect(head).toContainText("赵云");
   await expect(head).not.toContainText("经理");
-  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日订单桌位预约外卖菜品库存打印报表账单营销设置会员跳转");
+  await expect(page.getByRole("navigation", { name: "管理模块" })).toHaveText("今日会员桌位预约订单外卖菜品库存打印报表账单营销设置跳转");
 
   const picker = page.getByRole("group", { name: "界面语言" });
   await picker.getByRole("button", { name: "Deutsch" }).click();
