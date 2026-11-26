@@ -6043,7 +6043,7 @@ button.report-tile-link:hover {
 
 .announce-lang-tab.on {
   border-color: var(--a-accent);
-  background: var(--a-accent-soft);
+  background: var(--a-accent-wash);
   color: var(--a-ink);
 }
 
