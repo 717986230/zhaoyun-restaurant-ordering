@@ -38,16 +38,18 @@
       @keyframes zy-ink{to{stroke-dashoffset:0}}
       .zy-fx{opacity:0;animation:zy-in .8s ease .55s forwards}
       @keyframes zy-in{to{opacity:1}}
-      .zy-steam{animation:zy-float 2.8s ease-in-out 1.1s infinite}
-      @keyframes zy-float{0%,100%{transform:translateY(0);opacity:.75}50%{transform:translateY(-4px);opacity:1}}
+      .zy-p{opacity:0;transform:translate(var(--dx,0px),var(--dy,-18px)) scale(.35);
+        animation:zy-gather .95s cubic-bezier(.16,.9,.24,1) var(--d,.45s) forwards}
+      @keyframes zy-gather{to{opacity:var(--op,1);transform:translate(0,0) scale(1)}}
       .zy-word{max-width:84vw;font-weight:600;font-size:clamp(22px,6.2vw,31px);letter-spacing:.14em;
         line-height:1.2;text-align:center;text-wrap:balance;color:#e9edee;padding-left:.14em;
         opacity:0;animation:zy-in .9s ease 1.05s forwards}
       .zy-word:empty{display:none}
       @media (prefers-reduced-motion:reduce){
-        .zy-ring,.zy-steam{animation:none}
+        .zy-ring{animation:none}
         .zy-draw{stroke-dashoffset:0;animation:none}
         .zy-fx,.zy-word{opacity:1;animation:none}
+        .zy-p{opacity:var(--op,1);transform:none;animation:none}
         .zy-splash{animation:zy-out .4s ease 1.4s forwards}
       }
     </style>
@@ -63,16 +65,48 @@
                     stroke-dasharray="64 740" stroke-linecap="round"/>
           </g>
           <circle cx="160" cy="160" r="112" stroke="rgba(233,238,240,.06)" stroke-width="1"/>
-          <!-- Minimalist CK treasure-basin (聚宝盆) monogram -->
+          <!-- Flowing C treasure-basin + powder-particle converging K -->
           <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <g class="zy-draw" stroke="#8fb0a3" stroke-width="6.5">
-              <path d="M110 170 C110 214 210 214 210 170"/>
-              <path d="M96 152 H224"/>
+            <g class="zy-draw">
+              <path d="M102 164 C102 220 218 220 218 164" stroke="#8fb0a3" stroke-width="6"/>
+              <path d="M124 186 C140 202 180 202 196 186" stroke="rgba(169,199,186,.36)" stroke-width="2.2"/>
             </g>
-            <g class="zy-fx" stroke="#a9c7ba" stroke-width="6">
-              <path d="M150 152 L124 114"/>
-              <path d="M170 152 L196 114"/>
-            </g>
+          </g>
+          <g fill="#a9c7ba">
+            <!-- K horizontal rim formed by converging powder particles -->
+            <circle class="zy-p" cx="98" cy="150" r="1.5" style="--dx:-18px;--dy:-12px;--d:.42s;--op:.75"/>
+            <circle class="zy-p" cx="108" cy="150" r="2.0" style="--dx:-12px;--dy:-16px;--d:.46s"/>
+            <circle class="zy-p" cx="118" cy="150" r="2.3" style="--dx:-8px;--dy:-10px;--d:.50s"/>
+            <circle class="zy-p" cx="129" cy="150" r="2.5" style="--dx:-6px;--dy:-18px;--d:.54s"/>
+            <circle class="zy-p" cx="140" cy="150" r="2.6" style="--dx:-4px;--dy:-14px;--d:.58s"/>
+            <circle class="zy-p" cx="151" cy="150" r="2.8" style="--dx:-2px;--dy:-20px;--d:.62s"/>
+            <circle class="zy-p" cx="160" cy="150" r="2.4" style="--dx:0px;--dy:-22px;--d:.64s"/>
+            <circle class="zy-p" cx="169" cy="150" r="2.8" style="--dx:2px;--dy:-20px;--d:.62s"/>
+            <circle class="zy-p" cx="180" cy="150" r="2.6" style="--dx:4px;--dy:-14px;--d:.58s"/>
+            <circle class="zy-p" cx="191" cy="150" r="2.5" style="--dx:6px;--dy:-18px;--d:.54s"/>
+            <circle class="zy-p" cx="202" cy="150" r="2.3" style="--dx:8px;--dy:-10px;--d:.50s"/>
+            <circle class="zy-p" cx="212" cy="150" r="2.0" style="--dx:12px;--dy:-16px;--d:.46s"/>
+            <circle class="zy-p" cx="222" cy="150" r="1.5" style="--dx:18px;--dy:-12px;--d:.42s;--op:.75"/>
+            <!-- K left & right rising wings in converging powder -->
+            <circle class="zy-p" cx="146" cy="142" r="2.4" style="--dx:-14px;--dy:-24px;--d:.66s"/>
+            <circle class="zy-p" cx="140" cy="134" r="2.2" style="--dx:-18px;--dy:-28px;--d:.70s"/>
+            <circle class="zy-p" cx="134" cy="126" r="2.0" style="--dx:-22px;--dy:-30px;--d:.74s"/>
+            <circle class="zy-p" cx="128" cy="118" r="1.7" style="--dx:-26px;--dy:-32px;--d:.78s;--op:.85"/>
+            <circle class="zy-p" cx="123" cy="111" r="1.2" style="--dx:-28px;--dy:-34px;--d:.82s;--op:.65"/>
+            <circle class="zy-p" cx="174" cy="142" r="2.4" style="--dx:14px;--dy:-24px;--d:.66s"/>
+            <circle class="zy-p" cx="180" cy="134" r="2.2" style="--dx:18px;--dy:-28px;--d:.70s"/>
+            <circle class="zy-p" cx="186" cy="126" r="2.0" style="--dx:22px;--dy:-30px;--d:.74s"/>
+            <circle class="zy-p" cx="192" cy="118" r="1.7" style="--dx:26px;--dy:-32px;--d:.78s;--op:.85"/>
+            <circle class="zy-p" cx="197" cy="111" r="1.2" style="--dx:28px;--dy:-34px;--d:.82s;--op:.65"/>
+            <!-- Fine golden-celadon dust motes settling into the basin -->
+            <circle class="zy-p" cx="155" cy="136" r="1.3" style="--dx:-6px;--dy:-28px;--d:.76s;--op:.7"/>
+            <circle class="zy-p" cx="165" cy="134" r="1.4" style="--dx:6px;--dy:-30px;--d:.80s;--op:.75"/>
+            <circle class="zy-p" cx="160" cy="124" r="1.8" style="--dx:0px;--dy:-34px;--d:.86s;--op:.9"/>
+            <circle class="zy-p" cx="134" cy="144" r="1.1" style="--dx:-12px;--dy:-20px;--d:.72s;--op:.55"/>
+            <circle class="zy-p" cx="186" cy="144" r="1.1" style="--dx:12px;--dy:-20px;--d:.72s;--op:.55"/>
+            <circle class="zy-p" cx="149" cy="160" r="1.3" style="--dx:-4px;--dy:-18px;--d:.84s;--op:.6"/>
+            <circle class="zy-p" cx="171" cy="160" r="1.3" style="--dx:4px;--dy:-18px;--d:.84s;--op:.6"/>
+            <circle class="zy-p" cx="160" cy="164" r="1.6" style="--dx:0px;--dy:-20px;--d:.88s;--op:.75"/>
           </g>
         </svg>
         <div class="zy-word" id="zy-word"></div>
