@@ -84,16 +84,11 @@ export function isSet(product: Product): boolean {
  * every duration goes through `useReducedMotion` below instead.
  */
 const EASE = [0.2, 0.7, 0.2, 1] as const;
-const DURATION = { backdrop: 0.2, card: 0.32, page: 0.46 };
+const DURATION = { backdrop: 0.2, card: 0.28, page: 0.26 };
 // A page's rows arrive in two steps: a screenful with the page, the rest the
 // moment it has finished turning. "All" is 111 dishes, and building every row
 // at once froze a phone for a third of a second in the middle of the turn.
 const FIRST_ROWS = 14;
-/** The card turns like a card: quick off the mark, settling without a wobble. */
-// ② Flip to reveal: 180° about the Y axis in 0.8 s on cubic-bezier(.3,.7,.2,1);
-// the faces swap at 90° (each hides its back). A tap mid-turn reverses from
-// where the card is, as a tween in motion starts from the current angle.
-const FLIP = { duration: 0.8, ease: [0.3, 0.7, 0.2, 1] } as const;
 
 function localized(names: { zh: string; de: string; en: string }, language: CustomerState["language"]): string {
   return names[language] || names.de || names.en;
@@ -269,9 +264,9 @@ function Deconstruction({ product, language, reduceMotion, showing }: { product:
     <ol className="dish-parts">{parts.map((part, index) => <m.li className="dish-part" key={`${part.de}-${index}`}
       // The parts come off the dish as the card turns over, not while it
       // is still face up and they cannot be seen.
-      initial={reduceMotion ? false : { opacity: 0, y: 14, rotateX: -24 }}
-      animate={showing || reduceMotion ? { opacity: 1, y: 0, rotateX: 0 } : { opacity: 0, y: 14, rotateX: -24 }}
-      transition={{ delay: reduceMotion || !showing ? 0 : 0.2 + index * 0.045, duration: reduceMotion ? 0 : 0.34, ease: EASE }}>
+      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+      animate={showing || reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+      transition={{ delay: reduceMotion || !showing ? 0 : 0.14 + index * 0.035, duration: reduceMotion ? 0 : 0.26, ease: EASE }}>
       <span className="part-index">{String(index + 1).padStart(2, "0")}</span>
       <span className="part-name"><b>{name(part)}</b><small>{second(part)}</small></span>
       {part.allergens.length > 0 && <span className="allergen-list part-allergens">{part.allergens.map((code) => <b className="allergen" key={code} title={allergenLabel(code, language)}>{code}</b>)}</span>}
@@ -407,19 +402,12 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
     }}>
     {/* Rises toward the guest, tilted back a few degrees, and settles flat. */}
     <m.div className="dish-detail-card" data-detail-id={product.id}
-      style={{ transformPerspective: 1400 }}
-      initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.94, rotateX: 9 }}
-      animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
-      exit={{ opacity: 0, y: 16, scale: 0.97, rotateX: 4 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 22, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 14, scale: 0.98 }}
       transition={{ duration: seconds(DURATION.card), ease: EASE }}>
       <button className="detail-close" aria-label={t(state.language, "close")} onClick={() => dispatch({ type: "close-product" })}>×</button>
-      {/* Mid-turn the card dips back a little, the way a card lifted off a
-          table does; the rotation itself is a spring, so a second tap while
-          it is turning reverses it from where it is instead of jumping. */}
-      <m.div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}
-        initial={false}
-        animate={{ rotateY: state.productFlipped ? 180 : 0, scale: reduceMotion ? 1 : [1, 0.86, 1] }}
-        transition={reduceMotion ? { duration: 0 } : { rotateY: FLIP, scale: { duration: 0.8, times: [0, 0.45, 1], ease: EASE } }}>
+      <div className={`detail-flip-inner ${state.productFlipped ? "flipped" : ""}`}>
         <section className="detail-face detail-front" aria-label={t(state.language, "flip")} onClick={() => dispatch({ type: "toggle-product-flip" })}>
           <div className="detail-heading">
             <span className="number">{product.sku}</span><span className="cat">{categoryName}</span>
@@ -470,7 +458,7 @@ function ProductDetail({ product, categoryName, byId, state, dispatch, ordering,
             </dl>
           </div>
         </section>
-      </m.div>
+      </div>
     </m.div>
   </m.div>;
 }
@@ -693,9 +681,9 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
   // from below for the next page and from above for the previous one.
   // Not on the first page the menu opens on: fading in the list a guest came
   // (or reloaded) to read left a ghost of every row over the next half second.
-  const enter = firstPage.current ? false : reduceMotion || turn.current.direction === 0
-    ? { opacity: 0 }
-    : { opacity: 0, y: 70 * turn.current.direction, rotateX: -24 * turn.current.direction, scale: 0.94 };
+  const enter = firstPage.current || reduceMotion || turn.current.direction === 0
+    ? false
+    : { opacity: 0.35, y: 22 * turn.current.direction };
 
   return <section id="menu" className={`screen menu active ${activeProduct ? "detail-open" : ""} ${onFeatured || onSets ? "on-featured" : ""} ${state.searchOpen ? "search-open" : ""}`} data-featured-template={onFeatured ? featured?.template : onSets ? "framed" : undefined}>
     <header className="topbar">
@@ -743,7 +731,7 @@ export function CatalogScreen({ state, dispatch, products, catalog = products, l
         {prevPage && <p className="page-hint page-hint-prev" aria-hidden="true"><i /><span className="page-hint-idle">↑ {t(state.language, "prevPage")} · {pageName(prevPage)}</span><span className="page-hint-armed">{t(state.language, "releaseToTurn")} · {pageName(prevPage)}</span></p>}
         <m.div key={`${state.category}|${query}`} className={`stack-page ${turn.current.direction ? "turned" : ""}`}
           initial={enter}
-          animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : DURATION.page, ease: EASE }}>
           {onFeatured && featured ? <FeaturedPage title={featuredHeading} eyebrow={t(state.language, "featuredEyebrow")} template={featured.template} products={featured.products} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />
             : onSets ? <FeaturedPage title={t(state.language, "setsPage")} eyebrow={t(state.language, "setsEyebrow")} template="framed" products={sets} byId={byId} language={state.language} onOpen={(productId) => dispatch({ type: "open-product", productId })} />

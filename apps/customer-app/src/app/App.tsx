@@ -125,6 +125,16 @@ export function App() {
     return chosen.length ? { title: featuredSettings.title, products: chosen, template: featuredSettings.template ?? DEFAULT_FEATURED_TEMPLATE } : null;
   }, [featuredSettings, products]);
 
+  useEffect(() => {
+    const splash = document.getElementById("zy-splash");
+    if (!splash) return;
+    const clear = () => splash.remove();
+    const onEnd = (event: AnimationEvent) => { if (event.animationName === "zy-out") clear(); };
+    splash.addEventListener("animationend", onEnd);
+    const timer = window.setTimeout(clear, 2900);
+    return () => { splash.removeEventListener("animationend", onEnd); window.clearTimeout(timer); };
+  }, []);
+
   return <main className="app-shell">
     <AnimatePresence>
       {announcement && announcementOpen && <AnnouncementPopup key="announce" announcement={announcement} language={language} />}

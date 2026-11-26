@@ -684,19 +684,6 @@ html.plt-android .screen.active {
   background: var(--accent);
 }
 
-@media (max-width: 440px) {
-  .flag,
-  .icon-btn.scheme-toggle,
-  .icon-btn.guest-toggle {
-    width: 30px;
-  }
-
-  .flag img {
-    width: 17px;
-    height: 11px;
-  }
-}
-
 .icon-btn.scheme-toggle {
   font-size: 18px;
   line-height: 1;
@@ -1455,6 +1442,19 @@ html.plt-android .screen.active {
   }
 }
 
+@media (max-width: 440px) {
+  .flag,
+  .icon-btn.scheme-toggle,
+  .icon-btn.guest-toggle {
+    width: 30px;
+  }
+
+  .flag img {
+    width: 17px;
+    height: 11px;
+  }
+}
+
 /* The smallest phones still sold: an italic "Carte" overhangs its box, and at
    26px it reaches the first flag. */
 @media (max-width: 340px) {
@@ -1481,8 +1481,7 @@ html.plt-android .screen.active {
 
 /* Shared-element menu detail used by the current customer app. */
 .stack {
-  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
-  transform-origin: 50% 30%;
+  transition: opacity var(--dur-base) var(--ease-out);
 }
 
 .dish-card {
@@ -1491,16 +1490,13 @@ html.plt-android .screen.active {
   background: linear-gradient(165deg, var(--panel-2), var(--panel));
   box-shadow: var(--shadow-2);
   transform-style: flat;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-/* The list steps back behind an open dish. Only opacity and transform: a
-   blur here re-rendered the whole list on every frame of the card opening,
-   which is where the stutter on a dish tap came from — on phones as much as
-   on the tablets that already had it turned off. */
+/* Only fade opacity when a dish opens: scaling an overflow-y scroller forces
+   compositor tile invalidation and flashes the list behind it. */
 .menu.detail-open .stack {
   opacity: 0.32;
-  transform: scale(0.985);
   pointer-events: none;
 }
 
@@ -1764,7 +1760,8 @@ html.plt-android .menu.detail-open .stack {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transition: none;
+  transform: rotateY(0deg);
+  transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
@@ -1777,7 +1774,7 @@ html.plt-android .menu.detail-open .stack {
   border: 0;
   background: transparent;
   box-shadow: none;
-  perspective: 1800px;
+  perspective: 1600px;
 }
 
 .detail-face {
@@ -1792,6 +1789,21 @@ html.plt-android .menu.detail-open .stack {
   box-shadow: var(--shadow-3);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+.detail-front {
+  transform: rotateY(0deg);
+}
+
+.detail-flip-inner.flipped .detail-front,
+.detail-flip-inner:not(.flipped) .detail-back {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-flip-inner {
+    transition: none;
+  }
 }
 
 @media (orientation: landscape) and (max-height: 620px) {
@@ -2082,7 +2094,6 @@ html.plt-android .menu.detail-open .stack {
    ------------------------------------------------------------------------ */
 .page-sheet {
   position: relative;
-  perspective: 1400px;
 }
 
 /* Its own layer only while a finger pulls it: kept for good, the whole
@@ -2094,24 +2105,6 @@ html.plt-android .menu.detail-open .stack {
 
 .stack-page {
   transform-origin: 50% 0;
-}
-
-/* After a turn the rows land one after another — the first twelve, which is
-   all a screen holds. Flat: the page itself turns in 3D, and a dozen rows
-   each tipping in their own 3D at the same moment was a dozen more layers
-   for a phone to draw every frame of the turn, and it stuttered.
-   `backwards`, not `both`: once landed, a row's transform is its own again,
-   so a press still presses it. */
-.stack-page.turned .dish-card[style] {
-  animation: row-in 0.42s var(--ease-out) backwards;
-  animation-delay: calc(var(--row) * 30ms + 120ms);
-}
-
-@keyframes row-in {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
 }
 
 /* Every row is laid out and painted before it is scrolled to. Rows skipped
@@ -3197,8 +3190,7 @@ button:focus-visible,
   .dish-detail-card .detail-scroll > .feature-media {
     grid-column: 1;
     grid-row: 1 / span 6;
-    position: sticky;
-    top: 0;
+    align-self: start;
   }
 
   .dish-detail-card .detail-scroll > :nth-child(2) {
@@ -3576,6 +3568,10 @@ button:focus-visible,
   transform: scale(0.9);
 }
 
+.stack-page .dish-card:has(+ .cat-divider) {
+  margin-bottom: 0;
+}
+
 .cat-divider {
   display: flex;
   align-items: center;
@@ -3670,10 +3666,8 @@ button:focus-visible,
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--panel-glass);
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
   color: var(--ink);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
 }
 
 .favorite-toggle svg {
@@ -4732,6 +4726,7 @@ button:focus-visible,
    each row a fling brought on screen. */
 .dish-card {
   background: var(--panel);
+  box-shadow: var(--shadow-1);
 }
 
 /* Nothing over the list blurs it: the buttons floating on it were frosted
@@ -4905,10 +4900,7 @@ button:focus-visible,
    Motion, to the prompts in docs/motion-prompts.md (2026-10).
    ------------------------------------------------------------------------ */
 
-/* ② Flip to reveal: perspective 1200px (the turn itself is in CatalogScreen). */
-.dish-detail-card {
-  perspective: 1200px;
-}
+/* ② Flip to reveal: pure GPU transform flip, perspective on .dish-detail-card above. */
 
 /* ④ Fly to cart: the round copy of the dish that arcs into the cart bar. */
 .fly-ghost {
