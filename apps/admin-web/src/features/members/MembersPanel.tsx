@@ -41,6 +41,12 @@ export function MembersPanel({ api, settings, notify, failed, onSaveSettings }: 
   return <section id="membersPanel" className="admin-panel active"><div className="settings-page">
     <h1 className="settings-title">{t("tabMembers")}</h1>
     <div className="settings-grid">
+      <section className="settings-card settings-section wide" id="member-list">
+        <div className="settings-body">
+          <h2 id="member-list-title">{t("membersListTitle")}</h2>
+          <MemberList api={api} notify={notify} failed={failed} />
+        </div>
+      </section>
       <Section id="member-stats" title={t("memberStatsTitle")} summary={t("memberStatsHint")} wide>
         <MemberStats api={api} timeZone={settings.timeZone} failed={failed} />
       </Section>
@@ -52,9 +58,6 @@ export function MembersPanel({ api, settings, notify, failed, onSaveSettings }: 
       </Section>
       <Section id="member-birthday" title={t("sectionBirthdayPerk")} summary={t(settings.birthdayPerk.enabled ? "orderingOn" : "orderingOff")}>
         <BirthdayPerkForm key={JSON.stringify(settings.birthdayPerk)} perk={settings.birthdayPerk} onSave={(birthdayPerk) => onSaveSettings({ birthdayPerk }, "birthdayPerkSaved")} />
-      </Section>
-      <Section id="member-list" title={t("membersListTitle")} wide>
-        <MemberList api={api} notify={notify} failed={failed} />
       </Section>
     </div>
   </div></section>;

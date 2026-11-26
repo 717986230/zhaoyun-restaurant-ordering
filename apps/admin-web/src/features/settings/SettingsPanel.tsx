@@ -700,15 +700,14 @@ export function SettingsPanel(props: Props) {
       </div>) : <div className="admin-empty">{t("auditEmpty")}</div>}</div>
     </details>
 
-    {/* Open by itself only when the console could not reach its backend —
-        then the address is the thing to fix. */}
-    <details className="settings-card settings-section" open={!settings}>
+    {/* Open only when the console could not reach its backend or in token mode. */}
+    {(!settings || !props.account) && <details className="settings-card settings-section" open={!settings}>
       <summary><h2>{t("sectionConnection")}</h2></summary>
       <form id="connectionForm" className="editor-form settings-body" onSubmit={saveConnection}>
         <label><span>{t("apiAddress")}</span><input name="baseUrl" required defaultValue={props.storage.baseUrl} placeholder="https://…" /></label>
         <label><span>{t("adminToken")}</span><input name="token" type="password" defaultValue={props.storage.token} autoComplete="off" /></label>
         <button className="primary-action" type="submit">{t("saveConnection")}</button>
       </form>
-    </details>
+    </details>}
   </div></section>;
 }

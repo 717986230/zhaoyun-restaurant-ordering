@@ -563,24 +563,24 @@ export function CatalogPanel(props: Props) {
       </div>
       
       <label><span>{t("fieldDescription")}</span><textarea name="description" rows={3} defaultValue={product?.description ?? ""} /></label>
-      <label><span>{t("fieldIngredients")}</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
-      <div className="field-grid three"><label><span>{t("fieldTime")}</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>{t("fieldPortion")}</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>{t("fieldLevel")}</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
       <fieldset className="allergen-picker"><legend>{t("fieldAllergens")}</legend>{ALLERGENS.map((allergen) => <label key={allergen.code}><input type="checkbox" name="allergens" value={allergen.code} defaultChecked={product?.allergens.includes(allergen.code) ?? false} /><span><b>{allergen.code}</b> {language === "zh" ? allergen.zh : allergen.de}</span></label>)}</fieldset>
-      <fieldset className="tag-colour-picker"><legend>{t("fieldTagColour")}</legend>
-        <label className="tag-colour-none"><input type="radio" name="tagColor" value="" defaultChecked={!product?.tagColor} /><span>{t("tagColourNone")}</span></label>
-        {TAG_COLORS.map((colour) => <label key={colour} className="tag-colour-swatch" style={{ "--swatch": colour } as CSSProperties}>
-          <input type="radio" name="tagColor" value={colour} defaultChecked={product?.tagColor === colour} /><span aria-hidden="true" /></label>)}
-      </fieldset>
       <MediaField current={product?.media?.[0] ?? null} mediaUrl={props.mediaUrl} />
       <div className="switch-row"><label><input type="checkbox" name="available" defaultChecked={product?.available ?? true} /><span>{t("fieldAvailable")}</span></label><label><input type="checkbox" name="published" defaultChecked={product?.published ?? true} /><span>{t("fieldPublished")}</span></label></div>
       <label className="daily-limit"><span>{t("fieldDailyLimit")}</span><input name="dailyLimit" id="dailyLimit" type="number" min="1" max="9999" step="1" inputMode="numeric" defaultValue={product?.dailyLimit ?? ""} placeholder={t("dailyLimitNone")} />
         {product?.leftToday !== undefined && product?.leftToday !== null ? <small className="settings-hint">{t("dailyLimitToday", { n: product.leftToday })}</small> : null}</label>
       <ModifierFieldset product={product} />
       <BundleFieldset product={product} products={props.products} mediaUrl={props.mediaUrl} />
-      {/* What a restaurant rarely touches: numbering, printing and tax. Folded
+      {/* What a restaurant rarely touches: details, colour tag, numbering and printing. Folded
           away so the form is the dish, not the plumbing. */}
       <details className="form-advanced">
         <summary>{t("advanced")}</summary>
+        <label><span>{t("fieldIngredients")}</span><input name="ingredients" defaultValue={product?.details.ingredients ?? ""} /></label>
+        <div className="field-grid three"><label><span>{t("fieldTime")}</span><input name="time" defaultValue={product?.details.time ?? ""} /></label><label><span>{t("fieldPortion")}</span><input name="people" defaultValue={product?.details.people ?? ""} /></label><label><span>{t("fieldLevel")}</span><input name="level" defaultValue={product?.details.level ?? ""} /></label></div>
+        <fieldset className="tag-colour-picker"><legend>{t("fieldTagColour")}</legend>
+          <label className="tag-colour-none"><input type="radio" name="tagColor" value="" defaultChecked={!product?.tagColor} /><span>{t("tagColourNone")}</span></label>
+          {TAG_COLORS.map((colour) => <label key={colour} className="tag-colour-swatch" style={{ "--swatch": colour } as CSSProperties}>
+            <input type="radio" name="tagColor" value={colour} defaultChecked={product?.tagColor === colour} /><span aria-hidden="true" /></label>)}
+        </fieldset>
         <div className="field-grid three">
           <label><span>{t("fieldSku")}</span><input name="sku" defaultValue={product?.sku ?? ""} placeholder={t("fieldSkuHint")} /></label>
           <label><span>{t("fieldPrintTarget")}</span><select name="printTarget" defaultValue={printTargetValue(product, props.printers)}>

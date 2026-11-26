@@ -122,13 +122,15 @@ describe("KDS board on screen", () => {
     });
   });
 
-  it("asks for the kitchen token first, and a wrong one is refused", async () => {
+  it("asks for account sign-in first, and wrong credentials are refused", async () => {
     sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal("fetch", vi.fn(async () => ({ status: 401, ok: false, json: async () => ({}) } as Response)));
     const { findByText, getByText, getByLabelText } = render(<Kitchen />);
     expect(getByText("厨房看板")).toBeTruthy();
-    fireEvent.change(getByLabelText("厨房令牌"), { target: { value: "nope" } });
+    fireEvent.change(getByLabelText("账户名"), { target: { value: "chef" } });
+    fireEvent.change(getByLabelText("账户密码"), { target: { value: "nope" } });
     fireEvent.click(getByText("进入厨房看板"));
-    expect(await findByText("令牌不对，请检查后重试")).toBeTruthy();
+    expect(await findByText("账户名或密码不对")).toBeTruthy();
   });
 });
