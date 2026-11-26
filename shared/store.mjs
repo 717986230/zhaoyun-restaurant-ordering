@@ -1129,6 +1129,9 @@ export function createStore(driver, options = {}) {
     const correct = await verifyPassword(String(pin ?? ""), stored);
     if (!row || !row.active || !correct) return null;
     const token = newSessionToken();
+    // 单设备登录（顶号）：同一员工在新设备登录时，踢出旧设备会话并释放其遗留桌台锁，避免切设备后自己锁自己。
+    await run("DELETE FROM pos_sessions WHERE tenant_id = ? AND staff_id = ?", tenantId, row.id);
+    await run("DELETE FROM table_claims WHERE tenant_id = ? AND staff_id = ? AND device_id <> ?", tenantId, row.id, device.id);
     await run("INSERT INTO pos_sessions (tenant_id, token_hash, staff_id, device_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       tenantId, await hashSessionToken(token), row.id, device.id, new Date(Date.now() + POS_SESSION_TTL_MS).toISOString(), now());
     return { token, staff: staffView(row), expiresInMs: POS_SESSION_TTL_MS };

@@ -352,30 +352,26 @@ test("a table open on one device is locked to it; the manager may take it over",
   await phone.close();
 });
 
-test("the same waiter on a second device sees the table locked there, with whose it is", async ({ browser }, testInfo) => {
+test("a waiter signing in on a second device replaces the old session and releases their table lock", async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
   const tablet = await browser.newPage({ locale: "zh-CN" });
   const phone = await browser.newPage({ locale: "zh-CN" });
   await pairAndSignIn(tablet, "Tablet L", "Li", "1234");
-  await pairAndSignIn(phone, "Phone L", "Li", "1234");
-
   await tablet.getByLabel("打开桌号").fill("5");
   await tablet.getByRole("button", { name: "打开", exact: true }).click();
   await expect(tablet.locator(".pos-ticket h1")).toHaveText("桌 5");
 
-  // Locked on the phone, even for the same waiter: the tablet has it open.
+  // Li signs in on the phone: the old tablet session is kicked and table 5 is freed for the phone.
+  await pairAndSignIn(phone, "Phone L", "Li", "1234");
   const five = phone.locator(".pos-table[data-table='5']");
-  await expect(five).toHaveClass(/claimed/);
-  await expect(five.locator(".pos-lock")).toHaveText("🔒");
-  await expect(five).toContainText("Li 正在操作");
+  await expect(five).not.toHaveClass(/claimed/);
   await five.click();
-  await expect(phone.locator(".pos-toast")).toContainText("桌 5 正在 Li 的设备上操作");
-  await expect(phone.locator(".pos-floor")).toBeVisible();
-  // Li leaves the table on the tablet: free on the phone again.
+  await expect(phone.locator(".pos-ticket h1")).toHaveText("桌 5");
+  // The displaced tablet gets 401 on its next action and returns to PIN sign-in.
   await tablet.getByRole("button", { name: "← 返回" }).click();
-  await expect(tablet.locator(".pos-floor")).toBeVisible();
-  await phone.reload();
-  await expect(phone.locator(".pos-table[data-table='5']")).not.toHaveClass(/claimed/);
+  await expect(tablet.locator(".pos-signin")).toBeVisible({ timeout: 10_000 });
+  await phone.getByRole("button", { name: "← 返回" }).click();
+  await expect(phone.locator(".pos-floor")).toBeVisible();
   await tablet.close();
   await phone.close();
 });
