@@ -3866,6 +3866,19 @@ em.voided {
   gap: 6px;
 }
 
+.staff-pin-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--a-card);
+  border: 1px solid var(--a-line);
+  color: var(--a-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .staff-list .ghost-action {
   padding: 6px 10px;
   font-size: 13px;

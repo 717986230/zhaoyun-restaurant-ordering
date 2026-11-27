@@ -60,12 +60,10 @@ test.beforeEach(async ({ page }, testInfo) => {
 
 test("a Lieferando order reaches the POS; the waiter accepts it for 30 minutes, then ready, then picked up", async ({ page, request }) => {
   await page.goto("/pos.html");
-  await page.getByLabel(/设备名称/).fill("Counter");
   await page.getByLabel("账户名").fill(LOGIN);
   await page.getByLabel("账户密码").fill(PASSWORD);
   await page.getByRole("button", { name: "配对" }).click();
   await page.getByLabel("用户名").fill("Li");
-  for (const digit of "1234") await page.locator(".pos-keypad").getByRole("button", { name: digit, exact: true }).click();
   await page.getByRole("button", { name: "OK" }).click();
   await expect(page.locator(".pos-who")).toContainText("Li");
 
@@ -129,12 +127,10 @@ test("每日限量 on the POS: two left today, sold out at the count; the kitche
   const dish = (await (await request.get(`${API}/api/catalog`)).json()).products.find((product) => !product.bundleItems?.length && !product.modifiers?.length);
 
   await page.goto("/pos.html");
-  await page.getByLabel(/设备名称/).fill("Counter 2");
   await page.getByLabel("账户名").fill(LOGIN);
   await page.getByLabel("账户密码").fill(PASSWORD);
   await page.getByRole("button", { name: "配对" }).click();
   await page.getByLabel("用户名").fill("Li");
-  for (const digit of "1234") await page.locator(".pos-keypad").getByRole("button", { name: digit, exact: true }).click();
   await page.getByRole("button", { name: "OK" }).click();
   await page.getByLabel("打开桌号").fill("7");
   await page.getByRole("button", { name: "打开", exact: true }).click();

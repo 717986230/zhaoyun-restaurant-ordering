@@ -158,6 +158,12 @@ CREATE TABLE staff (
       updated_at TEXT NOT NULL,
       UNIQUE (tenant_id, name)
     );
+CREATE TABLE staff_pins (
+      staff_id TEXT PRIMARY KEY REFERENCES staff(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default',
+      pin_code TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 CREATE TABLE pos_sessions (
       token_hash TEXT PRIMARY KEY,
       tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),

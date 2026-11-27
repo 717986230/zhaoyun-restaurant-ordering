@@ -610,8 +610,10 @@ export class PosApi {
   }
 
   staff(): Promise<{ staff: PosStaff[] }> { return this.#request("/api/pos/staff", {}, ""); }
-  async signIn(target: string | { staffId?: string; name?: string }, pin: string): Promise<PosStaff> {
-    const payload = typeof target === "string" ? { staffId: target, pin } : { ...target, pin };
+  async signIn(target: string | { staffId?: string; name?: string }, pin?: string): Promise<PosStaff> {
+    const payload = typeof target === "string"
+      ? { staffId: target, ...(pin ? { pin } : {}) }
+      : { ...target, ...(pin ? { pin } : {}) };
     const { token, staff } = await this.#request<{ token: string; staff: PosStaff }>("/api/pos/sign-in", { method: "POST", body: JSON.stringify(payload) }, "");
     localStorage.setItem("zy_pos_session", JSON.stringify({ token, staff }));
     return staff;

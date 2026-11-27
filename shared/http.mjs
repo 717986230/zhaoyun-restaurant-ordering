@@ -1738,7 +1738,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       }
       if (path[2] === "staff") {
         try {
-          if (path.length === 3 && method === "GET") return json({ staff: await store.listStaff() });
+          if (path.length === 3 && method === "GET") return json({ staff: await (store.listStaffWithPins ? store.listStaffWithPins() : store.listStaff()) });
           const { value, invalid } = await body(request, StaffBody);
           if (invalid) return invalid;
           if (path.length === 3 && method === "POST") return json({ staff: await store.saveStaff(value) }, 201);

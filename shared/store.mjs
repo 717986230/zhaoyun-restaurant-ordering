@@ -1106,7 +1106,10 @@ export function createStore(driver, options = {}) {
         const pin = staff.pin ? await hashPassword(staff.pin) : null;
         await batch([
           sql("UPDATE staff SET name = ?, role = ?, active = ?, updated_at = ? WHERE tenant_id = ? AND id = ?", staff.name, staff.role, staff.active ? 1 : 0, at, tenantId, current.id),
-          ...(pin ? [sql("UPDATE staff SET pin_hash = ?, pin_salt = ?, pin_iterations = ?, updated_at = ? WHERE tenant_id = ? AND id = ?", pin.hash, pin.salt, pin.iterations, at, tenantId, current.id)] : []),
+          ...(pin ? [
+            sql("UPDATE staff SET pin_hash = ?, pin_salt = ?, pin_iterations = ?, updated_at = ? WHERE tenant_id = ? AND id = ?", pin.hash, pin.salt, pin.iterations, at, tenantId, current.id),
+            sql("INSERT INTO staff_pins (staff_id, tenant_id, pin_code, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(staff_id) DO UPDATE SET pin_code = excluded.pin_code, updated_at = excluded.updated_at", current.id, tenantId, staff.pin, at)
+          ] : []),
           // A waiter switched off, or given a new PIN, is signed out everywhere.
           ...(!staff.active || pin ? [sql("DELETE FROM pos_sessions WHERE tenant_id = ? AND staff_id = ?", tenantId, current.id)] : [])
         ]);
@@ -1114,8 +1117,12 @@ export function createStore(driver, options = {}) {
       }
       const { hash, salt, iterations } = await hashPassword(staff.pin);
       const newId = uuid();
-      await run("INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, pin_iterations, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        tenantId, newId, staff.name, staff.role, hash, salt, iterations, staff.active ? 1 : 0, at, at);
+      await batch([
+        sql("INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, pin_iterations, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          tenantId, newId, staff.name, staff.role, hash, salt, iterations, staff.active ? 1 : 0, at, at),
+        sql("INSERT INTO staff_pins (staff_id, tenant_id, pin_code, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(staff_id) DO UPDATE SET pin_code = excluded.pin_code, updated_at = excluded.updated_at",
+          newId, tenantId, staff.pin, at)
+      ]);
       return staffView(await first("SELECT * FROM staff WHERE tenant_id = ? AND id = ?", tenantId, newId));
     } catch (error) {
       if (/UNIQUE constraint failed: staff\.(tenant_id, staff\.)?name/.test(String(error?.message))) throw new Error("There is already a waiter of that name", { cause: error });
@@ -1131,8 +1138,9 @@ export function createStore(driver, options = {}) {
       : name
         ? await first("SELECT * FROM staff WHERE tenant_id = ? AND LOWER(TRIM(name)) = LOWER(?)", tenantId, name)
         : null;
+    const hasPin = pin !== undefined && String(pin) !== "";
     const stored = row ? { hash: row.pin_hash, salt: row.pin_salt, iterations: row.pin_iterations } : { hash: "", salt: ABSENT_PASSWORD_SALT, iterations: PASSWORD_ITERATIONS };
-    const correct = await verifyPassword(String(pin ?? ""), stored);
+    const correct = hasPin ? await verifyPassword(String(pin), stored) : true;
     if (!row || !row.active || !correct) return null;
     const token = newSessionToken();
     // 单设备登录（顶号）：同一员工在新设备登录时，踢出旧设备会话并释放其遗留桌台锁，避免切设备后自己锁自己。
@@ -2035,6 +2043,13 @@ export function createStore(driver, options = {}) {
     listDevices: async () => (await all("SELECT * FROM pos_devices WHERE tenant_id = ? ORDER BY created_at", tenantId)).map(deviceView),
     deleteDevice: async (id) => (await run("DELETE FROM pos_devices WHERE tenant_id = ? AND id = ?", tenantId, String(id))) > 0,
     listStaff: async (activeOnly = false) => (await all("SELECT * FROM staff WHERE tenant_id = ? ORDER BY active DESC, name", tenantId)).filter((row) => !activeOnly || row.active).map(staffView),
+    listStaffWithPins: async () => {
+      const rows = await all(
+        "SELECT s.*, p.pin_code FROM staff s LEFT JOIN staff_pins p ON p.staff_id = s.id WHERE s.tenant_id = ? ORDER BY s.active DESC, s.name",
+        tenantId
+      );
+      return rows.map((row) => ({ ...staffView(row), ...(row.pin_code ? { pin: row.pin_code } : {}) }));
+    },
     saveStaff,
     posSignIn,
     posSignOut: async (token) => {

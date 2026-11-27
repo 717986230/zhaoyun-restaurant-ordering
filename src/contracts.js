@@ -378,7 +378,7 @@ export const PosSignInBody = Type.Object(
   {
     staffId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
     name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
-    pin: Type.String({ maxLength: 12 })
+    pin: Type.Optional(Type.String({ maxLength: 12 }))
   },
   { additionalProperties: false }
 );

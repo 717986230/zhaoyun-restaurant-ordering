@@ -77,7 +77,7 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
 
   return <div className="staff-card">
     {staff.length ? <ul className="staff-list">{staff.map((person) => <li key={person.id} data-staff={person.name} className={person.active ? "" : "inactive"}>
-      <b>{person.name}</b>
+      <b>{person.name} <small className="staff-pin-badge">PIN: {person.pin ?? "—"}</small></b>
       <select aria-label={t("staffRole")} value={person.role} onChange={(event) => void save(person, { role: event.target.value === "manager" ? "manager" : "staff" })}>
         <option value="staff">{t("roleWaiter")}</option>
         <option value="manager">{t("roleManagerShort")}</option>

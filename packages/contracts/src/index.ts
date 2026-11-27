@@ -472,7 +472,7 @@ export interface RegisterCommand { login: string; name?: string; password: strin
 /** Every change is made against the password in force. */
 export interface AccountUpdateCommand { currentPassword: string; login?: string; name?: string; password?: string }
 
-export interface PosStaff { id: string; name: string; role: "staff" | "manager"; active?: boolean }
+export interface PosStaff { id: string; name: string; role: "staff" | "manager"; active?: boolean; pin?: string }
 export interface PosDevice { id: string; name: string; createdAt: string; lastSeenAt: string | null }
 /**
  * A table open on a device, locked to it until closed or left alone. `epoch` is

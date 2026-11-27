@@ -293,17 +293,21 @@ export function App() {
   </div>;
 }
 
-/** Pairing, once per device, with the restaurant's account. */
+/** First-launch device binding: Manager account + password once per phone/tablet. */
 function Pair({ t, onPaired }: { t: (key: PosKey) => string; onPaired: () => void }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const login = String(data.get("login") || "").trim().toLowerCase();
+    const password = String(data.get("password") || "");
+    const deviceName = String(data.get("name") || "").trim() || "POS";
+    const base = String(data.get("base") || "").trim();
     setBusy(true);
     setError("");
     try {
-      await api.pair(String(data.get("base") || "").trim(), String(data.get("login") || "").trim().toLowerCase(), String(data.get("password") || ""), String(data.get("name") || "").trim());
+      await api.pair(base, login, password, deviceName);
       onPaired();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t("pairFailed"));
@@ -314,27 +318,28 @@ function Pair({ t, onPaired }: { t: (key: PosKey) => string; onPaired: () => voi
   return <form className="pos-card pos-pair" onSubmit={submit}>
     <h1>{t("pairTitle")}</h1>
     <p>{t("pairLead")}</p>
-    <label><span>{t("deviceName")}</span><input name="name" required maxLength={32} /></label>
     <label><span>{t("accountLogin")}</span><input name="login" required autoComplete="username" autoCapitalize="none" spellCheck={false} /></label>
     <label><span>{t("managerPassword")}</span><input name="password" type="password" required autoComplete="current-password" /></label>
-    <label><span>{t("apiBase")}</span><input name="base" inputMode="url" placeholder="https://…" /></label>
+    <details>
+      <summary className="pos-link">{t("pairAdvanced")}</summary>
+      <label><span>{t("deviceName")}</span><input name="name" maxLength={32} placeholder="POS" /></label>
+      <label><span>{t("apiBase")}</span><input name="base" inputMode="url" placeholder="https://…" /></label>
+    </details>
     {error && <p className="pos-error" role="alert">{error}</p>}
     <button className="pos-primary" type="submit" disabled={busy}>{t("pair")}</button>
   </form>;
 }
 
-/** Direct staff sign-in: username + PIN (with both keyboard input and thumb keypad). */
+/** Daily waiter sign-in on an already-bound device: just enter the staff username. */
 function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof translator>; onSignedIn: (staff: PosStaff) => void; onUnpair: () => void; failed: (error: unknown) => void }) {
   const [name, setName] = useState(() => {
     try { return localStorage.getItem("zy_pos_last_user") ?? ""; } catch { return ""; }
   });
-  const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.staff().catch((failure) => {
-      // The manager unpaired this device: back to pairing.
       if ((failure as { status?: number })?.status === 401) onUnpair();
       else failed(failure);
     });
@@ -343,12 +348,12 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed || pin.length < 4 || busy) return;
+    if (!trimmed || busy) return;
     setBusy(true);
     setError("");
     try { localStorage.setItem("zy_pos_last_user", trimmed); } catch { /* private mode */ }
     try {
-      onSignedIn(await api.signIn({ name: trimmed }, pin));
+      onSignedIn(await api.signIn({ name: trimmed }));
     } catch (failure) {
       const status = (failure as { status?: number })?.status;
       const message = failure instanceof Error ? failure.message : "";
@@ -356,20 +361,12 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
         onUnpair();
         return;
       }
-      if (status === 401) {
-        setError(t("wrongPin"));
-      } else {
-        setError(message || t("failed"));
-      }
-      setPin("");
+      if (status === 401) setError(t("wrongPin"));
+      else setError(message || t("failed"));
     } finally {
       setBusy(false);
     }
   }
-  const press = (digit: string) => {
-    setError("");
-    setPin((current) => `${current}${digit}`.slice(0, 6));
-  };
 
   return <form className="pos-card pos-signin" onSubmit={(event) => void submit(event)}>
     <h1>{t("posSignInTitle")}</h1>
@@ -380,6 +377,7 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
         value={name}
         required
         maxLength={64}
+        autoFocus
         autoComplete="off"
         autoCapitalize="none"
         autoCorrect="off"
@@ -393,27 +391,8 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
         }}
       />
     </label>
-    <label>
-      <span>PIN</span>
-      <input
-        name="staff-pin"
-        type="password"
-        inputMode="numeric"
-        maxLength={6}
-        value={pin}
-        autoComplete="one-time-code"
-        placeholder="4–6 位数字"
-        onChange={(event) => { setError(""); setPin(event.target.value.replace(/\D/g, "").slice(0, 6)); }}
-      />
-    </label>
-    <div className="pos-pin" aria-label="PIN">{Array.from({ length: Math.max(4, pin.length) }, (_, index) => <i key={index} className={index < pin.length ? "on" : ""} />)}</div>
     {error && <p className="pos-error" role="alert">{error}</p>}
-    <div className="pos-keypad">
-      {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => <button key={digit} type="button" onClick={() => press(digit)}>{digit}</button>)}
-      <button type="button" aria-label={t("back")} onClick={() => { setError(""); setPin((current) => current.slice(0, -1)); }}>⌫</button>
-      <button type="button" onClick={() => press("0")}>0</button>
-      <button type="submit" className="pos-primary" disabled={!name.trim() || pin.length < 4 || busy}>OK</button>
-    </div>
+    <button type="submit" className="pos-primary" disabled={!name.trim() || busy}>OK</button>
     <button type="button" className="pos-link" onClick={() => { if (window.confirm(t("unpairConfirm"))) onUnpair(); }}>{t("unpair")}</button>
   </form>;
 }

@@ -8,7 +8,8 @@ export const POS_LANGUAGES: PosLanguage[] = ["zh", "de", "en"];
 
 const zh = {
   pairTitle: "配对这台设备",
-  pairLead: "每台收银 / 点单设备只需配对一次：用餐厅账户（在管理台注册的账户名和密码）。配对后跑堂用自己的 PIN 登录。",
+  pairLead: "每台手机或平板只需首次用管理账户（账户名 + 密码）绑定一次。绑定后跑堂只需输入用户名即可直接登录。",
+  pairAdvanced: "可选设置（设备名 / 服务器地址）",
   apiBase: "服务器地址（留空用默认）",
   accountLogin: "账户名",
   managerPassword: "账户密码",
@@ -17,10 +18,10 @@ const zh = {
   pairFailed: "配对失败",
   posSignInTitle: "员工登录",
   staffUsername: "用户名",
-  staffUsernameHint: "输入跑堂名字 / 账号",
+  staffUsernameHint: "输入跑堂用户名",
   whoAreYou: "请选择你的名字",
   enterPin: "{name}，请输入 PIN",
-  wrongPin: "用户名或 PIN 不对",
+  wrongPin: "用户名不存在或已停用",
   noStaff: "还没有跑堂。请经理在管理台「设置 → 跑堂与设备」里添加。",
   unpair: "取消配对",
   unpairConfirm: "取消这台设备的配对？之后需要餐厅账户（账户名 + 密码）重新配对。",
@@ -382,7 +383,8 @@ type Copy = typeof zh;
 
 const de: Copy = {
   pairTitle: "Gerät koppeln",
-  pairLead: "Jedes Kassen- oder Bestellgerät wird einmal mit dem Konto des Lokals gekoppelt (Kontoname und Passwort aus der Verwaltung). Danach melden sich die Kellner mit ihrer PIN an.",
+  pairLead: "Jedes Gerät wird nur einmal mit dem Verwaltungskonto gekoppelt. Danach genügt für Kellner der Benutzername.",
+  pairAdvanced: "Optionale Einstellungen",
   apiBase: "Serveradresse (leer: Standard)",
   accountLogin: "Kontoname",
   managerPassword: "Passwort des Kontos",
@@ -394,7 +396,7 @@ const de: Copy = {
   staffUsernameHint: "Name eingeben",
   whoAreYou: "Wer bist du?",
   enterPin: "{name}, PIN eingeben",
-  wrongPin: "Benutzername oder PIN falsch",
+  wrongPin: "Benutzername nicht gefunden oder inaktiv",
   noStaff: "Noch keine Kellner. Die Leitung legt sie in der Verwaltung unter „Einstellungen → Kellner und Geräte“ an.",
   unpair: "Entkoppeln",
   unpairConfirm: "Dieses Gerät entkoppeln? Danach braucht es wieder das Konto des Lokals (Kontoname und Passwort).",
@@ -754,7 +756,8 @@ const de: Copy = {
 
 const en: Copy = {
   pairTitle: "Pair this device",
-  pairLead: "Each till or order device is paired once, with the restaurant's account (the account name and password registered in the admin console). After that waiters sign in with their PIN.",
+  pairLead: "Each device is bound once with the restaurant's admin account. After that, waiters sign in with their username.",
+  pairAdvanced: "Optional settings",
   apiBase: "Server address (empty: default)",
   accountLogin: "Account name",
   managerPassword: "Account password",
@@ -766,7 +769,7 @@ const en: Copy = {
   staffUsernameHint: "Enter your name",
   whoAreYou: "Who are you?",
   enterPin: "{name}, enter your PIN",
-  wrongPin: "Wrong username or PIN",
+  wrongPin: "Username not found or inactive",
   noStaff: "No waiters yet. The manager adds them in the console under “Settings → Waiters and devices”.",
   unpair: "Unpair",
   unpairConfirm: "Unpair this device? It will need the restaurant's account (account name and password) again.",
