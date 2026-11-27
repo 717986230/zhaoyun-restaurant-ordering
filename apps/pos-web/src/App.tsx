@@ -376,27 +376,32 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
     <label>
       <span>{t("staffUsername")}</span>
       <input
-        name="username"
+        name="staff-username"
         value={name}
         required
         maxLength={64}
-        autoComplete="username"
+        autoComplete="off"
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
         placeholder={t("staffUsernameHint")}
-        onChange={(event) => { setError(""); setName(event.target.value); }}
+        onChange={(event) => {
+          const next = event.target.value;
+          setError("");
+          setName(next);
+          try { localStorage.setItem("zy_pos_last_user", next); } catch { /* private mode */ }
+        }}
       />
     </label>
     <label>
       <span>PIN</span>
       <input
-        name="pin"
+        name="staff-pin"
         type="password"
         inputMode="numeric"
         maxLength={6}
         value={pin}
-        autoComplete="current-password"
+        autoComplete="one-time-code"
         placeholder="4–6 位数字"
         onChange={(event) => { setError(""); setPin(event.target.value.replace(/\D/g, "").slice(0, 6)); }}
       />
