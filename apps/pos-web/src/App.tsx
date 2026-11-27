@@ -346,8 +346,18 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
     setError("");
     try {
       onSignedIn(await api.signIn({ name: trimmed }, pin));
-    } catch {
-      setError(t("wrongPin"));
+    } catch (failure) {
+      const status = (failure as { status?: number })?.status;
+      const message = failure instanceof Error ? failure.message : "";
+      if (status === 401 && /not paired/i.test(message)) {
+        onUnpair();
+        return;
+      }
+      if (status === 401) {
+        setError(t("wrongPin"));
+      } else {
+        setError(message || t("failed"));
+      }
       setPin("");
     } finally {
       setBusy(false);
@@ -369,6 +379,7 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
         maxLength={64}
         autoComplete="username"
         autoCapitalize="none"
+        autoCorrect="off"
         spellCheck={false}
         placeholder={t("staffUsernameHint")}
         onChange={(event) => { setError(""); setName(event.target.value); }}
