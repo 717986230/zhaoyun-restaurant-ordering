@@ -397,7 +397,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
       <div className="pos-menu-split">
         <nav className="pos-categories" aria-label={t("all")}>
           <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
-          {categories.map((entry) => <button key={entry} type="button" className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>
+          {categories.map((entry) => <button key={entry} type="button" style={{ "--tag": catColor(entry) } as CSSProperties} className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>
             <span className="pos-cat-dot" aria-hidden="true" style={{ background: catColor(entry) }} />{entry}
           </button>)}
         </nav>

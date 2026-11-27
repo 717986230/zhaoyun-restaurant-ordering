@@ -325,7 +325,9 @@ function Pair({ t, onPaired }: { t: (key: PosKey) => string; onPaired: () => voi
 
 /** Direct staff sign-in: username + PIN (with both keyboard input and thumb keypad). */
 function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof translator>; onSignedIn: (staff: PosStaff) => void; onUnpair: () => void; failed: (error: unknown) => void }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => {
+    try { return localStorage.getItem("zy_pos_last_user") ?? ""; } catch { return ""; }
+  });
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -344,6 +346,7 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
     if (!trimmed || pin.length < 4 || busy) return;
     setBusy(true);
     setError("");
+    try { localStorage.setItem("zy_pos_last_user", trimmed); } catch { /* private mode */ }
     try {
       onSignedIn(await api.signIn({ name: trimmed }, pin));
     } catch (failure) {

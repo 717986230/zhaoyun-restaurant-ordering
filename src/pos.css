@@ -310,15 +310,53 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 /* The order's bottom-sheet bar (phones only — hidden in the two-column layout). */
 .pos-sheet-bar { display: none; }
 
-.pos-menu { display: grid; gap: 10px; min-width: 0; }
-.pos-number input { min-height: 56px; font-size: 22px; font-weight: 700; }
-.pos-menu-split { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; }
-.pos-categories { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow-y: auto; padding-bottom: 4px; }
-.pos-categories button { width: 100%; display: flex; align-items: center; justify-content: flex-start; gap: 7px; text-align: left; padding: 10px 8px; font-size: 13px; white-space: normal; line-height: 1.25; }
+.pos-menu { display: grid; gap: 10px; min-width: 0; align-content: start; }
+.pos-number input { min-height: 52px; font-size: 20px; font-weight: 700; }
+.pos-menu-split { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; }
+.pos-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100dvh - 210px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.pos-categories button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  text-align: left;
+  padding: 10px 8px 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: normal;
+  line-height: 1.25;
+  background: color-mix(in srgb, var(--tag, var(--p-accent)) 14%, var(--p-card));
+  box-shadow: inset 5px 0 0 var(--tag, var(--p-accent));
+  border-color: color-mix(in srgb, var(--tag, var(--p-accent)) 28%, var(--p-line));
+}
+.pos-categories button.on {
+  background: var(--tag, var(--p-accent));
+  border-color: var(--tag, var(--p-accent));
+  color: var(--p-accent-ink);
+  box-shadow: none;
+}
 /* A category's colour, so a waiter tells categories apart at a glance. */
 .pos-cat-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--p-line); flex: 0 0 auto; }
+.pos-categories button.on .pos-cat-dot { background: var(--p-accent-ink) !important; }
 
-.pos-dishes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; min-width: 0; }
+.pos-dishes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  max-height: calc(100dvh - 210px);
+  overflow-y: auto;
+  align-content: start;
+  padding-right: 2px;
+}
 
 .pos-dishes button {
   display: grid;
@@ -484,9 +522,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 @media (max-width: 820px) {
   .pos-order, .pos-pay-screen { grid-template-columns: minmax(0, 1fr); }
   .pos-pay-panel { position: static; max-height: none; }
-  .pos-menu-split { grid-template-columns: 88px minmax(0, 1fr); gap: 8px; }
-  .pos-categories { position: static; max-height: 70vh; }
-  .pos-dishes { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+  .pos-menu-split { grid-template-columns: 96px minmax(0, 1fr); gap: 8px; }
+  .pos-categories { max-height: calc(100dvh - 250px); }
+  .pos-dishes { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: calc(100dvh - 250px); }
 
   /* On a phone the order rides as a bottom sheet: a fixed summary bar sits at
      the foot while the dishes keep the whole screen; tapping the bar slides the
@@ -1289,4 +1327,9 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
   color: var(--p-ink);
   font-size: 12px;
   font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .pos-menu-split { grid-template-columns: 84px minmax(0, 1fr); gap: 6px; }
+  .pos-dishes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
