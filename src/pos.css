@@ -199,6 +199,10 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 .pos-floor h2 { margin: 18px 0 10px; font-size: 16px; color: var(--p-muted); }
 
 .pos-table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.pos-floor-zones { display: flex; flex-wrap: nowrap; gap: 6px; margin: 0 0 10px; overflow-x: auto; scrollbar-width: none; }
+.pos-floor-zones::-webkit-scrollbar { display: none; }
+.pos-floor-zones button { flex: none; min-height: 36px; padding: 5px 12px; border-radius: var(--r-pill); font-size: 13px; white-space: nowrap; background: var(--p-card); color: var(--p-muted); border: 1px solid var(--p-line); }
+.pos-floor-zones button.on { background: var(--p-accent); border-color: var(--p-accent); color: var(--p-accent-ink); font-weight: 700; }
 
 .pos-table {
   display: grid;

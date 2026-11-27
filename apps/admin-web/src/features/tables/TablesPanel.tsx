@@ -77,6 +77,24 @@ function sampleOf(names: string[]): string {
 }
 const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(value || lo)));
 
+/** Derive zone prefix from table code (e.g. A1 -> A, VIP2 -> VIP, 12 -> #). */
+function zoneOf(table: string): string {
+  const trimmed = table.trim().toUpperCase();
+  const match = /^([A-Z]+)\d/.exec(trimmed);
+  if (match) return match[1]!;
+  if (/^\d+$/.test(trimmed)) return "#";
+  return trimmed.slice(0, 1) || "#";
+}
+
+function sortZones(zones: string[]): string[] {
+  return [...zones].sort((a, b) => (a === "#" ? 1 : b === "#" ? -1 : a.localeCompare(b)));
+}
+
+function zoneText(zone: string, language: string): string {
+  if (zone === "#") return language === "zh" ? "数字区" : language === "de" ? "Nummern" : "Numbers";
+  return language === "zh" ? `${zone} 区` : language === "de" ? `Bereich ${zone}` : `Zone ${zone}`;
+}
+
 /** The default tables standing in until the room is set up: 1, 2, 3 … with none missing. */
 function defaultCount(tables: TableOverview[]) {
   const numbers = new Set(tables.filter((table) => !table.registered).map((table) => table.table));
@@ -114,6 +132,7 @@ export function TablesPanel(props: Props) {
   const [renaming, setRenaming] = useState<string | null>(null);
   // Which tables the grid shows: everything, or one state at a time.
   const [filter, setFilter] = useState<"all" | TableOverview["state"]>("all");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
   const [compact, setCompact] = useState(false);
   const [selectedTableName, setSelectedTableName] = useState<string | null>(null);
   // The printable QR cards for the room.
@@ -345,11 +364,30 @@ export function TablesPanel(props: Props) {
       </div>}
     </article>;
     };
+    const zones = sortZones([...new Set(dineIn.map((table) => zoneOf(table.table)))]);
+    const activeZone = zoneFilter !== "all" && zones.includes(zoneFilter) ? zoneFilter : "all";
+    const filteredDineIn = activeZone === "all" ? dineIn : dineIn.filter((table) => zoneOf(table.table) === activeZone);
     return <>
-      <div className={`table-grid ${compact ? "compact" : ""}`}>{dineIn.length ? dineIn.map(renderTile) : <div className="admin-empty">
+      {zones.length > 1 && <div className="table-zones" role="group" aria-label={t("tablesTitle")}>
+        <button type="button" className={activeZone === "all" ? "active" : ""} aria-pressed={activeZone === "all"} onClick={() => setZoneFilter("all")}>{t("filterAll")} · {dineIn.length}</button>
+        {zones.map((zone) => {
+          const count = dineIn.filter((table) => zoneOf(table.table) === zone).length;
+          return <button key={zone} type="button" className={activeZone === zone ? "active" : ""} aria-pressed={activeZone === zone} onClick={() => setZoneFilter(zone)}>{zoneText(zone, language)} · {count}</button>;
+        })}
+      </div>}
+      {zones.length > 1 && activeZone === "all" && filteredDineIn.length > 0 ? <div className="table-zone-groups">
+        {zones.map((zone) => {
+          const group = filteredDineIn.filter((table) => zoneOf(table.table) === zone);
+          if (!group.length) return null;
+          return <section key={zone} className="table-zone-group" aria-label={zoneText(zone, language)}>
+            <h2 className="table-zone-heading">{zoneText(zone, language)} <span>· {group.length}</span></h2>
+            <div className={`table-grid ${compact ? "compact" : ""}`}>{group.map(renderTile)}</div>
+          </section>;
+        })}
+      </div> : <div className={`table-grid ${compact ? "compact" : ""}`}>{filteredDineIn.length ? filteredDineIn.map(renderTile) : <div className="admin-empty">
         <p>{t("tablesEmpty")}</p>
         {manager && !editing && props.tables.length === 0 && <button className="primary-action" data-action="generate-tables" disabled={props.busy} onClick={() => void startEditing()}>{t("tablesGenerate")}</button>}
-      </div>}</div>
+      </div>}</div>}
       {takeaway.length > 0 && <section className="takeaway-section" aria-label={t("tablesTakeaway")}>
         <div className="takeaway-head">
           <h2>{t("tablesTakeaway")}</h2>

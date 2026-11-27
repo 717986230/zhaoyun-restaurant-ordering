@@ -275,6 +275,7 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   // A booking being seated: the free-table picker is open for it.
   const [seating, setSeating] = useState<ApiReservation | null>(null);
   const [tableFilter, setTableFilter] = useState<"all" | "seated" | "attention">("all");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
   // This device: the tables it has open are its own, every other device's are locked to it.
   const [deviceId, setDeviceId] = useState("");
 
@@ -312,6 +313,15 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   for (const entry of held) heldAt.set(entry.table.toUpperCase(), entry.time);
   const room = tables.filter((table) => !TAKEAWAY.test(table.table));
   const takeaways = tables.filter((table) => TAKEAWAY.test(table.table) && table.state !== "free");
+  const zoneOf = (name: string) => {
+    const trimmed = name.trim().toUpperCase();
+    const match = /^([A-Z]+)\d/.exec(trimmed);
+    if (match) return match[1]!;
+    if (/^\d+$/.test(trimmed)) return "#";
+    return trimmed.slice(0, 1) || "#";
+  };
+  const zones = [...new Set(room.map((table) => zoneOf(table.table)))].sort((a, b) => (a === "#" ? 1 : b === "#" ? -1 : a.localeCompare(b)));
+  const activeZone = zoneFilter !== "all" && zones.includes(zoneFilter) ? zoneFilter : "all";
   const isAttention = (table: TableOverview) => {
     const code = table.table.toUpperCase();
     return calling.has(code) || table.state === "locked" || heldAt.has(code) || bookedAt.has(code);
@@ -319,7 +329,8 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
   const seatedRoom = room.filter((table) => table.state !== "free");
   const seatedTotalCents = seatedRoom.reduce((sum, table) => sum + Math.round(table.total * 100), 0);
   const attentionRoom = room.filter(isAttention);
-  const shownRoom = tableFilter === "seated" ? seatedRoom : tableFilter === "attention" ? attentionRoom : room;
+  const stateRoom = tableFilter === "seated" ? seatedRoom : tableFilter === "attention" ? attentionRoom : room;
+  const shownRoom = activeZone === "all" ? stateRoom : stateRoom.filter((table) => zoneOf(table.table) === activeZone);
 
   async function newTakeaway() {
     try {
@@ -395,6 +406,17 @@ export function Floor({ pos, go }: { pos: Pos; go: (screen: Screen) => void }) {
         <button type="button" className={tableFilter === "attention" ? "on" : ""} aria-pressed={tableFilter === "attention"} onClick={() => setTableFilter("attention")}>{t("filterAttention")} ({attentionRoom.length})</button>
       </div>
     </div>
+    {zones.length > 1 && <div className="pos-floor-zones" role="group" aria-label={t("tables")}>
+      <button type="button" className={activeZone === "all" ? "on" : ""} aria-pressed={activeZone === "all"} onClick={() => setZoneFilter("all")}>{t("filterAll")} ({stateRoom.length})</button>
+      {zones.map((zone) => {
+        const count = stateRoom.filter((table) => zoneOf(table.table) === zone).length;
+        if (!count) return null;
+        const label = zone === "#"
+          ? (pos.language === "zh" ? "数字区" : pos.language === "de" ? "Nummern" : "Numbers")
+          : (pos.language === "zh" ? `${zone}区` : pos.language === "de" ? `Bereich ${zone}` : `Zone ${zone}`);
+        return <button key={zone} type="button" className={activeZone === zone ? "on" : ""} aria-pressed={activeZone === zone} onClick={() => setZoneFilter(zone)}>{label} ({count})</button>;
+      })}
+    </div>}
     <div className="pos-table-grid">{shownRoom.map(tile)}</div>
     {takeaways.length > 0 && <>
       <h2>{t("takeaways")}</h2>

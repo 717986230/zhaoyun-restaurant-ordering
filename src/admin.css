@@ -1250,6 +1250,41 @@ em.voided {
   gap: 12px;
   align-items: stretch;
 }
+.table-zones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.table-zones button {
+  border: 1px solid var(--a-line);
+  border-radius: 999px;
+  background: var(--a-card);
+  color: var(--a-muted);
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.table-zones button.active {
+  border-color: var(--a-accent);
+  background: var(--a-accent);
+  color: var(--a-on-accent);
+}
+.table-zone-groups {
+  display: grid;
+  gap: 18px;
+}
+.table-zone-heading {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--a-ink);
+}
+.table-zone-heading span {
+  color: var(--a-muted);
+  font-weight: 500;
+}
 
 /* Online-pickup orders live under their own heading, apart from the floor. */
 .admin-update-banner {
