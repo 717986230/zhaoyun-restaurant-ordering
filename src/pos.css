@@ -1330,6 +1330,14 @@ label { display: grid; gap: 4px; color: var(--p-muted); font-size: 13px; }
 }
 
 @media (max-width: 480px) {
+  .pos-head { padding: 8px 10px; gap: 6px; }
+  .pos-head strong { font-size: 18px; }
+  .pos-head-actions { gap: 4px; }
+  .pos-head-actions button { padding: 4px 8px; font-size: 12px; min-height: 32px; }
+  .pos-languages button { width: 26px; min-height: 26px; }
+  .pos-languages img { width: 18px; height: 13px; }
+  .pos-main { padding: 10px; }
+  .pos-table-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
   .pos-menu-split { grid-template-columns: 84px minmax(0, 1fr); gap: 6px; }
   .pos-dishes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

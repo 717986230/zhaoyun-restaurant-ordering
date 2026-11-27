@@ -1286,6 +1286,22 @@ em.voided {
   font-weight: 500;
 }
 
+@media (max-width: 520px) {
+  .table-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .table-tile {
+    min-height: 148px;
+    padding: 10px;
+  }
+  .bill-sheet {
+    width: min(94vw, 520px);
+    max-height: 88dvh;
+    overflow-y: auto;
+  }
+}
+
 /* Online-pickup orders live under their own heading, apart from the floor. */
 .admin-update-banner {
   display: block;
