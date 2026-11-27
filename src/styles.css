@@ -5220,6 +5220,27 @@ button:focus-visible,
   min-width: 0;
 }
 
+.password-input-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.password-input-wrap input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.password-toggle {
+  flex: none;
+  min-width: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+
 .dial-code-select {
   min-width: 84px;
   max-width: 108px;

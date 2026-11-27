@@ -95,9 +95,12 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [repeat, setRepeat] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const registering = mode === "register";
+  const isEmailInput = email.includes("@");
+  const tooShort = registering && password.length > 0 && password.length < PASSWORD_MIN;
   const mismatch = registering && repeat.length > 0 && password !== repeat;
   const ready = email.trim().length > 0 && password.length > 0 && (!registering || repeat.length > 0);
 
@@ -146,17 +149,21 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
     </div>
     <label>{g(language, "login")}
       <div className="phone-input-group">
-        <select className="dial-code-select" aria-label={g(language, "dialCode")} value={dialCode} onChange={(event) => { setDialCode(event.target.value); setError(""); }}>
+        {!isEmailInput && <select className="dial-code-select" aria-label={g(language, "dialCode")} value={dialCode} onChange={(event) => { setDialCode(event.target.value); setError(""); }}>
           {COUNTRY_DIAL_CODES.map((entry) => <option key={entry.code} value={entry.code}>{entry.flag} {entry.label}</option>)}
-        </select>
+        </select>}
         <input name="email" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="0660 1234567 / name@example.com" value={email} onChange={(event) => { setEmail(event.target.value); if (error) setError(""); }} required />
       </div>
     </label>
     {registering && !elder && <label>{g(language, "name")}<input name="name" autoComplete="nickname" maxLength={40} value={name} onChange={(event) => setName(event.target.value)} /></label>}
     <label>{g(language, "password")}{registering && <small> · {g(language, "passwordHint")}</small>}
-      <input name="password" type="password" autoComplete={registering ? "new-password" : "current-password"} value={password} onChange={(event) => { setPassword(event.target.value); if (error) setError(""); }} required />
+      <div className="password-input-wrap">
+        <input name="password" type={showPassword ? "text" : "password"} autoComplete={registering ? "new-password" : "current-password"} value={password} onChange={(event) => { setPassword(event.target.value); if (error) setError(""); }} required />
+        <button type="button" className="password-toggle" aria-pressed={showPassword} aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((on) => !on)}>{showPassword ? "🙈" : "👁"}</button>
+      </div>
     </label>
-    {registering && <label>{g(language, "passwordRepeat")}<input name="password-repeat" type="password" autoComplete="new-password" value={repeat} onChange={(event) => { setRepeat(event.target.value); if (error) setError(""); }} required /></label>}
+    {registering && <label>{g(language, "passwordRepeat")}<input name="password-repeat" type={showPassword ? "text" : "password"} autoComplete="new-password" value={repeat} onChange={(event) => { setRepeat(event.target.value); if (error) setError(""); }} required /></label>}
+    {tooShort && <p className="cart-error">{g(language, "passwordTooShort", { n: PASSWORD_MIN })}</p>}
     {mismatch && <p className="cart-error">{g(language, "passwordMismatch")}</p>}
     {error && <p className="cart-error" role="alert">{error}</p>}
     <button type="submit" className="primary" disabled={!ready || busy}>{busy ? "…" : g(language, registering ? "register" : "signIn")}</button>

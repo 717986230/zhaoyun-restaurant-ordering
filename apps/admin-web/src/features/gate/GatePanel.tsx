@@ -26,10 +26,12 @@ export function GatePanel({ registered, busy, error, onSignIn, onRegister }: Gat
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [repeat, setRepeat] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const account = login.trim().toLowerCase();
   // Checked here as well as on the server, because the server never sees the
   // second field: a typo in a password nobody has written down anywhere is
   // how a restaurant locks itself out of its own menu.
+  const invalidLogin = !registered && account.length > 0 && !LOGIN_PATTERN.test(account);
   const mismatch = !registered && repeat.length > 0 && password !== repeat;
   const tooShort = !registered && password.length > 0 && password.length < PASSWORD_MIN;
   const ready = registered
@@ -41,8 +43,6 @@ export function GatePanel({ registered, busy, error, onSignIn, onRegister }: Gat
     if (!ready || busy) return;
     if (registered) onSignIn(account, password);
     else onRegister({ login: account, ...(name.trim() ? { name: name.trim() } : {}), password });
-    setPassword("");
-    setRepeat("");
   }
 
   return <div className="gate-pane">
@@ -67,20 +67,30 @@ export function GatePanel({ registered, busy, error, onSignIn, onRegister }: Gat
 
       <label>
         <span>{registered ? t("gatePassword") : t("gateNewPassword", { min: PASSWORD_MIN })}</span>
-        <input
-          type="password"
-          name="password"
-          autoComplete={registered ? "current-password" : "new-password"}
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
+        <div className="gate-password-wrap">
+          <input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            autoComplete={registered ? "current-password" : "new-password"}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <button
+            type="button"
+            className="ghost-action gate-password-toggle"
+            aria-pressed={showPassword}
+            aria-label={showPassword ? "隐藏密码" : "显示密码"}
+            onClick={() => setShowPassword((on) => !on)}
+          >{showPassword ? "🙈" : "👁"}</button>
+        </div>
       </label>
 
       {!registered && <label>
         <span>{t("gateRepeat")}</span>
-        <input type="password" name="password-repeat" autoComplete="new-password" value={repeat} onChange={(event) => setRepeat(event.target.value)} />
+        <input type={showPassword ? "text" : "password"} name="password-repeat" autoComplete="new-password" value={repeat} onChange={(event) => setRepeat(event.target.value)} />
       </label>}
 
+      {invalidLogin && <p className="gate-note error" role="alert">{t("gateLoginHint")}</p>}
       {tooShort && <p className="gate-note">{t("gateTooShort", { min: PASSWORD_MIN })}</p>}
       {mismatch && <p className="gate-note">{t("gateMismatch")}</p>}
       {error && <p className="gate-note error" role="alert">{error}</p>}

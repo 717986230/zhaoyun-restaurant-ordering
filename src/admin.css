@@ -2190,6 +2190,23 @@ em.voided {
   font-weight: 650;
 }
 
+.gate-password-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.gate-password-wrap input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gate-password-toggle {
+  flex: none;
+  min-width: 44px;
+  padding-inline: 10px;
+}
+
 /* 菜单语言: the same pill as a menu style swatch, with the flag the guest
    will see in place of the colour dot. */
 .language-picker {
