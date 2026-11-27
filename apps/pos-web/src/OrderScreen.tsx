@@ -2,7 +2,7 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import type { CSSProperties, FormEvent } from "react";
 import type { ApiBill, PosClaim } from "@zhaoyun/contracts";
 import type { ModifierGroup, Product } from "@zhaoyun/domain";
-import { pinyinInitials } from "@zhaoyun/domain";
+import { defaultCategoryLabel, pinyinInitials } from "@zhaoyun/domain";
 import { ApiError } from "@zhaoyun/api-client";
 import { TAG_COLORS } from "../../../src/tag-colors.js";
 import { api, useLiveReload } from "./App";
@@ -50,7 +50,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
   // One id per batch sent: a retried tap is the same order, not a second one.
   const requestId = useRef(crypto.randomUUID());
 
-  const name = (product: Product) => product.names[language] || product.names.zh || product.names.de;
+  const name = (product: Product) => product.names[language] || product.names.zh || product.names.de || product.names.en;
   // Open for its guests to order from their phones (开台), and until when.
   const [orderingUntil, setOrderingUntil] = useState<string | null>(null);
   // 多人同桌: whether this table is open to several POS devices at once.
@@ -398,7 +398,7 @@ export function OrderScreen({ pos, table, pickupNo, go }: { pos: Pos; table: str
         <nav className="pos-categories" aria-label={t("all")}>
           <button type="button" className={category ? "" : "on"} onClick={() => setCategory("")}>{t("all")}</button>
           {categories.map((entry) => <button key={entry} type="button" style={{ "--tag": catColor(entry) } as CSSProperties} className={category === entry ? "on" : ""} onClick={() => setCategory(entry)}>
-            <span className="pos-cat-dot" aria-hidden="true" style={{ background: catColor(entry) }} />{entry}
+            <span className="pos-cat-dot" aria-hidden="true" style={{ background: catColor(entry) }} />{defaultCategoryLabel(entry, language)}
           </button>)}
         </nav>
         <div className={`pos-dishes ${soldOutMode || stockMode ? "choosing-soldout" : ""}`}>{shown.map((product) => {
