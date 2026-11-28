@@ -1117,6 +1117,12 @@ test("the manager adds a waiter with a PIN, switches one off, and unpairs a lost
   await page.route("**/api/admin/staff**", (route) => {
     const request = route.request();
     if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ staff }) });
+    if (request.method() === "DELETE") {
+      const id = new URL(request.url()).pathname.split("/").pop();
+      sent.push({ method: "DELETE", url: new URL(request.url()).pathname });
+      staff = staff.filter((person) => person.id !== id);
+      return route.fulfill({ status: 204 });
+    }
     const body = request.postDataJSON();
     sent.push({ method: request.method(), url: new URL(request.url()).pathname, body });
     const person = request.method() === "POST" ? { id: "s-2", active: true, ...body } : { ...staff[0], ...body };
@@ -1142,6 +1148,12 @@ test("the manager adds a waiter with a PIN, switches one off, and unpairs a lost
   await card.locator('li[data-staff="Li"]').getByRole("button", { name: "停用" }).click();
   await expect.poll(() => sent[1]).toEqual({ method: "PUT", url: "/api/admin/staff/s-1", body: { active: false } });
   await expect(card.locator('li[data-staff="Li"]')).toContainText("已停用");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await card.locator('li[data-staff="Wang"]').getByRole("button", { name: "删除" }).click();
+  await expect.poll(() => sent[2]).toEqual({ method: "DELETE", url: "/api/admin/staff/s-2" });
+  await expect(page.locator("#adminToast")).toHaveText("已删除 Wang");
+  await expect(card.locator('li[data-staff="Wang"]')).toHaveCount(0);
 
   page.once("dialog", (dialog) => dialog.accept());
   await card.getByRole("button", { name: "取消配对" }).click();

@@ -433,6 +433,7 @@ export class AdminApi {
   saveStaff(input: { name?: string; role?: PosStaff["role"]; pin?: string; active?: boolean }, id?: string): Promise<{ staff: PosStaff }> {
     return this.#request(id ? `/api/admin/staff/${encodeURIComponent(id)}` : "/api/admin/staff", { method: id ? "PUT" : "POST", body: JSON.stringify(input) });
   }
+  deleteStaff(id: string): Promise<void> { return this.#request(`/api/admin/staff/${encodeURIComponent(id)}`, { method: "DELETE" }); }
   /** Each waiter now: signed in where, which tables open, the shift so far. */
   staffActivity(): Promise<{ staff: PosStaffActivity[] }> { return this.#request("/api/admin/staff/activity"); }
   posDevices(): Promise<{ devices: PosDevice[] }> { return this.#request("/api/admin/pos-devices"); }

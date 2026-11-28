@@ -63,6 +63,14 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
       await load();
     } catch (error) { failed(error); }
   }
+  async function remove(person: PosStaff) {
+    if (!window.confirm(t("staffDeleteConfirm", { name: person.name }))) return;
+    try {
+      await api.deleteStaff(person.id);
+      notify(t("staffDeleted", { name: person.name }));
+      await load();
+    } catch (error) { failed(error); }
+  }
 
   // Devices under their person, by the name they were paired with; the rest
   // have no person and are listed on their own below.
@@ -91,6 +99,7 @@ export function StaffCard({ api, notify, failed }: { api: AdminApi; notify: (mes
         : <span className="staff-actions">
           <button type="button" className="ghost-action" onClick={() => { setPinFor(person.id); setPin(""); }}>{t("changePin")}</button>
           <button type="button" className="ghost-action" onClick={() => void save(person, { active: !person.active })}>{t(person.active ? "deactivate" : "activate")}</button>
+          <button type="button" className="ghost-action danger" onClick={() => void remove(person)}>{t("delete")}</button>
         </span>}
       {!person.active && <em>{t("staffInactive")}</em>}
       {devicesOf(person).length > 0 && <ul className="staff-devices">{devicesOf(person).map(deviceRow)}</ul>}

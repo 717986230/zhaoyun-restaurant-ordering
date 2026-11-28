@@ -917,7 +917,7 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         if (!device) return fail("This device is not paired with the POS", 401);
         const { value, invalid } = await body(request, PosSignInBody);
         if (invalid) return invalid;
-        const staffKey = value.staffId || String(value.name ?? "").trim().toLowerCase();
+        const staffKey = value.staffId || String(value.name ?? "").trim().replace(/\s+/g, " ").toLowerCase();
         if (!staffKey) return fail("Staff name or ID is required", 400);
         // A PIN is four to six digits: the waiter's, from any of the paired devices, counts too.
         const budget = await guessBudget(ctx, "pin", staffKey);
@@ -1744,6 +1744,11 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
       if (path[2] === "staff") {
         try {
           if (path.length === 3 && method === "GET") return json({ staff: await (store.listStaffWithPins ? store.listStaffWithPins() : store.listStaff()) });
+          if (path.length === 4 && method === "DELETE") {
+            return (await store.deleteStaff(path[3]))
+              ? new Response(null, { status: 204, headers: SECURITY_HEADERS })
+              : fail("Waiter not found", 404);
+          }
           const { value, invalid } = await body(request, StaffBody);
           if (invalid) return invalid;
           if (path.length === 3 && method === "POST") return json({ staff: await store.saveStaff(value) }, 201);

@@ -1169,9 +1169,24 @@ export function createStore(driver, options = {}) {
     }
   }
 
+  async function deleteStaff(id) {
+    const staffId = String(id ?? "").trim();
+    if (!staffId) return false;
+    const row = await first("SELECT id FROM staff WHERE tenant_id = ? AND id = ?", tenantId, staffId);
+    if (!row) return false;
+    await batch([
+      sql("DELETE FROM pos_sessions WHERE tenant_id = ? AND staff_id = ?", tenantId, staffId),
+      sql("DELETE FROM table_claims WHERE tenant_id = ? AND staff_id = ?", tenantId, staffId),
+      sql("DELETE FROM staff_pins WHERE staff_id = ?", staffId),
+      sql("DELETE FROM roster_shifts WHERE tenant_id = ? AND staff_id = ?", tenantId, staffId),
+      sql("DELETE FROM staff WHERE tenant_id = ? AND id = ?", tenantId, staffId)
+    ]);
+    return true;
+  }
+
   async function posSignIn(device, target, pin) {
     const staffId = typeof target === "string" ? target : target?.staffId;
-    const name = typeof target === "object" && target ? String(target.name ?? "").trim() : "";
+    const name = typeof target === "object" && target ? String(target.name ?? "").trim().replace(/\s+/g, " ") : "";
     const row = staffId
       ? await first("SELECT * FROM staff WHERE tenant_id = ? AND id = ?", tenantId, String(staffId))
       : name
@@ -2090,6 +2105,7 @@ export function createStore(driver, options = {}) {
       return rows.map((row) => ({ ...staffView(row), ...(row.pin_code ? { pin: row.pin_code } : {}) }));
     },
     saveStaff,
+    deleteStaff,
     posSignIn,
     posSignOut: async (token) => {
       if (!token) return false;

@@ -1467,9 +1467,21 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       const kinds = (await call("GET", `/api/admin/journal?from=${today}&to=${tomorrow}`, { admin: true })).json.entries.map((entry) => entry.kind);
       for (const kind of ["table.moved", "staff.settled", "drawer.opened", "drawer.out", "drawer.in", "drawer.closed"]) assert.ok(kinds.includes(kind), kind);
 
+      // Waiters with short or spaced names ("y", "y y") sign in by username cleanly, and can be deleted.
+      const yStaff = (await hire({ name: "y  y", pin: "1122" })).json.staff;
+      const asY = await call("POST", "/api/pos/sign-in", { deviceToken: deviceA, body: { name: "  y   y " } });
+      assert.equal(asY.status, 200);
+      assert.equal(asY.json.staff.name, "y y");
+      assert.equal((await call("DELETE", `/api/admin/staff/${yStaff.id}`, { admin: true })).status, 204);
+
       // A waiter switched off is signed out at once.
       assert.equal((await call("PUT", `/api/admin/staff/${li.id}`, { admin: true, body: { active: false } })).status, 200);
       assert.equal((await call("GET", "/api/pos/floor", asLi)).status, 401);
+
+      // A waiter can also be deleted (and a second delete returns 404).
+      assert.equal((await call("DELETE", `/api/admin/staff/${li.id}`, { admin: true })).status, 204);
+      assert.equal((await call("DELETE", `/api/admin/staff/${li.id}`, { admin: true })).status, 404);
+      assert.equal((await call("GET", "/api/admin/staff", { admin: true })).json.staff.some((entry) => entry.id === li.id), false);
 
       // Leave the room as it was found.
       for (const table of ["P1", "P2", "P3", "P4", takeaway.json.table, second.table]) await call("DELETE", `/api/pos/tables/${table}/claim?force=1`, asWang);

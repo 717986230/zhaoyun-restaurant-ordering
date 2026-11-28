@@ -347,8 +347,14 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
 
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed || busy) return;
+    if (busy) return;
+    const formValue = event ? new FormData(event.currentTarget).get("staff-username") : null;
+    const trimmed = String(typeof formValue === "string" ? formValue : name).trim().replace(/\s+/g, " ");
+    if (!trimmed) {
+      setError(t("staffUsernameHint"));
+      return;
+    }
+    setName(trimmed);
     setBusy(true);
     setError("");
     try { localStorage.setItem("zy_pos_last_user", trimmed); } catch { /* private mode */ }
@@ -375,7 +381,6 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
       <input
         name="staff-username"
         value={name}
-        required
         maxLength={64}
         autoFocus
         autoComplete="off"
@@ -389,10 +394,17 @@ function SignIn({ t, onSignedIn, onUnpair, failed }: { t: ReturnType<typeof tran
           setName(next);
           try { localStorage.setItem("zy_pos_last_user", next); } catch { /* private mode */ }
         }}
+        onInput={(event) => {
+          const next = (event.target as HTMLInputElement).value;
+          if (next !== name) {
+            setError("");
+            setName(next);
+          }
+        }}
       />
     </label>
     {error && <p className="pos-error" role="alert">{error}</p>}
-    <button type="submit" className="pos-primary" disabled={!name.trim() || busy}>OK</button>
+    <button type="submit" className="pos-primary" disabled={busy}>OK</button>
     <button type="button" className="pos-link" onClick={() => { if (window.confirm(t("unpairConfirm"))) onUnpair(); }}>{t("unpair")}</button>
   </form>;
 }
