@@ -171,6 +171,7 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   // Signing up brings 20 points, wherever it is done.
   await expect(sheet.locator(".points-balance b")).toHaveText("20");
   // Signed-in account settings: separated phone + email, requiring at least one.
+  await sheet.getByText("偏好与账户设置").click();
   await sheet.getByRole("button", { name: /账户设置/ }).click();
   await sheet.locator("form.profile input[name=phone]").fill("0660 5556677");
   await sheet.locator("form.profile input[autocomplete=current-password]").fill("noodles-4-life");
