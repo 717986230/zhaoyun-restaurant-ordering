@@ -331,8 +331,10 @@ test("等叫：点菜时把一道菜标成等叫", async ({ page, request }, tes
 
 test("a table open on one device is locked to it; the manager may take it over", async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
-  const counter = await browser.newPage({ locale: "zh-CN" });
-  const phone = await browser.newPage({ locale: "zh-CN" });
+  const counterCtx = await browser.newContext({ locale: "zh-CN" });
+  const phoneCtx = await browser.newContext({ locale: "zh-CN" });
+  const counter = await counterCtx.newPage();
+  const phone = await phoneCtx.newPage();
   await pairAndSignIn(counter, "Tablet A", "Li", "1234");
   await pairAndSignIn(phone, "Phone B", "Wang", "9876");
 
@@ -350,14 +352,16 @@ test("a table open on one device is locked to it; the manager may take it over",
   phone.once("dialog", (dialog) => dialog.accept());
   await phone.getByRole("button", { name: "打开", exact: true }).click();
   await expect(phone.locator(".pos-ticket h1")).toHaveText("桌 8");
-  await counter.close();
-  await phone.close();
+  await counterCtx.close();
+  await phoneCtx.close();
 });
 
 test("a waiter signing in on a second device replaces the old session and releases their table lock", async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name !== PROJECT, "one server, one project");
-  const tablet = await browser.newPage({ locale: "zh-CN" });
-  const phone = await browser.newPage({ locale: "zh-CN" });
+  const tabletCtx = await browser.newContext({ locale: "zh-CN" });
+  const phoneCtx = await browser.newContext({ locale: "zh-CN" });
+  const tablet = await tabletCtx.newPage();
+  const phone = await phoneCtx.newPage();
   await pairAndSignIn(tablet, "Tablet L", "Li", "1234");
   await tablet.getByLabel("打开桌号").fill("5");
   await tablet.getByRole("button", { name: "打开", exact: true }).click();
@@ -369,13 +373,18 @@ test("a waiter signing in on a second device replaces the old session and releas
   await expect(five).not.toHaveClass(/claimed/);
   await five.click();
   await expect(phone.locator(".pos-ticket h1")).toHaveText("桌 5");
-  // The displaced tablet gets 401 on its next action and returns to PIN sign-in.
-  await tablet.getByRole("button", { name: "← 返回" }).click();
+  // The displaced tablet gets 401 either in the background or on its next action and returns to sign-in.
+  if (!(await tablet.locator(".pos-signin").isVisible())) {
+    await Promise.race([
+      tablet.getByRole("button", { name: "← 返回" }).click().catch(() => {}),
+      tablet.locator(".pos-signin").waitFor({ state: "visible" }),
+    ]);
+  }
   await expect(tablet.locator(".pos-signin")).toBeVisible({ timeout: 10_000 });
   await phone.getByRole("button", { name: "← 返回" }).click();
   await expect(phone.locator(".pos-floor")).toBeVisible();
-  await tablet.close();
-  await phone.close();
+  await tabletCtx.close();
+  await phoneCtx.close();
 });
 
 test("a guest's call is on the waiter's floor at once, and gone once they deal with it", async ({ page, request }, testInfo) => {
