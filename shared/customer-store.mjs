@@ -28,7 +28,7 @@ import { now, uuid } from "./core.mjs";
 import {
   ADD_FAVORITE_SQL,
   CHANGE_POINTS_SQL,
-  CUSTOMER_BY_EMAIL_SQL,
+  CUSTOMER_BY_CONTACT_SQL,
   CUSTOMER_BY_ID_SQL,
   CUSTOMER_SESSION_SQL,
   CUSTOMER_SESSION_TTL_MS,
@@ -44,16 +44,21 @@ import {
   isOverdrawn,
   isPhoneLogin,
   MAX_FAVORITES,
+  normalizeCustomerContacts,
   normalizeCustomerName,
+  normalizeEmail,
   normalizeLogin,
   normalizeCustomerRegistration,
+  normalizePhone,
   normalizePointsAdjustment,
   pointsEntryView,
   POINTS_HISTORY_SQL,
   REMOVE_FAVORITE_SQL,
   SEARCH_CUSTOMERS_SQL,
   storedCustomerPassword,
+  UPDATE_CUSTOMER_EMAIL_SQL,
   UPDATE_CUSTOMER_SQL,
+  UPSERT_CUSTOMER_CONTACT_SQL,
   balanceEntryView,
   BALANCE_HISTORY_SQL,
   changeBalanceStatements,
@@ -217,30 +222,46 @@ export function createCustomerStore(
       : null;
   }
 
+  async function findByContactKey(key) {
+    if (!key) return null;
+    return driver.first(CUSTOMER_BY_CONTACT_SQL, tenantId, key, key, key);
+  }
+
   async function register(input) {
-    const { email, name, password } = normalizeCustomerRegistration(input);
-    if (await driver.first(CUSTOMER_BY_EMAIL_SQL, tenantId, email))
-      throw coded(
-        "This email or number already has an account: sign in",
-        "EMAIL_TAKEN",
-        409,
-      );
+    const { email, contactEmail, phone, name, password } =
+      normalizeCustomerRegistration(input);
+    for (const key of [email, contactEmail, phone].filter(Boolean)) {
+      if (await findByContactKey(key))
+        throw coded(
+          "This email or number already has an account: sign in",
+          "EMAIL_TAKEN",
+          409,
+        );
+    }
     const stored = await hashPassword(password);
     const id = uuid();
     const at = now();
     try {
-      await driver.run(
-        INSERT_CUSTOMER_SQL,
-        tenantId,
-        id,
-        email,
-        name,
-        stored.hash,
-        stored.salt,
-        stored.iterations,
-        at,
-        at,
-      );
+      await driver.batch([
+        [
+          INSERT_CUSTOMER_SQL,
+          [
+            tenantId,
+            id,
+            email,
+            name,
+            stored.hash,
+            stored.salt,
+            stored.iterations,
+            at,
+            at,
+          ],
+        ],
+        [
+          UPSERT_CUSTOMER_CONTACT_SQL,
+          [id, tenantId, phone, contactEmail, at],
+        ],
+      ]);
     } catch (error) {
       // Two registrations of one email at once: the UNIQUE index decides.
       if (/UNIQUE/i.test(String(error?.message)))
@@ -254,17 +275,39 @@ export function createCustomerStore(
     return openSession(await byId(id));
   }
 
-  async function signIn(emailInput, password) {
-    // An email or a mobile number, written any way: the same key the account was made with.
-    let login = String(emailInput ?? "")
-      .trim()
-      .toLowerCase();
-    try {
-      login = normalizeLogin(emailInput);
-    } catch {
-      /* Not one or the other: no such account, the same answer. */
+  async function signIn(loginInput, password) {
+    const rawObj =
+      loginInput && typeof loginInput === "object"
+        ? loginInput
+        : { email: loginInput };
+    const rawEmail = String(rawObj.email ?? "").trim();
+    const rawPhone = String(rawObj.phone ?? "").trim();
+    let emailRow = null;
+    let phoneRow = null;
+    if (rawEmail) {
+      let emailKey = rawEmail.toLowerCase();
+      try {
+        emailKey = rawObj.phone !== undefined ? normalizeEmail(rawEmail) : normalizeLogin(rawEmail);
+      } catch {
+        /* Invalid format: falls through cleanly as unknown account. */
+      }
+      emailRow = await findByContactKey(emailKey);
     }
-    const row = await driver.first(CUSTOMER_BY_EMAIL_SQL, tenantId, login);
+    if (rawPhone) {
+      let phoneKey = rawPhone;
+      try {
+        phoneKey = normalizePhone(rawPhone);
+      } catch {
+        /* Invalid format: falls through cleanly as unknown account. */
+      }
+      phoneRow = await findByContactKey(phoneKey);
+    }
+    const row =
+      rawEmail && rawPhone
+        ? emailRow && phoneRow && emailRow.id === phoneRow.id
+          ? emailRow
+          : null
+        : emailRow ?? phoneRow;
     const stored = row
       ? storedCustomerPassword(row)
       : {
@@ -350,6 +393,49 @@ export function createCustomerStore(
   async function update(customerId, input) {
     const row = await withPassword(customerId, input?.currentPassword);
     if (!row) return null;
+    const at = now();
+    if (input.phone !== undefined || input.email !== undefined) {
+      const currentPhone =
+        row.contact_phone || (isPhoneLogin(row.email) ? row.email : "");
+      const currentEmail = isPhoneLogin(row.email) ? "" : row.email;
+      const contacts = normalizeCustomerContacts({
+        phone: input.phone !== undefined ? input.phone : currentPhone,
+        email: input.email !== undefined ? input.email : currentEmail,
+      });
+      for (const key of [
+        contacts.primaryEmail,
+        contacts.contactEmail,
+        contacts.phone,
+      ].filter(Boolean)) {
+        const existing = await findByContactKey(key);
+        if (existing && existing.id !== row.id) {
+          throw coded(
+            "This email or number already has an account: sign in",
+            "EMAIL_TAKEN",
+            409,
+          );
+        }
+      }
+      try {
+        await driver.batch([
+          ...(contacts.primaryEmail !== row.email
+            ? [[UPDATE_CUSTOMER_EMAIL_SQL, [contacts.primaryEmail, at, tenantId, row.id]]]
+            : []),
+          [
+            UPSERT_CUSTOMER_CONTACT_SQL,
+            [row.id, tenantId, contacts.phone, contacts.contactEmail, at],
+          ],
+        ]);
+      } catch (error) {
+        if (/UNIQUE/i.test(String(error?.message)))
+          throw coded(
+            "This email or number already has an account: sign in",
+            "EMAIL_TAKEN",
+            409,
+          );
+        throw error;
+      }
+    }
     const name =
       input.name === undefined ? row.name : normalizeCustomerName(input.name);
     const stored =
@@ -362,12 +448,12 @@ export function createCustomerStore(
       stored.hash,
       stored.salt,
       stored.iterations,
-      now(),
+      at,
       tenantId,
       row.id,
     );
     if (input.password === undefined)
-      return { customer: customerView(await byId(row.id)) };
+      return { customer: await withMembership(customerView(await byId(row.id))) };
     await driver.run(DELETE_CUSTOMER_SESSIONS_SQL, tenantId, row.id);
     return openSession(await byId(row.id));
   }
@@ -735,6 +821,7 @@ export function createCustomerStore(
           text,
           text,
           text,
+          text,
           Math.min(Math.max(Number(limit) || 50, 1), 200),
         )
       ).map(customerView);
@@ -764,7 +851,7 @@ export function createCustomerStore(
       } catch {
         return null;
       }
-      const row = await driver.first(CUSTOMER_BY_EMAIL_SQL, tenantId, key);
+      const row = await findByContactKey(key);
       return row ? withMembership(customerView(row)) : null;
     },
     /** A guest who forgot their password gets a new one at the counter; every session of theirs ends. */

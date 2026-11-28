@@ -763,8 +763,9 @@ export class RestaurantApi {
   registerCustomer(command: CustomerRegisterCommand): Promise<CustomerSession> {
     return this.#request("/api/customer/register", { method: "POST", body: JSON.stringify(command) });
   }
-  signInCustomer(email: string, password: string): Promise<CustomerSession> {
-    return this.#request("/api/customer/sign-in", { method: "POST", body: JSON.stringify({ email, password }) });
+  signInCustomer(login: string | { email?: string; phone?: string }, password: string): Promise<CustomerSession> {
+    const payload = typeof login === "string" ? { email: login, password } : { ...login, password };
+    return this.#request("/api/customer/sign-in", { method: "POST", body: JSON.stringify(payload) });
   }
   signOutCustomer(): Promise<void> { return this.#request("/api/customer/sign-out", { method: "POST" }); }
   customer(): Promise<{ customer: ApiCustomer; favorites: string[] }> { return this.#request("/api/customer"); }

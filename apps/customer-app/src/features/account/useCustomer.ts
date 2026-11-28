@@ -10,7 +10,7 @@ export interface CustomerAccount {
   signedIn: boolean;
   customer: ApiCustomer | null;
   favorites: string[];
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (login: string | { email?: string; phone?: string }, password: string) => Promise<void>;
   register: (command: CustomerRegisterCommand) => Promise<void>;
   signOut: () => Promise<void>;
   toggleFavorite: (productId: string) => Promise<void>;

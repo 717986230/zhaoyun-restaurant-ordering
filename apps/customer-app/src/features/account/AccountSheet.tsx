@@ -10,7 +10,7 @@ import { formatPrice, productName, t } from "../../app/i18n";
 import type { CustomerDispatch, CustomerState } from "../../app/model";
 import type { OrderingState } from "../../app/ordering";
 import { Sheet } from "../../components/Sheet";
-import { COUNTRY_DIAL_CODES, validateEmailOrPhone } from "../../app/contactInput";
+import { COUNTRY_DIAL_CODES, validateEmailOnly, validateMobileOnly } from "../../app/contactInput";
 import { useElderMode } from "../../app/useElderMode";
 import type { CustomerAccount } from "./useCustomer";
 import { MemberBadge } from "./MemberBadge";
@@ -80,6 +80,9 @@ function message(language: CustomerState["language"], error: unknown): string {
   if (error.code === "EMAIL_TAKEN") return g(language, "emailTaken");
   if (error.code === "ACCOUNTS_OFF") return g(language, "accountsOff");
   if (error.code === "BAD_LOGIN") return g(language, "loginInvalid");
+  if (error.code === "BAD_EMAIL") return g(language, "emailInvalid");
+  if (error.code === "BAD_PHONE") return g(language, "phoneInvalid");
+  if (error.code === "CONTACT_REQUIRED") return g(language, "contactRequired");
   if (error.code === "NOT_MOBILE") return g(language, "phoneNotMobile");
   if (error.status === 401) return g(language, "wrongLogin");
   if (error.status === 429) return g(language, "tooManyTries");
@@ -87,10 +90,82 @@ function message(language: CustomerState["language"], error: unknown): string {
   return g(language, "accountFailed");
 }
 
+function splitDialCode(phone: string): { dialCode: string; local: string } {
+  const clean = phone.trim();
+  if (!clean.startsWith("+")) return { dialCode: "43", local: clean };
+  const digits = clean.slice(1);
+  const sorted = [...COUNTRY_DIAL_CODES].sort((a, b) => b.code.length - a.code.length);
+  const match = sorted.find((entry) => digits.startsWith(entry.code));
+  if (match) return { dialCode: match.code, local: digits.slice(match.code.length) };
+  return { dialCode: "43", local: clean };
+}
+
+function validateSeparatedContacts(
+  language: Language,
+  phoneRaw: string,
+  dialCode: string,
+  emailRaw: string
+): { ok: true; phone: string; email: string } | { ok: false; error: string } {
+  const hasPhone = phoneRaw.trim().length > 0;
+  const hasEmail = emailRaw.trim().length > 0;
+  if (!hasPhone && !hasEmail) return { ok: false, error: g(language, "contactRequired") };
+  let phone = "";
+  if (hasPhone) {
+    const mobile = validateMobileOnly(phoneRaw, dialCode);
+    if (!mobile.ok) {
+      return { ok: false, error: g(language, mobile.reason === "NOT_MOBILE" ? "phoneNotMobile" : "phoneInvalid") };
+    }
+    phone = mobile.e164;
+  }
+  let email = "";
+  if (hasEmail) {
+    const mail = validateEmailOnly(emailRaw);
+    if (!mail.ok) return { ok: false, error: g(language, "emailInvalid") };
+    email = mail.value;
+  }
+  return { ok: true, phone, email };
+}
+
+function ContactFields({
+  language,
+  dialCode,
+  phone,
+  email,
+  onDialCode,
+  onPhone,
+  onEmail,
+  emailAutoComplete = "email"
+}: {
+  language: Language;
+  dialCode: string;
+  phone: string;
+  email: string;
+  onDialCode: (next: string) => void;
+  onPhone: (next: string) => void;
+  onEmail: (next: string) => void;
+  emailAutoComplete?: string;
+}) {
+  return <>
+    <p className="cart-hint">{g(language, "contactEitherHint")}</p>
+    <label>{g(language, "phone")}
+      <div className="phone-input-group">
+        <select className="dial-code-select" aria-label={g(language, "dialCode")} value={dialCode} onChange={(event) => onDialCode(event.target.value)}>
+          {COUNTRY_DIAL_CODES.map((entry) => <option key={entry.code} value={entry.code}>{entry.flag} {entry.label}</option>)}
+        </select>
+        <input name="phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="0660 1234567" value={phone} onChange={(event) => onPhone(event.target.value)} />
+      </div>
+    </label>
+    <label>{g(language, "email")}
+      <input name="email" type="email" autoComplete={emailAutoComplete} autoCapitalize="none" spellCheck={false} placeholder="name@example.com" value={email} onChange={(event) => onEmail(event.target.value)} />
+    </label>
+  </>;
+}
+
 function SignInForm({ language, account, restaurantName, signupPoints }: { language: Language; account: CustomerAccount; restaurantName: string; signupPoints: number }) {
   const [elder, toggleElder] = useElderMode();
   const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
   const [dialCode, setDialCode] = useState("43");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -99,19 +174,16 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const registering = mode === "register";
-  const isEmailInput = email.includes("@");
   const tooShort = registering && password.length > 0 && password.length < PASSWORD_MIN;
   const mismatch = registering && repeat.length > 0 && password !== repeat;
-  const ready = email.trim().length > 0 && password.length > 0 && (!registering || repeat.length > 0);
+  const ready = (phone.trim().length > 0 || email.trim().length > 0) && password.length > 0 && (!registering || repeat.length > 0);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
-    const contact = validateEmailOrPhone(email, dialCode);
-    if (!contact.ok) {
-      if (contact.reason === "EMAIL_FORMAT") setError(g(language, "emailInvalid"));
-      else if (contact.reason === "NOT_MOBILE") setError(g(language, "phoneNotMobile"));
-      else setError(g(language, "loginInvalid"));
+    const contacts = validateSeparatedContacts(language, phone, dialCode, email);
+    if (!contacts.ok) {
+      setError(contacts.error);
       return;
     }
     if (registering && password.length < PASSWORD_MIN) {
@@ -125,8 +197,12 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
     setBusy(true);
     setError("");
     try {
-      if (registering) await account.register({ email: contact.value, password, ...(name.trim() ? { name: name.trim() } : {}) });
-      else await account.signIn(contact.value, password);
+      const loginPayload = {
+        ...(contacts.phone ? { phone: contacts.phone } : {}),
+        ...(contacts.email ? { email: contacts.email } : {})
+      };
+      if (registering) await account.register({ ...loginPayload, password, ...(name.trim() ? { name: name.trim() } : {}) });
+      else await account.signIn(loginPayload, password);
     } catch (failure) {
       setError(message(language, failure));
     } finally {
@@ -147,14 +223,16 @@ function SignInForm({ language, account, restaurantName, signupPoints }: { langu
       <button type="button" role="tab" aria-selected={!registering} className={!registering ? "on" : ""} onClick={() => { setMode("sign-in"); setError(""); }}>{g(language, "signIn")}</button>
       <button type="button" role="tab" aria-selected={registering} className={registering ? "on" : ""} onClick={() => { setMode("register"); setError(""); }}>{g(language, "register")}</button>
     </div>
-    <label>{g(language, "login")}
-      <div className="phone-input-group">
-        {!isEmailInput && <select className="dial-code-select" aria-label={g(language, "dialCode")} value={dialCode} onChange={(event) => { setDialCode(event.target.value); setError(""); }}>
-          {COUNTRY_DIAL_CODES.map((entry) => <option key={entry.code} value={entry.code}>{entry.flag} {entry.label}</option>)}
-        </select>}
-        <input name="email" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="0660 1234567 / name@example.com" value={email} onChange={(event) => { setEmail(event.target.value); if (error) setError(""); }} required />
-      </div>
-    </label>
+    <ContactFields
+      language={language}
+      dialCode={dialCode}
+      phone={phone}
+      email={email}
+      onDialCode={(next) => { setDialCode(next); if (error) setError(""); }}
+      onPhone={(next) => { setPhone(next); if (error) setError(""); }}
+      onEmail={(next) => { setEmail(next); if (error) setError(""); }}
+      emailAutoComplete={registering ? "email" : "username"}
+    />
     {registering && !elder && <label>{g(language, "name")}<input name="name" autoComplete="nickname" maxLength={40} value={name} onChange={(event) => setName(event.target.value)} /></label>}
     <label>{g(language, "password")}{registering && <small> · {g(language, "passwordHint")}</small>}
       <div className="password-input-wrap">
@@ -227,7 +305,9 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
   const tierLevel = customer.membership?.tierLevel ?? 0;
   const visual = memberTierVisual(tierLevel);
   const { entering, muted, toggleMuted } = useTierEntry(visual?.theme ?? null);
-  const displayName = customer.name || customer.email.split("@")[0] || customer.email;
+  const realEmail = customer.email.includes("@") ? customer.email : "";
+  const phoneNumber = customer.phone || (!customer.email.includes("@") ? customer.email : "");
+  const displayName = customer.name || (realEmail ? realEmail.split("@")[0] : phoneNumber) || customer.email;
 
   return <div
     className={`guest-account${visual ? " member-themed" : ""}${visual?.skin ? ` tier-skin-${visual.skin}` : ""}${entering ? " tier-entering" : ""}`}
@@ -246,7 +326,8 @@ function SignedIn({ state, dispatch, products, account, loyalty, birthdayPerk, o
         <div className="member-hero-identity">
           {visual && <span className="member-crest-rank">{tierRank(language, visual.theme)} · {customer.membership?.tier}</span>}
           <strong className={visual ? "member-hero-greeting" : ""}>{g(language, "welcome", { name: displayName })}</strong>
-          <small>{customer.email}</small>
+          {phoneNumber && <small>📱 {phoneNumber}</small>}
+          {realEmail && <small>✉ {realEmail}</small>}
           <span className="member-crest-meta">
             {customer.membership && customer.membership.discountPercent > 0 && <em>{g(language, "memberPriceOff", { percent: customer.membership.discountPercent })}</em>}
             {!visual && customer.membership?.tier && <small>{customer.membership.tier}</small>}
@@ -387,13 +468,30 @@ function MarketingToggle({ language, dispatch }: { language: CustomerState["lang
 }
 
 function ProfileForm({ language, account, dispatch }: { language: CustomerState["language"]; account: CustomerAccount; dispatch: CustomerDispatch }) {
+  const customer = account.customer;
+  const savedPhone = customer ? (customer.phone || (!customer.email.includes("@") ? customer.email : "")) : "";
+  const savedEmail = customer && customer.email.includes("@") ? customer.email : "";
+  const initialPhone = splitDialCode(savedPhone);
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState(account.customer?.name ?? "");
+  const [name, setName] = useState(customer?.name ?? "");
+  const [dialCode, setDialCode] = useState(initialPhone.dialCode);
+  const [phone, setPhone] = useState(initialPhone.local);
+  const [email, setEmail] = useState(savedEmail);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  function openEditor() {
+    const parsed = splitDialCode(savedPhone);
+    setName(customer?.name ?? "");
+    setDialCode(parsed.dialCode);
+    setPhone(parsed.local);
+    setEmail(savedEmail);
+    setError("");
+    setOpen(true);
+  }
 
   async function run(action: () => Promise<void>, done: string) {
     setBusy(true);
@@ -410,13 +508,36 @@ function ProfileForm({ language, account, dispatch }: { language: CustomerState[
     }
   }
 
-  if (!open) return <button type="button" className="link-button" onClick={() => setOpen(true)}>{g(language, "profile")} ▾</button>;
+  if (!open) return <button type="button" className="link-button" onClick={openEditor}>{g(language, "profile")} ▾</button>;
   return <form className="guest-form profile" onSubmit={(event) => {
     event.preventDefault();
-    if (deleting) void run(() => account.remove(current), g(language, "deleted"));
-    else void run(() => account.update({ currentPassword: current, name: name.trim(), ...(next ? { password: next } : {}) }), g(language, "saved"));
+    if (deleting) {
+      void run(() => account.remove(current), g(language, "deleted"));
+      return;
+    }
+    const contacts = validateSeparatedContacts(language, phone, dialCode, email);
+    if (!contacts.ok) {
+      setError(contacts.error);
+      return;
+    }
+    void run(() => account.update({
+      currentPassword: current,
+      name: name.trim(),
+      phone: contacts.phone,
+      email: contacts.email,
+      ...(next ? { password: next } : {})
+    }), g(language, "saved"));
   }}>
     <h3>{g(language, "profile")}</h3>
+    {!deleting && <ContactFields
+      language={language}
+      dialCode={dialCode}
+      phone={phone}
+      email={email}
+      onDialCode={(val) => { setDialCode(val); if (error) setError(""); }}
+      onPhone={(val) => { setPhone(val); if (error) setError(""); }}
+      onEmail={(val) => { setEmail(val); if (error) setError(""); }}
+    />}
     {!deleting && <label>{g(language, "name")}<input value={name} maxLength={40} onChange={(event) => setName(event.target.value)} /></label>}
     {!deleting && <label>{g(language, "newPassword")}<input type="password" autoComplete="new-password" value={next} onChange={(event) => setNext(event.target.value)} /></label>}
     {deleting && <p className="cart-error">{g(language, "deleteConfirm")}</p>}

@@ -26,6 +26,37 @@ export type ContactValidation =
   | { ok: true; kind: "phone"; value: string; e164: string }
   | { ok: false; reason: "EMPTY" | "EMAIL_FORMAT" | "NOT_MOBILE" | "PHONE_FORMAT" };
 
+export type MobileValidation =
+  | { ok: true; e164: string }
+  | { ok: false; reason: "EMPTY" | "NOT_MOBILE" | "PHONE_FORMAT" };
+
+export type EmailValidation =
+  | { ok: true; value: string }
+  | { ok: false; reason: "EMPTY" | "EMAIL_FORMAT" };
+
+/** Validates a mobile phone number (rejecting emails and landlines). */
+export function validateMobileOnly(raw: string, dialCode = "43"): MobileValidation {
+  const clean = raw.trim();
+  if (!clean) return { ok: false, reason: "EMPTY" };
+  if (clean.includes("@")) return { ok: false, reason: "PHONE_FORMAT" };
+  const hasExplicitPrefix = clean.startsWith("+") || clean.startsWith("00") || clean.startsWith("0");
+  const candidate = hasExplicitPrefix
+    ? clean
+    : `+${dialCode}${clean.replace(/[^0-9]/g, "")}`;
+  const mobile = checkMobile(candidate, { country: dialCode });
+  if (mobile.ok) return { ok: true, e164: mobile.e164 };
+  return { ok: false, reason: mobile.reason === "NOT_MOBILE" ? "NOT_MOBILE" : "PHONE_FORMAT" };
+}
+
+/** Validates an email address. */
+export function validateEmailOnly(raw: string): EmailValidation {
+  const clean = raw.trim().toLowerCase();
+  if (!clean) return { ok: false, reason: "EMPTY" };
+  return EMAIL_SHAPE.test(clean) && clean.length <= 254
+    ? { ok: true, value: clean }
+    : { ok: false, reason: "EMAIL_FORMAT" };
+}
+
 /**
  * Validates and normalizes an email address or mobile phone number with an
  * optional country dial code (default "43" for Austria).

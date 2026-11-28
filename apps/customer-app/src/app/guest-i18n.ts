@@ -9,9 +9,9 @@ import type { Language } from "./i18n";
  */
 const copy = {
   zh: {
-    account: "我的账户", signIn: "登录", register: "注册", signOut: "退出登录", email: "邮箱", login: "邮箱或手机号", password: "密码", passwordRepeat: "再输一次密码",
+    account: "我的账户", signIn: "登录", register: "注册", signOut: "退出登录", email: "邮箱", phone: "手机号", login: "邮箱或手机号", password: "密码", passwordRepeat: "再输一次密码",
     name: "称呼（可不填）", passwordHint: "至少 6 位", passwordMismatch: "两次输入的密码不一样", wrongLogin: "账号或密码不对", emailTaken: "这个邮箱或手机号已经注册过，请直接登录",
-    signupBonusHint: "新用户注册即送 {n} 积分", signupBonusGot: "注册成功，已赠送 {n} 积分", loginInvalid: "请填写有效的邮箱或手机号", emailInvalid: "请填写有效的邮箱地址（例如 name@example.com）", phoneNotMobile: "请填写手机号，不是座机号码", dialCode: "国家区号",
+    signupBonusHint: "新用户注册即送 {n} 积分", signupBonusGot: "注册成功，已赠送 {n} 积分", loginInvalid: "请填写有效的邮箱或手机号", emailInvalid: "请填写有效的邮箱地址（例如 name@example.com）", phoneInvalid: "请填写有效的手机号", phoneNotMobile: "请填写手机号，不是座机号码", contactRequired: "请至少填写手机号或邮箱中的一项", contactEitherHint: "手机号和邮箱至少填一项（两项都填也可以）", dialCode: "国家区号",
     passwordTooShort: "密码至少需要 {n} 位", elderMode: "长辈大字版", standardMode: "标准版", memberQrHint: "结账时向店员出示此码",
     tooManyTries: "操作太频繁，请稍后再试", accountFailed: "没有成功，请检查填写的内容再试一次",
     tableNotOpenYet: "这桌还没开台：可以先选好菜，请服务员开台后再下单",
@@ -53,9 +53,9 @@ const copy = {
     failed: "没能下单：{message}", offline: "网络连不上，订单没有发出去，请稍后再试"
   },
   de: {
-    account: "Mein Konto", signIn: "Anmelden", register: "Registrieren", signOut: "Abmelden", email: "E-Mail", login: "E-Mail oder Handynummer", password: "Passwort", passwordRepeat: "Passwort wiederholen",
+    account: "Mein Konto", signIn: "Anmelden", register: "Registrieren", signOut: "Abmelden", email: "E-Mail", phone: "Handynummer", login: "E-Mail oder Handynummer", password: "Passwort", passwordRepeat: "Passwort wiederholen",
     name: "Name (optional)", passwordHint: "Mindestens 6 Zeichen", passwordMismatch: "Die Passwörter stimmen nicht überein", wrongLogin: "Konto oder Passwort falsch", emailTaken: "Diese E-Mail oder Nummer ist schon registriert – bitte anmelden",
-    signupBonusHint: "Neu hier? Registrieren und {n} Punkte geschenkt bekommen", signupBonusGot: "Willkommen! {n} Punkte sind schon gutgeschrieben", loginInvalid: "Bitte eine gültige E-Mail oder Handynummer angeben", emailInvalid: "Bitte eine gültige E-Mail-Adresse angeben (z. B. name@example.com)", phoneNotMobile: "Bitte eine Handynummer angeben, keine Festnetznummer", dialCode: "Vorwahl",
+    signupBonusHint: "Neu hier? Registrieren und {n} Punkte geschenkt bekommen", signupBonusGot: "Willkommen! {n} Punkte sind schon gutgeschrieben", loginInvalid: "Bitte eine gültige E-Mail oder Handynummer angeben", emailInvalid: "Bitte eine gültige E-Mail-Adresse angeben (z. B. name@example.com)", phoneInvalid: "Bitte eine gültige Handynummer angeben", phoneNotMobile: "Bitte eine Handynummer angeben, keine Festnetznummer", contactRequired: "Bitte mindestens Handynummer oder E-Mail-Adresse angeben", contactEitherHint: "Mindestens eines angeben: Handynummer oder E-Mail (oder beides)", dialCode: "Vorwahl",
     passwordTooShort: "Passwort braucht mindestens {n} Zeichen", elderMode: "Senioren-Ansicht", standardMode: "Standard", memberQrHint: "Beim Bezahlen im Lokal vorzeigen",
     tooManyTries: "Zu viele Versuche – bitte kurz warten", accountFailed: "Das hat nicht geklappt – bitte die Angaben prüfen und erneut versuchen",
     tableNotOpenYet: "Der Tisch ist noch nicht freigegeben: schon auswählen, nach der Freigabe durch den Service bestellen",
@@ -97,9 +97,9 @@ const copy = {
     failed: "Nicht bestellt: {message}", offline: "Keine Verbindung – die Bestellung wurde nicht gesendet, bitte gleich noch einmal"
   },
   en: {
-    account: "My account", signIn: "Sign in", register: "Register", signOut: "Sign out", email: "Email", login: "Email or mobile number", password: "Password", passwordRepeat: "Repeat password",
+    account: "My account", signIn: "Sign in", register: "Register", signOut: "Sign out", email: "Email", phone: "Mobile number", login: "Email or mobile number", password: "Password", passwordRepeat: "Repeat password",
     name: "Name (optional)", passwordHint: "At least 6 characters", passwordMismatch: "The passwords differ", wrongLogin: "Wrong account or password", emailTaken: "This email or number is registered already – please sign in",
-    signupBonusHint: "New here? Sign up for {n} points on us", signupBonusGot: "Welcome! {n} points are already yours", loginInvalid: "Please enter a valid email or mobile number", emailInvalid: "Please enter a valid email address (e.g. name@example.com)", phoneNotMobile: "Please enter a mobile number, not a landline", dialCode: "Country code",
+    signupBonusHint: "New here? Sign up for {n} points on us", signupBonusGot: "Welcome! {n} points are already yours", loginInvalid: "Please enter a valid email or mobile number", emailInvalid: "Please enter a valid email address (e.g. name@example.com)", phoneInvalid: "Please enter a valid mobile number", phoneNotMobile: "Please enter a mobile number, not a landline", contactRequired: "Please enter at least a mobile number or an email address", contactEitherHint: "Enter at least one: mobile number or email (or both)", dialCode: "Country code",
     passwordTooShort: "Password needs at least {n} characters", elderMode: "Simple large view", standardMode: "Standard", memberQrHint: "Show at counter when paying",
     tooManyTries: "Too many attempts – please wait a moment", accountFailed: "That did not work – please check your details and try again",
     tableNotOpenYet: "Your table is not open yet: pick your dishes now, then order once a waiter has opened it",

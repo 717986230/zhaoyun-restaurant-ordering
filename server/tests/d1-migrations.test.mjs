@@ -75,7 +75,8 @@ const incremental = [
   // 0001 that shipped before tenants.
   { file: "0112_multi_tenancy.sql", drop: readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "pre-tenant-schema.sql"), "utf8") },
   { file: "0118_query_indexes.sql", drop: "DROP INDEX idx_product_media_tenant_product; DROP INDEX idx_orders_open; DROP INDEX idx_service_requests_status;" },
-  { file: "0119_staff_pin_code.sql", drop: "DROP TABLE staff_pins;" }
+  { file: "0119_staff_pin_code.sql", drop: "DROP TABLE staff_pins;" },
+  { file: "0120_customer_contacts.sql", drop: "DROP TABLE customer_contacts;" }
 ].map((migration) => ({
   ...migration,
   sql: [migration.file, migration.then].filter(Boolean).map((file) => readFileSync(path.join(migrationsDir, file), "utf8")).join("\n")

@@ -54,10 +54,14 @@ async function confirmOptions(page) {
   if (await dialog.isVisible()) await dialog.getByRole("button", { name: "加入" }).click();
 }
 
-async function pairAndSignIn(page, _device, name) {
+async function pairAndSignIn(page, device, name) {
   await page.goto("/pos.html");
   await page.getByLabel("账户名").fill(LOGIN);
   await page.getByLabel("账户密码").fill(PASSWORD);
+  if (device) {
+    await page.getByText("可选设置").click();
+    await page.getByLabel(/设备名称/).fill(device);
+  }
   await page.getByRole("button", { name: "配对" }).click();
   await page.getByLabel("用户名").fill(name);
   await page.getByRole("button", { name: "OK" }).click();

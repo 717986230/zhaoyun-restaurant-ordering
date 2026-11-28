@@ -825,6 +825,14 @@ export function createDatabase(databasePath, { busyTimeoutMs = BUSY_TIMEOUT_MS, 
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_email_codes_customer ON email_codes(customer_id, created_at);
+    CREATE TABLE IF NOT EXISTS customer_contacts (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default',
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS customer_verified_emails (
       customer_id TEXT PRIMARY KEY,
       tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),

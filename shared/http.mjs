@@ -598,15 +598,20 @@ export function createApi({ store, tokens = {}, state = createApiState(), upload
         }
         const { value, invalid } = await body(request, CustomerSignInBody);
         if (invalid) return invalid;
-        const budget = await guessBudget(ctx, "customer", value.email);
+        const loginInput = {
+          ...(value.email !== undefined ? { email: value.email } : {}),
+          ...(value.phone !== undefined ? { phone: value.phone } : {}),
+        };
+        const budgetKey = String(value.email ?? value.phone ?? "").trim();
+        const budget = await guessBudget(ctx, "customer", budgetKey);
         if (budget.denied) return budget.denied;
-        // This tenant first; a member whose email belongs to exactly one
+        // This tenant first; a member whose email or phone belongs to exactly one
         // other tenant signs in there instead, so a pickup guest who opens
         // the menu without a table token still reaches their account.
-        let session = await customers.signIn(value.email, value.password);
-        if (!session) {
-          const emailTenant = await store.tenantForCustomerEmail(value.email);
-          if (emailTenant && emailTenant !== ctx.tenantId) session = await store.withTenant(emailTenant).customers.signIn(value.email, value.password);
+        let session = budgetKey ? await customers.signIn(loginInput, value.password) : null;
+        if (!session && budgetKey) {
+          const emailTenant = await store.tenantForCustomerEmail(loginInput);
+          if (emailTenant && emailTenant !== ctx.tenantId) session = await store.withTenant(emailTenant).customers.signIn(loginInput, value.password);
         }
         if (!session) {
           throttle.fail();

@@ -67,9 +67,9 @@ export interface ApiMembershipStatus { growthCents: number; tier: string | null;
 /** `signupBonus`: signed up from a table's code, and the points for it given. */
 export interface CustomerSession { token: string; expiresInMs: number; customer: ApiCustomer; signupBonus?: boolean }
 /** `table`: the table whose code the guest scanned (its token rides in x-table-token): the sign-up bonus. */
-export interface CustomerRegisterCommand { email: string; name?: string; password: string; table?: string }
+export interface CustomerRegisterCommand { email?: string; phone?: string; name?: string; password: string; table?: string }
 /** Every change is made against the password in force. */
-export interface CustomerUpdateCommand { currentPassword: string; name?: string; password?: string }
+export interface CustomerUpdateCommand { currentPassword: string; name?: string; email?: string; phone?: string; password?: string }
 export type PointsReason = "earn" | "reverse" | "redeem" | "refund" | "adjust";
 /**
  * The booking membership's own lines among the adjustments: the first visit's

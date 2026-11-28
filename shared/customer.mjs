@@ -82,9 +82,24 @@ export function normalizeEmail(value) {
   const email = String(value ?? "")
     .trim()
     .toLowerCase();
-  if (email.length > 254 || !EMAIL_PATTERN.test(email))
-    throw new Error("Please enter a valid email address");
+  if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    const error = new Error("Please enter a valid email address");
+    error.code = "BAD_EMAIL";
+    throw error;
+  }
   return email;
+}
+
+export function normalizePhone(value) {
+  const mobile = checkMobile(String(value ?? "").trim());
+  if (mobile.ok) return mobile.e164;
+  const error = new Error(
+    mobile.reason === "NOT_MOBILE"
+      ? "Please give a mobile number, not a landline"
+      : "Please enter a valid mobile number",
+  );
+  error.code = mobile.reason === "NOT_MOBILE" ? "NOT_MOBILE" : "BAD_PHONE";
+  throw error;
 }
 
 export function normalizeCustomerName(value) {
@@ -120,9 +135,47 @@ export function isPhoneLogin(login) {
   return Boolean(login) && !String(login).includes("@");
 }
 
-export function normalizeCustomerRegistration(input) {
+/**
+ * Separated phone + email contacts for registration and profile updates.
+ * At least one of the two must be provided; both may be provided.
+ * Legacy callers that send only `email` (containing a phone number) continue to work identically.
+ */
+export function normalizeCustomerContacts(input) {
+  const hasExplicitPhone = input?.phone !== undefined;
+  const rawPhone = String(input?.phone ?? "").trim();
+  const rawEmail = String(input?.email ?? "").trim();
+  let phone = rawPhone ? normalizePhone(rawPhone) : "";
+  let contactEmail = "";
+  if (rawEmail) {
+    if (hasExplicitPhone) {
+      contactEmail = normalizeEmail(rawEmail);
+    } else {
+      const login = normalizeLogin(rawEmail);
+      if (isPhoneLogin(login)) {
+        if (!phone) phone = login;
+      } else {
+        contactEmail = login;
+      }
+    }
+  }
+  if (!phone && !contactEmail) {
+    const error = new Error("Please enter a phone number or email address");
+    error.code = "CONTACT_REQUIRED";
+    throw error;
+  }
   return {
-    email: normalizeLogin(input?.email),
+    primaryEmail: contactEmail || phone,
+    contactEmail,
+    phone,
+  };
+}
+
+export function normalizeCustomerRegistration(input) {
+  const contacts = normalizeCustomerContacts(input);
+  return {
+    email: contacts.primaryEmail,
+    contactEmail: contacts.contactEmail,
+    phone: contacts.phone,
     name: normalizeCustomerName(input?.name),
     password: assertPassword(input?.password),
   };
@@ -130,21 +183,21 @@ export function normalizeCustomerRegistration(input) {
 
 /** A guest as they see themselves, and as the console lists them: never the hash. */
 export function customerView(row) {
-  return row
-    ? {
-        id: row.id,
-        email: row.email,
-        name: row.name,
-        points: row.points,
-        balanceCents: row.balance_cents ?? 0,
-        createdAt: row.created_at,
-        // Signed up with a mobile number: `email` is that number too, for the lists that show who it is.
-        ...(isPhoneLogin(row.email) ? { phone: row.email } : {}),
-        ...(row.email_verified !== undefined
-          ? { emailVerified: Boolean(row.email_verified) }
-          : {}),
-      }
-    : null;
+  if (!row) return null;
+  const phone = row.contact_phone || (isPhoneLogin(row.email) ? row.email : "");
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    points: row.points,
+    balanceCents: row.balance_cents ?? 0,
+    createdAt: row.created_at,
+    // Signed up with a mobile number, or has one saved in customer_contacts: keep `phone` present.
+    ...(phone ? { phone } : {}),
+    ...(row.email_verified !== undefined
+      ? { emailVerified: Boolean(row.email_verified) }
+      : {}),
+  };
 }
 
 export function storedCustomerPassword(row) {
@@ -614,18 +667,32 @@ export function isOverdrawn(error) {
 /** Whether the account's address, as it is now, was proved by a code (shared/email-verify.mjs). The verified row is the tenant's own. */
 const EMAIL_VERIFIED_COLUMN = `(SELECT 1 FROM customer_verified_emails AS verified
     WHERE verified.tenant_id = customers.tenant_id AND verified.customer_id = customers.id AND verified.email = customers.email) AS email_verified`;
+/** The member's stored mobile number from customer_contacts, if any. */
+const CONTACT_PHONE_COLUMN = `(SELECT phone FROM customer_contacts AS cc WHERE cc.tenant_id = customers.tenant_id AND cc.customer_id = customers.id) AS contact_phone`;
 /** The member's stored value, read beside the account (shared/customer.mjs). Zero when they have no row yet. */
 const BALANCE_COLUMN = `COALESCE((SELECT balance_cents FROM member_balances WHERE member_balances.tenant_id = customers.tenant_id AND member_balances.customer_id = customers.id), 0) AS balance_cents`;
 /** Parameters: tenant, email. */
-export const CUSTOMER_BY_EMAIL_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE tenant_id = ? AND email = ?`;
+export const CUSTOMER_BY_EMAIL_SQL = `SELECT customers.*, ${CONTACT_PHONE_COLUMN}, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE tenant_id = ? AND email = ?`;
+/** Parameters: tenant, key, key, key (email or normalized phone). */
+export const CUSTOMER_BY_CONTACT_SQL = `SELECT customers.*, ${CONTACT_PHONE_COLUMN}, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN}
+  FROM customers
+  LEFT JOIN customer_contacts AS cc ON cc.tenant_id = customers.tenant_id AND cc.customer_id = customers.id
+  WHERE customers.tenant_id = ? AND (customers.email = ? OR cc.phone = ? OR cc.email = ?)`;
 /** Parameters: tenant, id. */
-export const CUSTOMER_BY_ID_SQL = `SELECT customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE tenant_id = ? AND id = ?`;
+export const CUSTOMER_BY_ID_SQL = `SELECT customers.*, ${CONTACT_PHONE_COLUMN}, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN} FROM customers WHERE tenant_id = ? AND id = ?`;
 /** Parameters: tenant, id, email, name, hash, salt, iterations, at, at. */
 export const INSERT_CUSTOMER_SQL = `INSERT INTO customers (tenant_id, id, email, name, password_hash, password_salt, password_iterations, points, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`;
+/** Parameters: customer_id, tenant_id, phone, email, updated_at. */
+export const UPSERT_CUSTOMER_CONTACT_SQL = `INSERT INTO customer_contacts (customer_id, tenant_id, phone, email, updated_at)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(customer_id) DO UPDATE SET phone = excluded.phone, email = excluded.email, updated_at = excluded.updated_at`;
 /** Parameters: name, hash, salt, iterations, updated at, tenant, id. */
 export const UPDATE_CUSTOMER_SQL =
   "UPDATE customers SET name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = ? WHERE tenant_id = ? AND id = ?";
+/** Parameters: email, updated_at, tenant, id. */
+export const UPDATE_CUSTOMER_EMAIL_SQL =
+  "UPDATE customers SET email = ?, updated_at = ? WHERE tenant_id = ? AND id = ?";
 /**
  * A guest's account removed on request (GDPR): their orders stay the restaurant's, without them.
  * Every statement takes [tenant, customer]: the tenant first, then the customer.
@@ -644,6 +711,7 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   "DELETE FROM customer_sessions WHERE tenant_id = ? AND customer_id = ?",
   "DELETE FROM email_codes WHERE tenant_id = ? AND customer_id = ?",
   "DELETE FROM customer_verified_emails WHERE tenant_id = ? AND customer_id = ?",
+  "DELETE FROM customer_contacts WHERE tenant_id = ? AND customer_id = ?",
   // Their marketing consent and the record of which broadcasts reached them go
   // with the account (GDPR erasure); the broadcasts themselves stay the
   // restaurant's, with no trace of who this member was.
@@ -651,16 +719,17 @@ export const DELETE_CUSTOMER_STATEMENTS = [
   "DELETE FROM broadcast_sends WHERE tenant_id = ? AND customer_id = ?",
   "DELETE FROM customers WHERE tenant_id = ? AND id = ?",
 ];
-/** The console's list: newest first, or those whose email or name holds the search. Parameters: tenant, search, search, search, limit. */
-export const SEARCH_CUSTOMERS_SQL = `SELECT customers.*, ${BALANCE_COLUMN} FROM customers
-  WHERE tenant_id = ? AND (? = '' OR email LIKE '%' || ? || '%' OR name LIKE '%' || ? || '%')
-  ORDER BY created_at DESC LIMIT ?`;
+/** The console's list: newest first, or those whose email, phone or name holds the search. Parameters: tenant, search, search, search, limit. */
+export const SEARCH_CUSTOMERS_SQL = `SELECT customers.*, ${CONTACT_PHONE_COLUMN}, ${BALANCE_COLUMN} FROM customers
+  LEFT JOIN customer_contacts AS cc ON cc.tenant_id = customers.tenant_id AND cc.customer_id = customers.id
+  WHERE customers.tenant_id = ? AND (? = '' OR customers.email LIKE '%' || ? || '%' OR customers.name LIKE '%' || ? || '%' OR cc.phone LIKE '%' || ? || '%')
+  ORDER BY customers.created_at DESC LIMIT ?`;
 
 /** Parameters: tenant, token hash, customer, expires, created at. */
 export const INSERT_CUSTOMER_SESSION_SQL =
   "INSERT INTO customer_sessions (tenant_id, token_hash, customer_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)";
 /** Parameters: tenant, token hash. The session's customer is the tenant's own. */
-export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN}
+export const CUSTOMER_SESSION_SQL = `SELECT customer_sessions.expires_at, customers.*, ${CONTACT_PHONE_COLUMN}, ${EMAIL_VERIFIED_COLUMN}, ${BALANCE_COLUMN}
   FROM customer_sessions JOIN customers ON customers.id = customer_sessions.customer_id AND customers.tenant_id = customer_sessions.tenant_id
   WHERE customer_sessions.tenant_id = ? AND customer_sessions.token_hash = ?`;
 /** Parameters: tenant, token hash. */

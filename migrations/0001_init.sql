@@ -609,6 +609,13 @@ CREATE TABLE email_codes (
       used_at TEXT,
       created_at TEXT NOT NULL
     );
+CREATE TABLE customer_contacts (
+      customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL DEFAULT 't_default',
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
 CREATE TABLE customer_verified_emails (
       customer_id TEXT PRIMARY KEY,
       tenant_id TEXT NOT NULL DEFAULT 't_default' REFERENCES tenants(id),

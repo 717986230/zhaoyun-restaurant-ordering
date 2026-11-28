@@ -60,7 +60,9 @@ import {
   TENANT_BY_SLUG_SQL, TENANT_TOKEN_SQL, UPDATE_ACCOUNT_SQL, USE_ACCOUNT_TOKEN_SQL
 } from "./account.mjs";
 import {
-  customerView, earnPointsStatements, isOverdrawn, isPhoneLogin, refundBalanceStatements, refundPointsStatements, reverseBalanceStatements,
+  customerView, earnPointsStatements, isOverdrawn, isPhoneLogin, normalizeEmail as normalizeCustomerEmail,
+  normalizeLogin as normalizeCustomerLogin, normalizePhone as normalizeCustomerPhone,
+  refundBalanceStatements, refundPointsStatements, reverseBalanceStatements,
   reversePointsStatements, spendBalanceStatements, topUpBalanceStatements, topUpPointsStatements, welcomePointsStatements
 } from "./customer.mjs";
 import { createCustomerStore } from "./customer-store.mjs";
@@ -1072,10 +1074,47 @@ export function createStore(driver, options = {}) {
    * email is unknown, or when it belongs to members of more than one tenant
    * (then only the table or the slug can tell them apart).
    */
-  async function tenantForCustomerEmail(emailInput) {
-    const email = String(emailInput ?? "").trim().toLowerCase();
-    if (!email) return null;
-    const rows = await all("SELECT DISTINCT tenant_id FROM customers WHERE email = ?", email);
+  async function tenantForCustomerEmail(loginInput) {
+    const raw =
+      loginInput && typeof loginInput === "object"
+        ? loginInput
+        : { email: loginInput };
+    const keys = new Set();
+    const rawEmail = String(raw.email ?? "").trim();
+    const rawPhone = String(raw.phone ?? "").trim();
+    if (rawEmail) {
+      keys.add(rawEmail.toLowerCase());
+      try {
+        keys.add(
+          raw.phone !== undefined
+            ? normalizeCustomerEmail(rawEmail)
+            : normalizeCustomerLogin(rawEmail),
+        );
+      } catch {
+        /* Keep lowercase fallback above */
+      }
+    }
+    if (rawPhone) {
+      keys.add(rawPhone);
+      try {
+        keys.add(normalizeCustomerPhone(rawPhone));
+      } catch {
+        /* Keep raw fallback above */
+      }
+    }
+    const list = [...keys].filter(Boolean);
+    if (!list.length) return null;
+    const placeholders = list.map(() => "?").join(", ");
+    const rows = await all(
+      `SELECT DISTINCT tenant_id FROM (
+        SELECT tenant_id FROM customers WHERE email IN (${placeholders})
+        UNION
+        SELECT tenant_id FROM customer_contacts WHERE phone IN (${placeholders}) OR email IN (${placeholders})
+      )`,
+      ...list,
+      ...list,
+      ...list,
+    );
     return rows.length === 1 ? rows[0].tenant_id : null;
   }
 
@@ -1542,7 +1581,7 @@ export function createStore(driver, options = {}) {
     "journal", "mail_outbox", "media_files", "print_bridges", "reservation_reminders",
     "reservations", "restaurant_settings", "restaurant_tables", "service_requests",
     "promotions", "member_consent", "broadcasts", "broadcast_sends", "roster_shifts",
-    "staff_settlements", "table_claim_meta", "table_claims", "table_sessions",
+    "customer_contacts", "staff_pins", "staff_settlements", "table_claim_meta", "table_claims", "table_sessions",
     "tenant_tokens", "waitlist",
     "order_items", "receipts", "customers", "accounts", "staff", "pos_devices",
     "printer_profiles", "products", "drawer_sessions",

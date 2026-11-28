@@ -2532,6 +2532,35 @@ export function contractChecks(call, assert, { liveBase } = {}) {
       assert.equal((await call("POST", "/api/customer/email-code", { customerToken: signedIn.json.token, body: {} })).json.code, "NO_EMAIL");
     }],
 
+    ["separated phone and email: either one required on register/sign-in/update, independent validation", async () => {
+      const stamp = Date.now().toString().slice(-6);
+      const phone = `0660 8${stamp}`;
+      const e164 = `+436608${stamp}`;
+      const email = `split-${stamp}@example.com`;
+      const neither = await call("POST", "/api/customer/register", { body: { phone: "", email: "", password: "secret123" } });
+      assert.deepEqual([neither.status, neither.json.code], [400, "CONTACT_REQUIRED"]);
+      const badEmail = await call("POST", "/api/customer/register", { body: { phone, email: "0660123456", password: "secret123" } });
+      assert.deepEqual([badEmail.status, badEmail.json.code], [400, "BAD_EMAIL"], "email field strictly checks email when phone field exists");
+      const badPhone = await call("POST", "/api/customer/register", { body: { phone: "01 5877777", email, password: "secret123" } });
+      assert.deepEqual([badPhone.status, badPhone.json.code], [400, "NOT_MOBILE"], "phone field strictly checks mobile");
+      const both = await call("POST", "/api/customer/register", { body: { phone, email, name: "Split", password: "secret123" } });
+      assert.equal(both.status, 201, JSON.stringify(both.json));
+      assert.equal(both.json.customer.email, email);
+      assert.equal(both.json.customer.phone, e164);
+      const byPhone = await call("POST", "/api/customer/sign-in", { body: { phone: `+43 660 8${stamp}`, password: "secret123" } });
+      assert.equal(byPhone.status, 200);
+      const byEmail = await call("POST", "/api/customer/sign-in", { body: { email, password: "secret123" } });
+      assert.equal(byEmail.status, 200);
+      const dupPhone = await call("POST", "/api/customer/register", { body: { phone, password: "secret123" } });
+      assert.deepEqual([dupPhone.status, dupPhone.json.code], [409, "EMAIL_TAKEN"]);
+      const updated = await call("PUT", "/api/customer", { customerToken: both.json.token, body: { currentPassword: "secret123", phone: `0699 8${stamp}`, email: "" } });
+      assert.equal(updated.status, 200, JSON.stringify(updated.json));
+      assert.equal(updated.json.customer.phone, `+436998${stamp}`);
+      assert.equal(updated.json.customer.email, `+436998${stamp}`);
+      const clearBoth = await call("PUT", "/api/customer", { customerToken: both.json.token, body: { currentPassword: "secret123", phone: "", email: "" } });
+      assert.deepEqual([clearBoth.status, clearBoth.json.code], [400, "CONTACT_REQUIRED"]);
+    }],
+
     ["a new account brings 20 points, once; each booking costs 5, back when it is cancelled or declined", async () => {
       const rules = { enabled: true, hours: [{ days: EVERY_DAY, from: "12:00", to: "20:00" }], intervalMinutes: 30, durationMinutes: 120, capacity: 100, maxParty: 8, leadMinutes: 60, daysAhead: 30, autoConfirm: true, closedDates: [], tables: [], maxActivePerGuest: 5, maxPerDayPerGuest: 3, noShowLimit: 0, minPoints: 0, welcomePoints: 0, signupPoints: 0, bookingPoints: 5, noShowPoints: 5, noShowAfterMinutes: 0 };
       const setRules = async (change) => assert.equal((await call("PUT", "/api/admin/settings", { admin: true, body: { reservations: { ...rules, ...change } } })).status, 200);

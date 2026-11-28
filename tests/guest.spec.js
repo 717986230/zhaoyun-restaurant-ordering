@@ -140,12 +140,12 @@ test("signing up with a mobile number brings 20 points, said before and after", 
   await expect(sheet.locator("#signupBonusHint")).toHaveText("新用户注册即送 20 积分");
   await sheet.getByRole("tab", { name: "注册" }).click();
   // A landline is said in words; a mobile number goes through, no "@" needed.
-  await sheet.locator("input[name=email]").fill("01 5877777");
+  await sheet.locator("input[name=phone]").fill("01 5877777");
   await sheet.locator("input[name=password]").fill("dumplings");
   await sheet.locator("input[name=password-repeat]").fill("dumplings");
   await sheet.locator("button[type=submit]").click();
   await expect(sheet.locator(".cart-error")).toHaveText("请填写手机号，不是座机号码");
-  await sheet.locator("input[name=email]").fill("0699 222 33 44");
+  await sheet.locator("input[name=phone]").fill("0699 222 33 44");
   await sheet.locator("button[type=submit]").click();
   await expect(sheet.locator("#signupBonusGot")).toHaveText("注册成功，已赠送 20 积分");
   await expect(sheet.locator(".points-balance b")).toHaveText("20");
@@ -170,6 +170,13 @@ test("a guest registers, keeps a favourite, orders for pickup, earns points and 
   await expect(sheet.locator(".guest-card")).toContainText("你好，Mei");
   // Signing up brings 20 points, wherever it is done.
   await expect(sheet.locator(".points-balance b")).toHaveText("20");
+  // Signed-in account settings: separated phone + email, requiring at least one.
+  await sheet.getByRole("button", { name: /账户设置/ }).click();
+  await sheet.locator("form.profile input[name=phone]").fill("0660 5556677");
+  await sheet.locator("form.profile input[autocomplete=current-password]").fill("noodles-4-life");
+  await sheet.locator("form.profile button[type=submit]").click();
+  await expect(sheet.locator(".guest-card")).toContainText("+436605556677");
+  await expect(sheet.locator(".guest-card")).toContainText("mei@example.com");
   await sheet.locator(".sheet-close").click();
 
   // A favourite: the heart on the dish's card, and a page of their own.

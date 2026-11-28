@@ -668,12 +668,13 @@ export const TableBody = Type.Object({
   rotateToken: Type.Optional(Type.Boolean())
 });
 
-// Guests' own accounts (shared/customer.mjs). An email and a password; the
-// email's form and the password floor are the shared rules'.
-const Email = Type.String({ minLength: 3, maxLength: 254 });
+// Guests' own accounts (shared/customer.mjs). At least a mobile number or an email and a password;
+// their form and the password floor are the shared rules'.
+const OptionalEmail = Type.Optional(Type.String({ maxLength: 254 }));
+const OptionalPhone = Type.Optional(Type.String({ maxLength: 40 }));
 // `table`: the table whose code the guest scanned before signing up (with its token in x-table-token): the sign-up bonus.
-export const CustomerRegisterBody = Type.Object({ email: Email, name: Type.Optional(Type.String({ maxLength: 40 })), password: Password, table: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
-export const CustomerSignInBody = Type.Object({ email: Type.String({ maxLength: 254 }), password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
+export const CustomerRegisterBody = Type.Object({ email: OptionalEmail, phone: OptionalPhone, name: Type.Optional(Type.String({ maxLength: 40 })), password: Password, table: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
+export const CustomerSignInBody = Type.Object({ email: OptionalEmail, phone: OptionalPhone, password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
 // A code to the guest's email, and the code back (shared/email-verify.mjs).
 export const EmailCodeBody = Type.Object({ language: Type.Optional(Type.String({ maxLength: 8 })) }, { additionalProperties: false });
 // 生日营销: a member sets their birth month and day, or clears it (shared/customer.mjs checks the date).
@@ -689,6 +690,8 @@ export const MailTestBody = Type.Object({ to: Type.String({ minLength: 3, maxLen
 export const CustomerUpdateBody = Type.Object({
   currentPassword: Type.String({ maxLength: 200 }),
   name: Type.Optional(Type.String({ maxLength: 40 })),
+  email: OptionalEmail,
+  phone: OptionalPhone,
   password: Type.Optional(Password)
 }, { additionalProperties: false });
 export const CustomerDeleteBody = Type.Object({ password: Type.String({ maxLength: 200 }) }, { additionalProperties: false });
